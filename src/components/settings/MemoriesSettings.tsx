@@ -1,4 +1,13 @@
-import { Brain, CircleHelp, Pencil, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  Brain,
+  CircleHelp,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../common/Button'
@@ -357,17 +366,12 @@ export function MemoriesSettings({ onPrivacyPrompt, credentials }: MemoriesSetti
           </Callout>
         )}
 
-        {userMemoryEnabled &&
-          (requiresHostedAck(memoryGen?.endpointClass) ||
-            requiresHostedAck(memoryEmbed?.endpointClass)) && (
-            <Callout tone="warning">{t('user_memory.hosted_active_indicator')}</Callout>
-          )}
-
         <div className="space-y-3">
           <div id="settings-anchor-memory-model-gen">
             <MemoryModelsSection
               role="gen"
               config={memoryGen}
+              hostedWarning={requiresHostedAck(memoryGen?.endpointClass)}
               onSave={handleSaveGen}
               onError={setActionError}
               allowHosted={allowHosted}
@@ -382,6 +386,7 @@ export function MemoriesSettings({ onPrivacyPrompt, credentials }: MemoriesSetti
             <MemoryModelsSection
               role="embed"
               config={memoryEmbed}
+              hostedWarning={requiresHostedAck(memoryEmbed?.endpointClass)}
               onSave={handleSaveEmbed}
               onError={setActionError}
               allowHosted={allowHosted}
@@ -512,6 +517,8 @@ interface MemoryModelsSectionProps<I> {
   onConfirmAllowHosted: () => Promise<void>
   credentials: ProviderCredential[]
   ollama: OllamaProbeState
+  /** Slot runs on a hosted/CLI provider — show the raw-content warning icon. */
+  hostedWarning: boolean
   /** Master User Memory preference off — freeze controls. */
   disabled?: boolean
 }
@@ -534,6 +541,7 @@ function MemoryModelsSection<
   onConfirmAllowHosted,
   credentials,
   ollama,
+  hostedWarning,
   disabled = false,
 }: MemoryModelsSectionProps<I>) {
   const { t } = useTranslation('ai')
@@ -760,7 +768,20 @@ function MemoryModelsSection<
 
   return (
     <section className="border-border-card bg-surface-hi space-y-3 overflow-hidden rounded-2xl border p-4">
-      <h3 className="text-fg text-sm font-semibold">{sectionTitle}</h3>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-fg text-sm font-semibold">{sectionTitle}</h3>
+        {hostedWarning && (
+          <Tooltip content={t('user_memory.hosted_active_indicator')} multiline placement="top">
+            <button
+              type="button"
+              aria-label={t('user_memory.hosted_active_indicator')}
+              className="text-warning hover:text-warning-text inline-flex cursor-help items-center rounded-full outline-none"
+            >
+              <AlertTriangle className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="min-w-0 flex-1 basis-48">
           <div className="flex items-center gap-3">
