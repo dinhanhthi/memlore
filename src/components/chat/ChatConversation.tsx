@@ -183,7 +183,7 @@ function MessageCopyButton({ content, t }: { content: string; t: TFn }) {
       <Button
         variant="ghost"
         size="sm"
-        className="text-fg-muted hover:text-fg h-auto w-auto px-1 py-0"
+        className="text-fg-muted hover:text-fg size-6 justify-center p-0"
         aria-label={t('daily_chat.copy', { defaultValue: 'Copy' })}
         onClick={async () => {
           try {
@@ -193,14 +193,13 @@ function MessageCopyButton({ content, t }: { content: string; t: TFn }) {
             /* clipboard unavailable — silently no-op */
           }
         }}
-        icon={
-          copied ? (
-            <Check className="size-3.5" aria-hidden />
-          ) : (
-            <Copy className="size-3.5" aria-hidden />
-          )
-        }
-      />
+      >
+        {copied ? (
+          <Check className="size-3.5" aria-hidden />
+        ) : (
+          <Copy className="size-3.5" aria-hidden />
+        )}
+      </Button>
     </Tooltip>
   )
 }
