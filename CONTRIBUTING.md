@@ -15,6 +15,16 @@ pnpm tauri dev
 
 Optional: copy `.env.example` to `.env` if you need Google Drive OAuth in development.
 
+## UI playground (`web/`)
+
+`web/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.
+
+```bash
+pnpm web:dev   # http://localhost:5175
+```
+
+Pick a scenario from the floating panel (or `?scenario=<id>`). **Never change `src/` components to make the browser happy** — fix `web/mocks/` instead. Details: [`web/README.md`](web/README.md).
+
 ## How we work
 
 1. Open an issue (or comment on an existing one) before large changes.

@@ -9,7 +9,7 @@
 
 <img src="public/screenshot.png" width="100%" alt="Screenshot" />
 
-## Features
+## ✨ Features
 
 - **Local-first & private** — works fully offline. Your journal stays on your device. No Memlore server, no account, no telemetry.
 - **Rich editor** — write with markdown shortcuts, then add plugins for anything: math, code, tables, checklists, media, and more.
@@ -21,11 +21,11 @@
 - **Import & export** — import from Day One, Journey, Apple Journal, markdown, and more; export to files.
 - **Yours to look at** — UI and layout are highly customizable, with different design systems and layouts to choose from.
 
-## Platforms
+## 💻 Platforms
 
 **macOS** (desktop) is the only supported target today. Windows, Linux, iOS, and Android are planned.
 
-## Tech stack
+## 🛠️ Tech stack
 
 | Layer  | Technology                                                                           |
 | ------ | ------------------------------------------------------------------------------------ |
@@ -37,7 +37,7 @@
 | Sync   | Yjs over iCloud Drive / Google Drive                                                 |
 | AI     | HTTP providers + opt-in on-device embedding (`fastembed`) and `llama-server` sidecar |
 
-## Development
+## 🚀 Development
 
 **Prerequisites:** [Rust](https://rustup.rs/) 1.77+, [Node.js](https://nodejs.org/) 20+, [pnpm](https://pnpm.io/) 9+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. VS Code: install the recommended extensions when prompted (format-on-save + ESLint).
 
@@ -56,25 +56,24 @@ pnpm lint && pnpm format:check
 pnpm tauri build                  # current platform
 ```
 
-Google Drive OAuth (optional): put `GDRIVE_CLIENT_ID` and `GDRIVE_CLIENT_SECRET` in `.env` at the repo root, then `pnpm tauri dev`. Copy `.env.example`.
+Optional `.env` (copy `.env.example`): [Google Drive OAuth](docs/gdrive-oauth-setup.md) and [MapKit JS](docs/mapkit-js-setup.md).
 
-### Reset local state
-
-Quit the app first.
+### 🔄 Reset local state
 
 ```bash
+# Quit the app first
 ./scripts/reset-machine.sh           # interactive
 ./scripts/reset-machine.sh --force   # non-interactive local wipe
 ```
 
 Wipes the app data dir, Keychain biometric key, and WebView caches. Cloud appdata (Google Drive hidden folder, iCloud) is not deleted automatically — disconnect or wipe from the app / provider UI if you need a clean cloud too.
 
-After unlock in a debug build: Settings → Data → **Import** → **Seed demo data**.
+Need demo data: Settings → Data → **Import** → **Seed demo data**.
 
-## Contributing
+## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## 📄 License
 
 Memlore is licensed under [AGPL-3.0-or-later](LICENSE).
