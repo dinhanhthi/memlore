@@ -77,6 +77,9 @@ ds-bundle/
 .design-sync/
 CLAUDE.md
 AGENTS.md
+WATCHDOG.yml
+run-ds-build.sh
+run-ds-validate.sh
 
 # docs/ is deny-by-default. Opt in later with !/docs/foo (and !/docs/foo/** for a folder).
 /docs/*
