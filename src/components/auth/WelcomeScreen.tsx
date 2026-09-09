@@ -2,7 +2,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, CloudDownload } from 'lucide-react'
+import { ArrowRight, ChevronDown, CloudDownload } from 'lucide-react'
 import { FirstTimeSetupWizard } from './FirstTimeSetupWizard'
 import { OnboardNewDeviceScreen } from './OnboardNewDeviceScreen'
 import { LanguageStep } from '../onboarding/steps/LanguageStep'
@@ -99,6 +99,9 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
   const [explainerOpen, setExplainerOpen] = useState(false)
 
   // Drive-connect state (the "I already have a journal" entrance)
+  // Collapsed by default — the intro leads with the new-journal CTA, and the
+  // provider picker only unfolds when the user says they already have a vault.
+  const [existingCloudOpen, setExistingCloudOpen] = useState(false)
   const [cloudConnectBusy, setCloudConnectBusy] = useState(false)
   const [isAwaitingCallback, setIsAwaitingCallback] = useState(false)
   const [cloudConnectError, setCloudConnectError] = useState('')
@@ -569,6 +572,10 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
   // onboarding paths while a connect is running.
   const actionsDisabled = cloudConnectBusy || hydrating
 
+  // Force the section open while a connect is in flight (or errored), so a
+  // re-mount mid-OAuth can't hide the progress hint and the cancel affordance.
+  const existingCloudExpanded = existingCloudOpen || cloudConnectBusy || !!cloudConnectError
+
   // While the join-existing-vault flow runs, the primary CTA doubles as its
   // progress indicator (it's the biggest thing on the screen, and the flow
   // leaves the app for the browser). Two states, discriminated by
@@ -631,65 +638,85 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
         {/* Secondary path — this device is joining a vault that already exists
             in the cloud. Reworked by Phase 6 task 4. */}
         <div className="flex flex-col items-center gap-3">
-          <p className="text-fg-muted text-center text-sm">
-            {t('welcome_first_run.existing_cloud_title')}
-          </p>
-          <CloudProviderPicker
-            value={selected}
-            onChange={(kind) => {
-              userTouchedProvider.current = true
-              setSelected(kind)
-              setCloudConnectError('')
-            }}
-            localPath={localPath}
-            onPickFolder={() => {
-              void (async () => {
-                const path = await pickFolder()
-                if (path) {
-                  setLocalPath(path)
-                  setCloudConnectError('')
-                }
-              })()
-            }}
-            icloudAvailable={pickerIcloud}
-            disabled={actionsDisabled}
-          />
-          <p className="text-fg-muted text-center text-xs">{t('onboarding.drive.picker_hint')}</p>
-          <p className="text-fg-muted flex flex-wrap items-center justify-center gap-x-2 text-center text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                void handlePickExistingCloud(selected, selected === 'local' ? localPath : undefined)
-              }}
-              disabled={actionsDisabled}
-              data-testid="existing-cloud-connect"
-              className={cn(
-                'text-accent font-medium underline-offset-2 hover:underline',
-                'rounded-sm',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-            >
-              {/* Connecting copy is only true until a backend phase arrives.
-                  Once a connect phase is live the CTA above carries the
-                  progress narration — so we drop back to the static label. */}
-              {cloudConnectBusy && cloudConnectPhase == null
-                ? t('welcome_first_run.existing_cloud_connecting', i18nProvider)
-                : t('welcome_first_run.existing_cloud_button')}
-            </button>
-            {shouldShowExistingCloudCancel(selected, isAwaitingCallback) && (
-              <button
-                type="button"
-                onClick={handleCancelCloudConnect}
-                data-testid="existing-cloud-cancel"
-                className={cn(
-                  'text-fg-muted font-medium underline-offset-2 hover:underline',
-                  'rounded-sm',
-                )}
-              >
-                {t('welcome_first_run.existing_cloud_cancel')}
-              </button>
+          <button
+            type="button"
+            onClick={() => setExistingCloudOpen((open) => !open)}
+            aria-expanded={existingCloudExpanded}
+            data-testid="existing-cloud-disclosure"
+            className={cn(
+              'text-fg-muted hover:text-fg inline-flex items-center gap-1 rounded-sm text-center text-sm',
+              'underline-offset-2 hover:underline',
             )}
-          </p>
+          >
+            {t('welcome_first_run.existing_cloud_title')}
+            <ChevronDown
+              className={cn(
+                'size-3.5 shrink-0 transition-transform motion-reduce:transition-none',
+                existingCloudExpanded && 'rotate-180',
+              )}
+              strokeWidth={1.75}
+            />
+          </button>
+          {existingCloudExpanded && (
+            <>
+              <CloudProviderPicker
+                value={selected}
+                onChange={(kind) => {
+                  userTouchedProvider.current = true
+                  setSelected(kind)
+                  setCloudConnectError('')
+                }}
+                localPath={localPath}
+                onPickFolder={() => {
+                  void (async () => {
+                    const path = await pickFolder()
+                    if (path) {
+                      setLocalPath(path)
+                      setCloudConnectError('')
+                    }
+                  })()
+                }}
+                icloudAvailable={pickerIcloud}
+                disabled={actionsDisabled}
+              />
+              <p className="text-fg-muted text-center text-xs">
+                {t('onboarding.drive.picker_hint')}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void handlePickExistingCloud(
+                      selected,
+                      selected === 'local' ? localPath : undefined,
+                    )
+                  }}
+                  disabled={actionsDisabled}
+                  loading={cloudConnectBusy}
+                  data-testid="existing-cloud-connect"
+                >
+                  {/* Connecting copy is only true until a backend phase arrives.
+                      Once a connect phase is live the CTA above carries the
+                      progress narration — so we drop back to the static label. */}
+                  {cloudConnectBusy && cloudConnectPhase == null
+                    ? t('welcome_first_run.existing_cloud_connecting', i18nProvider)
+                    : t('welcome_first_run.existing_cloud_button')}
+                </Button>
+                {shouldShowExistingCloudCancel(selected, isAwaitingCallback) && (
+                  <button
+                    type="button"
+                    onClick={handleCancelCloudConnect}
+                    data-testid="existing-cloud-cancel"
+                    className={cn(
+                      'text-fg-muted rounded-sm text-sm font-medium underline-offset-2 hover:underline',
+                    )}
+                  >
+                    {t('welcome_first_run.existing_cloud_cancel')}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Live progress hint while the backend walks the slow post-OAuth Drive
