@@ -893,6 +893,9 @@
   /* Neutral clay (`--neu`) — secondary slabs and the switch-off track. */
   --color-surface-control: #efe6d8;
   --color-surface-control-hover: #f7f1e6;
+  /* Button face: one step above `--neu` so the 4px `--neu-deep` lip
+     reads on neu-colored cards (dashboard shells use surface-control). */
+  --color-button-slab: #f7f1e6;
   --color-surface-subtle: #f7f1e6;
   --nav-active-bg: #f7f1e6;
   --nav-hover-bg: color-mix(in oklab, #f7f1e6 85%, #ebe3d6);
@@ -990,6 +993,8 @@
   --color-surface-row-hover: #252220;
   --color-surface-control: #2c2926;
   --color-surface-control-hover: #36322d;
+  /* Lifted chip on `--neu` cards so the near-black under-bar is visible. */
+  --color-button-slab: #3a3530;
   --color-surface-subtle: #2a2622;
   --nav-active-bg: #2a2622;
   --nav-hover-bg: #201d1a;
@@ -1492,11 +1497,10 @@
 :root.ds-clay button[data-variant='outline-secondary'],
 :root.ds-clay button[data-variant='secondary-outline'],
 :root.ds-clay button[data-variant='ghost'] {
-  /* Neutral clay slab: same 4px --rise under-bar as primary, --neu fill
-     + --neu-deep edge. Also hooks Select's trigger (a field-width slab).
-     Ghost is a slab at rest too so it matches primary height in a row.
-     Label is ink-soft: full ink read too heavy on the pale slab. */
-  background-color: var(--color-surface-control);
+  /* Neutral clay slab: same 4px --rise under-bar as primary. Face is
+     `--color-button-slab` (above `--neu`) so the lip reads on neu cards.
+     Also hooks Select's trigger. Label is ink-soft. */
+  background-color: var(--color-button-slab);
   background-image: var(--grad-surface);
   border-color: transparent;
   color: var(--color-fg-secondary);
