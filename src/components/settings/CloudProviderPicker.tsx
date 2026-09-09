@@ -13,9 +13,11 @@ const PROVIDER_DESCRIPTION_KEYS = {
   local: 'cloud.providers.local.description',
 } as const
 
-function ProviderIcon({ kind }: { kind: CloudProviderKind }) {
+function ProviderIcon({ kind, selected }: { kind: CloudProviderKind; selected: boolean }) {
   const Icon = kind === 'local' ? HardDrive : Cloud
-  return <Icon className="size-5 shrink-0" aria-hidden />
+  return (
+    <Icon className={cn('size-5 shrink-0', selected ? 'text-accent' : 'text-fg')} aria-hidden />
+  )
 }
 
 export interface CloudProviderPickerProps {
@@ -53,13 +55,13 @@ export function CloudProviderPicker({
         const card = (
           <div
             className={cn(
-              'bg-elevated flex h-full min-w-0 flex-col rounded-xl',
+              'flex h-full min-w-0 flex-col rounded-xl',
               'motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-150',
               'motion-reduce:transition-none',
               selected
-                ? 'gradient-border-primary border border-transparent [--border-gradient-width:2px]'
-                : 'border-border-default border',
-              !cardDisabled && 'hover:bg-surface-row-hover',
+                ? 'border-accent bg-accent-soft border'
+                : 'border-border-default bg-elevated border',
+              !cardDisabled && !selected && 'hover:bg-surface-row-hover',
             )}
           >
             <button
@@ -74,8 +76,12 @@ export function CloudProviderPicker({
                 cardDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
               )}
             >
-              <ProviderIcon kind={kind} />
-              <span className="text-fg text-sm font-semibold">{providerLabel(kind, t)}</span>
+              <ProviderIcon kind={kind} selected={selected} />
+              <span
+                className={cn('text-sm font-semibold', selected ? 'text-accent-text' : 'text-fg')}
+              >
+                {providerLabel(kind, t)}
+              </span>
               <span className="text-fg-muted text-xs leading-snug">
                 {t(PROVIDER_DESCRIPTION_KEYS[kind])}
               </span>
