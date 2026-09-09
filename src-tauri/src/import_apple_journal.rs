@@ -416,6 +416,7 @@ const NATIVE_ASSET_TYPES: &[&str] = &["photo", "video", "audio", "map"];
 const LIMITED_ASSET_TYPES: &[&str] = &["location", "drawing", "livephoto", "live_photo"];
 
 /// True when `assetType_*` is a known observed card (photo/video/audio/map/drawing/…).
+#[cfg(test)]
 pub fn is_known_apple_asset_type(asset_type: &str) -> bool {
     is_fully_mapped_apple_asset_type(asset_type) || is_limited_apple_asset_type(asset_type)
 }
@@ -681,6 +682,7 @@ pub fn resolve_apple_entry_date<Tz: TimeZone>(
 }
 
 /// Same as [`resolve_apple_entry_date`] using the importing system's local zone.
+#[cfg(test)]
 pub fn resolve_apple_entry_date_local(
     html: &str,
     source_name: &str,

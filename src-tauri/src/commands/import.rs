@@ -2463,6 +2463,8 @@ impl AppleStagedInsertionMode {
 pub(crate) struct AppleStagedMedia {
     pub media_id: String,
     pub entry_relative_path: PathBuf,
+    /// Original export stem. Persist uses `source_file_name`; tests assert this.
+    #[allow(dead_code)]
     pub source_stem: String,
     pub source_file_name: String,
     pub mime: String,
@@ -2476,10 +2478,15 @@ pub(crate) struct AppleStagedMedia {
     pub height: Option<i64>,
     pub duration_seconds: Option<f64>,
     pub capture_unix: Option<i64>,
+    /// How `capture_unix` was chosen. Persist stores the timestamp only.
+    #[allow(dead_code)]
     pub capture_provenance: AppleCaptureDateProvenance,
     pub exif_latitude: Option<f64>,
     pub exif_longitude: Option<f64>,
+    /// Over-cap files are still imported; these flags are asserted in tests.
+    #[allow(dead_code)]
     pub exceeds_photo_upload_limit: bool,
+    #[allow(dead_code)]
     pub exceeds_video_upload_limit: bool,
     pub warnings: Vec<AppleStagingWarning>,
 }
@@ -3159,7 +3166,6 @@ pub(crate) struct ApplePreparedImport {
     pub entries: Vec<ApplePreparedEntry>,
     pub warnings: Vec<ImportWarning>,
     pub resources_referenced: u64,
-    pub resources_imported: u64,
     pub resources_missing: u64,
     pub resources_unsupported: u64,
     pub resources_unreferenced: u64,
@@ -3611,6 +3617,7 @@ fn write_apple_import_manifest(
     Ok(manifest_path)
 }
 
+#[cfg(test)]
 pub(crate) fn prepare_apple_journal_import(
     src: &Path,
     media_root: &Path,
@@ -3681,7 +3688,6 @@ fn prepare_apple_journal_import_checked(
                 entries,
                 warnings,
                 resources_referenced: scan.entries.iter().map(|e| e.media_refs.len() as u64).sum(),
-                resources_imported: staged.media.len() as u64,
                 resources_missing: missing,
                 resources_unsupported: unsupported,
                 resources_unreferenced: scan.unreferenced_resources.len() as u64,
