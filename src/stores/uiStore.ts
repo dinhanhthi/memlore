@@ -494,7 +494,8 @@ export const useUiStore = create<UiState>()(
         }
         state.theme = coerceTheme(state.theme)
         // Leftover Lumen-as-DS blobs must be read before coerceDesignSystem
-        // or the migrate signal is lost (coerce maps 'lumen' → 'signature').
+        // or the migrate signal is lost (coerce maps any unknown value,
+        // 'lumen' included, to DEFAULT_DESIGN_SYSTEM).
         if ((state.designSystem as string) === 'lumen') {
           state.designSystem = 'signature'
           state.surfaceStyle = 'lumen'

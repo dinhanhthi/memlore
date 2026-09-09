@@ -22,8 +22,8 @@ describe('designSystem constants', () => {
     expect(DESIGN_SYSTEMS).toEqual(['signature', 'clean', 'clay'])
   })
 
-  it('defaults to signature', () => {
-    expect(DEFAULT_DESIGN_SYSTEM).toBe('signature')
+  it('defaults to clay', () => {
+    expect(DEFAULT_DESIGN_SYSTEM).toBe('clay')
   })
 
   it('maps each system to its root class', () => {
@@ -73,19 +73,19 @@ describe('coerceDesignSystem', () => {
     expect(coerceDesignSystem('clay')).toBe('clay')
   })
 
-  it("maps leftover 'lumen' to 'signature'", () => {
-    expect(coerceDesignSystem('lumen')).toBe('signature')
+  it("maps leftover 'lumen' to the default", () => {
+    expect(coerceDesignSystem('lumen')).toBe(DEFAULT_DESIGN_SYSTEM)
   })
 
-  it("maps class-name 'ds-clay' to 'signature'", () => {
-    expect(coerceDesignSystem('ds-clay')).toBe('signature')
+  it("maps class-name 'ds-clay' to the default", () => {
+    expect(coerceDesignSystem('ds-clay')).toBe(DEFAULT_DESIGN_SYSTEM)
   })
 
-  it("maps undefined / null / 'superx' / 42 to 'signature'", () => {
-    expect(coerceDesignSystem(undefined)).toBe('signature')
-    expect(coerceDesignSystem(null)).toBe('signature')
-    expect(coerceDesignSystem('superx')).toBe('signature')
-    expect(coerceDesignSystem(42)).toBe('signature')
+  it("maps undefined / null / 'superx' / 42 to the default", () => {
+    expect(coerceDesignSystem(undefined)).toBe(DEFAULT_DESIGN_SYSTEM)
+    expect(coerceDesignSystem(null)).toBe(DEFAULT_DESIGN_SYSTEM)
+    expect(coerceDesignSystem('superx')).toBe(DEFAULT_DESIGN_SYSTEM)
+    expect(coerceDesignSystem(42)).toBe(DEFAULT_DESIGN_SYSTEM)
   })
 })
 

@@ -11,7 +11,7 @@ export type DesignSystem = 'signature' | 'clean' | 'clay'
 
 export const DESIGN_SYSTEMS: readonly DesignSystem[] = ['signature', 'clean', 'clay']
 
-export const DEFAULT_DESIGN_SYSTEM: DesignSystem = 'signature'
+export const DEFAULT_DESIGN_SYSTEM: DesignSystem = 'clay'
 
 export const DESIGN_SYSTEM_CLASS: Record<DesignSystem, string> = {
   signature: 'ds-signature',

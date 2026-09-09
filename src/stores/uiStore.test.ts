@@ -186,7 +186,7 @@ describe('uiStore', () => {
       expect(persisted.state).toEqual({
         sidebarCollapsed: true,
         theme: 'dark',
-        designSystem: 'signature',
+        designSystem: DEFAULT_DESIGN_SYSTEM,
         surfaceStyle: 'deep',
         cornerRadius: 'low',
         reducedMotion: true,
@@ -277,8 +277,9 @@ describe('uiStore', () => {
   })
 
   describe('designSystem', () => {
-    it("defaults to 'signature'", () => {
-      expect(useUiStore.getState().designSystem).toBe('signature')
+    it('defaults to clay', () => {
+      expect(DEFAULT_DESIGN_SYSTEM).toBe('clay')
+      expect(useUiStore.getState().designSystem).toBe('clay')
     })
 
     it("setDesignSystem('clean') updates state", () => {
@@ -294,7 +295,7 @@ describe('uiStore', () => {
       expect(persisted.state?.designSystem).toBe('clean')
     })
 
-    it("rehydrate coerces an unknown designSystem ('shadcn-v2') back to 'signature'", async () => {
+    it("rehydrate coerces an unknown designSystem ('shadcn-v2') back to the default", async () => {
       globalThis.localStorage.setItem(
         'memlore-ui',
         JSON.stringify({
@@ -305,7 +306,7 @@ describe('uiStore', () => {
 
       await useUiStore.persist.rehydrate()
 
-      expect(useUiStore.getState().designSystem).toBe('signature')
+      expect(useUiStore.getState().designSystem).toBe(DEFAULT_DESIGN_SYSTEM)
     })
 
     it("rehydrate maps leftover designSystem 'lumen' to signature + surfaceStyle lumen", async () => {
