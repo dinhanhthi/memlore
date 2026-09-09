@@ -1443,15 +1443,21 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
     expect(clayDarkTokenBodies).toMatch(/--grad-danger-fill:\s*linear-gradient\(180deg/)
   })
 
-  it('Clay ghost is a raised clay chip at rest, not a flat wash', () => {
+  it('Clay ghost is chrome-less at rest and a raised chip on hover', () => {
     expect(cssCode).toMatch(
-      /button\[data-variant='ghost'\]\s*\{[^}]*box-shadow:\s*var\(--shadow-control\)/,
+      /:root\.ds-clay\s+button\[data-variant='ghost'\]\s*\{[^}]*box-shadow:\s*none/,
     )
     expect(cssCode).toMatch(
-      /button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/,
+      /:root\.ds-clay\s+button\[data-variant='ghost'\]\s*\{[^}]*background-color:\s*transparent/,
     )
     expect(cssCode).toMatch(
-      /button\[data-variant='ghost'\]:active:not\(:disabled\)\s*\{[^}]*translateY\(var\(--rise\)\)/,
+      /:root\.ds-clay\s+button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--shadow-control\)/,
+    )
+    expect(cssCode).toMatch(
+      /:root\.ds-clay\s+button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/,
+    )
+    expect(cssCode).toMatch(
+      /:root\.ds-clay\s+button\[data-variant='ghost'\]:active:not\(:disabled\)\s*\{[^}]*translateY\(var\(--rise\)\)/,
     )
   })
 
@@ -1461,7 +1467,7 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
     expect(clayLightTokenBodies).toMatch(/--color-button-slab:\s*#f7f1e6/)
     expect(clayDarkTokenBodies).toMatch(/--color-button-slab:\s*#3a3530/)
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='secondary'\],\s*:root\.ds-clay\s+button\[data-variant='outline-secondary'\],\s*:root\.ds-clay\s+button\[data-variant='secondary-outline'\],\s*:root\.ds-clay\s+button\[data-variant='ghost'\]\s*\{[^}]*background-color:\s*var\(--color-button-slab\)[^}]*box-shadow:\s*var\(--shadow-control\)/,
+      /:root\.ds-clay\s+button\[data-variant='secondary'\],\s*:root\.ds-clay\s+button\[data-variant='outline-secondary'\],\s*:root\.ds-clay\s+button\[data-variant='secondary-outline'\]\s*\{[^}]*background-color:\s*var\(--color-button-slab\)[^}]*box-shadow:\s*var\(--shadow-control\)/,
     )
     expect(cssCode).not.toMatch(
       /:root\.ds-clay\s+button\[data-variant='secondary'\][^}]*--rise:\s*3px/,
