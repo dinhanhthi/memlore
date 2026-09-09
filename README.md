@@ -7,6 +7,8 @@
 > [!WARNING]
 > Memlore is under **heavy development**. There is no production release yet — APIs, schemas, and data formats can change freely. Current work focuses on the **desktop macOS** app. Windows, Linux, iOS, and Android are planned and coming soon.
 
+<img src="public/screenshot.png" width="100%" alt="Screenshot" />
+
 ## Features
 
 - **Local-first & encrypted** — works fully offline. Entries stay on your device, encrypted at rest (SQLCipher + AES-256-GCM). No Memlore server, no account, no telemetry.
@@ -25,15 +27,15 @@
 
 ## Tech stack
 
-| Layer | Technology |
-| ----- | ---------- |
-| App | Tauri 2 (Rust) + React 19 + TypeScript + Vite |
-| UI | Tailwind CSS v4, Zustand, i18next, Leaflet, Recharts |
-| Editor | TipTap + Yjs (CRDT) |
-| Data | SQLite / SQLCipher, FTS5 |
-| Crypto | AES-256-GCM, Argon2id |
-| Sync | Yjs over iCloud Drive / Google Drive |
-| AI | HTTP providers + opt-in on-device embedding (`fastembed`) and `llama-server` sidecar |
+| Layer  | Technology                                                                           |
+| ------ | ------------------------------------------------------------------------------------ |
+| App    | Tauri 2 (Rust) + React 19 + TypeScript + Vite                                        |
+| UI     | Tailwind CSS v4, Zustand, i18next, Leaflet, Recharts                                 |
+| Editor | TipTap + Yjs (CRDT)                                                                  |
+| Data   | SQLite / SQLCipher, FTS5                                                             |
+| Crypto | AES-256-GCM, Argon2id                                                                |
+| Sync   | Yjs over iCloud Drive / Google Drive                                                 |
+| AI     | HTTP providers + opt-in on-device embedding (`fastembed`) and `llama-server` sidecar |
 
 ## Development
 
