@@ -11,15 +11,15 @@
 
 ## Features
 
-- **Local-first & encrypted** — works fully offline. Entries stay on your device, encrypted at rest (SQLCipher + AES-256-GCM). No Memlore server, no account, no telemetry.
-- **Rich editor** — TipTap WYSIWYG with markdown shortcuts, tables, checklists, code, math, and inline media.
-- **Find anything** — instant full-text search (SQLite FTS5), tags, favorites, calendar, and On This Day lookback.
+- **Local-first & private** — works fully offline. Your journal stays on your device. No Memlore server, no account, no telemetry.
+- **Rich editor** — write with markdown shortcuts, then add plugins for anything: math, code, tables, checklists, media, and more.
+- **Find anything** — instant search, tags, favorites, calendar, and On This Day lookback.
 - **Media & places** — photos, video, voice memos, a media gallery, and a locations map.
-- **AI-rich, optional** — Daily Chat over your journal, semantic search, and writing help. Bring your own provider (OpenAI, Anthropic, Ollama, CLI, …) or run models on-device. Off until you opt in.
-- **Sync you control** — end-to-end encrypted sync over your own Google Drive or iCloud Drive. Multi-device recovery phrase, device list, and revoke.
-- **Locks** — app password + Touch ID, second lock, and invisible vaults.
-- **Import & export** — Apple Journal folder import; `.memlore.zip`, Markdown, and plain-text export.
-- **Yours to look at** — Home dashboard, statistics, three design systems (Signature, Clean, Clay), light/dark, English and Vietnamese.
+- **AI, when you want it** — a rich set of optional AI tools over your journal. Bring your own provider or run models on-device. Off until you opt in.
+- **Sync you control** — encrypted sync over your own Google Drive or iCloud Drive, with more services coming. Recover across devices, see who is connected, and revoke any of them.
+- **Locks** — lock the app with a password or Touch ID. Second lock hides chosen entries behind an extra password. Invisible lock keeps separate vaults that vanish until you enter the right password.
+- **Import & export** — import from Day One, Journey, Apple Journal, markdown, and more; export to files.
+- **Yours to look at** — UI and layout are highly customizable, with different design systems and layouts to choose from.
 
 ## Platforms
 
