@@ -1050,7 +1050,9 @@
   --content-grad-to: #201d1a;
 
   --neu: #2c2926;
-  --neu-deep: #161412;
+  /* Near-black lip so the 4px under-bar reads on canvas `#171513`
+     (kit `#161412` vanished into the page and left secondary looking flat). */
+  --neu-deep: #0a0806;
   --neu-hi: rgb(255 250 242 / 0.1);
   --neu-press: rgb(0 0 0 / 0.45);
   --amb: rgb(0 0 0 / 0.45);
@@ -1077,8 +1079,8 @@
   --shadow-panel: var(--elev-2);
   --shadow-card: var(--elev-2);
   --shadow-control:
-    0 3px 0 0 var(--neu-deep), 0 8px 16px var(--amb), inset 0 1px 0 var(--neu-hi),
-    inset 0 -2px 5px rgb(0 0 0 / 0.06);
+    0 var(--rise) 0 0 var(--neu-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 var(--neu-hi), inset 0 -2px 5px rgb(0 0 0 / 0.06);
   --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
   /* Kit sheen (white 35%) shared by every accent slab; the sunken track
      under the switch-off thumb and the segmented thumb; the knob rim. */
@@ -1153,8 +1155,8 @@
   /* Neutral slab — secondary buttons, pills. Wells (inputs, switch-off,
      segmented track) invert this via :root.ds-clay rules below. */
   --shadow-control:
-    0 3px 0 0 var(--neu-deep), 0 8px 16px var(--amb), inset 0 1px 0 var(--neu-hi),
-    inset 0 -2px 5px rgb(0 0 0 / 0.06);
+    0 var(--rise) 0 0 var(--neu-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 var(--neu-hi), inset 0 -2px 5px rgb(0 0 0 / 0.06);
   --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
   /* Kit sheen (white 35%) shared by every accent slab; the sunken track
      under the switch-off thumb and the segmented thumb; the knob rim. */
@@ -1488,27 +1490,31 @@
 
 :root.ds-clay button[data-variant='secondary'],
 :root.ds-clay button[data-variant='outline-secondary'],
-:root.ds-clay button[data-variant='secondary-outline'] {
-  /* Neutral clay slab: --neu fill + --neu-deep edge via --shadow-control.
-     Also hooks Select's trigger (a field-width slab). Label is ink-soft:
-     full ink read too heavy on the pale slab. */
-  --rise: 3px;
+:root.ds-clay button[data-variant='secondary-outline'],
+:root.ds-clay button[data-variant='ghost'] {
+  /* Neutral clay slab: same 4px --rise under-bar as primary, --neu fill
+     + --neu-deep edge. Also hooks Select's trigger (a field-width slab).
+     Ghost is a slab at rest too so it matches primary height in a row.
+     Label is ink-soft: full ink read too heavy on the pale slab. */
   background-color: var(--color-surface-control);
   background-image: var(--grad-surface);
   border-color: transparent;
   color: var(--color-fg-secondary);
+  box-shadow: var(--shadow-control);
 }
 
 :root.ds-clay button[data-variant='secondary']:hover:not(:disabled),
 :root.ds-clay button[data-variant='outline-secondary']:hover:not(:disabled),
-:root.ds-clay button[data-variant='secondary-outline']:hover:not(:disabled) {
+:root.ds-clay button[data-variant='secondary-outline']:hover:not(:disabled),
+:root.ds-clay button[data-variant='ghost']:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.04);
 }
 
 :root.ds-clay button[data-variant='secondary']:active:not(:disabled),
 :root.ds-clay button[data-variant='outline-secondary']:active:not(:disabled),
-:root.ds-clay button[data-variant='secondary-outline']:active:not(:disabled) {
+:root.ds-clay button[data-variant='secondary-outline']:active:not(:disabled),
+:root.ds-clay button[data-variant='ghost']:active:not(:disabled) {
   transform: translateY(var(--rise));
   scale: none;
   box-shadow:
@@ -1518,8 +1524,8 @@
 }
 
 :root.ds-clay button[data-variant='outline'] {
-  /* canvas-soft fill, inset accent ring, edge mixed from accent-deep + neu-deep. */
-  --rise: 3px;
+  /* canvas-soft fill, inset accent ring, same 4px under-bar as primary
+     (edge mixed from accent-deep + neu-deep). */
   background-color: var(--color-elevated);
   border-color: transparent;
   color: var(--color-accent-text);
@@ -1538,31 +1544,6 @@
   transform: translateY(var(--rise));
   scale: none;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
-}
-
-:root.ds-clay button[data-variant='ghost']:hover:not(:disabled) {
-  /* Idle stays flat; hover pops a secondary clay chip so the type
-     still reads quiet at rest and tactile on contact. */
-  --rise: 3px;
-  background-color: var(--color-surface-control);
-  background-image: var(--grad-surface);
-  color: var(--color-fg-secondary);
-  box-shadow: var(--shadow-control);
-  transform: translateY(-1px);
-  filter: brightness(1.04);
-}
-
-:root.ds-clay button[data-variant='ghost']:active:not(:disabled) {
-  --rise: 3px;
-  background-color: var(--color-surface-control);
-  background-image: var(--grad-surface);
-  color: var(--color-fg-secondary);
-  transform: translateY(var(--rise));
-  scale: none;
-  box-shadow:
-    0 0 0 0 var(--neu-deep),
-    0 2px 8px var(--amb),
-    inset 0 3px 7px var(--neu-press);
 }
 
 :root.ds-clay button[data-variant='destructive'] {

@@ -1443,18 +1443,26 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
     expect(clayDarkTokenBodies).toMatch(/--grad-danger-fill:\s*linear-gradient\(180deg/)
   })
 
-  it('Clay ghost hover is a raised clay chip, not a flat wash', () => {
+  it('Clay ghost is a raised clay chip at rest, not a flat wash', () => {
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--shadow-control\)/,
+      /button\[data-variant='ghost'\]\s*\{[^}]*box-shadow:\s*var\(--shadow-control\)/,
     )
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*background-image:\s*var\(--grad-surface\)/,
+      /button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/,
     )
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='ghost'\]:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/,
+      /button\[data-variant='ghost'\]:active:not\(:disabled\)\s*\{[^}]*translateY\(var\(--rise\)\)/,
     )
+  })
+
+  it('Clay secondary uses the same 4px under-bar as primary', () => {
+    expect(clayLightTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--neu-deep\)/)
+    expect(clayDarkTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--neu-deep\)/)
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='ghost'\]:active:not\(:disabled\)\s*\{[^}]*translateY\(var\(--rise\)\)/,
+      /:root\.ds-clay\s+button\[data-variant='secondary'\],\s*:root\.ds-clay\s+button\[data-variant='outline-secondary'\],\s*:root\.ds-clay\s+button\[data-variant='secondary-outline'\],\s*:root\.ds-clay\s+button\[data-variant='ghost'\]\s*\{[^}]*box-shadow:\s*var\(--shadow-control\)/,
+    )
+    expect(cssCode).not.toMatch(
+      /:root\.ds-clay\s+button\[data-variant='secondary'\][^}]*--rise:\s*3px/,
     )
   })
 
