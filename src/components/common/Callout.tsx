@@ -135,7 +135,7 @@ export function Callout({
         {showIcon && resolvedIcon}
         <div className="min-w-0">
           {hasTitle && (
-            <p className={cn(ink ?? 'text-fg', 'text-sm leading-snug font-medium')}>{title}</p>
+            <p className={cn(ink ?? 'text-fg', 'text-base leading-snug font-medium')}>{title}</p>
           )}
           {body}
         </div>
