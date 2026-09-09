@@ -1,0 +1,25 @@
+// Design system barrel entry — bundled by Vite lib + converter for claude.ai/design.
+// Excluded: EmotionPicker, LocationPicker, SyncStatus, TagPickerPopover (Tauri-coupled).
+// Side effect: initialize i18n so components using useTranslation() work in previews.
+import './lib/i18n'
+import './styles/globals.css'
+
+export * from './components/common/Button'
+export * from './components/common/ComboBox'
+export * from './components/common/ConfirmDialog'
+export * from './components/common/DeleteConfirmModal'
+export * from './components/common/IconCustom'
+export * from './components/common/MiniDatePicker'
+export * from './components/common/Modal'
+export * from './components/common/Paginator'
+export * from './components/common/PasswordInput'
+export * from './components/common/PillButton'
+export * from './components/common/primitives'
+export * from './components/common/RadioOptionPill'
+export * from './components/common/RangePill'
+export * from './components/common/SegmentedControl'
+export * from './components/common/Select'
+export * from './components/common/SlideOverPanel'
+export * from './components/common/useSlideOverPanel'
+export * from './components/common/TextInput'
+export * from './components/common/Tooltip'

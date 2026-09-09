@@ -1,0 +1,18 @@
+{
+  "visits": [
+    {
+      "placeName": "Synthetic Park",
+      "latitude": 10.5,
+      "longitude": 20.25,
+      "city": "Example City",
+      "typeOfPlace": "park"
+    },
+    { "placeName": "Invalid Peak", "latitude": 95.0, "longitude": 20.0 },
+    {
+      "placeName": "Example Harbor",
+      "latitude": -33.75,
+      "longitude": 151.125,
+      "city": "Harbor Town"
+    }
+  ]
+}

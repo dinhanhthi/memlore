@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "Memlore"
+  },
+  "sync_catchup": {
+    "incomplete": "Figures are still filling in while older entries sync.",
+    "progress": "{{pulled}} / {{total}} entries synced"
+  },
+  "map": {
+    "aria_label": "Locations map",
+    "empty": "No geotagged entries yet"
+  },
+  "mini_date_picker": {
+    "prev_month": "Previous month",
+    "next_month": "Next month",
+    "date_input": "Date",
+    "time": "Time",
+    "hour": "Hour",
+    "minute": "Minute",
+    "toggle_am_pm": "Toggle AM/PM",
+    "extract_from_media": "Extract from media",
+    "today": "Today",
+    "cancel": "Cancel",
+    "apply": "Apply"
+  },
+  "combobox": {
+    "toggle_aria": "Toggle suggestions"
+  }
+}

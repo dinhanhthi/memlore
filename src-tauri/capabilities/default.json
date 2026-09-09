@@ -1,0 +1,52 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "mcp-bridge:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "notification:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://accounts.google.com/*" },
+        { "url": "https://oauth2.googleapis.com/*" },
+        { "url": "https://myaccount.google.com/*" },
+        { "url": "https://account.mapbox.com/*" },
+        { "url": "https://console.cloud.google.com/*" },
+        { "url": "https://cloud.maptiler.com/*" },
+        { "url": "https://ai.google.dev/*" },
+        { "url": "https://aistudio.google.com/*" },
+        { "url": "https://fonts.google.com/*" },
+        { "url": "https://dinhanhthi.com" },
+        { "url": "https://dinhanhthi.com/*" },
+        { "url": "https://github.com/dinhanhthi/*" },
+        { "url": "https://github.com/ggml-org/*" },
+        { "url": "https://github.com/openai/*" },
+        { "url": "https://ollama.com" },
+        { "url": "https://ollama.com/*" },
+        { "url": "https://lmstudio.ai" },
+        { "url": "https://lmstudio.ai/*" },
+        { "url": "https://docs.claude.com/*" },
+        { "url": "https://platform.openai.com/*" },
+        { "url": "https://console.anthropic.com/*" },
+        { "url": "https://console.x.ai" },
+        { "url": "https://console.x.ai/*" },
+        { "url": "https://openrouter.ai/*" },
+        { "url": "https://api.together.ai/*" },
+        { "url": "https://console.groq.com/*" },
+        { "url": "https://dashboard.voyageai.com" },
+        { "url": "https://dashboard.voyageai.com/*" },
+        { "url": "mailto:*" }
+      ]
+    }
+  ]
+}

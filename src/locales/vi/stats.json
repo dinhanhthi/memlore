@@ -1,0 +1,126 @@
+{
+  "page": {
+    "title": "Thống kê",
+    "description": "Trực quan hoá thói quen viết và xem lại hoạt động AI trên các bài viết của bạn."
+  },
+  "tabs": {
+    "charts": "Biểu đồ",
+    "insights": "Phân tích",
+    "reviews": "Tổng kết",
+    "usage": "Sử dụng AI",
+    "audit": "Nhật ký AI"
+  },
+  "insights": {
+    "title": "Phân tích",
+    "description": "Xem xu hướng cảm xúc theo thời gian, rồi nhờ AI gợi ý chủ đề lặp lại và yếu tố cảm xúc trong kỳ.",
+    "emotion_trend_title": "Xu hướng cảm xúc",
+    "emotion_trend_empty_hint": "Gắn cảm xúc cho mục để xem xu hướng tại đây.",
+    "ai_themes_title": "Chủ đề AI cho kỳ này",
+    "ai_themes_description": "Phân tích theo yêu cầu về chủ đề lặp lại và yếu tố cảm xúc. Dùng văn bản mục trong kỳ đã chọn.",
+    "disabled_hint": "Bật “Phân tích chủ đề” trong Cài đặt → AI để tạo chủ đề.",
+    "needs_provider_hint": "Hãy cấu hình nhà cung cấp Chat trong Cài đặt → AI trước.",
+    "needs_privacy_hint": "Hãy chấp nhận thông báo riêng tư AI trong Cài đặt → AI trước.",
+    "generate": "Tạo chủ đề",
+    "generating": "Đang phân tích…",
+    "regenerate": "Tạo lại",
+    "cached_hint": "Đã tải từ bộ nhớ đệm.",
+    "section_themes": "Chủ đề lặp lại",
+    "section_mood_drivers": "Yếu tố cảm xúc có thể",
+    "section_empty": "Không ghi nhận.",
+    "entry_count": "Dựa trên {{count}} mục"
+  },
+  "period": {
+    "label": "Khoảng thời gian",
+    "7d": "7 ngày",
+    "30d": "30 ngày",
+    "90d": "90 ngày",
+    "365d": "1 năm",
+    "all": "Tất cả"
+  },
+  "chart": {
+    "entries_over_time": {
+      "title": "Số bài viết theo thời gian",
+      "tooltip": "bài viết"
+    },
+    "word_count": {
+      "title": "Tổng số từ",
+      "label": "từ trong khoảng đã chọn"
+    },
+    "mood_histogram": {
+      "title": "Phân bố tâm trạng"
+    },
+    "mood_trend": {
+      "title": "Phân bố cảm xúc"
+    },
+    "emotion_heatmap": {
+      "title": "Cảm xúc cả năm",
+      "year_label": "Cảm xúc năm {{year}}"
+    },
+    "tag_frequency": {
+      "title": "Thẻ phổ biến",
+      "tooltip": "bài viết",
+      "no_tags": "Chưa có thẻ nào"
+    },
+    "writing_volume": {
+      "title": "Khối lượng viết",
+      "tooltip": "từ",
+      "axis_y": "Số từ"
+    },
+    "streak_calendar": {
+      "title": "Chuỗi ngày viết",
+      "year_label": "Chuỗi viết {{year}}",
+      "less": "Ít hơn",
+      "more": "Nhiều hơn"
+    },
+    "location_heatmap": {
+      "title": "Bản đồ nhiệt vị trí",
+      "empty": "Chưa có bài viết nào được gắn vị trí — thêm vị trí trong thanh công cụ để xem bản đồ này.",
+      "tooltip": "{{count}} bài viết",
+      "mapkit_notice": "Bản đồ nhiệt cần nguồn Offline hoặc MapTiler. Apple Maps chưa hỗ trợ lớp phủ bản đồ nhiệt."
+    }
+  },
+  "mood_legend": {
+    "label": "Phân bổ tâm trạng",
+    "entries": "bài viết"
+  },
+  "empty": {
+    "no_data": "Không có dữ liệu cho khoảng thời gian này",
+    "no_data_hint": "Hãy viết vài bài để xem thống kê tại đây.",
+    "load_failed": "Không tải được biểu đồ.",
+    "retry": "Thử lại"
+  },
+  "export": {
+    "button": "Xuất",
+    "modal": {
+      "title": "Xuất thống kê",
+      "sections_label": "Nội dung cần xuất",
+      "format_label": "Định dạng",
+      "png_hint": "PNG chỉ khả dụng khi mục Biểu đồ được chọn.",
+      "png_needs_charts": "Cần chọn mục Biểu đồ để xuất PNG.",
+      "png_needs_visible": "Hãy mở tab Biểu đồ trước — PNG chụp SVG đã render.",
+      "export_button": "Xuất",
+      "exporting": "Đang xuất…",
+      "cancel": "Huỷ",
+      "close": "Đóng",
+      "saved_to": "Đã lưu vào"
+    },
+    "section": {
+      "charts": "Dữ liệu biểu đồ",
+      "usage": "Sử dụng AI",
+      "audit": "Nhật ký AI"
+    },
+    "format": {
+      "csv": "CSV",
+      "json": "JSON",
+      "html": "HTML",
+      "png": "PNG",
+      "pdf": "PDF"
+    },
+    "error": {
+      "empty": "Chưa có nội dung để xuất với định dạng và mục đã chọn."
+    }
+  },
+  "tab_sections": {
+    "statistics": "Các mục Thống kê"
+  }
+}

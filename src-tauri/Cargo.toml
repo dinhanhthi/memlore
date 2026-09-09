@@ -1,0 +1,155 @@
+[package]
+name = "memlore"
+version = "0.1.0"
+description = "Memlore — a privacy-first local journal app"
+authors = []
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/dinhanhthi/memlore"
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.3", features = [] }
+swift-rs = { version = "1", features = ["build"] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.9.5", features = ["protocol-asset"] }
+tauri-plugin-log = "2"
+rusqlite = { version = "0.34", features = ["bundled-sqlcipher-vendored-openssl"] }
+uuid = { version = "1", features = ["v4", "v5"] }
+tauri-plugin-mcp-bridge = "0.11"
+tauri-plugin-opener = "2"
+argon2 = "0.5"
+rand = "0.8"
+aes-gcm = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+hkdf = "0.12"
+zeroize = { version = "1", features = ["derive"] }
+base64 = "0.22"
+hex = "0.4"
+rfd = "0.15"
+kamadak-exif = "0.5"
+reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
+# Phase 6 v2 (2026-05-07): on-device ML stack removed (`ort`, `ndarray`,
+# `tokenizers`, `llama-cpp-2`) in favour of external provider HTTP calls.
+# Rationale + integration history: see docs/SPECIFICATION.md → "Phase 6 — AI &
+# Intelligence (External Provider model)" and `docs/plans/phase-6-main/README.md`.
+# AI features now require the user to configure a provider + API key; no
+# native ML libs ship with the binary.
+# Embedding Cost Guardrails (2026-07): on-device *embedding* runtime re-introduced
+# via `fastembed` (opt-in, download-once model, offline thereafter) — the approved
+# on-device embedding path. Models are NOT bundled: they download at runtime when
+# the user opts into on-device embedding.
+# On-device LLM chat (2026-07): on-device *generation* is now also approved, but
+# ONLY via a `llama-server` (llama.cpp) sidecar spawned on localhost — never via
+# in-process inference crates (`llama-cpp-2`, `candle`, etc.), which stay banned.
+# Both the binary AND the GGUF models are opt-in, download-on-demand assets (JIT,
+# pinned version + SHA256-verified) and never ship with the installer. See
+# `docs/plans/2026-07-16-on-device-llm-chat/`.
+fastembed = "4"
+tokio-util = { version = "0.7", features = ["io"] }
+futures-util = "0.3"
+async-trait = "0.1"
+thiserror = "2"
+bincode = "1.3"
+yrs = "0.25"
+tokio = { version = "1", features = ["fs", "rt", "io-util", "sync", "net", "time", "process"] }
+which = "7"
+url = "2"
+urlencoding = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+cpal = "0.15"
+hound = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+chrono = "0.4"
+whatlang = "0.18.0"
+# Used by `ai::providers::cli::codex` for the `--output-last-message`
+# fallback path (write Codex's final reply to a tmp file when the
+# `--json` stream doesn't carry an `agent_message` event).
+tempfile = "3"
+bip39 = { version = "2", default-features = false, features = ["std", "zeroize"] }
+# Phase 4 (recovery sheet): QR encode (render the 24-word mnemonic as a QR for
+# the export sheet) + QR decode (read a mnemonic back from an exported sheet
+# image). Two small, pure-Rust, well-maintained crates — no camera/scanning
+# stack. Both integrate with the `image` crate already above.
+qrcode = { version = "0.14", default-features = false, features = ["image"] }
+rqrr = "0.10"
+# Recovery sheet is rendered as a PDF. printpdf is pure Rust (no system binary,
+# no wkhtmltopdf). `default-features = false` deliberately drops its `images`
+# feature so it does NOT pull a second, conflicting `image` crate version — the
+# QR is embedded from raw greyscale pixels (RawImage/R8), not via printpdf's
+# own decoder. Built-in PDF fonts (Helvetica/Courier) mean no font file to bundle.
+printpdf = { version = "0.12", default-features = false }
+# Pure-Rust PDF parser. Used ONLY to read the recovery sheet back on import:
+# the QR is extracted directly from the PDF's embedded image XObject (full
+# module resolution, no page-scaling) instead of forcing the user to crop a
+# screenshot of the whole sheet. No rendering/rasterizer, no system binary.
+lopdf = { version = "0.44", default-features = false }
+# Used to inflate a recovery-sheet PDF's FlateDecode QR stream through a
+# size-bounded reader — lopdf's own `decompressed_content` has no output cap, so
+# a crafted image stream could inflate unbounded. Already in the tree via image/
+# printpdf; declared directly so the bounded decode is explicit.
+flate2 = "1"
+# tar + flate2 — extract `llama-server` out of the `.tar.gz` release archives the
+# on-device LLM JIT downloader fetches for macOS/Linux hosts (Phase 2 Task 2).
+# `zip` covers the Windows `.zip` variant; there is no existing tar extractor in
+# the codebase (only zlib streams in sync/recovery + the zip crate).
+tar = "0.4"
+pulldown-cmark = { version = "0.13.4", default-features = false }
+# Browser-grade HTML5 parser (html5ever 0.38) for Apple Journal folder import.
+# Already present transitively; declared directly so the Apple scanner can
+# query observed CSS classes without a hand-rolled tokenizer.
+dom_query = "0.27"
+# UAX #15 NFC for Apple Journal resource stem matching (NFC/NFD twins).
+unicode-normalization = "0.1"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+swift-rs = "1"
+# Runtime traffic-light placement (`commands::window_chrome`) — same version
+# tao already pulls in, so this adds no new native code to the tree.
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "objc2-core-foundation",
+  "NSButton",
+  "NSControl",
+  "NSGraphics",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+] }
+
+# Used by the CLI-provider subprocess runtime: `killpg(pgid, SIGTERM)` so
+# we reap grandchildren (e.g. `node` spawned by `claude`) on cancel.
+# `tokio::process::Child::start_kill` only kills the direct PID.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "test-util"] }
+# Unified with the `tauri` dep above (2.9.5 → lock 2.10.3). `test` enables
+# `tauri::test::{mock_builder, mock_app}` so `#[tauri::command]`s that take
+# `AppHandle<R>` can be driven from unit tests (T40).
+tauri = { version = "2.9.5", features = ["test"] }
+wiremock = "0.6"
+# `pending_drive_session::tests` uses a process-wide `static STORE`; tests in
+# that module share state and interleave under parallel `cargo test`. `#[serial]`
+# runs each annotated test in its own critical section so a parallel `stash()`
+# from another test can't perturb eviction-count assertions. See
+# `docs/LATER.md` "Testing" entry.
+serial_test = "3"

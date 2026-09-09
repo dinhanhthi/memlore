@@ -1,0 +1,126 @@
+{
+  "title": "Home",
+  "customize": "Customize",
+  "customize_title": "Customize dashboard",
+  "customize_hint": "Show or hide cards and drag to reorder. Changes save immediately.",
+  "customize_reorder": "Reorder {{card}}",
+  "customize_ai_hint": "Needs an AI feature turned on in Settings → AI",
+  "empty_all_hidden": "All cards are hidden. Customize the dashboard to show some again.",
+  "cards": {
+    "streak": "Streak",
+    "quick_stats": "Quick stats",
+    "prompt": "Writing prompt",
+    "on_this_day": "On this day",
+    "mood_trend": "Mood trend",
+    "recent_entries": "Recent entries",
+    "ai_insights": "AI insights",
+    "today": "Today",
+    "heatmap": "Heatmap",
+    "top_tags": "Top tags",
+    "places": "Places",
+    "photos": "Photos",
+    "weekly_review": "Weekly review",
+    "chat": "Chat"
+  },
+  "actions": {
+    "calendar": "Calendar",
+    "stats": "Stats",
+    "entries": "All entries",
+    "onthisday": "Memories",
+    "tags": "Tags",
+    "map": "Map",
+    "media": "Gallery",
+    "reviews": "Reviews",
+    "insights": "Insights",
+    "chat": "Open chat",
+    "write": "Write"
+  },
+  "quick_stats": {
+    "entries_7d": "Entries · Last 7 days",
+    "entries_30d": "Entries · Last 30 days",
+    "words_7d": "Words · Last 7 days"
+  },
+  "prompt": {
+    "another": "Another",
+    "write_now": "Write now"
+  },
+  "on_this_day": {
+    "empty": "Nothing from this day in past years."
+  },
+  "recent": {
+    "empty": "No entries yet.",
+    "open": "Open"
+  },
+  "insights": {
+    "generate": "Generate insights",
+    "regenerate": "Regenerate",
+    "enable_hint": "Turn on Dashboard insights in Settings → AI to generate themes here.",
+    "enable_link": "Open AI settings",
+    "range_hint": "Last 30 days"
+  },
+  "today": {
+    "entries_one": "{{count}} entry today",
+    "entries_other": "{{count}} entries today",
+    "none": "Nothing written yet today"
+  },
+  "heatmap": {
+    "hint": "Last 16 weeks",
+    "summary": "{{days}} days with entries in the last 16 weeks"
+  },
+  "top_tags": {
+    "empty": "No tags yet."
+  },
+  "places": {
+    "summary_one": "{{count}} place · {{entries}} entries",
+    "summary_other": "{{count}} places · {{entries}} entries",
+    "empty": "No places yet."
+  },
+  "photos": {
+    "empty": "No photos yet."
+  },
+  "weekly_review": {
+    "generate": "Generate",
+    "generating": "Generating…",
+    "empty": "No review yet for last week"
+  },
+  "chat": {
+    "start": "Start",
+    "empty": "No conversations yet.",
+    "untitled": "New chat"
+  },
+  "ai_hint": {
+    "body": "Turn on {{feature}} in Settings → AI to show this card"
+  },
+  "prompts": [
+    "What felt heavy today, and what made it lighter?",
+    "When did you feel most like yourself this week?",
+    "What conversation is still sitting with you?",
+    "What are you avoiding, and what would happen if you faced it gently?",
+    "Where did you notice beauty you almost walked past?",
+    "What did you need today that you didn't ask for?",
+    "Which thought kept looping — and is it still true?",
+    "Who made you feel seen recently, and how?",
+    "What would you tell yesterday-you with more kindness?",
+    "What small thing went right that you haven't named yet?",
+    "Where did you overgive, and what would enough look like?",
+    "What are you proud of that nobody else noticed?",
+    "If today had a weather, what would it be and why?",
+    "What are you carrying that isn't yours?",
+    "When did you last rest without earning it?",
+    "What question are you living with right now?",
+    "What habit is quietly shaping your days?",
+    "What would “good enough” look like this week?",
+    "Which fear is louder than the facts?",
+    "What did your body try to tell you today?",
+    "Who do you miss, and what would you say if they were here?",
+    "What are you ready to let end?",
+    "Where did you choose comfort over honesty?",
+    "What are you curious about that you keep postponing?",
+    "How did you take care of someone else — and of yourself?",
+    "What memory keeps asking to be written down?",
+    "If you could redo one moment from today, which one and why?",
+    "What are you becoming, slowly?",
+    "What do you wish you had more time for, really?",
+    "What are you grateful for that you almost took for granted?"
+  ]
+}

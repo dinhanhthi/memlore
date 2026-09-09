@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist-lib",
+    "verbatimModuleSyntax": true,
+    "rootDir": "src"
+  },
+  "include": ["src/ds-global.d.ts", "src/ds-entry.ts"]
+}

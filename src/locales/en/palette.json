@@ -1,0 +1,333 @@
+{
+  "search_placeholder": "Search commands…",
+  "no_results": "No results",
+  "group": {
+    "pages": "Pages",
+    "settings": "Settings",
+    "settings_values": "Toggle & set",
+    "actions": "Actions",
+    "journals": "Journals",
+    "tags": "Tags"
+  },
+  "page": {
+    "dashboard": "Home",
+    "entries": "All Entries",
+    "calendar": "Calendar",
+    "tags": "Tags",
+    "onthisday": "On This Day",
+    "media": "Media",
+    "map": "Map",
+    "stats": "Statistics",
+    "chat": "Daily Chat",
+    "settings": "Settings",
+    "about": "About"
+  },
+  "settings": {
+    "editor": "Settings → Editor",
+    "appearance": "Settings → Appearance",
+    "security": "Settings → Security",
+    "sync": "Settings → Sync",
+    "media": "Settings → Media",
+    "location": "Settings → Location",
+    "journals": "Settings → Journals",
+    "templates": "Settings → Templates",
+    "reminders": "Settings → Reminders",
+    "ai": "Settings → AI",
+    "data": "Settings → Data",
+    "general": "Settings → General",
+    "editor_general": "Settings → Editor → General",
+    "editor_layout": "Settings → Editor → Layout",
+    "editor_font": "Settings → Editor → Font",
+    "appearance_theme": "Settings → Appearance → Theme",
+    "appearance_display": "Settings → Appearance → Display",
+    "sync_gdrive": "Settings → Sync → Cloud Provider",
+    "sync_devices": "Settings → Sync → Devices",
+    "sync_schedule": "Settings → Sync → Schedule",
+    "ai_general": "Settings → AI → General",
+    "ai_providers": "Settings → AI → Providers",
+    "ai_memories": "Settings → AI → Memories",
+    "ai_persona": "Settings → AI → Persona",
+    "security_device_password": "Settings → Security → Device password",
+    "security_second_lock": "Settings → Security → Second lock",
+    "security_recovery_devices": "Settings → Security → Security actions",
+    "security_invisible_lock": "Settings → Security → Invisible lock",
+    "location_geocoding": "Settings → Location → Geocoding",
+    "location_default": "Settings → Location → Default location",
+    "location_saved": "Settings → Location → Saved locations",
+    "ai_models": "Settings → AI → Models",
+    "ai_features": "Settings → AI → Features",
+    "templates_custom": "Settings → Templates → Custom",
+    "templates_builtin": "Settings → Templates → Built-in",
+    "data_import": "Settings → Data → Import",
+    "data_export": "Settings → Data → Export",
+    "data_downloads": "Settings → Data → Downloads",
+    "accent_color": "Settings → Accent color",
+    "sync_interval": "Settings → Sync interval",
+    "cache_limit": "Settings → Media cache limit",
+    "compression_mode": "Settings → Compression mode",
+    "upload_limits": "Settings → Upload limits",
+    "geocoding_provider": "Settings → Geocoding provider",
+    "geocoding_api_key": "Settings → Geocoding API key",
+    "biometric": "Settings → Biometric unlock",
+    "change_password": "Settings → Change password",
+    "second_lock_auto_lock": "Settings → Second lock auto-lock",
+    "invisible_lock_auto_lock": "Settings → Invisible lock auto-lock",
+    "ai_response_language": "Settings → AI response language",
+    "ai_emotion_language": "Settings → AI emotion language",
+    "ai_daily_chat_persona": "Settings → Daily Chat persona",
+    "ai_memory_include_protected": "Settings → Memory include protected",
+    "ai_memory_model_gen": "Settings → Memory generation model",
+    "ai_memory_model_embed": "Settings → Memory embedding model",
+    "editor_font_family": "Settings → Editor font",
+    "editor_font_size": "Settings → Editor font size",
+    "editor_font_contrast": "Settings → Editor font contrast",
+    "saved_locations": "Settings → Saved locations"
+  },
+  "settings_value": {
+    "start_at_login": {
+      "enable": "Enable start at login",
+      "disable": "Disable start at login"
+    },
+    "math": {
+      "enable": "Enable math expressions",
+      "disable": "Disable math expressions"
+    },
+    "emoji_shortcodes": {
+      "enable": "Enable emoji shortcodes",
+      "disable": "Disable emoji shortcodes"
+    },
+    "fixed_title": {
+      "enable": "Enable fixed title",
+      "disable": "Disable fixed title"
+    },
+    "right_to_left": {
+      "enable": "Enable right-to-left",
+      "disable": "Disable right-to-left"
+    },
+    "distraction": {
+      "enable": "Enable distraction-free mode",
+      "disable": "Disable distraction-free mode"
+    },
+    "justify": {
+      "enable": "Enable text justify",
+      "disable": "Disable text justify"
+    },
+    "first_line_indent": {
+      "enable": "Enable first line indent",
+      "disable": "Disable first line indent"
+    },
+    "hyphenation": {
+      "enable": "Enable hyphenation",
+      "disable": "Disable hyphenation"
+    },
+    "reduced_motion": {
+      "enable": "Enable reduced motion",
+      "disable": "Disable reduced motion"
+    },
+    "gradient_primary": {
+      "enable": "Enable gradient primary",
+      "disable": "Disable gradient primary"
+    },
+    "logo_follows_cursor": {
+      "enable": "Enable logo follows cursor",
+      "disable": "Disable logo follows cursor"
+    },
+    "sync_enabled": {
+      "enable": "Enable sync",
+      "disable": "Disable sync",
+      "go": "Settings → Sync"
+    },
+    "sync_on_save": {
+      "enable": "Enable sync on save",
+      "disable": "Disable sync on save",
+      "go": "Settings → Sync on save"
+    },
+    "sync_on_launch": {
+      "enable": "Enable sync on launch",
+      "disable": "Disable sync on launch",
+      "go": "Settings → Sync on launch"
+    },
+    "default_location_enabled": {
+      "enable": "Enable default location",
+      "disable": "Disable default location"
+    },
+    "semantic_search": {
+      "enable": "Enable semantic search",
+      "disable": "Disable semantic search",
+      "go": "Settings → Semantic search"
+    },
+    "emotion_suggestions": {
+      "enable": "Enable emotion suggestions",
+      "disable": "Disable emotion suggestions",
+      "go": "Settings → Emotion suggestions"
+    },
+    "chat_rag": {
+      "enable": "Enable chat context retrieval",
+      "disable": "Disable chat context retrieval",
+      "go": "Settings → Chat context retrieval"
+    },
+    "title_suggestions": {
+      "enable": "Enable title suggestions",
+      "disable": "Disable title suggestions",
+      "go": "Settings → Title suggestions"
+    },
+    "entry_highlights": {
+      "enable": "Enable entry highlights",
+      "disable": "Disable entry highlights",
+      "go": "Settings → Entry highlights"
+    },
+    "go_deeper": {
+      "enable": "Enable Go Deeper",
+      "disable": "Disable Go Deeper",
+      "go": "Settings → Go Deeper"
+    },
+    "continue_writing": {
+      "enable": "Enable Continue Writing",
+      "disable": "Disable Continue Writing",
+      "go": "Settings → Continue Writing"
+    },
+    "daily_chat": {
+      "enable": "Enable Daily Chat",
+      "disable": "Disable Daily Chat",
+      "go": "Settings → Daily Chat"
+    },
+    "image_generation": {
+      "enable": "Enable image generation",
+      "disable": "Disable image generation",
+      "go": "Settings → Image generation"
+    },
+    "multi_entry_summary": {
+      "enable": "Enable multi-entry summary",
+      "disable": "Disable multi-entry summary",
+      "go": "Settings → Multi-entry summary"
+    },
+    "tag_suggestions": {
+      "enable": "Enable tag suggestions",
+      "disable": "Disable tag suggestions",
+      "go": "Settings → Tag suggestions"
+    },
+    "periodic_review": {
+      "enable": "Enable periodic review",
+      "disable": "Disable periodic review",
+      "go": "Settings → Periodic review"
+    },
+    "theme_insights": {
+      "enable": "Enable theme insights",
+      "disable": "Disable theme insights",
+      "go": "Settings → Theme insights"
+    },
+    "dashboard_insights": {
+      "enable": "Enable dashboard insights",
+      "disable": "Disable dashboard insights",
+      "go": "Settings → Dashboard insights"
+    },
+    "chat_memory": {
+      "enable": "Enable chat memory",
+      "disable": "Disable chat memory"
+    },
+    "daily_chat_ai_title": {
+      "enable": "Enable AI-generated titles",
+      "disable": "Disable AI-generated titles"
+    },
+    "show_message_meta": {
+      "enable": "Enable message metadata",
+      "disable": "Disable message metadata"
+    },
+    "user_memory_master": {
+      "enable": "Enable AI memory",
+      "disable": "Disable AI memory"
+    },
+    "persona_enabled": {
+      "enable": "Enable persona",
+      "disable": "Disable persona",
+      "go": "Settings → Persona"
+    },
+    "second_lock_show_existence": {
+      "enable": "Enable show locked entries",
+      "disable": "Disable show locked entries"
+    },
+    "language": {
+      "en": "Language: English",
+      "vi": "Language: Tiếng Việt"
+    },
+    "time_format": {
+      "24h": "Time format: 24h",
+      "12h": "Time format: 12h"
+    },
+    "version_retention": {
+      "3": "Version retention: 3 days",
+      "7": "Version retention: 7 days",
+      "15": "Version retention: 15 days"
+    },
+    "line_height": {
+      "compact": "Line height: Compact",
+      "normal": "Line height: Normal",
+      "relaxed": "Line height: Relaxed"
+    },
+    "paragraph_spacing": {
+      "compact": "Paragraph spacing: Compact",
+      "normal": "Paragraph spacing: Normal",
+      "relaxed": "Paragraph spacing: Relaxed"
+    },
+    "design_system": {
+      "signature": "Design: Signature",
+      "clean": "Design: Clean",
+      "clay": "Design: Clay"
+    },
+    "surface_style": {
+      "deep": "Surface: Deep",
+      "soft": "Surface: Soft",
+      "lumen": "Surface: Lumen"
+    },
+    "ui_font_scale": {
+      "1": "UI scale: 100%",
+      "1_05": "UI scale: 105%",
+      "1_1": "UI scale: 110%"
+    },
+    "media_view_mode": {
+      "full": "Media view: Full",
+      "panel": "Media view: Panel"
+    },
+    "default_search_mode": {
+      "keyword": "Search mode: Keyword",
+      "meaning": "Search mode: Meaning",
+      "go": "Settings → Search mode"
+    }
+  },
+  "action": {
+    "new_entry": "New entry",
+    "new_journal": "New journal",
+    "toggle_theme_dark": "Switch to dark theme",
+    "toggle_theme_light": "Switch to light theme",
+    "toggle_sidebar": "Toggle sidebar",
+    "open_search": "Search entries",
+    "lock_app": "Lock app",
+    "unlock_second_lock": "Unlock second lock",
+    "lock_second_lock": "Lock second lock",
+    "unlock_second_lock_description": "Enter the second-lock password to reveal locked entries and journals for this session.",
+    "unlock_invisible": "Unlock invisible content",
+    "lock_invisible": "Lock invisible content",
+    "unlock_invisible_description": "Enter a vault password to open a matching vault or create a new empty one. Only one vault is open at a time.",
+    "unlock_invisible_password": "Password",
+    "unlock_invisible_password_placeholder": "Vault password",
+    "unlock_invisible_error": "Nothing to reveal.",
+    "unlock_invisible_cancel": "Cancel",
+    "unlock_invisible_submit": "Open",
+    "sync_now": "Sync now",
+    "export_data": "Export data",
+    "import_data": "Import data"
+  },
+  "footer": {
+    "navigate": "navigate",
+    "select": "select",
+    "close": "close"
+  },
+  "find": {
+    "placeholder": "Find in entry…",
+    "no_matches": "No matches",
+    "previous": "Previous match",
+    "next": "Next match",
+    "close": "Close find",
+    "aria_label": "Find in editor"
+  }
+}

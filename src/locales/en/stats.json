@@ -1,0 +1,126 @@
+{
+  "page": {
+    "title": "Statistics",
+    "description": "Visualize your journaling patterns and review AI activity across your entries."
+  },
+  "tabs": {
+    "charts": "Charts",
+    "insights": "Insights",
+    "reviews": "Reviews",
+    "usage": "AI usage",
+    "audit": "AI audit log"
+  },
+  "insights": {
+    "title": "Insights",
+    "description": "See how your logged emotions trend over time, then ask AI to surface recurring themes and mood drivers for the period.",
+    "emotion_trend_title": "Emotion trend",
+    "emotion_trend_empty_hint": "Tag entries with an emotion to see trends here.",
+    "ai_themes_title": "AI themes for this period",
+    "ai_themes_description": "On-demand analysis of recurring themes and likely mood drivers. Uses entry text from the selected period.",
+    "disabled_hint": "Enable “Theme insights” in Settings → AI to generate themes.",
+    "needs_provider_hint": "Configure a generation provider in Settings → AI first.",
+    "needs_privacy_hint": "Accept the AI privacy notice in Settings → AI first.",
+    "generate": "Generate themes",
+    "generating": "Analyzing…",
+    "regenerate": "Regenerate",
+    "cached_hint": "Loaded from cache.",
+    "section_themes": "Recurring themes",
+    "section_mood_drivers": "Likely mood drivers",
+    "section_empty": "None noted.",
+    "entry_count": "Based on {{count}} entries"
+  },
+  "period": {
+    "label": "Period",
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "365d": "1y",
+    "all": "All"
+  },
+  "chart": {
+    "entries_over_time": {
+      "title": "Entries Over Time",
+      "tooltip": "entries"
+    },
+    "word_count": {
+      "title": "Total Words",
+      "label": "words in selected range"
+    },
+    "mood_histogram": {
+      "title": "Mood Distribution"
+    },
+    "mood_trend": {
+      "title": "Mood Distribution"
+    },
+    "emotion_heatmap": {
+      "title": "Emotions Across the Year",
+      "year_label": "Feelings in {{year}}"
+    },
+    "tag_frequency": {
+      "title": "Top Tags",
+      "tooltip": "entries",
+      "no_tags": "No tags yet"
+    },
+    "writing_volume": {
+      "title": "Writing Volume",
+      "tooltip": "words",
+      "axis_y": "Words"
+    },
+    "streak_calendar": {
+      "title": "Writing Streak",
+      "year_label": "{{year}} Writing Streak",
+      "less": "Less",
+      "more": "More"
+    },
+    "location_heatmap": {
+      "title": "Location Heatmap",
+      "empty": "No geotagged entries yet — add a location in the toolbar to see this map.",
+      "tooltip": "{{count}} entries",
+      "mapkit_notice": "The heatmap needs the Offline or MapTiler map source. Apple Maps cannot show a heatmap overlay yet."
+    }
+  },
+  "mood_legend": {
+    "label": "Mood breakdown",
+    "entries": "entries"
+  },
+  "empty": {
+    "no_data": "No data for this period",
+    "no_data_hint": "Write a few entries to see your stats here.",
+    "load_failed": "Couldn't load charts.",
+    "retry": "Retry"
+  },
+  "export": {
+    "button": "Export",
+    "modal": {
+      "title": "Export statistics",
+      "sections_label": "What to include",
+      "format_label": "Format",
+      "png_hint": "PNG snapshots are only available when the Charts section is selected.",
+      "png_needs_charts": "PNG snapshots require the Charts section to be selected.",
+      "png_needs_visible": "Open the Charts tab first — PNG captures the rendered chart SVGs.",
+      "export_button": "Export",
+      "exporting": "Exporting…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "saved_to": "Saved to"
+    },
+    "section": {
+      "charts": "Charts data",
+      "usage": "AI usage",
+      "audit": "AI audit log"
+    },
+    "format": {
+      "csv": "CSV",
+      "json": "JSON",
+      "html": "HTML",
+      "png": "PNG",
+      "pdf": "PDF"
+    },
+    "error": {
+      "empty": "Nothing to export for the chosen format and sections yet."
+    }
+  },
+  "tab_sections": {
+    "statistics": "Statistics sections"
+  }
+}

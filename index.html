@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Boot-time class is stamped from the persisted design system, surface
+     style, and theme (localStorage 'memlore-ui') so once globals.css loads
+     the matching tokens resolve immediately — including Signature and Clean
+     light. Leftover designSystem 'lumen' is Signature + surface-lumen. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Boot-time background shim: globals.css (which sets
+         `body { background: var(--color-app) }`) is JS-injected via main.tsx,
+         so nothing paints the app background until the whole bundle (React +
+         @fontsource) has loaded — several seconds of white on a cold start.
+         This script paints the matching --color-app colour (Clean light
+         #ffffff, Clean dark #252525, Signature light #f4f3f1, Signature
+         dark #0d0d0d, Signature Lumen surface dark #05070d = oklch(13% 0.014 265),
+         Clay light #ebe3d6, Clay dark #171513)
+         on the very first frame, before any CSS or JS loads. Lumen is a
+         Signature-only dark surface. -->
+    <script>
+      ;(function () {
+        var ds = 'signature',
+          theme = 'dark',
+          surface = 'deep',
+          radius = 'low'
+        try {
+          var p = JSON.parse(localStorage.getItem('memlore-ui') || '{}').state || {}
+          if (p.designSystem === 'clean') ds = 'clean'
+          if (p.designSystem === 'clay') ds = 'clay'
+          if (p.surfaceStyle === 'lumen' || p.surfaceStyle === 'soft' || p.surfaceStyle === 'deep')
+            surface = p.surfaceStyle
+          if (p.designSystem === 'lumen') surface = 'lumen'
+          if (p.theme === 'light' || p.theme === 'dark') theme = p.theme
+          if (p.cornerRadius === 'medium' || p.cornerRadius === 'high' || p.cornerRadius === 'low')
+            radius = p.cornerRadius
+        } catch (e) {}
+        var light = theme === 'light'
+        if (ds === 'signature' && surface === 'lumen') light = false
+        var cls = 'ds-' + ds + (light ? '' : ' dark')
+        if (!light && ds === 'signature') {
+          if (surface === 'lumen') cls += ' surface-lumen'
+          else if (surface === 'soft') cls += ' surface-soft'
+        }
+        if (radius === 'medium') cls += ' rad-medium'
+        else if (radius === 'high') cls += ' rad-high'
+        var r = document.documentElement
+        r.className = cls
+        r.style.backgroundColor = light
+          ? ds === 'clean'
+            ? '#ffffff'
+            : ds === 'clay'
+              ? '#ebe3d6'
+              : '#f4f3f1'
+          : ds === 'signature' && surface === 'lumen'
+            ? '#05070d'
+            : ds === 'clean'
+              ? '#252525'
+              : ds === 'clay'
+                ? '#171513'
+                : '#0d0d0d'
+      })()
+    </script>
+    <link rel="icon" type="image/png" href="/logo-without-container/256.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memlore</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

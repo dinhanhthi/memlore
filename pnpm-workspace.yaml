@@ -1,0 +1,7 @@
+allowBuilds:
+  core-js: true
+
+ignoredBuiltDependencies:
+  - core-js@3.49.0
+
+managePackageManagerVersions: false

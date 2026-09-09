@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Required for biometric (Touch ID) unlock.
+
+      `commands/keychain.rs` stores the os_kek as a generic password guarded by
+      a SecAccessControl with BIOMETRY_CURRENT_SET. macOS refuses that with
+      errSecMissingEntitlement ("A required entitlement isn't present") unless
+      the binary is signed with a real team identity AND declares the keychain
+      access group it writes to.
+
+      An ad-hoc/linker-signed binary — which is what `cargo build` produces by
+      default — can never satisfy this, so biometric unlock silently fails to
+      enable in an unsigned dev build. See scripts/sign-dev.sh.
+    -->
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)app.memlore</string>
+    </array>
+</dict>
+</plist>

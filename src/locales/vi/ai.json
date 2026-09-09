@@ -1,0 +1,1280 @@
+{
+  "privacy_top_banner": {
+    "already_accepted_prefix": "Bạn đã chấp nhận ",
+    "already_accepted_link": "thông báo riêng tư AI",
+    "review_notice": "Xem thông báo riêng tư AI",
+    "aria_view_notice": "Mở thông báo riêng tư AI",
+    "aria_review": "Xem thông báo riêng tư AI trước khi dùng nhà cung cấp không cục bộ."
+  },
+  "privacy_banner_local": "Mọi yêu cầu AI sẽ đi tới {{host}} trên máy tính của bạn. Không có dữ liệu nào rời khỏi máy.",
+  "privacy_banner_remote": "Các mục bạn xử lý bằng AI sẽ được gửi tới {{host}}. Nhà cung cấp có thể lưu lại các yêu cầu theo điều khoản dịch vụ của họ.",
+  "privacy_banner_subscription_short": "CLI cục bộ xử lý xác thực. Memlore không bao giờ thấy API key của bạn; các lệnh gọi AI tính vào hạn mức gói đăng ký.",
+  "privacy_banner_subscription": "Prompt của bạn được trao cho CLI {{cli}} cục bộ, sau đó chuyển tiếp tới {{upstream}} qua gói đăng ký của bạn. Memlore không bao giờ thấy API key.",
+  "embed_slot_pair_hint": "💡 {{label}} chỉ dùng để trò chuyện. Để mở khoá tìm kiếm ngữ nghĩa, gợi ý cảm xúc và việc dùng nhật ký trong Trò chuyện hằng ngày, hãy cấu hình một nhà cung cấp embedding (Voyage / Ollama / OpenAI) ở tab Mô hình.",
+  "cli_slow_warning": "Nhà cung cấp CLI chạy tiến trình cục bộ. Xử lý có thể mất nhiều thời gian hơn bình thường.",
+  "cli_health": {
+    "checking_status": "Đang kiểm tra trạng thái CLI…",
+    "checking_button": "Đang kiểm tra…",
+    "error_prefix": "Kiểm tra trạng thái thất bại:",
+    "try_again": "Thử lại",
+    "not_found": "Không tìm thấy CLI.",
+    "not_signed_in": "CLI đã cài nhưng chưa đăng nhập.",
+    "version_label": "Phiên bản: {{version}}",
+    "recheck": "Kiểm tra lại",
+    "recheck_after": "Kiểm tra lại sau khi chạy",
+    "ready": "CLI sẵn sàng — đã đăng nhập qua gói đăng ký."
+  },
+  "provider_picker": {
+    "needs_api_key": "Cần khoá API",
+    "hosted_not_allowed": "Không cho phép nhà cung cấp đám mây cho bộ nhớ"
+  },
+  "section": {
+    "provider": "Nhà cung cấp",
+    "privacy": "Quyền riêng tư",
+    "features": "Tính năng",
+    "features_rag": "Tính năng cần lập chỉ mục (RAG)",
+    "features_general": "Tính năng AI chung"
+  },
+  "group": {
+    "local": "Ưu tiên riêng tư / chạy hoàn toàn cục bộ",
+    "subscription": "CLI gói đăng ký",
+    "hosted": "Dịch vụ đám mây",
+    "cli": "CLI gói đăng ký",
+    "integrated": "Trên thiết bị"
+  },
+  "providers_tab": {
+    "test_local_button": "Kiểm tra khả năng kết nối",
+    "test_local_hint": "Kiểm tra xem máy chủ có phản hồi không và liệt kê các mô hình sẵn có — không gọi chat hay nhúng.",
+    "test_model_label": "Mô hình kiểm tra",
+    "test_model_placeholder": "ID mô hình để kiểm tra",
+    "test_detail_latency": "{{ms}} ms",
+    "test_detail_embed": "{{dim}} chiều · {{ms}} ms",
+    "test_models_found_one": "Tìm thấy {{count}} mô hình · {{ms}} ms",
+    "test_models_found_other": "Tìm thấy {{count}} mô hình · {{ms}} ms",
+    "integrated_chat_title": "Mô hình chat tích hợp",
+    "integrated_embed_title": "Mô hình embedding tích hợp",
+    "connected_title": "Nhà cung cấp đã kết nối",
+    "available_title": "Nhà cung cấp khả dụng",
+    "connected_empty": "Chưa kết nối nhà cung cấp nào.",
+    "available_empty": "Tất cả nhà cung cấp đã được kết nối.",
+    "connect": "Kết nối",
+    "disconnect": "Ngắt kết nối",
+    "disconnect_confirm_title": "Ngắt kết nối nhà cung cấp này?",
+    "disconnect_confirm_body": "Nhà cung cấp sẽ bị gỡ khỏi danh sách đã kết nối. Không có gì bị xóa khỏi thiết bị của bạn — bạn có thể kết nối lại bất cứ lúc nào.",
+    "config": "Cấu hình",
+    "downloaded_models": "Đã tải:",
+    "desc": {
+      "ollama": "Chạy mô hình cục bộ qua ứng dụng Ollama — không dữ liệu nào rời máy bạn.",
+      "lmstudio": "Máy chủ cục bộ từ ứng dụng LM Studio.",
+      "llama-server": "Máy chủ llama.cpp do bạn tự chạy.",
+      "other-local": "Bất kỳ máy chủ tương thích OpenAI nào trên máy hoặc mạng LAN của bạn.",
+      "claude-cli": "Dùng CLI claude và gói thuê bao Claude của bạn. Chỉ chat.",
+      "codex-cli": "Dùng CLI codex và gói thuê bao ChatGPT của bạn. Chỉ chat.",
+      "openai": "API lưu trữ — chat, ảnh và embedding. Cần API key.",
+      "anthropic": "API lưu trữ — chỉ chat. Cần API key.",
+      "gemini": "API lưu trữ — chat và embedding. Cần API key.",
+      "xai": "API lưu trữ — chat và ảnh. Cần API key.",
+      "openrouter": "Một API key cho hàng trăm mô hình lưu trữ.",
+      "together": "API lưu trữ cho các mô hình open-weight. Cần API key.",
+      "groq": "Suy luận lưu trữ tốc độ cao — chỉ chat. Cần API key.",
+      "voyage": "Embedding lưu trữ — kết hợp tốt với Anthropic.",
+      "custom": "Endpoint tương thích OpenAI của riêng bạn.",
+      "on-device-llm": "Mô hình chat ngoại tuyến do Memlore quản lý — không máy chủ, không khóa API.",
+      "on-device": "Mô hình embedding ngoại tuyến do Memlore quản lý — không máy chủ, không khóa API."
+    }
+  },
+  "provider_hint": {
+    "ollama": "Khuyến nghị — chạy ngay trên máy của bạn nên không có dữ liệu nào rời khỏi máy. Cài Ollama, sau đó tải một mô hình trò chuyện và một mô hình nhúng; danh sách chọn cũng tự nhận các mô hình bạn đã có sẵn.",
+    "lmstudio": "Chạy ngay trên máy của bạn — không có dữ liệu nào rời khỏi máy. Cài LM Studio, nạp một mô hình trò chuyện + một mô hình nhúng, rồi bấm \"Start Server\" (cổng mặc định 1234).",
+    "llama-server": "Chạy ngay trên máy của bạn — không có dữ liệu nào rời khỏi máy. Biên dịch llama.cpp rồi chạy `llama-server -m <model.gguf> -c 4096`; thêm `--embedding` để bật endpoint nhúng.",
+    "other-local": "Chạy ngay trên máy của bạn — không có dữ liệu nào rời khỏi máy. Bất kỳ máy chủ tương thích OpenAI nào trên localhost hoặc mạng LAN riêng; hãy sửa endpoint cho khớp với thiết lập của bạn.",
+    "on-device": "Chạy hoàn toàn ngoại tuyến trên thiết bị này — không cần máy chủ, không cần khoá API, không tốn token. Tải một mô hình bên dưới để bắt đầu.",
+    "on-device-llm": "Chạy hoàn toàn ngoại tuyến trên thiết bị này — không cần máy chủ, không cần khoá API, không tốn token. Tải một mô hình trò chuyện bên dưới; trình đi kèm llama-server sẽ tự khởi động khi dùng lần đầu và tự dừng sau khoảng 10 phút không hoạt động.",
+    "claude-cli": "Tái sử dụng CLI `claude` bạn đã đăng nhập sẵn — Memlore không bao giờ thấy khoá API của bạn, và các yêu cầu được tính vào gói đăng ký Claude. Chạy `claude /login` một lần. Chỉ trò chuyện: hãy ghép thêm một nhà cung cấp nhúng.",
+    "codex-cli": "Tái sử dụng CLI `codex` bạn đã đăng nhập sẵn — Memlore không bao giờ thấy khoá API của bạn, và các yêu cầu được tính vào gói đăng ký ChatGPT. Chạy `codex login` một lần. Câu trả lời trả về một lần, không phát trực tiếp.",
+    "openai": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại platform.openai.com → API keys.",
+    "anthropic": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại console.anthropic.com → Settings → API keys. Không hỗ trợ nhúng hay tạo ảnh ở đây.",
+    "gemini": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại aistudio.google.com → Get API key.",
+    "xai": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại console.x.ai → API keys. Endpoint này không hỗ trợ nhúng hay tạo ảnh.",
+    "openrouter": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Một khoá, hàng trăm mô hình: tạo khoá tại openrouter.ai → Keys.",
+    "together": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại api.together.ai → Settings → API keys.",
+    "groq": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại console.groq.com → API keys. Groq không có mô hình nhúng — hãy chọn nhà cung cấp khác cho các tính năng đó.",
+    "voyage": "Chất lượng tốt hơn, không cần cài đặt — nhưng văn bản nhật ký sẽ rời khỏi máy của bạn. Tạo khoá API tại dashboard.voyageai.com → API Keys. Kết hợp tốt với Anthropic (Claude) cho phần tạo nội dung.",
+    "custom": "Sử dụng endpoint tương thích OpenAI của riêng bạn — tiện cho các gateway tự vận hành (Cloudflare AI Gateway, Portkey, …). Dữ liệu có rời khỏi máy hay không tuỳ thuộc vào nơi endpoint trỏ tới."
+  },
+  "field": {
+    "preset": "Nhà cung cấp",
+    "endpoint": "Endpoint",
+    "api_key": "Khóa API",
+    "api_key_optional": "Khóa API (tùy chọn)",
+    "api_key_set": "Đã lưu (một khóa được lưu trữ)",
+    "api_key_replace": "Thay khóa",
+    "api_key_paste": "Dán khóa của bạn",
+    "chat_model": "Mô hình chat",
+    "embedding_model": "Mô hình embedding",
+    "image_model": "Mô hình ảnh",
+    "on_device_no_models": "Chưa tải mô hình nào.",
+    "on_device_no_models_link": "Tải một mô hình ở tab Nhà cung cấp"
+  },
+  "models": {
+    "group_suggested": "Gợi ý",
+    "badge_installed": "Đã cài",
+    "badge_recommended": "Khuyến nghị",
+    "custom": "Tùy chỉnh…",
+    "ollama_unreachable": "Không kết nối được tới máy chủ Ollama tại 127.0.0.1:11434. Hãy khởi động Ollama để thấy các mô hình bạn đã cài."
+  },
+  "action": {
+    "test": "Kiểm tra kết nối",
+    "testing": "Đang kiểm tra…",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "forget_confirm_title": "Quên nhà cung cấp AI?",
+    "forget_confirm_body": "Hành động này xóa nhà cung cấp, endpoint và khóa API đã lưu khỏi thiết bị này. Các tính năng AI sẽ bị tắt cho tới khi bạn cấu hình lại.",
+    "forget_cancel": "Hủy",
+    "delete": "Xoá",
+    "close": "Đóng",
+    "accept_privacy": "Tôi hiểu và đồng ý",
+    "save_no_changes": "Không có thay đổi nào để lưu",
+    "accepted": "Đã chấp nhận lúc {{when}}",
+    "read_more": "Tìm hiểu thêm",
+    "save_invalidated_privacy": "Endpoint đã thay đổi — vui lòng chấp nhận lại thông báo riêng tư bên dưới."
+  },
+  "test_result": {
+    "fail": "Kiểm tra thất bại: {{message}}",
+    "ok_chat": "Kết nối đã được cấu hình đúng",
+    "ok_embed": "Kết nối đã được cấu hình đúng",
+    "ok_local": "Máy chủ có thể kết nối được"
+  },
+  "feature": {
+    "semantic_search": {
+      "title": "Tìm kiếm ngữ nghĩa",
+      "description": "Tìm mục theo ý nghĩa, không chỉ từ khóa."
+    },
+    "emotion_suggestions": {
+      "title": "Gợi ý cảm xúc",
+      "description": "Gợi ý cảm xúc khi bạn viết."
+    },
+    "title_suggestions": {
+      "title": "Tạo tiêu đề",
+      "description": "Tiêu đề một dòng cho mục."
+    },
+    "entry_highlights": {
+      "title": "Điểm nổi bật của mục",
+      "description": "Chủ đề và khoảnh khắc sau khi lưu."
+    },
+    "go_deeper": {
+      "title": "Đi sâu hơn",
+      "description": "Câu hỏi suy ngẫm từ nội dung bạn viết."
+    },
+    "continue_writing": {
+      "title": "Viết tiếp & Viết lại",
+      "description": "Viết tiếp nhật ký từ chân trang, hoặc viết lại đoạn đang chọn — đều theo giọng văn của bạn."
+    },
+    "daily_chat": {
+      "title": "Trò chuyện hằng ngày",
+      "description": "Trò chuyện về ngày của bạn; lưu thành mục."
+    },
+    "user_memory": {
+      "title": "Bộ nhớ người dùng",
+      "description": "Ghi nhớ dữ kiện về bạn cho Trò chuyện hằng ngày. Ở trên máy trừ khi chọn mô hình hosted."
+    },
+    "image_generation": {
+      "title": "Tạo ảnh bằng AI",
+      "description": "Ảnh bìa và hình minh họa.",
+      "requires_model": "Hãy cấu hình một Mô hình ảnh ở trên để bật tính năng này."
+    },
+    "multi_entry_summary": {
+      "title": "Tóm tắt bằng AI",
+      "description": "Tóm tắt một hoặc nhiều mục."
+    },
+    "periodic_review": {
+      "title": "Tổng kết định kỳ",
+      "description": "Tổng kết tuần/tháng trong Thống kê → Tổng kết."
+    },
+    "theme_insights": {
+      "title": "Phân tích chủ đề",
+      "description": "Chủ đề lặp lại trong Thống kê → Phân tích."
+    },
+    "dashboard_insights": {
+      "title": "Insight trên Tổng quan",
+      "description": "Dùng lại Phân tích chủ đề cho 30 ngày gần nhất; chỉ sinh khi bạn nhấn Generate."
+    },
+    "tag_suggestions": {
+      "title": "Gợi ý thẻ bằng AI",
+      "description": "Gợi ý thẻ từ nội dung mục."
+    },
+    "disabled": {
+      "configure_generation": "Hãy cấu hình nhà cung cấp tạo sinh ở tab Mô hình trước.",
+      "configure_image": "Hãy cấu hình nhà cung cấp ảnh ở tab Mô hình trước.",
+      "configure_embedding": "Hãy cấu hình nhà cung cấp embedding ở tab Mô hình trước.",
+      "accept_privacy": "Hãy chấp nhận thông báo riêng tư AI trong Cài đặt → AI trước.",
+      "needs_persona": "Cần Phong cách — hãy bật ở Cài đặt → AI → Phong cách."
+    },
+    "rag_group": {
+      "warning_needs_provider": "Thiết bị này chưa kết nối nhà cung cấp embedding — hãy kết nối ở tab Nhà cung cấp.",
+      "warning_many_pending": "Còn nhiều mục chờ lập chỉ mục — kết quả có thể chưa đầy đủ.",
+      "warning_needs_consent": "Lập chỉ mục hosted cần đồng ý — xem lại ở tab Mô hình."
+    },
+    "accordion": {
+      "enable_to_configure": "Bật để cấu hình."
+    },
+    "chat_rag": {
+      "title": "Dùng nhật ký của tôi trong cuộc trò chuyện",
+      "description": "Cho phép Trò chuyện hằng ngày dùng mục đã viết. Gửi nội dung mục tới nhà cung cấp AI mỗi lượt."
+    },
+    "chat_memory": {
+      "title": "Ký ức trong Trò chuyện",
+      "description": "Truy xuất ký ức đã lưu và thêm vào câu trả lời của Trò chuyện hằng ngày."
+    }
+  },
+  "usage_warning": {
+    "daily_chat": "Chat dài gửi lại toàn bộ lịch sử mỗi lượt — chi phí tăng theo độ dài.",
+    "image_generation": "Mỗi ảnh thường là loại lệnh gọi tốn nhất.",
+    "multi_entry_summary": "Gửi mọi mục đã chọn trong một lệnh gọi — chi phí tăng theo số mục.",
+    "periodic_review": "Gửi mọi mục trong khoảng thời gian trong một lệnh gọi.",
+    "theme_insights": "Gửi mọi mục trong khoảng thời gian trong một lệnh gọi.",
+    "dashboard_insights": "Gửi mọi mục trong 30 ngày gần nhất trong một lệnh gọi.",
+    "rebuild_index": "Nhúng lại mọi mục — tốn kém với nhà cung cấp hosted.",
+    "chat_rag": "Mỗi lượt truy xuất và gửi mục khớp — chi phí lặp lại theo tin nhắn.",
+    "user_memory": "Trích xuất + embedding nhỏ; mặc định trên máy."
+  },
+  "empty": {
+    "title": "Chưa cấu hình nhà cung cấp AI",
+    "body": "Chọn một nhà cung cấp ở trên để bật các tính năng AI. Chúng tôi khuyến nghị một máy chủ 🔒 cục bộ (Ollama / LM Studio / llama-server) để dữ liệu của bạn ở lại trên máy."
+  },
+  "privacy_locked": {
+    "title": "Chấp nhận thông báo riêng tư để bật các tính năng",
+    "body": "Sau khi bạn cấu hình nhà cung cấp và bấm \"Tôi hiểu và đồng ý\" bên dưới, các công tắc bên dưới sẽ được mở khóa."
+  },
+  "no_providers_banner": {
+    "title": "Chưa cấu hình nhà cung cấp AI nào",
+    "body": "Các tính năng AI đang tắt vì chưa có nhà cung cấp nào được thiết lập. Thêm một nhà cung cấp để bật lại trò chuyện, tìm kiếm ngữ nghĩa và các tính năng AI khác.",
+    "action": "Đi tới Nhà cung cấp"
+  },
+  "setup_attention": {
+    "slot_chat": "Chat",
+    "slot_image": "Ảnh",
+    "slot_embed": "Nhúng",
+    "slot_list_sep": ", ",
+    "privacy": {
+      "title": "Cần chấp nhận thông báo quyền riêng tư",
+      "body": "Đã có nhà cung cấp AI không cục bộ, nhưng các tính năng vẫn bị khóa cho đến khi bạn chấp nhận thông báo quyền riêng tư.",
+      "action": "Xem thông báo"
+    },
+    "slots_not_connected": {
+      "title": "Nhà cung cấp chưa kết nối trên thiết bị này",
+      "body": "Các mô hình sau vẫn cần kết nối tại đây: {{slots}}. Kết nối nhà cung cấp tương ứng ở tab Nhà cung cấp (API key không đồng bộ giữa các thiết bị).",
+      "action": "Đi tới Nhà cung cấp"
+    },
+    "embed_not_configured": {
+      "title": "Chưa chọn mô hình embedding",
+      "body": "Chat có thể chạy, nhưng tìm kiếm ngữ nghĩa, ký ức và các tính năng liên quan cần một nhà cung cấp và mô hình embedding ở tab Mô hình.",
+      "action": "Đi tới Mô hình"
+    }
+  },
+  "adopt_setup": {
+    "title": "Thiết lập AI trên thiết bị này?",
+    "body": "Máy khác đã cấu hình AI ({{slots}}). API key ở lại từng máy, nên thiết bị này vẫn cần thông tin đăng nhập.",
+    "yes": "Thiết lập",
+    "cancel": "Hủy",
+    "wizard_title": "Hoàn tất thiết lập AI"
+  },
+  "privacy_modal": {
+    "title": "Thông báo quyền riêng tư AI",
+    "sections_title": "Cách mỗi nhà cung cấp xử lý dữ liệu của bạn",
+    "intro": "Memlore có thể dùng ba loại nhà cung cấp AI. Mô hình cục bộ giữ mục nhật ký trên máy bạn. CLI gói đăng ký và API hosted có thể gửi nội dung mục tới dịch vụ bên ngoài. Vui lòng đọc cách mỗi loại xử lý dữ liệu trước khi tiếp tục với nhà cung cấp không cục bộ.",
+    "local_title": "Mô hình cục bộ — ở trên máy của bạn",
+    "local_description": "Nội dung của bạn được gửi tới một máy chủ chạy ngay trên máy bạn (Ollama, LM Studio, llama.cpp, …). Không có gì rời khỏi máy; không có upload nào ra Internet.",
+    "subscription_title": "Subscription CLI — dùng gói Claude / ChatGPT của bạn",
+    "subscription_description": "Memlore trao prompt cho CLI cục bộ (claude / codex) mà bạn đã đăng nhập. CLI sau đó chuyển tiếp tới Anthropic hoặc OpenAI bằng gói đăng ký của bạn. Memlore không bao giờ thấy API key, và các lệnh gọi AI tính vào hạn mức gói.",
+    "remote_title": "Mô hình hosted / bên ngoài — dữ liệu rời khỏi máy của bạn",
+    "remote_description": "Nội dung của bạn được upload tới một nhà cung cấp hosted (OpenAI, Anthropic, Voyage, …) qua HTTPS. Nhà cung cấp đó nhận được văn bản nhật ký cộng với mọi truy vấn bạn thực hiện. Chính sách quyền riêng tư của họ và điều khoản tài khoản của bạn áp dụng cho dữ liệu đó.",
+    "scope_footnote": "Bạn chỉ cần chấp nhận thông báo này một lần. Sau đó, mọi nhà cung cấp không cục bộ và mọi tính năng AI gửi nhiều mục đều được bao phủ — kể cả khi chuyển giữa API hosted và CLI gói đăng ký.",
+    "bullet_remote_text": "Văn bản nhật ký đã giải mã được gửi tới nhà cung cấp để xử lý yêu cầu của bạn.",
+    "bullet_remote_query": "Các chuỗi truy vấn tìm kiếm và prompt sinh ảnh cũng rời khỏi thiết bị.",
+    "bullet_remote_log": "Nhà cung cấp có thể lưu các yêu cầu vô thời hạn theo điều khoản dịch vụ.",
+    "bullet_remote_cache": "Embedding sinh ra được lưu cục bộ để các lần tìm kiếm sau không phải trả chi phí lại.",
+    "bullet_local_loop": "Yêu cầu nằm trong máy của bạn — không có vòng quay internet.",
+    "bullet_local_server": "Máy chủ cục bộ bạn cấu hình xử lý mọi suy luận.",
+    "bullet_local_cache": "Embedding sinh ra được lưu cục bộ để các lần tìm kiếm sau không phải tính lại.",
+    "bullet_subscription_cli": "Memlore khởi chạy CLI {{cli}} như một tiến trình con. CLI tự dùng phiên đăng nhập của nó (chạy `claude /login` / `codex login` một lần); Memlore không bao giờ thấy API key.",
+    "bullet_subscription_upstream": "CLI sau đó gửi prompt của bạn tới máy chủ {{upstream}} như thể bạn gõ trực tiếp trong CLI. Chính sách riêng tư của {{upstream}} và điều khoản của gói đăng ký áp dụng.",
+    "bullet_subscription_quota": "Các tính năng AI tính vào hạn mức gói đăng ký — giống như khi bạn dùng CLI trực tiếp.",
+    "bullet_subscription_tools": "Memlore tắt các công cụ CLI (filesystem, shell, MCP). Mô hình chỉ có thể trả về văn bản."
+  },
+  "error": {
+    "AI_NOT_CONFIGURED": "Hãy cấu hình nhà cung cấp AI trước.",
+    "AI_PRIVACY_NOT_ACCEPTED": "Hãy chấp nhận thông báo riêng tư để bật tính năng này.",
+    "AI_PROVIDER_UNSUPPORTED": "Nhà cung cấp này không hỗ trợ thao tác đó.",
+    "AI_PROVIDER_ERROR": "Có lỗi khi giao tiếp với nhà cung cấp.",
+    "AI_AUTH_FAILED": "Khóa API bị từ chối — hãy nhập lại.",
+    "AI_RATE_LIMITED": "Nhà cung cấp đã giới hạn tần suất — hãy thử lại sau.",
+    "AI_BACKFILL_ALREADY_RUNNING": "Quá trình lập chỉ mục đang chạy.",
+    "AI_BACKFILL_FAILED": "Lập chỉ mục thất bại — hãy thử lại.",
+    "AI_GO_DEEPER_DISABLED": "Khám phá sâu hơn đang tắt trong Cài đặt → AI.",
+    "AI_CONTINUE_WRITING_DISABLED": "Viết tiếp & Viết lại đang tắt trong Cài đặt → AI.",
+    "AI_GO_DEEPER_TOO_SHORT": "Hãy viết thêm (ít nhất 80 từ) trước khi xin gợi ý.",
+    "AI_DAILY_CHAT_DISABLED": "Trò chuyện hằng ngày đang tắt trong Cài đặt → AI.",
+    "AI_IMAGE_GENERATION_DISABLED": "Tạo ảnh đang tắt trong Cài đặt → AI.",
+    "AI_IMAGE_PROMPT_EMPTY": "Hãy nhập gợi ý trước khi tạo.",
+    "AI_PERSONA_DISABLED": "Hãy bật Phong cách ở Cài đặt → AI → Phong cách để dùng mục này."
+  },
+  "backfill": {
+    "title": "Chỉ mục embedding",
+    "description": "Hỗ trợ Tìm kiếm ngữ nghĩa, Gợi ý cảm xúc và việc dùng nhật ký trong Trò chuyện hằng ngày. Tạm dừng / Tiếp tục / Lập chỉ mục ngay điều khiển hàng đợi; Xây lại nhúng lại toàn bộ từ đầu (hữu ích sau khi đổi model).",
+    "indexed_count": "Đã lập chỉ mục {{indexed}} / {{total}} mục",
+    "reindex_needed": "Đã đổi mô hình nhúng — hãy lập chỉ mục lại để tìm kiếm ngữ nghĩa và gợi ý cảm xúc dùng vector mới.",
+    "reindex_start": "Lập chỉ mục lại ngay",
+    "reindex_dismiss": "Để sau",
+    "pending": "{{count}} mục đang chờ được lập chỉ mục",
+    "in_progress": "Đang lập chỉ mục {{indexed}} / {{total}} mục…",
+    "pause": "Tạm dừng",
+    "resume": "Tiếp tục",
+    "index_now": "Lập chỉ mục ngay",
+    "rebuild": "Xây lại chỉ mục",
+    "rebuild_confirm_title": "Xây lại chỉ mục embedding?",
+    "rebuild_confirm_body": "Thao tác này xoá các vector hiện có của mô hình đang dùng và nhúng lại toàn bộ mục từ đầu. Việc này có thể mất một lúc, và với nhà cung cấp hosted sẽ gọi lại nhà cung cấp đó cho từng mục.",
+    "rebuild_confirm_yes": "Xây lại chỉ mục",
+    "review_consent": "Xem lại & bật",
+    "complete": "Đã lập chỉ mục tất cả các mục.",
+    "status_up_to_date": "Đã cập nhật",
+    "status_needs_provider": "Cần nhà cung cấp embedding",
+    "status_waiting": "Đang chờ các thay đổi ổn định",
+    "status_waiting_help": "Sau khi bạn ngừng chỉnh sửa, hệ thống chờ vài phút rồi mới lập chỉ mục để gõ liên tục không kích hoạt nhúng lại nhiều lần. Chỉ các đoạn đã đổi mới được nhúng lại. Dùng “Lập chỉ mục ngay” để bỏ qua thời gian chờ.",
+    "status_stuck": "Một số mục bị kẹt — Lập chỉ mục ngay sẽ xếp lại chúng vào hàng đợi",
+    "status_indexing": "Đang lập chỉ mục {{count}} mục",
+    "status_paused": "Đã tạm dừng",
+    "status_needs_consent": "Cần đồng ý",
+    "status_error": "Lỗi nhà cung cấp",
+    "status_downloading_model": "Đang tải… {{percent}}%",
+    "status_model_error": "Tải mô hình thất bại",
+    "status_needs_decision": "Cần quyết định"
+  },
+  "embedding_decision": {
+    "title": "Đồng bộ embedding cần quyết định",
+    "intro": "Thiết bị khác dùng mô hình embedding khác, hoặc thiết bị này chưa lập chỉ mục được. Hãy chọn cách xử lý — Memlore sẽ không re-embed im lặng (có thể tốn token API). Tạm dừng chỉ ngừng re-embed từ thiết bị khác; chỉnh sửa mới trên máy này vẫn được lập chỉ mục.",
+    "slot_entry": "Embedding mục nhật ký",
+    "slot_memory": "Embedding ký ức",
+    "reason_model_mismatch": "Các thiết bị khác có vector của mô hình khác. Vector chỉ dùng được khi mô hình khớp với thiết bị này.",
+    "reason_missing_key": "Nhà cung cấp embedding đã cấu hình nhưng thiếu API key trên thiết bị này. Key không bao giờ đồng bộ.",
+    "reason_invalid_key": "Nhà cung cấp embedding từ chối API key trên thiết bị này. Kiểm tra hoặc nhập lại trong Cài đặt.",
+    "reason_unconfigured": "Thiết bị này chưa cấu hình nhà cung cấp embedding nên không chạy được phần việc đang chờ.",
+    "local_model": "Mô hình trên thiết bị này",
+    "peer_models": "Mô hình thấy trên thiết bị khác",
+    "pending_units": "Việc đang chờ",
+    "pending_units_value": "{{count}} đơn vị",
+    "action_reembed": "Re-embed bằng mô hình thiết bị này",
+    "action_switch": "Chuyển sang mô hình peer đã chọn",
+    "action_pause": "Tạm dừng backfill đồng bộ",
+    "pause_keeps_local": "Chỉnh sửa mới trên máy này vẫn được lập chỉ mục. Chỉ tạm dừng re-embed khi mô hình peer không khớp.",
+    "pause_all_close": "Tạm dừng phần chờ & đóng",
+    "open_ai_settings": "Mở cài đặt AI",
+    "needs_key_hint": "Mô hình đó cần API key trên thiết bị này. Mở cài đặt AI để thêm key, rồi thử lại.",
+    "error_select_peer": "Hãy chọn mô hình peer trước khi chuyển.",
+    "error_generic": "Có lỗi xảy ra. Hãy thử lại."
+  },
+  "background": {
+    "title": "Lập chỉ mục nền",
+    "description": "Giữ chỉ mục embedding cập nhật khi bạn viết. Sau khi bạn ngừng sửa, worker chờ vài phút rồi mới lập chỉ mục để gõ liên tục không kích hoạt nhúng lại nhiều lần. Chỉ chunk đã đổi mới được nhúng lại — văn bản không đổi được bỏ qua.",
+    "local_note": "Chạy cục bộ — không tốn token.",
+    "consent_title": "Lập chỉ mục nền với dịch vụ hosted sẽ tốn token",
+    "consent_body": "Lập chỉ mục nền sẽ gọi tới nhà cung cấp hosted bạn đã cấu hình để nhúng các mục mới và đã chỉnh sửa khi bạn viết. Việc này dùng hạn mức API của bạn, và chi phí tăng theo số lượng mục bạn viết và độ dài của chúng — văn bản không đổi sẽ được bỏ qua.",
+    "consent_accept": "Tôi hiểu, bật lập chỉ mục nền",
+    "consent_cancel": "Hủy",
+    "protected_title": "Bao gồm cả mục đã khoá",
+    "protected_description": "Mặc định tắt. Khi bật, lập chỉ mục nền cũng nhúng cả các mục đã khoá của bạn. Mục ẩn luôn bị loại trừ.",
+    "protected_risk_title": "Rủi ro",
+    "protected_risk_body": "Vector từ các mục này được lưu (và đồng bộ) ở dạng mã hoá như mọi vector khác, nhưng với nhà cung cấp hosted, nội dung mục sẽ được gửi tới nhà cung cấp đó để tính toán.",
+    "protected_benefit_title": "Lợi ích",
+    "protected_benefit_body": "Khi đó Tìm kiếm ngữ nghĩa và Trò chuyện hằng ngày cũng bao phủ được các mục đang khoá, không chỉ những mục hiện đang mở.",
+    "protected_read_note": "Các mục đang khoá và ẩn vẫn bị loại khỏi kết quả tìm kiếm và khỏi mọi thứ Trò chuyện hằng ngày truy xuất trong lúc chúng còn khoá hoặc ẩn — cài đặt này chỉ ảnh hưởng tới thứ được lập chỉ mục ở nền.",
+    "protected_confirm_enable": "Bật"
+  },
+  "on_device_models": {
+    "section_description": "Chạy hoàn toàn ngoại tuyến trên thiết bị này sau khi tải xong.",
+    "recommended_badge": "Đề xuất",
+    "ready_badge": "Sẵn sàng",
+    "current_model": "Mô hình đang dùng",
+    "download_size_label": "Dung lượng tải",
+    "approx_ram_label": "RAM ước tính",
+    "dim_context_label": "Chiều / ngữ cảnh",
+    "dim_context_value": "{{dim}} chiều / {{ctx}} token",
+    "multilingual_yes": "Đa ngôn ngữ",
+    "multilingual_no": "Tập trung tiếng Anh",
+    "high_ram_warning": "Mô hình này cần nhiều RAM hơn các mô hình khác ở đây — hãy kiểm tra máy của bạn có đủ RAM trước khi tải.",
+    "status_downloading": "Đang tải… {{percent}}%",
+    "status_error": "Tải xuống thất bại",
+    "status_error_detail": "Tải xuống thất bại: {{detail}}",
+    "eta": "còn khoảng {{seconds}}s",
+    "action_download": "Tải xuống",
+    "action_retry": "Thử lại",
+    "action_remove": "Xóa",
+    "action_use_for_embedding": "Dùng để embedding",
+    "remove_confirm_title": "Xóa {{name}}?",
+    "remove_confirm_description": "{{name}} sẽ bị xóa khỏi thiết bị này. Bạn có thể tải lại sau.",
+    "remove_confirm_description_active": "{{name}} đang là mô hình embedding bạn dùng. Xóa nó sẽ gỡ mô hình khỏi thiết bị này và dừng embedding trên thiết bị cho tới khi bạn tải lại hoặc chọn mô hình khác.",
+    "error_not_available_yet": "Tính năng tải mô hình trên thiết bị sẽ có cùng bản cập nhật runtime on-device.",
+    "error_not_supported": "Chưa hỗ trợ trên nền tảng này.",
+    "models": {
+      "multilingual-e5-base": {
+        "display_name": "multilingual-e5-base",
+        "when_to_choose": "Cân bằng tốt nhất cho nhật ký đa ngôn ngữ/tiếng Việt.",
+        "download_size": "~1,1 GB",
+        "approx_ram": "~1,5-2 GB"
+      },
+      "multilingual-e5-small": {
+        "display_name": "multilingual-e5-small",
+        "when_to_choose": "Lựa chọn đa ngôn ngữ nhẹ nhất; phù hợp máy ít RAM.",
+        "download_size": "~470 MB",
+        "approx_ram": "~0,6-1 GB"
+      },
+      "multilingual-e5-large": {
+        "display_name": "multilingual-e5-large",
+        "when_to_choose": "Chất lượng đa ngôn ngữ cao nhất; cần máy đủ mạnh.",
+        "download_size": "~2,2 GB",
+        "approx_ram": "~3-4 GB"
+      },
+      "nomic-embed-text-v1.5": {
+        "display_name": "nomic-embed-text-v1.5",
+        "when_to_choose": "Mục dài (ngữ cảnh 8K); mạnh nhất cho tiếng Anh.",
+        "download_size": "~275 MB",
+        "approx_ram": "~0,5-1 GB"
+      }
+    }
+  },
+  "on_device_llm": {
+    "section_description": "Tải một lần, rồi trò chuyện hoàn toàn ngoại tuyến trên thiết bị này.",
+    "binary_failed": "Tải trình on-device thất bại",
+    "start_failed_toast": "Không thể khởi động engine AI on-device ({{code}})",
+    "recommended_badge": "Đề xuất",
+    "ready_badge": "Sẵn sàng",
+    "selected": "Đã chọn",
+    "download_size_label": "Dung lượng",
+    "min_ram_label": "RAM tối thiểu",
+    "context_label": "Ngữ cảnh",
+    "multilingual_yes": "Đa ngôn ngữ",
+    "multilingual_no": "Đơn ngôn ngữ",
+    "action_download": "Tải xuống",
+    "action_cancel": "Hủy",
+    "action_retry": "Thử lại",
+    "action_select": "Chọn",
+    "action_delete": "Xóa",
+    "delete_confirm_title": "Xóa \"{{name}}\"?",
+    "delete_confirm_description": "Thao tác này sẽ gỡ các tệp mô hình đã tải khỏi thiết bị của bạn. Bạn có thể tải lại sau.",
+    "delete_confirm_description_active": "{{name}} đang là mô hình chat on-device bạn dùng. Xóa nó sẽ gỡ mô hình khỏi thiết bị này và dừng chat on-device cho tới khi bạn tải lại hoặc chọn mô hình khác.",
+    "status_downloading": "Đang tải… {{percent}}%",
+    "status_error": "Tải xuống thất bại",
+    "server_starting": "Đang khởi động trình on-device…",
+    "server_ready": "Trình on-device đã sẵn sàng",
+    "server_failed": "Trình on-device không thể khởi động",
+    "error_code_aria": "Mã lỗi",
+    "terms": {
+      "title": "Điều khoản sử dụng Gemma",
+      "summary": "Các mô hình Gemma được cấp phép theo Điều khoản sử dụng Gemma của Google. Bạn phải chấp nhận các điều khoản này trước khi tải mô hình về thiết bị. Memlore lưu biên nhận chấp nhận trên thiết bị; biên nhận không được đồng bộ.",
+      "accept": "Chấp nhận",
+      "cancel": "Hủy",
+      "link_label": "Đọc Điều khoản sử dụng Gemma"
+    },
+    "models": {
+      "gemma-4-e2b-it": {
+        "display_name": "Gemma 4 E2B (QAT Q4_0)",
+        "when_to_choose": "Nhẹ và nhanh nhất; phù hợp cho các mục ghi ngắn trên máy 8 GB."
+      },
+      "gemma-4-e4b-it": {
+        "display_name": "Gemma 4 E4B (QAT Q4_0)",
+        "when_to_choose": "Cân bằng tốt nhất giữa chất lượng và tốc độ; mặc định được đề xuất."
+      },
+      "gemma-4-12b-it": {
+        "display_name": "Gemma 4 12B (QAT Q4_0)",
+        "when_to_choose": "Chất lượng cao nhất; cần máy 16 GB cho trọng số mô hình và bộ nhớ đệm KV."
+      }
+    }
+  },
+  "emotion": {
+    "suggestion_label": "Gợi ý AI",
+    "suggestion_text": "✨ {{emoji}} {{emotion}} (cường độ {{intensity}})",
+    "apply": "Áp dụng",
+    "dismiss": "Bỏ qua"
+  },
+  "emotion_suggestions": {
+    "language": {
+      "label": "Ngôn ngữ",
+      "hint": "Auto theo ngôn ngữ trả lời AI ở mục Chung.",
+      "auto": "Auto",
+      "en": "English",
+      "vi": "Tiếng Việt",
+      "fr": "Français",
+      "es": "Español",
+      "zh-Hans": "简体中文",
+      "zh-Hant": "繁體中文"
+    }
+  },
+  "highlights": {
+    "title": "Điểm nổi bật",
+    "regenerate": "Tạo lại",
+    "clear": "Xoá",
+    "close": "Đóng",
+    "cancel": "Huỷ tạo",
+    "streaming": "Đang tạo…",
+    "cancelled": "Đã huỷ tạo.",
+    "empty_hint": "Chưa có điểm nổi bật. Bấm tiêu đề ở trên để tạo tóm tắt.",
+    "needs_more_words": "Viết thêm {{remaining}} từ nữa để mở Điểm nổi bật.",
+    "error_unknown": "Không thể tạo điểm nổi bật. Hãy thử lại."
+  },
+  "feature_prompt": {
+    "customize": "Tùy chỉnh prompt",
+    "input_label": "Prompt tùy chỉnh cho {{feature}}",
+    "using_custom": "Đang dùng prompt tuỳ chỉnh",
+    "using_default": "Đang dùng prompt mặc định",
+    "save": "Lưu prompt",
+    "reset": "Đặt lại mặc định"
+  },
+  "reflection_lens": {
+    "label": "Góc nhìn suy ngẫm",
+    "default": "Mặc định",
+    "default_hint": "Suy ngẫm mở, không theo khung",
+    "cbt_reframe": "Tái khung CBT",
+    "cbt_reframe_hint": "Tái khung nhận thức nhẹ nhàng",
+    "gratitude": "Biết ơn",
+    "gratitude_hint": "Chú ý điều tốt đẹp",
+    "inversion": "Đảo ngược",
+    "inversion_hint": "Thách thức giả định",
+    "stoic": "Khắc kỷ",
+    "stoic_hint": "Kiểm soát, đức hạnh, chấp nhận"
+  },
+  "go_deeper": {
+    "button": "Khám phá sâu hơn",
+    "loading": "Đang suy nghĩ…",
+    "use_prompt": "Dùng",
+    "dismiss": "Bỏ qua",
+    "close": "Đóng",
+    "regenerate": "Tạo lại",
+    "cards_label": "Gợi ý suy ngẫm",
+    "error_unknown": "Không thể tạo gợi ý. Hãy thử lại.",
+    "needs_more_words": "Viết thêm {{remaining}} từ nữa để mở Khám phá sâu hơn."
+  },
+  "image_gen": {
+    "button": "Tạo ảnh",
+    "dialog_title": "Tạo ảnh",
+    "prompt_label": "Gợi ý",
+    "prompt_placeholder": "Mô tả ảnh bạn muốn…",
+    "placement_label": "Vị trí",
+    "placement_attach": "Đính kèm",
+    "placement_attach_hint": "Thêm vào thanh đính kèm ở cuối bài.",
+    "placement_inline": "Nội tuyến",
+    "placement_inline_hint": "Chèn tại vị trí con trỏ trong văn bản.",
+    "size_label": "Kích thước",
+    "size_square": "Vuông",
+    "size_portrait": "Dọc",
+    "size_landscape": "Ngang",
+    "generate": "Tạo",
+    "guide_label": "Cách tạo",
+    "from_entry": "Từ mục này",
+    "custom_prompt": "Gợi ý tùy chỉnh",
+    "from_entry_hint": "Lấy cảm hứng từ nội dung mục và luôn vẽ hình ảnh ấm áp, tích cực — kể cả khi bài viết nặng nề.",
+    "from_entry_empty": "Hãy viết gì đó trong mục trước.",
+    "generating": "Đang tạo… có thể mất 1–4 phút.",
+    "generating_short": "Đang tạo…",
+    "cancel": "Huỷ",
+    "cancel_confirm_title": "Dừng tạo ảnh?",
+    "cancel_confirm_body": "Ảnh vẫn đang được tạo. Dừng bây giờ sẽ bỏ kết quả. Yêu cầu có thể vẫn chạy ngầm.",
+    "cancel_confirm_action": "Dừng tạo ảnh",
+    "error_unknown": "Không thể tạo ảnh.",
+    "unsupported": "Nhà cung cấp này không hỗ trợ tạo ảnh.",
+    "needs_setup": "Hãy hoàn tất thiết lập nhà cung cấp ảnh ở Cài đặt → AI để tạo ảnh."
+  },
+  "daily_chat": {
+    "title": "Trò chuyện hằng ngày",
+    "save_as_entry": "Chuyển thành nhật ký",
+    "saved_as_entry_indicator": "Đã chuyển thành nhật ký",
+    "update_entry": "Cập nhật mục",
+    "update_no_new": "Không có tin nhắn mới kể từ lần bạn lưu cuộc trò chuyện này.",
+    "update_marker": "Đã cập nhật từ Trò chuyện hằng ngày · {{date}}",
+    "update_target_unavailable_title": "Không thể cập nhật mục đó",
+    "update_target_unavailable_body": "Mục do cuộc trò chuyện này tạo ra không còn truy cập được (đã xoá hoặc bị khoá). Bạn có muốn lưu các tin nhắn mới thành một mục riêng không?",
+    "save_as_new_entry": "Lưu thành mục mới",
+    "entry_link_label": "Mở mục đã tạo",
+    "input_placeholder": "Kể cho tôi nghe về ngày của bạn…",
+    "empty_hint": "Hãy kể cho tôi nghe về ngày của bạn. Tôi sẽ hỏi tiếp để giúp bạn ngẫm sâu hơn.",
+    "error_unknown": "Không thể tiếp tục cuộc trò chuyện.",
+    "sessions_title": "Cuộc trò chuyện",
+    "new_chat": "Mới",
+    "new_chat_short": "Mới",
+    "loading_sessions": "Đang tải…",
+    "empty_sessions": "Chưa có cuộc trò chuyện nào. Bấm \"Trò chuyện mới\".",
+    "gate_no_provider": "Thiết lập nhà cung cấp AI để chat",
+    "gate_privacy": "Chấp nhận thông báo riêng tư AI để chat",
+    "gate_open_settings": "Đi tới Nhà cung cấp",
+    "search_placeholder": "Tìm cuộc trò chuyện…",
+    "search_aria": "Tìm cuộc trò chuyện",
+    "clear_search": "Xoá tìm kiếm cuộc trò chuyện",
+    "no_search_results": "Không có cuộc trò chuyện nào khớp với tìm kiếm.",
+    "selected_outside_search": "Cuộc trò chuyện đã chọn nằm ngoài kết quả tìm kiếm.",
+    "untitled": "Trò chuyện mới",
+    "message_count_one": "{{count}} tin nhắn",
+    "message_count_other": "{{count}} tin nhắn",
+    "rename": "Đổi tên",
+    "pin_to_top": "Ghim lên đầu",
+    "unpin": "Bỏ ghim",
+    "pinned": "Đã ghim",
+    "session_actions": "Tác vụ cuộc trò chuyện",
+    "delete_session": "Xoá cuộc trò chuyện",
+    "delete_confirm_title": "Xoá cuộc trò chuyện này?",
+    "delete_confirm_body": "Cuộc trò chuyện này sẽ bị xoá vĩnh viễn.",
+    "no_session_title": "Chưa chọn cuộc trò chuyện",
+    "no_session_hint": "Bấm \"Mới\" ở bên trái để bắt đầu một cuộc trò chuyện mới.",
+    "send": "Gửi",
+    "stop": "Dừng",
+    "thinking": "Đang suy nghĩ…",
+    "copy": "Chép",
+    "copied": "Đã chép",
+    "attach": "Đính kèm",
+    "attach_search_placeholder": "Tìm mục…",
+    "attach_search_aria": "Tìm mục",
+    "attach_tab_entries": "Mục",
+    "attach_tab_date": "Ngày",
+    "attach_tab_aria": "Loại đính kèm",
+    "attach_dialog_aria": "Đính kèm nội dung",
+    "attach_searching": "Đang tìm…",
+    "attach_no_results": "Không tìm thấy mục nào",
+    "attach_preset_this_week": "Tuần này",
+    "attach_preset_this_month": "Tháng này",
+    "attach_preset_this_year": "Năm nay",
+    "attach_preset_custom": "Tuỳ chỉnh",
+    "attach_preset_aria": "Khoảng thời gian có sẵn",
+    "attach_custom_from": "Từ",
+    "attach_custom_to": "Đến",
+    "attach_custom_range_aria": "Khoảng ngày tùy chỉnh",
+    "attach_invalid_range": "Ngày kết thúc phải cùng hoặc sau ngày bắt đầu.",
+    "attach_counting": "Đang đếm…",
+    "attach_entry_count_one": "{{count}} mục",
+    "attach_entry_count_other": "{{count}} mục",
+    "attach_confirm": "Đính kèm",
+    "attach_entry_unavailable": "Không thể đính kèm mục này vào trò chuyện.",
+    "attach_cap_reached": "Bạn đã đạt giới hạn {{max}} đính kèm cho tin nhắn này.",
+    "attach_remove": "Xoá \"{{label}}\"",
+    "rag_toggle_label": "Ngữ cảnh nhật ký",
+    "rag_toggle_tooltip_on": "Ngữ cảnh nhật ký đang bật — tắt đi",
+    "rag_toggle_tooltip_off": "Bật ngữ cảnh nhật ký cho cuộc trò chuyện này",
+    "rag_toggle_tooltip_not_configured": "Thiết lập nhà cung cấp AI trong Cài đặt để dùng ngữ cảnh nhật ký.",
+    "rag_toggle_tooltip_privacy_not_accepted": "Chấp nhận thông báo riêng tư AI trong Cài đặt để dùng ngữ cảnh nhật ký.",
+    "rag_toggle_tooltip_error": "Không thể thay đổi cài đặt này.",
+    "context_size": "tối đa {{kb}} KB",
+    "context_size_trimmed": "tối đa {{kb}} KB — có thể bị cắt bớt",
+    "context_confirm_title": "Gửi nhiều ngữ cảnh vậy sao?",
+    "context_confirm_body_one": "\"{{label}}\" có {{count}} mục (≈ {{totalKb}} KB). Chỉ trích đoạn từ khoảng {{entriesIncluded}} mục trong số đó sẽ được gửi (≈ {{estimatedKb}} KB). Tiếp tục?",
+    "context_confirm_body_other": "\"{{label}}\" có {{count}} mục (≈ {{totalKb}} KB). Chỉ trích đoạn từ khoảng {{entriesIncluded}} mục trong số đó sẽ được gửi (≈ {{estimatedKb}} KB). Tiếp tục?",
+    "context_confirm_body_no_period_one": "Các đính kèm này gồm tổng cộng {{count}} mục (≈ {{totalKb}} KB). Chỉ trích đoạn từ khoảng {{entriesIncluded}} mục trong số đó sẽ được gửi (≈ {{estimatedKb}} KB). Tiếp tục?",
+    "context_confirm_body_no_period_other": "Các đính kèm này gồm tổng cộng {{count}} mục (≈ {{totalKb}} KB). Chỉ trích đoạn từ khoảng {{entriesIncluded}} mục trong số đó sẽ được gửi (≈ {{estimatedKb}} KB). Tiếp tục?",
+    "context_confirm_send": "Vẫn gửi",
+    "context_confirm_cancel": "Huỷ",
+    "period_too_large": "\"{{label}}\" có {{count}} mục — quá nhiều để gửi trong một tin nhắn. Hãy bật và lập chỉ mục embedding, hoặc chọn khoảng thời gian ngắn hơn.",
+    "period_no_budget": "\"{{label}}\" không đủ chỗ — các đính kèm khác đã dùng hết ngân sách khả dụng. Hãy xoá bớt một đính kèm.",
+    "needs_confirmation": "Gửi khoảng {{kb}} KB từ {{count}} mục cần được xác nhận.",
+    "consent_required": "Hãy chấp nhận thông báo gửi nhiều mục để tiếp tục.",
+    "sources_heading_one": "Nguồn ({{count}})",
+    "sources_heading_other": "Nguồn ({{count}})",
+    "sources_truncated_hint": "Đang hiển thị {{shown}}/{{total}}",
+    "entry_badge_resolving": "Nhật ký…",
+    "entry_badge_unavailable": "Không mở được",
+    "entry_badge_open": "Mở \"{{title}}\"",
+    "entry_preview": {
+      "title": "Nhật ký",
+      "loading": "Đang mở nhật ký…",
+      "unavailable": "Không mở được mục này — có thể nó đã bị xoá hoặc bị khoá.",
+      "empty": "Mục này không có nội dung.",
+      "edit": "Chỉnh sửa"
+    },
+    "sources_trigger_aria_one": "{{count}} nguồn đã dùng cho câu trả lời này",
+    "sources_trigger_aria_other": "{{count}} nguồn đã dùng cho câu trả lời này",
+    "sources_trigger_tooltip": "Nguồn",
+    "source_chip": "Mục \"{{title}}\"",
+    "selected_on_other_page": "Cuộc trò chuyện đã chọn ở trang khác.",
+    "persona": {
+      "label": "Tính cách của AI",
+      "empathetic": "Người bạn thấu cảm",
+      "empathetic_hint": "Ấm áp, lắng nghe cảm xúc",
+      "tough": "Huấn luyện viên nghiêm khắc",
+      "tough_hint": "Thẳng thắn, đề cao trách nhiệm",
+      "jolly": "Người bạn vui vẻ",
+      "jolly_hint": "Tinh nghịch, luôn tìm điểm sáng",
+      "wise": "Người thầy uyên bác",
+      "wise_hint": "Triết lý, lắng nghe sâu sắc",
+      "custom": "Tuỳ chỉnh",
+      "custom_hint": "Tự viết prompt của bạn",
+      "custom_placeholder": "Mô tả cách AI nên nói chuyện. Ví dụ: \"Bạn là một huấn luyện viên thể hình thẳng thắn, không vòng vo…\""
+    },
+    "ai_title_label": "Tiêu đề do AI tạo",
+    "ai_title_description": "Thêm một lần gọi LLM để đặt tiêu đề (tắt = rút gọn tin nhắn đầu).",
+    "convert_modal": {
+      "title": "Lưu thành mục nhật ký",
+      "loading": "Đang soạn bản nháp…",
+      "hint": "Xem lại bản nháp dưới đây. Bạn có thể chỉnh sửa trước khi lưu — cuộc trò chuyện sẽ không được giữ lại.",
+      "edit_label": "Chỉnh sửa",
+      "split_label": "Chỉnh sửa + xem trước",
+      "show_preview": "Xem trước",
+      "hide_preview": "Ẩn xem trước",
+      "save": "Lưu mục",
+      "saving": "Đang lưu…",
+      "cancel": "Huỷ",
+      "error": "Không thể soạn mục từ cuộc trò chuyện.",
+      "update_title": "Cập nhật mục nhật ký của bạn",
+      "update_save": "Cập nhật mục"
+    },
+    "show_message_meta": {
+      "title": "Hiện thông tin model trên trả lời",
+      "description": "Model, provider, tokens và latency trên trả lời AI."
+    },
+    "use_memory_label": "Dùng Ký ức trong Trò chuyện",
+    "use_memory_description": "Truy xuất những điều đáng nhớ về bạn và thêm vào mỗi câu trả lời.",
+    "use_memory_needs_master": "Ký ức đang tắt ở Cài đặt → AI → Ký ức. Hãy bật lên để dùng mục này."
+  },
+  "summary": {
+    "suggest_title": "Gợi ý tiêu đề",
+    "suggesting": "Đang gợi ý…",
+    "apply": "Áp dụng",
+    "dismiss": "Bỏ qua",
+    "error_busy": "Một gợi ý khác đang chạy — thử lại sau giây lát.",
+    "error_unknown": "Không thể tạo tiêu đề. Hãy thử lại."
+  },
+  "multi_summary": {
+    "button": "Tóm tắt AI",
+    "loading": "Đang tóm tắt…",
+    "banner_label": "Bản tóm tắt AI",
+    "dismiss": "Bỏ qua",
+    "warning": {
+      "title": "Bản tóm tắt lớn",
+      "body": "Các entry này lớn hơn bình thường ({{kb}} KB). Bạn có thể yêu cầu AI cắt ngắn (giới hạn 48 KB) hoặc gửi toàn bộ nội dung như vốn có.",
+      "truncate": "Cắt ngắn",
+      "send_raw": "Gửi nguyên"
+    },
+    "errors": {
+      "no_entries": "Chưa chọn entry nào để tóm tắt.",
+      "no_content": "Các entry này không có nội dung văn bản để tóm tắt.",
+      "payload_too_large": "Nội dung quá lớn để gửi nguyên. Hãy chọn ít entry hơn.",
+      "disabled": "Tính năng tóm tắt nhiều entry đang tắt. Bật trong Cài đặt → AI.",
+      "not_configured": "Hãy cấu hình một nhà cung cấp AI trong Cài đặt → AI trước.",
+      "privacy_not_accepted": "Hãy chấp nhận thông báo riêng tư AI trong Cài đặt → AI trước.",
+      "auth_failed": "Nhà cung cấp AI từ chối yêu cầu. Kiểm tra API key trong Cài đặt.",
+      "rate_limited": "Nhà cung cấp AI đang giới hạn tần suất. Thử lại sau giây lát.",
+      "empty_response": "AI trả về nội dung trống. Hãy thử lại.",
+      "unknown": "Không thể tạo bản tóm tắt. Vui lòng thử lại."
+    }
+  },
+  "search": {
+    "tab_keyword": "Từ khóa",
+    "tab_meaning": "Ý nghĩa",
+    "tab_meaning_disabled_hint": "Bật Tìm kiếm ngữ nghĩa trong Cài đặt → AI",
+    "toggle_meaning": "Tìm theo ý nghĩa",
+    "toggle_meaning_aria": "Bật/tắt tìm kiếm theo ngữ nghĩa",
+    "toggle_keep_results": "Giữ kết quả",
+    "toggle_keep_results_aria": "Giữ kết quả tìm kiếm lần trước khi đóng panel",
+    "toggle_keep_results_help": "Khi bật, mở lại search sẽ hiện query, bộ lọc và kết quả lần trước.",
+    "default_mode_title": "Mặc định tìm theo nghĩa",
+    "default_mode_description": "Bật = tìm theo nghĩa; tắt = tìm theo từ khóa.",
+    "default_mode_aria": "Mặc định cửa sổ tìm kiếm theo chế độ ý nghĩa",
+    "score_label": "điểm",
+    "relevance_label": "khớp {{percent}}%",
+    "relevance_strong": "Khớp mạnh",
+    "relevance_good": "Khớp tốt",
+    "relevance_loose": "Khớp lỏng",
+    "relevance_weak": "Khớp yếu",
+    "loading": "Đang tìm kiếm…",
+    "failed": "Tìm kiếm thất bại: {{message}}",
+    "placeholder_title": "Nhập để tìm các mục nhật ký",
+    "placeholder_hint": "Tìm kiếm toàn văn trên tất cả các mục",
+    "placeholder_hint_meaning_needs_query": "Hãy gõ gì đó — tìm theo nghĩa cần một cụm từ để so khớp",
+    "placeholder_hint_meaning_needs_query_with_filters": "Đã chọn bộ lọc — hãy gõ một cụm từ để tìm theo nghĩa.",
+    "empty": "Không có mục nào tương tự về ngữ nghĩa — hãy thử cách diễn đạt khác.",
+    "empty_keyword": "Không có kết quả cho \"{{query}}\"",
+    "empty_filtered_no_query": "Không có mục nào khớp với bộ lọc đã chọn.",
+    "result_count_one": "{{count}} kết quả",
+    "result_count_other": "{{count}} kết quả",
+    "filter": {
+      "journal_pill": "Nhật ký",
+      "journal_pill_count": "Nhật ký ({{count}})",
+      "journal_empty": "Chưa có nhật ký nào",
+      "tags_pill": "Thẻ",
+      "tags_pill_count": "Thẻ ({{count}})",
+      "tags_empty": "Chưa có thẻ nào",
+      "emotion_pill": "Cảm xúc",
+      "emotion_pill_count": "Cảm xúc ({{count}})",
+      "has_media_any": "Tất cả",
+      "has_media_has": "Có media",
+      "has_media_none": "Không có media"
+    },
+    "overlay_aria": "Tìm kiếm",
+    "input_aria": "Tìm trong các mục",
+    "input_placeholder": "Tìm trong các mục...",
+    "results_aria": "Kết quả tìm kiếm"
+  },
+  "page": {
+    "ai_settings_title": "Cài đặt AI",
+    "ai_settings_description": "Cấu hình nhà cung cấp và bật/tắt các tính năng AI."
+  },
+  "tabs": {
+    "models": "Mô hình",
+    "features": "Tính năng",
+    "audit_log": "Nhật ký kiểm tra",
+    "usage": "Thống kê sử dụng",
+    "general": "Chung",
+    "providers": "Nhà cung cấp",
+    "memory": "Ký ức",
+    "persona": "Phong cách"
+  },
+  "privacy_banner": {
+    "host_not_set": "(chưa đặt)",
+    "host_empty": "(rỗng)",
+    "host_unparseable": "(không phân tích được)"
+  },
+  "usage": {
+    "title": "Thống kê sử dụng AI",
+    "period": {
+      "label": "Khoảng thời gian",
+      "24h": "24 giờ",
+      "7d": "7 ngày",
+      "30d": "30 ngày",
+      "90d": "90 ngày",
+      "all": "Tất cả"
+    },
+    "headline": {
+      "calls": "Số lời gọi",
+      "tokens_in": "Token đầu vào",
+      "tokens_out": "Token đầu ra",
+      "bytes_sent": "Dữ liệu đã gửi"
+    },
+    "null_tokens_hint_one": "{{count}} lời gọi không có thông tin token từ nhà cung cấp",
+    "null_tokens_hint_other": "{{count}} lời gọi không có thông tin token từ nhà cung cấp",
+    "by_provider": "Theo nhà cung cấp",
+    "by_provider_help": "Tổng trong khoảng thời gian đã chọn, tách theo nhà cung cấp AI. Khi nhà cung cấp không báo token (thường gặp với model local hoặc CLI), token hiển thị là —.",
+    "per_provider_calls": "{{count}} lời gọi",
+    "per_provider_tokens": "{{in}} vào / {{out}} ra",
+    "per_provider_untracked_one": "và {{count}} chưa theo dõi",
+    "per_provider_untracked_other": "và {{count}} chưa theo dõi",
+    "daily_chart_title": "Token đầu ra theo ngày",
+    "daily_chart_help": "Token đầu ra theo từng ngày lịch theo múi giờ máy bạn. Chỉ gồm các lời gọi trong khoảng thời gian đã chọn.",
+    "chart_loading": "Đang tải biểu đồ…",
+    "no_data": "Chưa có lời gọi AI nào.",
+    "no_data_chart": "Không có dữ liệu cho khoảng thời gian này.",
+    "breakdown_title": "Chi tiết",
+    "breakdown_help": "Gộp theo nhà cung cấp, model và tính năng — không phải mỗi tin nhắn một dòng. Nhiều phản hồi Daily Chat cùng model chỉ một dòng; chỉ tăng số Lời gọi và token.",
+    "table": {
+      "col_provider": "Nhà cung cấp",
+      "col_model": "Mô hình",
+      "col_feature": "Tính năng",
+      "col_calls": "Lời gọi",
+      "col_tokens_in": "Token vào",
+      "col_tokens_out": "Token ra",
+      "col_bytes": "Dung lượng",
+      "col_avg_latency": "Độ trễ TB",
+      "col_error_rate": "Tỷ lệ lỗi",
+      "null_display": "—"
+    },
+    "no_cost_note": "Chúng tôi không hiển thị ước tính chi phí vì bảng giá của nhà cung cấp thay đổi quá thường xuyên để duy trì tính chính xác. Số lượng token ở đây khớp với những gì bảng điều khiển thanh toán của nhà cung cấp bạn hiển thị."
+  },
+  "audit": {
+    "privacy_note_label": "Quyền riêng tư:",
+    "privacy_note_desc": "chúng tôi không bao giờ lưu nội dung lời gọi — chỉ siêu dữ liệu.",
+    "empty": "Chưa có lời gọi AI nào được ghi lại.",
+    "empty_filtered": "Không có lời gọi AI nào khớp bộ lọc hiện tại.",
+    "load_more": "Tải thêm",
+    "loading": "Đang tải…",
+    "filter": {
+      "feature_label": "Tính năng",
+      "feature_placeholder": "Tất cả tính năng",
+      "provider_label": "Nhà cung cấp",
+      "provider_placeholder": "Tất cả nhà cung cấp",
+      "options_empty_hint": "Tải thêm hàng để thấy thêm tuỳ chọn lọc.",
+      "class_label": "Loại",
+      "class_all": "Tất cả",
+      "class_local": "Cục bộ",
+      "class_remote": "Từ xa",
+      "class_subscription": "Gói đăng ký",
+      "class_on-device": "Trên thiết bị",
+      "range_label": "Khoảng thời gian",
+      "range_24h": "24h",
+      "range_7d": "7 ngày",
+      "range_30d": "30 ngày",
+      "range_all": "Tất cả"
+    },
+    "table": {
+      "col_time": "Thời gian",
+      "col_feature": "Tính năng",
+      "col_operation": "Thao tác",
+      "col_provider": "Nhà cung cấp",
+      "col_class": "Loại",
+      "col_tokens": "Token",
+      "col_status": "Trạng thái",
+      "tokens_format": "{{in}}→{{out}}",
+      "tokens_none": "—",
+      "status_ok": "OK",
+      "status_err": "Lỗi"
+    },
+    "row_detail": {
+      "host": "Máy chủ",
+      "payload": "Kích thước dữ liệu",
+      "latency": "Độ trễ",
+      "error_code": "Mã lỗi",
+      "timestamp": "Dấu thời gian",
+      "provider": "Nhà cung cấp",
+      "model": "Mô hình",
+      "device": "Thiết bị"
+    },
+    "retention": {
+      "label": "Giữ các mục trong",
+      "option_30": "1 tháng",
+      "option_30_aria": "1 tháng",
+      "option_90": "3 tháng",
+      "option_90_aria": "3 tháng",
+      "option_180": "6 tháng",
+      "option_180_aria": "6 tháng",
+      "option_365": "1 năm",
+      "option_365_aria": "1 năm",
+      "save_error": "Không thể lưu thời gian giữ: {{error}}"
+    },
+    "clear": {
+      "button": "Xoá nhật ký",
+      "confirm_title": "Xoá nhật ký kiểm tra AI?",
+      "confirm_body": "Thao tác này sẽ xoá vĩnh viễn tất cả siêu dữ liệu lời gọi AI đã ghi lại. Các mục nhật ký của bạn không bị ảnh hưởng.",
+      "confirm_action": "Vâng, xoá",
+      "cancel": "Huỷ"
+    }
+  },
+  "bulk_context_modal": {
+    "title": "Gửi nhiều mục nhật ký tới AI?",
+    "intro": "Tính năng này gửi toàn bộ nội dung văn bản của nhiều mục nhật ký tới nhà cung cấp AI trong một lần. Hãy xem lại chi tiết bên dưới trước khi tiếp tục.",
+    "intro_excerpts": "Tính năng này gửi các đoạn trích đã chọn từ những mục nhật ký liên quan tới nhà cung cấp AI trong một lần. Hãy xem lại chi tiết bên dưới trước khi tiếp tục.",
+    "entries_label": "Số mục",
+    "entries_value": "{{count}} mục",
+    "entries_value_excerpts": "Tối đa {{count}} mục liên quan",
+    "range_label": "Khoảng thời gian",
+    "provider_label": "Nhà cung cấp",
+    "class_label": "Xử lý dữ liệu",
+    "class_remote": "Các mục của bạn được tải lên nhà cung cấp lưu trữ qua HTTPS. Chính sách riêng tư và điều khoản tài khoản của họ được áp dụng.",
+    "class_subscription": "Các mục được chuyển tới CLI cục bộ, rồi CLI chuyển tiếp tới nhà cung cấp theo gói đăng ký. Memlore không bao giờ thấy API key của bạn.",
+    "class_remote_excerpts": "Các đoạn trích đã chọn được tải lên nhà cung cấp lưu trữ qua HTTPS. Chính sách riêng tư và điều khoản tài khoản của họ được áp dụng.",
+    "class_subscription_excerpts": "Các đoạn trích đã chọn được chuyển tới CLI cục bộ, rồi CLI chuyển tiếp tới nhà cung cấp theo gói đăng ký. Memlore không bao giờ thấy API key của bạn.",
+    "scope_footnote": "Chấp nhận thông báo này một lần là áp dụng cho mọi nhà cung cấp không cục bộ và mọi tính năng AI gửi nhiều mục.",
+    "accept": "Tôi hiểu — gửi {{count}} mục",
+    "accept_excerpts": "Tôi hiểu — gửi các đoạn trích đã chọn"
+  },
+  "period_review": {
+    "title": "Tổng kết định kỳ",
+    "description": "Tổng kết AI cho nhật ký — điểm sáng, điểm tối, chủ đề lặp lại và một nhận định cho khoảng thời gian.",
+    "kind_weekly": "Tuần",
+    "kind_monthly": "Tháng",
+    "kind_aria": "Loại kỳ tổng kết",
+    "prev_period": "{{kind}} trước",
+    "next_period": "{{kind}} sau",
+    "generate": "Tạo tổng kết",
+    "generating": "Đang tạo…",
+    "regenerate": "Tạo lại",
+    "loading_settings": "Đang tải cài đặt AI…",
+    "disabled_title": "Tổng kết định kỳ đang tắt",
+    "disabled_body": "Bật “Tổng kết định kỳ” trong Cài đặt → AI để tạo tổng kết theo tuần hoặc tháng.",
+    "needs_provider_title": "Thiết lập nhà cung cấp AI",
+    "needs_provider_body": "Cấu hình nhà cung cấp Chat trong Cài đặt → AI trước khi tạo tổng kết.",
+    "needs_privacy_title": "Cần chấp nhận thông báo riêng tư",
+    "needs_privacy_body": "Hãy chấp nhận thông báo riêng tư AI trong Cài đặt → AI trước.",
+    "generated_at": "Tạo lúc {{date}}",
+    "section_highlights": "Điểm sáng",
+    "section_lowlights": "Điểm tối",
+    "section_themes": "Chủ đề lặp lại",
+    "section_insight": "Nhận định",
+    "section_empty": "Không ghi nhận.",
+    "entry_count": "Dựa trên {{count}} mục",
+    "errors": {
+      "unknown": "Không thể tạo tổng kết ({{code}}).",
+      "AI_NOT_CONFIGURED": "Hãy thiết lập nhà cung cấp AI trong Cài đặt → AI.",
+      "AI_PRIVACY_NOT_ACCEPTED": "Hãy chấp nhận thông báo riêng tư trong Cài đặt → AI.",
+      "AI_BULK_CONTEXT_NOT_ACCEPTED": "Hãy chấp nhận thông báo gửi nhiều mục để tiếp tục.",
+      "AI_PERIODIC_REVIEW_DISABLED": "Tổng kết định kỳ đang tắt trong Cài đặt → AI.",
+      "AI_NO_ENTRIES_WITH_CONTENT": "Không có mục có nội dung trong kỳ này.",
+      "AI_PAYLOAD_TOO_LARGE": "Quá nhiều văn bản trong kỳ này — hãy thử khoảng ngắn hơn.",
+      "AI_AUTH_FAILED": "Xác thực nhà cung cấp AI thất bại. Kiểm tra API key.",
+      "AI_RATE_LIMITED": "Bị giới hạn tốc độ — thử lại sau.",
+      "AI_EMPTY_RESPONSE": "Nhà cung cấp AI trả về phản hồi trống."
+    }
+  },
+  "theme_insights": {
+    "errors": {
+      "unknown": "Không thể tạo phân tích ({{code}}).",
+      "AI_NOT_CONFIGURED": "Hãy thiết lập nhà cung cấp AI trong Cài đặt → AI.",
+      "AI_PRIVACY_NOT_ACCEPTED": "Hãy chấp nhận thông báo riêng tư trong Cài đặt → AI.",
+      "AI_BULK_CONTEXT_NOT_ACCEPTED": "Hãy chấp nhận thông báo gửi nhiều mục để tiếp tục.",
+      "AI_INSIGHTS_DISABLED": "Phân tích chủ đề đang tắt trong Cài đặt → AI.",
+      "AI_NO_ENTRIES_WITH_CONTENT": "Không có mục có nội dung trong kỳ này.",
+      "AI_PAYLOAD_TOO_LARGE": "Quá nhiều văn bản trong kỳ này — hãy thử khoảng ngắn hơn.",
+      "AI_AUTH_FAILED": "Xác thực nhà cung cấp AI thất bại. Kiểm tra API key.",
+      "AI_RATE_LIMITED": "Bị giới hạn tốc độ — thử lại sau.",
+      "AI_EMPTY_RESPONSE": "Nhà cung cấp AI trả về phản hồi trống."
+    }
+  },
+  "embedding_explainer": {
+    "title": "AI trong Memlore hoạt động thế nào",
+    "help_aria": "Tìm hiểu AI trong Memlore hoạt động thế nào",
+    "close": "Đóng",
+    "groups": {
+      "privacy": "Quyền riêng tư & kiểm soát",
+      "providers": "Nhà cung cấp",
+      "features": "AI có thể làm gì",
+      "indexing": "Embedding & tìm kiếm",
+      "data": "Dữ liệu được gửi đi"
+    },
+    "sections": {
+      "opt_in": {
+        "title": "Tắt cho đến khi bạn bật",
+        "body": "Mọi tính năng AI đều bắt đầu ở trạng thái tắt. Không có gì được gửi đi cho đến khi bạn kết nối nhà cung cấp, chấp nhận thông báo quyền riêng tư khi cần, và bật các tính năng bạn muốn — mỗi tính năng có công tắc riêng."
+      },
+      "no_server": {
+        "title": "Memlore không có đám mây AI",
+        "body": "Không có máy chủ AI của Memlore và không có telemetry. Bạn mang nhà cung cấp của riêng mình — trên thiết bị này, server cục bộ, CLI theo subscription, hoặc API key hosted. Nhật ký vẫn được mã hoá trên thiết bị; AI chỉ thấy văn bản bạn chủ động xử lý."
+      },
+      "locked": {
+        "title": "Mục đã khoá & mục ẩn",
+        "body": "Mục đã khoá và mục ẩn mặc định bị loại khỏi AI. Bạn có thể tùy chọn bao gồm mục đã khoá cho embedding hoặc memory; mục ẩn luôn bị loại. Ngay cả khi đã được lập chỉ mục lúc mở khoá, chúng cũng không xuất hiện trong tìm kiếm hay chat khi đang khoá hoặc ẩn."
+      },
+      "kinds": {
+        "title": "Bốn cách chạy AI",
+        "body": "Model on-device tải một lần rồi chạy hoàn toàn offline. Server cục bộ (Ollama, LM Studio, …) giữ dữ liệu trên máy bạn. CLI theo subscription (Claude CLI, Codex CLI) dùng công cụ đã đăng nhập trên máy. API hosted (OpenAI, Anthropic, …) gửi request qua internet và có thể tốn token."
+      },
+      "slots": {
+        "title": "Slot riêng cho chat, ảnh và embedding",
+        "body": "Chat/generation, tạo ảnh và embedding được cấu hình độc lập ở tab Models. Bạn có thể chat với một nhà cung cấp và embed với nhà cung cấp khác — ví dụ CLI subscription cho chat và model on-device cho tìm kiếm."
+      },
+      "writing": {
+        "title": "Trợ lý viết",
+        "body": "Gợi ý tiêu đề, Highlights, Go Deeper, Continue & Rewrite, tóm tắt nhiều mục, period review, theme insights và tạo ảnh — mỗi thứ chỉ gọi AI khi bạn dùng. Chúng dùng model generation hoặc image và không cần chỉ mục embedding."
+      },
+      "chat": {
+        "title": "Trò chuyện hằng ngày",
+        "body": "Hội thoại nhiều lượt về ngày của bạn. Bạn có thể đính kèm mục cụ thể hoặc khoảng ngày, tùy chọn kéo ngữ cảnh nhật ký liên quan khi đã có embedding, và dùng Memory & Persona để câu trả lời dựa trên các sự kiện bền về bạn. Hội thoại có thể lưu thành mục nhật ký."
+      },
+      "retrieval": {
+        "title": "Tính năng theo ý nghĩa",
+        "body": "Tìm kiếm ngữ nghĩa, Gợi ý cảm xúc và ngữ cảnh nhật ký trong Trò chuyện hằng ngày cần chỉ mục embedding — chúng khớp theo ý nghĩa, không chỉ từ khoá. Đính kèm một mục cụ thể hoặc khoảng ngày trong chat thì không cần embedding: những thứ đó được đọc trực tiếp."
+      },
+      "what": {
+        "title": "Embedding là gì",
+        "body": "Embedding biến văn bản nhật ký thành vector để Memlore so sánh ý nghĩa ngay trên máy. Chỉ mục cục bộ đó hỗ trợ Tìm kiếm ngữ nghĩa, Gợi ý cảm xúc và ngữ cảnh nhật ký tùy chọn trong chat. Chi tiết cách lập chỉ mục nằm cạnh các điều khiển embedding ở Cài đặt → AI."
+      },
+      "background": {
+        "title": "Lập chỉ mục nền",
+        "body": "Khi app đang mở và lập chỉ mục được phép, worker nền giữ chỉ mục cập nhật khi bạn viết. Nhà cung cấp embedding hosted cần thêm bước đồng ý chi phí token trước khi chạy nền. Tạm dừng, tiếp tục, lập chỉ mục ngay và xây lại nằm cạnh model embedding trong Cài đặt."
+      },
+      "when_sent": {
+        "title": "Khi nào văn bản rời thiết bị",
+        "body": "Chỉ khi bạn dùng nhà cung cấp hosted hoặc subscription cho tính năng bạn kích hoạt — hoặc khi lập chỉ mục nền hosted đang bật. Đường on-device và server cục bộ giữ văn bản trên máy. Đổi nhà cung cấp remote hoặc endpoint sẽ hỏi lại thông báo quyền riêng tư."
+      },
+      "tokens": {
+        "title": "Token, usage & audit",
+        "body": "Nhà cung cấp hosted có thể tính phí theo lần gọi (chat, embedding, ảnh). On-device và server cục bộ không tốn token. Thống kê → AI Usage và Audit log chỉ hiện metadata cuộc gọi — không bao giờ hiện nội dung mục của bạn."
+      }
+    }
+  },
+  "general": {
+    "response_language": {
+      "label": "Ngôn ngữ trả lời của AI",
+      "hint": "Áp dụng cho mọi tính năng AI — gợi ý tiêu đề, highlights, Go Deeper, tóm tắt và hơn nữa.",
+      "auto": "Tự động",
+      "en": "English",
+      "vi": "Tiếng Việt",
+      "custom": "Tùy chỉnh",
+      "custom_placeholder": "ví dụ: French, Japanese"
+    }
+  },
+  "message_info": {
+    "title": "Thông tin model",
+    "trigger_tooltip": "Thông tin model",
+    "model": "Model",
+    "provider": "Provider",
+    "type": "Loại",
+    "tokens_in": "Tokens vào",
+    "tokens_out": "Tokens ra",
+    "latency": "Độ trễ",
+    "latency_ms": "{{ms}} ms",
+    "latency_s": "{{s}} s",
+    "endpoint": {
+      "local": "Cục bộ",
+      "remote": "Hosted",
+      "subscription": "Gói đăng ký",
+      "on_device": "Trên thiết bị"
+    }
+  },
+  "user_memory": {
+    "master_toggle_title": "Bật User Memory",
+    "master_toggle_description": "Khi tắt, bộ nhớ không được quét, trích xuất, hay dùng trong Trò chuyện hằng ngày.",
+    "memory_gen_model_label": "Mô hình tạo bộ nhớ",
+    "gen_model_quality_hint": "Mẹo: hãy chọn mô hình chất lượng cao ở đây — nó chưng cất nhật ký của bạn thành bộ nhớ, gộp các mục trùng lặp và xây dựng persona, nên độ chính xác quan trọng hơn tốc độ. Mô hình này chỉ chạy khi quét bộ nhớ hoặc dựng lại persona, không chạy ở mỗi lần trò chuyện.",
+    "memory_embed_model_label": "Mô hình embedding bộ nhớ",
+    "scan_button": "Quét bộ nhớ",
+    "scan_running": "Đang quét & dọn…",
+    "scan_help": {
+      "aria": "Cách \"Quét bộ nhớ\" hoạt động",
+      "title": "Cách \"Quét bộ nhớ\" hoạt động",
+      "close": "Đóng",
+      "scan_title": "Quét nguồn mới",
+      "scan_body": "Duyệt các mục nhật ký gần đây và phiên Trò chuyện hằng ngày để tìm nội dung mới hoặc đã đổi, rồi đưa các nguồn đó vào hàng đợi trích xuất thành các dữ kiện bộ nhớ ngắn. Bước này luôn chạy khi bạn bấm \"Quét bộ nhớ\". Worker nền cũng quét tự động theo chu kỳ ngắn — quét không chỉ xảy ra khi bấm nút.",
+      "tidy_title": "Dọn danh sách",
+      "tidy_body": "Dùng mô hình tạo bộ nhớ để gộp trùng, hợp các mảnh liên quan và bỏ nội dung vụn vặt trên toàn bộ danh sách. Bước dọn chỉ chạy khi bạn bấm \"Quét bộ nhớ\" — worker nền không dọn tự động. Đây là bước dọn dẹp riêng, khác với việc claim nguồn mới.",
+      "cooldown_title": "Cooldown dọn 6 giờ",
+      "cooldown_body": "Bước dọn chạy tối đa một lần mỗi 6 giờ. Nếu bạn bấm \"Quét bộ nhớ\" lại trong cửa sổ đó, nguồn mới vẫn được claim, nhưng bước dọn bị bỏ qua. Lần dọn bị skip không reset đồng hồ cooldown — chỉ lần dọn thật mới đẩy mốc thời gian — nên bấm giữa chừng không làm trễ lần dọn kế tiếp.",
+      "last_scanned_title": "\"Quét lần cuối\" nghĩa là gì",
+      "last_scanned_body": "Dấu thời gian cạnh số lượng bộ nhớ cập nhật mỗi khi có lần quét chạy — cả khi bạn bấm \"Quét bộ nhớ\" và khi worker nền quét tự động. Nó không có nghĩa là bước dọn đã chạy.",
+      "manage_title": "Quản lý bộ nhớ",
+      "manage_body": "Mở danh sách đầy đủ để tìm kiếm, sửa văn bản, bật/tắt hoặc xoá từng mục. Bấm \"Quản lý bộ nhớ\" không khởi động quét hay dọn."
+    },
+    "last_scanned": "Quét lần cuối {{when}}",
+    "never_scanned": "Chưa quét lần nào",
+    "memories_list_title": "Bộ nhớ",
+    "edit": "Chỉnh sửa",
+    "delete": "Xoá",
+    "delete_confirm": "Xoá bộ nhớ này?",
+    "enable": "Bật",
+    "disable": "Tắt",
+    "empty_state": "Chưa có bộ nhớ nào. Quét để trích xuất các dữ kiện đáng chú ý từ các mục của bạn.",
+    "search_placeholder": "Tìm kiếm bộ nhớ…",
+    "search_aria": "Tìm kiếm bộ nhớ",
+    "clear_search": "Xoá tìm kiếm",
+    "search_empty": "Không có bộ nhớ nào khớp với tìm kiếm của bạn.",
+    "search_count": "{{shown}} / {{total}}",
+    "feature_off_title": "Chưa cấu hình mô hình",
+    "slot_missing_gen": "Bộ nhớ cần một mô hình tạo nội dung — hãy chọn một mô hình ở trên.",
+    "slot_missing_embed": "Bộ nhớ cần một mô hình embedding — hãy chọn một mô hình ở trên.",
+    "feature_off_body": "Cấu hình cả hai mô hình (tạo nội dung + embedding) để Bộ nhớ chạy.",
+    "memories_used_count_one": "Đã dùng {{count}} bộ nhớ",
+    "memories_used_count_other": "Đã dùng {{count}} bộ nhớ",
+    "memories_used_tooltip": "Bộ nhớ",
+    "edit_memory_placeholder": "Chỉnh sửa văn bản bộ nhớ…",
+    "memory_text_label": "Bộ nhớ",
+    "manage_button": "Quản lý bộ nhớ",
+    "manage_count": "{{count}} bộ nhớ",
+    "created_at": "Tạo {{when}}",
+    "updated_at": "Cập nhật {{when}}",
+    "protected_title": "Bao gồm cả mục đã khoá",
+    "protected_description": "Mặc định tắt. Khi bật, các mục đã khoá sẽ đủ điều kiện để trích xuất bộ nhớ và lấy mẫu giọng văn cho persona. Mục ẩn luôn bị loại trừ.",
+    "protected_risk_title": "Rủi ro",
+    "protected_risk_body": "Dữ kiện và giọng viết từ các mục đã khoá vẫn có thể xuất hiện trong bộ nhớ và persona của bạn.",
+    "protected_risk_body_hosted_active": "Dữ kiện và giọng viết từ các mục đã khoá vẫn có thể xuất hiện trong bộ nhớ và persona của bạn. Bộ nhớ đang dùng nhà cung cấp hosted hoặc CLI, nên toàn bộ nội dung các mục đó cũng được gửi đi — không chỉ dữ kiện ngắn.",
+    "protected_benefit_title": "Lợi ích",
+    "protected_benefit_body": "Khi đó việc trích xuất bộ nhớ và Xây dựng Persona có thể dùng cả các mục đang khoá của bạn, không chỉ những mục hiện đang mở.",
+    "protected_read_note": "Mục ẩn luôn bị loại trừ, dù cài đặt này bật hay tắt.",
+    "protected_confirm_enable": "Bật",
+    "hosted_active_indicator": "Bộ nhớ đang chạy trên nhà cung cấp hosted hoặc CLI — các mục nhật ký gốc và bản ghi trò chuyện được gửi tới đó trong quá trình trích xuất và xây dựng persona.",
+    "hosted_confirm_title": "Gửi dữ liệu nhật ký và trò chuyện gốc ra khỏi máy này?",
+    "hosted_confirm_body": "Bộ nhớ và persona gửi các mục nhật ký gốc cùng bản ghi Trò chuyện hằng ngày tới nhà cung cấp — không chỉ dữ kiện ngắn. Điều này đi xa hơn chỉ Trò chuyện hằng ngày.",
+    "hosted_confirm_body_protected_active": "Bộ nhớ và persona gửi các mục nhật ký gốc cùng bản ghi Trò chuyện hằng ngày tới nhà cung cấp — không chỉ dữ kiện ngắn. Các mục đã khoá cũng được bao gồm, nên nội dung của chúng cũng rời khỏi máy này.",
+    "hosted_confirm_footer": "Bạn có thể chuyển lại sang nhà cung cấp trên máy bất cứ lúc nào.",
+    "hosted_confirm_confirm": "Tôi hiểu, tiếp tục",
+    "persona": {
+      "title": "Xây dựng Persona của bạn",
+      "description": "Hồ sơ giúp các tính năng viết mục nhật ký có giọng điệu giống bạn hơn.",
+      "enabled": "Dùng persona",
+      "edited_badge": "Bạn đã chỉnh sửa",
+      "manage_button": "Quản lý persona",
+      "summary_empty": "Chưa xây dựng — trả lời vài câu hỏi hoặc tạo lại từ bộ nhớ.",
+      "needs_generation_model_title": "Chọn mô hình chat để dùng Phong cách",
+      "needs_generation_model_body": "Phong cách của bạn được thêm vào chỉ dẫn cho AI mỗi khi nó viết giúp bạn, nên cần một mô hình chat. Hãy chọn ở tab Mô hình.",
+      "needs_generation_title": "Kết nối nhà cung cấp chat để dùng Phong cách",
+      "needs_generation_body": "Phong cách của bạn được thêm vào chỉ dẫn cho AI mỗi khi nó viết giúp bạn. Mô hình chat đã được chọn, nhưng thiết bị này chưa có thông tin xác thực cho nhà cung cấp đó — hãy thêm ở tab Nhà cung cấp.",
+      "needs_memory_slots_title": "Tạo lại cần các mô hình bộ nhớ",
+      "needs_memory_slots_body": "Phong cách vẫn hoạt động, nhưng để tạo lại từ bộ nhớ thì cần một mô hình tạo sinh và một mô hình embedding. Hãy chọn ở tab Bộ nhớ.",
+      "summary_built": "Persona đã sẵn sàng",
+      "summary_answers_only": "Đã lưu {{count}} câu trả lời",
+      "answers_title": "Câu trả lời của bạn",
+      "answers_empty": "Trả lời vài câu hỏi để mô tả giọng điệu bạn muốn khi viết.",
+      "answer_questions": "Trả lời vài câu hỏi",
+      "edit_answers": "Chỉnh sửa câu trả lời",
+      "traits_label": "Đặc điểm & ưu tiên",
+      "traits_placeholder": "Chưa có đặc điểm được tạo.",
+      "style_label": "Phong cách viết",
+      "style_placeholder": "Chưa có phong cách viết được tạo.",
+      "last_built": "Tạo lần cuối {{when}}",
+      "not_enough_material_title": "Chưa đủ tư liệu",
+      "not_enough_material_body": "Hãy thêm vài bộ nhớ hoặc mục nhật ký, rồi xây dựng lại persona. Bạn cũng có thể trả lời câu hỏi ngay bây giờ.",
+      "not_enough_style_material_body": "Hãy thêm ít nhất ba mục nhật ký đủ điều kiện, rồi xây dựng lại để tạo Phong cách viết.",
+      "rebuild": "Xây dựng lại persona",
+      "rebuild_confirm_title": "Thay thế các chỉnh sửa persona?",
+      "rebuild_confirm_body": "Thao tác này sẽ thay thế hai phần Đặc điểm & ưu tiên và Phong cách viết mà bạn đã chỉnh sửa. Câu trả lời của bạn vẫn không đổi.",
+      "rebuild_confirm_yes": "Thay thế và xây dựng lại",
+      "continue_writing": "Tiếp tục viết theo giọng bạn",
+      "continue_writing_busy": "Đang viết…",
+      "continue_writing_failed": "Không tiếp tục viết được.",
+      "interview": {
+        "title": "Trả lời vài câu hỏi",
+        "description": "Mọi câu trả lời đều không bắt buộc. Chúng giúp các tính năng viết mục nhật ký theo đúng ưu tiên của bạn ngay từ ngày đầu.",
+        "save": "Lưu câu trả lời",
+        "cancel": "Huỷ",
+        "privacy": "Các câu trả lời này ở lại trên thiết bị của bạn. Chúng chỉ được gửi tới provider khi bạn dùng một tính năng áp dụng persona.",
+        "character_count": "{{count}}/{{max}}",
+        "questions": {
+          "preferred_name": {
+            "label": "AI nên gọi bạn là gì và xưng hô thế nào?",
+            "help": "Ví dụ: Minh, và xưng hô thân mật bằng tiếng Việt."
+          },
+          "journal_goal": {
+            "label": "Bạn chủ yếu viết nhật ký để làm gì?",
+            "help": "Chọn phương án gần nhất, hoặc để trống."
+          },
+          "voice_preference": {
+            "label": "Khi AI viết lại hoặc viết tiếp, bạn muốn giữ nguyên giọng văn hay trau chuốt hơn?",
+            "help": "Chọn mặc định bạn thích."
+          },
+          "languages": {
+            "label": "Bạn viết bằng ngôn ngữ nào và có trộn chúng không?",
+            "help": "Hãy nêu cách chuyển ngôn ngữ bạn muốn giữ lại."
+          },
+          "three_words": {
+            "label": "Ba từ mô tả bạn.",
+            "help": "Một vài phẩm chất, giá trị hoặc tâm trạng là đủ."
+          },
+          "life_priorities": {
+            "label": "Điều gì quan trọng nhất với bạn lúc này?",
+            "help": "Con người, dự án, mục tiêu hoặc điều quan trọng khác."
+          },
+          "avoid_topics": {
+            "label": "Có điều gì AI KHÔNG nên nhắc tới hoặc suy đoán không?",
+            "help": "Đây là một ưu tiên cứng cho nội dung dùng persona."
+          },
+          "length_preference": {
+            "label": "Bạn muốn văn bản do AI viết dài đến mức nào?",
+            "help": "Chọn độ dài mặc định bạn thích."
+          }
+        },
+        "options": {
+          "venting": "Trút bầu tâm sự",
+          "memories": "Lưu giữ kỷ niệm",
+          "tracking": "Theo dõi bản thân",
+          "reflection": "Suy ngẫm",
+          "keep_voice": "Giữ giọng văn của tôi",
+          "polish": "Trau chuốt hơn",
+          "brief": "Ngắn gọn",
+          "medium": "Vừa phải",
+          "detailed": "Chi tiết"
+        }
+      },
+      "used_by": "Dùng cho Viết tiếp & Viết lại trong trình soạn thảo và Lưu thành nhật ký trong Trò chuyện — chúng viết theo giọng văn của bạn. Hoạt động độc lập với Ký ức.",
+      "answers_description": "Lời của chính bạn về cách AI nên viết cho bạn. Đây là nguồn ưu tiên — thắng mọi thứ do AI sinh ra.",
+      "traits_description": "Hồ sơ ngắn về bạn, sinh ra từ ký ức và câu trả lời của bạn. Sửa lại nếu có chỗ chưa đúng.",
+      "style_description": "Giọng văn của bạn — độ dài câu, sắc thái, cách pha trộn ngôn ngữ. Sinh ra từ nhật ký của bạn."
+    },
+    "used_by": "Dùng cho Trò chuyện hằng ngày — những điều đáng nhớ về bạn được truy xuất và thêm vào cuộc trò chuyện."
+  },
+  "announcer": {
+    "generating": "Đang tạo…",
+    "done": "Xong",
+    "summary_ready": "Đã có bản tóm tắt",
+    "review_ready": "Đã có bản đánh giá",
+    "image_ready": "Đã có hình",
+    "writing_ready": "Đã viết xong",
+    "reply_ready": "Đã có câu trả lời",
+    "entry_saved": "Đã lưu nhật ký",
+    "export_ready": "Đã xuất"
+  },
+  "tab_sections": {
+    "ai": "Các mục Cài đặt AI"
+  },
+  "settings_panel": {
+    "loading": "Đang tải…"
+  }
+}

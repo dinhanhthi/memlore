@@ -1,0 +1,85 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+website/dist/
+*.local
+
+# pnpm
+.pnpm-debug.log*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor
+.idea/
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vite
+vite.config.ts.timestamp-*
+
+# Vitest coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Rust / Cargo
+src-tauri/target/
+
+# Tauri build outputs
+*.deb
+*.AppImage
+*.dmg
+*.exe
+*.msi
+*.rpm
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Apple MapKit JS .p8 private keys — never commit; generate JWT via
+# scripts/generate-mapkit-token.mjs from a key stored outside the repo.
+*.p8
+
+# Test output
+test-results/
+playwright-report/
+
+.mcp.json
+skills-lock.json
+.pnpm-store/
+
+.ab-trash/
+sync_files
+.zcode/
+.omo
+.codegraph/
+build-err.txt
+
+dist-lib/
+ds-bundle/
+.ds-sync/
+
+# Agent / AI tooling — copied locally, not tracked
+.claude/
+.agents/
+.cursor/
+.coding-friend/
+.design-sync/
+CLAUDE.md
+AGENTS.md
+
+# docs/ is deny-by-default. Opt in later with !/docs/foo (and !/docs/foo/** for a folder).
+/docs/*
+!/docs/.gitkeep
+!/docs/mapkit-js-setup.md
+!/docs/gdrive-oauth-setup.md

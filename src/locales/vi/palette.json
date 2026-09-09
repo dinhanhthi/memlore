@@ -1,0 +1,333 @@
+{
+  "search_placeholder": "Tìm lệnh…",
+  "no_results": "Không có kết quả",
+  "group": {
+    "pages": "Trang",
+    "settings": "Cài đặt",
+    "settings_values": "Bật/tắt & đặt",
+    "actions": "Hành động",
+    "journals": "Nhật ký",
+    "tags": "Thẻ"
+  },
+  "page": {
+    "dashboard": "Tổng quan",
+    "entries": "Tất cả mục",
+    "calendar": "Lịch",
+    "tags": "Thẻ",
+    "onthisday": "Ngày này năm xưa",
+    "media": "Thư viện",
+    "map": "Bản đồ",
+    "stats": "Thống kê",
+    "chat": "Trò chuyện hàng ngày",
+    "settings": "Cài đặt",
+    "about": "Giới thiệu"
+  },
+  "settings": {
+    "editor": "Cài đặt → Trình soạn thảo",
+    "appearance": "Cài đặt → Giao diện",
+    "security": "Cài đặt → Bảo mật",
+    "sync": "Cài đặt → Đồng bộ",
+    "media": "Cài đặt → Thư viện",
+    "location": "Cài đặt → Vị trí",
+    "journals": "Cài đặt → Nhật ký",
+    "templates": "Cài đặt → Mẫu",
+    "reminders": "Cài đặt → Nhắc nhở",
+    "ai": "Cài đặt → AI",
+    "data": "Cài đặt → Dữ liệu",
+    "general": "Cài đặt → Chung",
+    "editor_general": "Cài đặt → Trình soạn thảo → Chung",
+    "editor_layout": "Cài đặt → Trình soạn thảo → Bố cục",
+    "editor_font": "Cài đặt → Trình soạn thảo → Phông chữ",
+    "appearance_theme": "Cài đặt → Giao diện → Chủ đề",
+    "appearance_display": "Cài đặt → Giao diện → Hiển thị",
+    "sync_gdrive": "Cài đặt → Đồng bộ → Nhà cung cấp đám mây",
+    "sync_devices": "Cài đặt → Đồng bộ → Thiết bị",
+    "sync_schedule": "Cài đặt → Đồng bộ → Lịch trình",
+    "ai_general": "Cài đặt → AI → Chung",
+    "ai_providers": "Cài đặt → AI → Nhà cung cấp",
+    "ai_memories": "Cài đặt → AI → Ký ức",
+    "ai_persona": "Cài đặt → AI → Nhân cách",
+    "security_device_password": "Cài đặt → Bảo mật → Mật khẩu thiết bị",
+    "security_second_lock": "Cài đặt → Bảo mật → Khóa thứ hai",
+    "security_recovery_devices": "Cài đặt → Bảo mật → Hành động bảo mật",
+    "security_invisible_lock": "Cài đặt → Bảo mật → Khóa vô hình",
+    "location_geocoding": "Cài đặt → Vị trí → Geocoding",
+    "location_default": "Cài đặt → Vị trí → Vị trí mặc định",
+    "location_saved": "Cài đặt → Vị trí → Vị trí đã lưu",
+    "ai_models": "Cài đặt → AI → Mô hình",
+    "ai_features": "Cài đặt → AI → Tính năng",
+    "templates_custom": "Cài đặt → Mẫu → Tuỳ chỉnh",
+    "templates_builtin": "Cài đặt → Mẫu → Có sẵn",
+    "data_import": "Cài đặt → Dữ liệu → Nhập",
+    "data_export": "Cài đặt → Dữ liệu → Xuất",
+    "data_downloads": "Cài đặt → Dữ liệu → Tải xuống",
+    "accent_color": "Cài đặt → Màu nhấn",
+    "sync_interval": "Cài đặt → Tần suất đồng bộ",
+    "cache_limit": "Cài đặt → Giới hạn bộ nhớ đệm",
+    "compression_mode": "Cài đặt → Chế độ nén",
+    "upload_limits": "Cài đặt → Giới hạn tải lên",
+    "geocoding_provider": "Cài đặt → Dịch vụ geocoding",
+    "geocoding_api_key": "Cài đặt → Khóa API geocoding",
+    "biometric": "Cài đặt → Mở khóa sinh trắc",
+    "change_password": "Cài đặt → Đổi mật khẩu",
+    "second_lock_auto_lock": "Cài đặt → Tự khóa thứ hai",
+    "invisible_lock_auto_lock": "Cài đặt → Tự khóa ẩn",
+    "ai_response_language": "Cài đặt → Ngôn ngữ phản hồi AI",
+    "ai_emotion_language": "Cài đặt → Ngôn ngữ cảm xúc AI",
+    "ai_daily_chat_persona": "Cài đặt → Nhân cách trò chuyện",
+    "ai_memory_include_protected": "Cài đặt → Bộ nhớ bao gồm mục bảo vệ",
+    "ai_memory_model_gen": "Cài đặt → Mô hình tạo bộ nhớ",
+    "ai_memory_model_embed": "Cài đặt → Mô hình nhúng bộ nhớ",
+    "editor_font_family": "Cài đặt → Phông chữ soạn thảo",
+    "editor_font_size": "Cài đặt → Cỡ phông soạn thảo",
+    "editor_font_contrast": "Cài đặt → Tương phản phông soạn thảo",
+    "saved_locations": "Cài đặt → Vị trí đã lưu"
+  },
+  "settings_value": {
+    "start_at_login": {
+      "enable": "Bật khởi động cùng hệ thống",
+      "disable": "Tắt khởi động cùng hệ thống"
+    },
+    "math": {
+      "enable": "Bật biểu thức toán",
+      "disable": "Tắt biểu thức toán"
+    },
+    "emoji_shortcodes": {
+      "enable": "Bật mã emoji",
+      "disable": "Tắt mã emoji"
+    },
+    "fixed_title": {
+      "enable": "Bật tiêu đề cố định",
+      "disable": "Tắt tiêu đề cố định"
+    },
+    "right_to_left": {
+      "enable": "Bật phải sang trái",
+      "disable": "Tắt phải sang trái"
+    },
+    "distraction": {
+      "enable": "Bật chế độ tập trung",
+      "disable": "Tắt chế độ tập trung"
+    },
+    "justify": {
+      "enable": "Bật căn đều hai bên",
+      "disable": "Tắt căn đều hai bên"
+    },
+    "first_line_indent": {
+      "enable": "Bật thụt dòng đầu",
+      "disable": "Tắt thụt dòng đầu"
+    },
+    "hyphenation": {
+      "enable": "Bật gạch nối",
+      "disable": "Tắt gạch nối"
+    },
+    "reduced_motion": {
+      "enable": "Bật giảm chuyển động",
+      "disable": "Tắt giảm chuyển động"
+    },
+    "gradient_primary": {
+      "enable": "Bật gradient chính",
+      "disable": "Tắt gradient chính"
+    },
+    "logo_follows_cursor": {
+      "enable": "Bật logo theo con trỏ",
+      "disable": "Tắt logo theo con trỏ"
+    },
+    "sync_enabled": {
+      "enable": "Bật đồng bộ",
+      "disable": "Tắt đồng bộ",
+      "go": "Cài đặt → Đồng bộ"
+    },
+    "sync_on_save": {
+      "enable": "Bật đồng bộ khi lưu",
+      "disable": "Tắt đồng bộ khi lưu",
+      "go": "Cài đặt → Đồng bộ khi lưu"
+    },
+    "sync_on_launch": {
+      "enable": "Bật đồng bộ khi khởi động",
+      "disable": "Tắt đồng bộ khi khởi động",
+      "go": "Cài đặt → Đồng bộ khi khởi động"
+    },
+    "default_location_enabled": {
+      "enable": "Bật vị trí mặc định",
+      "disable": "Tắt vị trí mặc định"
+    },
+    "semantic_search": {
+      "enable": "Bật tìm kiếm ngữ nghĩa",
+      "disable": "Tắt tìm kiếm ngữ nghĩa",
+      "go": "Cài đặt → Tìm kiếm ngữ nghĩa"
+    },
+    "emotion_suggestions": {
+      "enable": "Bật gợi ý cảm xúc",
+      "disable": "Tắt gợi ý cảm xúc",
+      "go": "Cài đặt → Gợi ý cảm xúc"
+    },
+    "chat_rag": {
+      "enable": "Bật truy xuất ngữ cảnh trò chuyện",
+      "disable": "Tắt truy xuất ngữ cảnh trò chuyện",
+      "go": "Cài đặt → Truy xuất ngữ cảnh trò chuyện"
+    },
+    "title_suggestions": {
+      "enable": "Bật gợi ý tiêu đề",
+      "disable": "Tắt gợi ý tiêu đề",
+      "go": "Cài đặt → Gợi ý tiêu đề"
+    },
+    "entry_highlights": {
+      "enable": "Bật điểm nổi bật",
+      "disable": "Tắt điểm nổi bật",
+      "go": "Cài đặt → Điểm nổi bật"
+    },
+    "go_deeper": {
+      "enable": "Bật Đào sâu",
+      "disable": "Tắt Đào sâu",
+      "go": "Cài đặt → Đào sâu"
+    },
+    "continue_writing": {
+      "enable": "Bật Viết tiếp",
+      "disable": "Tắt Viết tiếp",
+      "go": "Cài đặt → Viết tiếp"
+    },
+    "daily_chat": {
+      "enable": "Bật Trò chuyện hàng ngày",
+      "disable": "Tắt Trò chuyện hàng ngày",
+      "go": "Cài đặt → Trò chuyện hàng ngày"
+    },
+    "image_generation": {
+      "enable": "Bật tạo ảnh",
+      "disable": "Tắt tạo ảnh",
+      "go": "Cài đặt → Tạo ảnh"
+    },
+    "multi_entry_summary": {
+      "enable": "Bật tóm tắt nhiều mục",
+      "disable": "Tắt tóm tắt nhiều mục",
+      "go": "Cài đặt → Tóm tắt nhiều mục"
+    },
+    "tag_suggestions": {
+      "enable": "Bật gợi ý thẻ",
+      "disable": "Tắt gợi ý thẻ",
+      "go": "Cài đặt → Gợi ý thẻ"
+    },
+    "periodic_review": {
+      "enable": "Bật đánh giá định kỳ",
+      "disable": "Tắt đánh giá định kỳ",
+      "go": "Cài đặt → Đánh giá định kỳ"
+    },
+    "theme_insights": {
+      "enable": "Bật phân tích chủ đề",
+      "disable": "Tắt phân tích chủ đề",
+      "go": "Cài đặt → Phân tích chủ đề"
+    },
+    "dashboard_insights": {
+      "enable": "Bật insight trên Tổng quan",
+      "disable": "Tắt insight trên Tổng quan",
+      "go": "Cài đặt → Insight trên Tổng quan"
+    },
+    "chat_memory": {
+      "enable": "Bật ký ức trò chuyện",
+      "disable": "Tắt ký ức trò chuyện"
+    },
+    "daily_chat_ai_title": {
+      "enable": "Bật tiêu đề AI",
+      "disable": "Tắt tiêu đề AI"
+    },
+    "show_message_meta": {
+      "enable": "Bật siêu dữ liệu tin nhắn",
+      "disable": "Tắt siêu dữ liệu tin nhắn"
+    },
+    "user_memory_master": {
+      "enable": "Bật bộ nhớ AI",
+      "disable": "Tắt bộ nhớ AI"
+    },
+    "persona_enabled": {
+      "enable": "Bật nhân cách",
+      "disable": "Tắt nhân cách",
+      "go": "Cài đặt → Nhân cách"
+    },
+    "second_lock_show_existence": {
+      "enable": "Bật hiển thị mục đã khóa",
+      "disable": "Tắt hiển thị mục đã khóa"
+    },
+    "language": {
+      "en": "Ngôn ngữ: English",
+      "vi": "Ngôn ngữ: Tiếng Việt"
+    },
+    "time_format": {
+      "24h": "Định dạng giờ: 24h",
+      "12h": "Định dạng giờ: 12h"
+    },
+    "version_retention": {
+      "3": "Lưu bản cũ: 3 ngày",
+      "7": "Lưu bản cũ: 7 ngày",
+      "15": "Lưu bản cũ: 15 ngày"
+    },
+    "line_height": {
+      "compact": "Dãn dòng: Gọn",
+      "normal": "Dãn dòng: Bình thường",
+      "relaxed": "Dãn dòng: Thoáng"
+    },
+    "paragraph_spacing": {
+      "compact": "Khoảng cách đoạn: Gọn",
+      "normal": "Khoảng cách đoạn: Bình thường",
+      "relaxed": "Khoảng cách đoạn: Thoáng"
+    },
+    "design_system": {
+      "signature": "Phong cách: Signature",
+      "clean": "Phong cách: Clean",
+      "clay": "Phong cách: Clay"
+    },
+    "surface_style": {
+      "deep": "Bề mặt: Sâu",
+      "soft": "Bề mặt: Nhẹ",
+      "lumen": "Bề mặt: Lumen"
+    },
+    "ui_font_scale": {
+      "1": "Cỡ chữ UI: 100%",
+      "1_05": "Cỡ chữ UI: 105%",
+      "1_1": "Cỡ chữ UI: 110%"
+    },
+    "media_view_mode": {
+      "full": "Xem ảnh: Toàn màn hình",
+      "panel": "Xem ảnh: Bảng"
+    },
+    "default_search_mode": {
+      "keyword": "Chế độ tìm: Từ khóa",
+      "meaning": "Chế độ tìm: Ngữ nghĩa",
+      "go": "Cài đặt → Chế độ tìm kiếm"
+    }
+  },
+  "action": {
+    "new_entry": "Mục mới",
+    "new_journal": "Nhật ký mới",
+    "toggle_theme_dark": "Chuyển sang chủ đề tối",
+    "toggle_theme_light": "Chuyển sang chủ đề sáng",
+    "toggle_sidebar": "Bật/tắt thanh bên",
+    "open_search": "Tìm mục",
+    "lock_app": "Khóa ứng dụng",
+    "unlock_second_lock": "Mở khóa thứ hai",
+    "lock_second_lock": "Khóa thứ hai",
+    "unlock_second_lock_description": "Nhập mật khẩu khóa thứ hai để hiện các mục và nhật ký đã khóa trong phiên này.",
+    "unlock_invisible": "Mở nội dung ẩn",
+    "lock_invisible": "Khóa nội dung ẩn",
+    "unlock_invisible_description": "Nhập mật khẩu vault để mở vault phù hợp hoặc tạo vault rỗng mới. Chỉ một vault mở cùng lúc.",
+    "unlock_invisible_password": "Mật khẩu",
+    "unlock_invisible_password_placeholder": "Mật khẩu vault",
+    "unlock_invisible_error": "Không có gì để hiện.",
+    "unlock_invisible_cancel": "Huỷ",
+    "unlock_invisible_submit": "Mở",
+    "sync_now": "Đồng bộ ngay",
+    "export_data": "Xuất dữ liệu",
+    "import_data": "Nhập dữ liệu"
+  },
+  "footer": {
+    "navigate": "điều hướng",
+    "select": "chọn",
+    "close": "đóng"
+  },
+  "find": {
+    "placeholder": "Tìm trong mục…",
+    "no_matches": "Không có kết quả",
+    "previous": "Kết quả trước",
+    "next": "Kết quả sau",
+    "close": "Đóng tìm kiếm",
+    "aria_label": "Tìm trong trình soạn thảo"
+  }
+}

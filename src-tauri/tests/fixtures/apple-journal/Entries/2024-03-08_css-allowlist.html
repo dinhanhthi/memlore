@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title></title>
+    <style>
+      p.p1 {
+        margin: 0px 0px 0px 0px;
+        font: 18px '.AppleSystemUIFont';
+        color: #000000;
+      }
+      span.sBold {
+        font-family: '.AppleSystemUIFont';
+        font-weight: bold;
+        font-style: normal;
+        font-size: 18px;
+      }
+      span.sInner {
+        font-kerning: none;
+      }
+      span.sNormal {
+        font-weight: normal;
+      }
+      span.sPaint {
+        color: #c41e3a;
+      }
+      div.pageHeader {
+        font-weight: bold;
+      }
+      div.title {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="p1">
+      <span class="s1">
+        <div>
+          <div class="pageHeader">Monday, March 8, 2024</div>
+          <div class="title">CSS allowlist</div>
+          <div class="bodyText">
+            <p class="p1">
+              <span class="sBold">Outer <span class="sInner">inherited</span></span>
+            </p>
+            <p class="p1">
+              <span class="sBold">kept <span class="sNormal">overridden</span> after</span>
+            </p>
+            <p class="p1"><span class="sPaint">painted</span></p>
+          </div>
+        </div>
+      </span>
+    </p>
+  </body>
+</html>

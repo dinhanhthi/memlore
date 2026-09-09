@@ -1,0 +1,3030 @@
+/* Fonts: Geist (chrome + most headings — modern geometric sans) + Geist Mono
+   (code/metadata) + Fraunces (editorial serif, retained for the app wordmark
+   and entry titles via --font-title). Editor font picker fonts (Inter, Nunito,
+   Open Sans, Fuzzy Bubbles) are kept for user choice.
+
+   All families are SELF-HOSTED via @fontsource packages, imported in
+   src/main.tsx — no Google Fonts @import here, so the app renders its full
+   typography 100% offline. The variable families register under a
+   "<Name> Variable" font-family (e.g. 'Geist Variable', 'Geist Mono Variable',
+   'Fraunces Variable', 'Inter Variable', 'Nunito Variable'); the static
+   families (Open Sans, Fuzzy Bubbles) keep their plain names. */
+
+/* Tailwind CSS v4 */
+@import 'tailwindcss';
+
+/* Interpolated entry-card fill so the row background and cover wash stay
+   the same color for the whole hover/selected transition. Without this,
+   custom properties snap and the two wash layers used to crossfade —
+   a frame of the raw photo (hard edge) leaked through. */
+@property --entry-card-fill {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+/* Wire Tailwind's dark: prefix to the .dark class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* `surface-soft:` prefix — targets the lighter "Soft" dark surface style. Use it
+   when an element needs a different value on the raised charcoal ladder — e.g. a
+   hairline that disappears against the lifted panels. Scoped to `.dark.surface-soft`
+   (not bare `.surface-soft`) to match the token block below: `themeColors.ts` toggles
+   `surface-soft` independently of `dark`, so the class can be parked on <html> without
+   `.dark`, and light mode's `--color-border-strong` is *darker* than `--color-border-subtle`. */
+@custom-variant surface-soft (&:where(.dark.surface-soft, .dark.surface-soft *));
+
+/* Tailwind v4 @theme — registers tokens so Tailwind generates utilities
+   (`bg-panel-1`, `text-fg-muted`, `border-default`, etc).
+
+   The values defined here are the **light-mode** values; `.dark` below
+   redefines the same custom-property names to swap in dark values.
+   Tailwind utilities emit `background-color: var(--color-panel-1)` etc,
+   so the override flows through automatically with no `dark:` siblings. */
+@theme {
+  --font-display: 'Geist Variable', system-ui, sans-serif;
+
+  /* Editorial serif retained for the app wordmark + entry titles only
+     (app title, entry-list card titles, editor title field). Everything
+     else stays on Geist (--font-display). Generates the `font-title`
+     utility and a :root var usable from inline styles. */
+  --font-title: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+
+  /* Interface font-size ladder (2xs → base) is multiplied by the runtime
+     `--ui-font-scale` (Appearance → Interface size; 1 / 1.05 / 1.1) and
+     `--ds-type-scale` (per design system; Clay 1.06). Headings (`text-lg`+)
+     are deliberately NOT scaled — they stay at Tailwind defaults so display
+     titles keep their proportions. `--ui-font-scale` defaults to 1 in `:root`
+     below and is overridden on `documentElement` by `useUiFontScale`.
+     `--ds-type-scale` lives on `:root` (not inline) so a Clay override is
+     not buried by the inline scale. Line-height tokens are unitless ratios,
+     so they track the scaled size. */
+
+  /* Bump the default text-xs from 0.75rem (12px) to 0.8125rem (13px) — the
+     app-wide `text-xs` (settings copy, badges, hints) read too small. */
+  --text-xs: calc(0.8125rem * var(--ui-font-scale) * var(--ds-type-scale));
+
+  /* Micro step below text-xs (0.75rem ≈ 11.25px on the 15px root) for
+     badges, counters and kbd hints. Replaces the ad-hoc text-[9..11px]
+     arbitrary values so the whole UI ladder is: 2xs → xs → sm → base → lg. */
+  --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
+  --text-2xs--line-height: calc(1 / 0.75);
+
+  /* Scaled UI body text (Tailwind defaults × `--ui-font-scale`). */
+  --text-sm: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
+  --text-base: calc(1rem * var(--ui-font-scale) * var(--ds-type-scale));
+
+  /* ── Semantic surfaces — SuperX light ladder (warm paper neutrals).
+     Source: docs/context/SURFACE-STYLES-superx.md
+     Layer model (back → front):
+       chrome (titlebar/footer) → white
+       app / editor canvas        → #f4f3f1
+       sidebar / entry list       → #fafaf8
+       cards / modals / inputs    → #ffffff
+       hover                      → #f0eeea
+     Surfaces are pure neutrals (no accent-hue tint). Accent only paints
+     interactive chrome. `--surface-hue` / `--surface-chroma-scale` remain
+     for decorative glows that still track the live accent. */
+  --surface-hue: 230; /* Sky #0ea5e9 */
+  --surface-chroma-scale: 1;
+  --color-app: #f4f3f1;
+  --color-panel-1: #fafaf8; /* sidebar */
+  --color-panel-2: #fafaf8; /* entry list */
+  --color-selected-tab: oklch(0.95 0 0 / 1); /* selected tab in titlebar + main body -> slate-200 */
+  --color-panel-3: #ffffff; /* editor */
+  --color-elevated: #ffffff; /* modal / toast / popover / cards */
+  --color-chrome: #ffffff; /* titlebar / footer */
+  --color-surface-hi: oklch(0.97 0 0); /* card group / raised panel */
+  --nav-active-bg: var(--color-elevated);
+  /* Cover washes track `--color-selected-tab` so editing that token
+     updates idle + hover together. Hover is a mix toward white — light
+     uses a stronger white stop so the lift still reads on paper. Dark
+     redefines the mix with a weaker white stop. */
+  --entry-card-idle-bg: var(--color-selected-tab);
+  --entry-card-hover-bg: color-mix(in oklab, var(--color-selected-tab) 45%, #ffffff);
+  /* Row hover inside a surface-hi card — one step darker than paper hover */
+  --color-surface-row-hover: #e5e2d9;
+  /* Secondary button chip resting / hover — always distinct from card + row */
+  --color-surface-control: oklch(0.94 0 0 / 1);
+  --color-surface-control-hover: oklch(0.9 0 0 / 1);
+  /* Grouped-card header strip (Providers Available groups) */
+  --color-surface-group-header: color-mix(in oklab, #6a6760 72%, transparent);
+
+  /* ── Text roles (warm stone scale) ──
+     primary #1a1917, secondary/muted #6a6760, subtle #9a968c.
+     Targets: primary ≥7:1, muted ≥4.5:1 on white/paper surfaces. */
+  --color-fg: #1a1917;
+  --color-fg-secondary: #6a6760;
+  --color-fg-muted: #6a6760;
+  --color-fg-faint: #9a968c; /* decorative mono labels / timestamps */
+  --color-fg-inverse: #ffffff; /* text on solid accent */
+
+  /* Chat user bubble. Light: SuperX stone darker than --color-app so the
+     chip reads on paper. Dark values live in `.dark` (Deep and Soft share
+     them — no `.dark.surface-soft` override). Clean overrides both tokens
+     in `:root.ds-clean` and `:root.dark.ds-clean`. */
+  --color-bubble-user: oklch(0.94 0 0 / 1);
+  --color-bubble-user-text: #1a1917;
+
+  /* ── Borders / dividers — solid warm stone, not alpha graphite.
+     Ladder (quiet → loud): subtle = previous default, default = previous
+     strong, strong = one more step so emphasis still reads. */
+  --color-border-subtle: #e5e2d9;
+  --color-border-default: #dddddd;
+  --color-border-strong: #c7c3bf;
+  --color-border-card: #dddddd;
+
+  /* Nested / track / pressed secondary (SuperX surface-2) */
+  --color-surface-subtle: oklch(0.94 0 0 / 1);
+
+  /* ── Brand accent — Sky. Mirrors applyAccent('sky') / buildTokens(230)
+     light-mode oklch — keep in sync so first paint matches post-unlock. */
+  --color-accent: oklch(55% 0.18 230);
+  --color-accent-hover: oklch(48% 0.2 230);
+  --color-accent-soft: oklch(60% 0.13 230 / 0.08);
+  --color-editor-selection: oklch(55% 0.18 230 / 0.3);
+  --color-accent-text: oklch(48% 0.2 230);
+  --color-focus-ring: oklch(52% 0.2 230);
+  /* Solid accent fill that carries BODY PROSE in --color-fg-inverse (white).
+     Chrome `--color-accent` is art-directed light (L55% here, L72% in dark,
+     L≈76% for hex orange) and only clears ~2.3–3.6:1 against white — fine
+     for icons and short chrome, not for wrapped paragraphs.
+     Fill is a chroma-preserving oklch at the lightest L that still
+     clears 4.5:1 (mix-with-black collapses chroma → orange reads brown).
+     applyAccent() overwrites this per preset; Sky first-paint matches sky's
+     accentFillLight. `--grad-accent-fill` (CTA sweep) lives in `:root`
+     — gradients are not @theme colors. */
+  --color-accent-fill: oklch(53% 0.2 230);
+
+  /* ── Semantic state ──
+     Status ladder (text/fill pairs):
+       info    — sky blue (counts, in-flight, neutral facts)
+       empty   — warm brown (not started / zero / nothing built)
+       success — green (done, up to date, ready)
+       warning — yellow-amber (needs attention, not fatal)
+       danger  — light-leaning red (errors, important risk)
+     danger base is SuperX #ef4444 family, darkened for AA text on white. */
+  --color-danger: #dc2626;
+  --color-success: oklch(51.5% 0.16 150);
+  --color-warning: oklch(0.7 0.17 75.44);
+  --color-info: oklch(50% 0.14 230);
+  /* Same hue as dark empty; darker L for AA on light paper. */
+  --color-empty: oklch(0.45 0.1 59.02);
+
+  /* Darker than --color-danger so danger *text* clears AA on warm paper
+     (not just white elevated). #dc2626 only manages 4.35:1 on --color-app
+     (#f4f3f1) and 4.17:1 on --color-surface-hi (#f0eeea); #b91c1c (red-700,
+     one step down the SuperX #ef4444 family) clears 4.5:1 on every paper
+     surface in the ladder (worst case 5.58:1 on surface-hi). Inverse of
+     the dark-mode lightening rule below. Does NOT clear AA on the control
+     rungs (#d0ccc0 → 4.03:1); no call site sits there today. */
+  --color-danger-text: #b91c1c;
+  --color-success-text: oklch(51.5% 0.16 150);
+  /* Warm yellow (hue 85.31, near --color-warning's 75.44); darkened to L52%
+     for AA on light paper — the dark block keeps the bright L82% hue-92 variant. */
+  --color-warning-text: oklch(0.52 0.15 85.31);
+  --color-info-text: oklch(50% 0.14 230);
+  /* Same as --color-warning-text so empty-state copy matches warning. */
+  --color-empty-text: var(--color-warning-text);
+
+  /* Solid warning / danger boxes — never paint these as `bg-warning/<alpha>`.
+     Alpha over a dark panel muddies yellow into brown. Light: bright
+     yellow-orange paper, burnt-orange ink, border one step deeper than fill. */
+  --color-warning-bg: oklch(0.95 0.1 82);
+  --color-warning-border: oklch(0.88 0.11 78);
+  --color-warning-fg: oklch(0.45 0.14 55);
+  --color-danger-bg: oklch(0.95 0.04 22);
+  --color-danger-border: oklch(0.88 0.06 22);
+  --color-danger-fg: oklch(0.45 0.18 25);
+
+  /* Editor inline highlight — fixed warm yellow, independent of accent. */
+  --color-editor-highlight: oklch(90% 0.16 95);
+}
+
+/* =========================================================
+   Memlore — design tokens
+   Only tokens that CANNOT be expressed as plain Tailwind
+   classes live here: gradients, complex shadows, glass rgba
+   (for inline/out-of-tree use), and motion.
+   ========================================================= */
+
+:root {
+  /* Interface font-size multiplier (Appearance → Interface size). Default 1;
+     `useUiFontScale` overrides it on `documentElement` (1 / 1.05 / 1.1). Drives
+     the scaled `--text-*` tokens in @theme and the icon size below. */
+  --ui-font-scale: 1;
+  /* Per-design-system type-scale. Chains into the same calc() as
+     `--ui-font-scale` so a Clay bump is not buried by the inline scale. */
+  --ds-type-scale: 1;
+  /* Sidebar + settings-rail icon size, tracks `--ui-font-scale` so icons grow
+     with the interface text (used via the `size-(--ui-icon-size)` utility). */
+  --ui-icon-size: calc(1rem * var(--ui-font-scale) * var(--ds-type-scale));
+  /* Dashboard bento row unit; scales with Interface size and skin type
+     scale so hard-capped card content never clips. */
+  --dashboard-row: calc(9rem * var(--ui-font-scale) * var(--ds-type-scale));
+  /* Dashboard card radius: rounded-xl, scaled like the row unit.
+     Bottom-right is 2× this value. */
+  --dashboard-card-r: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
+
+  /* Button border-radius — pill in Signature, shadcn rounded-md in Clean.
+     Used by Button.tsx as `rounded-(--button-radius)`. */
+  --button-radius: 9999px;
+  /* Button press/hover transition (time + easing). Clay slows it down so
+     the extrusion collapse reads as clay giving way, not a snap. */
+  --button-motion: var(--motion-fast);
+
+  /* Primary CTA extrusion. Signature/Clean leave this none; Clay paints
+     the token but primary buttons do not apply it. */
+  --shadow-cta: none;
+  --shadow-cta-pressed: none;
+
+  /* Second-panel tray lift. Signature/Clean leave this none; Clay paints
+     a puffy drop via `shadow-(--shadow-panel)` on SecondPanel. */
+  --shadow-panel: none;
+
+  /* Settings / grouped cards. Signature/Clean leave this none. */
+  --shadow-card: none;
+
+  /* Compact controls (toggle off, pills, segmented track). */
+  --shadow-control: none;
+  --shadow-toggle-on: none;
+  /* Top-lit wash for clay surfaces. `none` outside Clay so background-image
+     does not paint. */
+  --grad-surface: none;
+
+  /* Tooltip stacking — above Modal `z-1000`. */
+  --z-tooltip: 1100;
+
+  /* Typography families */
+  --font-sans: 'Geist Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-display: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+
+  /* Editor-only typography — overridden by the user's Font setting in
+     Settings/Appearance via applyFont(). App chrome (sidebar, settings,
+     titlebar, calendar, auth screens) keeps the defaults above. */
+  --font-editor-display: 'Geist Variable', system-ui, sans-serif;
+  --font-editor-body: 'Geist Variable', system-ui, sans-serif;
+
+  /* Semantic colour tokens (--color-app, --color-panel-1, --color-fg, etc)
+     are registered in the @theme block above so Tailwind generates the
+     `bg-*` / `text-*` / `border-*` utilities. Dark-mode values redefine
+     them in `.dark` below. */
+
+  /* Space-separated RGB channels for alpha-aware use in rgb(var(--x) / op).
+     Sky (#0ea5e9). applyAccent() rewrites this for other presets. */
+  --accent-rgb: 14 165 233;
+
+  /* Gradients — Sky CTAs. Mirror applyAccent('sky') / buildTokens(230)
+     light-mode output (applyAccent overrides at runtime). */
+  --grad-accent-fill: linear-gradient(165deg, oklch(46% 0.2 230), oklch(53% 0.2 230));
+  --grad-primary: linear-gradient(135deg, oklch(0.8 0.14 226.02), oklch(0.64 0.16 234.21));
+  --grad-accent-soft: linear-gradient(
+    135deg,
+    oklch(60% 0.13 230 / 0.08) 0%,
+    oklch(60% 0.13 230 / 0.045) 100%
+  );
+
+  /* Badge hairline — warm shimmer at the long edges. Neutral, theme-independent. */
+  --grad-badge-border: linear-gradient(
+    320deg,
+    color-mix(in oklab, var(--color-accent) 60%, transparent),
+    var(--color-selected-tab) 20%,
+    var(--color-selected-tab) 80%,
+    color-mix(in oklab, var(--color-accent) 60%, transparent) 95%
+  );
+
+  /* Dashboard card titles — two stops: current accent-text (AA on
+     paper) plus an analogous companion (+60°, same L/C so contrast
+     holds). Follows applyAccent because both stops read --color-accent-text. */
+  --gradient-rainbow-soft: linear-gradient(
+    90deg,
+    var(--color-accent-text),
+    oklch(from var(--color-accent-text) l c calc(h + 60))
+  );
+
+  /* Soft Sky CTA glow (primary button halo) — mirrors buildTokens(230) light. */
+  --shadow-primary-glow:
+    0 6px 20px -6px oklch(60% 0.27 230 / 0.4), 0 2px 6px oklch(65% 0.24 290 / 0.2);
+
+  /* Destructive action glow */
+  --shadow-destructive-glow:
+    0 6px 20px -6px rgba(239, 68, 68, 0.45), 0 2px 4px rgba(239, 68, 68, 0.18);
+
+  /* Elevation scale — SuperX principle: borders define structure; shadows
+     are rare (featured cards / modals). Light mode uses soft warm ink. */
+  --elev-1: 0 1px 2px rgb(26 25 23 / 0.06);
+  --elev-2: 0 8px 24px rgb(26 25 23 / 0.08);
+  --elev-3: 0 12px 32px rgb(26 25 23 / 0.1);
+  --elev-4: 0 20px 40px rgb(26 25 23 / 0.12);
+  --shadow-glow: 0 0 80px rgb(14 165 233 / 0.12);
+  /* Subtle inner rim on floating photo cards (EntryCoverBackdrop) — a hairline
+     edge-light, themed like the elevation scale above. */
+  --shadow-card-rim: rgb(26 25 23 / 0.06);
+
+  /* Hairline — scrollbar thumb + dark-mode-aware inline styles */
+  --hairline-strong: #d0ccc0;
+
+  /* Selection highlight — kept for dark-mode-aware inline ternary in primitives.tsx */
+  --selected-border: oklch(60% 0.13 230 / 0.26);
+
+  /* Content gradient stops (.xj-content-gradient) — light: warm paper wash */
+  --content-grad-from: #fafaf8;
+  --content-grad-to: #f4f3f1;
+
+  /* Soft top accent wash for entry-card decoration (SuperX ambient). */
+  --card-glow: radial-gradient(
+    60% 45% at 50% 0%,
+    color-mix(in oklab, var(--color-accent) 8%, transparent) 0%,
+    transparent 70%
+  );
+
+  /* Edge shadow color — used by shadow-edge-* utilities */
+  --shadow-edge-color: 26, 25, 23, 0.08;
+
+  /* Motion tokens.
+     --motion-fast/base/slow/spring are shorthand (time + easing) for inline
+     `transition: var(--motion-fast)` use. The split `--motion-duration-*` +
+     `--motion-ease-*` tokens are for Tailwind-v4 `duration-(--motion-duration-base)`
+     and `ease-(--motion-ease-out-expo)` utility form. */
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 400ms;
+  --motion-duration-spring: 350ms;
+  --motion-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-fast: var(--motion-duration-fast) var(--motion-ease-out-expo);
+  --motion-base: var(--motion-duration-base) var(--motion-ease-out-expo);
+  --motion-slow: var(--motion-duration-slow) var(--motion-ease-out-expo);
+  --motion-spring: var(--motion-duration-spring) var(--motion-ease-spring);
+}
+
+/* ---------------------------------------------------------
+   Dark theme overrides
+   --------------------------------------------------------- */
+.dark {
+  --accent-rgb: 14 165 233;
+
+  /* ── Semantic surfaces — SuperX dark charcoal ladder (default product look).
+     Layer model (back → front):
+       chrome / titlebar / footer  #0a0a0a
+       main canvas / editor        #0d0d0d  (--color-app / panel-3)
+       sidebar                     #141414  (--color-panel-1 / panel-2)
+       entry list (painted)        oklch(0.28 0 0)  (--color-selected-tab)
+       cards / modals / inputs     #1c1c1c  (--color-elevated)
+       card groups (AI settings)   #242424  (--color-surface-hi)
+       row hover in card groups    #2e2e2e  (--color-surface-row-hover)
+       nested / track              #2a2a2a  (--color-surface-subtle)
+       secondary control chip      #363636  (--color-surface-control)
+       secondary control hover     #575757  (--color-surface-control-hover)
+     Pure neutrals — no accent-hue tint on panels. */
+  --color-app: #0d0d0d;
+  --color-panel-1: #141414;
+  --color-panel-2: #141414;
+  --color-selected-tab: oklch(0.28 0 0);
+  --color-panel-3: #0d0d0d;
+  --color-elevated: #1c1c1c;
+  --color-chrome: #0a0a0a;
+  --color-surface-hi: #242424;
+  /* Idle = selected-tab. Hover = same token mixed toward white, not a
+     fixed ladder step — otherwise editing selected-tab leaves the hover
+     wash behind (surface-hi was darker than the current tab). */
+  --entry-card-idle-bg: var(--color-selected-tab);
+  --entry-card-hover-bg: color-mix(in oklab, var(--color-selected-tab) 92%, #ffffff);
+  --color-surface-row-hover: #2e2e2e;
+  /* Secondary chips must read on surface-hi and on surface-row-hover */
+  --color-surface-control: #363636;
+  --color-surface-control-hover: #575757;
+  /* Providers group-card header strip (#3c3c3c @ ~72%) */
+  --color-surface-group-header: #3c3c3cb8;
+
+  /* Text: primary / near-primary secondary / warm-stone muted / cool-gray subtle.
+     fg-secondary carries real body copy (About page, settings descriptions,
+     blockquotes) so it sits close to fg — 6.9:1 even on the brightest raised
+     surface (#363636). fg-muted stays the dimmer stone for labels/captions. */
+  --color-fg: #eee;
+  --color-fg-secondary: #c7c3bf;
+  --color-fg-muted: #a8a29e;
+  --color-fg-faint: #6b6b6b;
+  --color-fg-inverse: #ffffff; /* accent-fg — white on solid accent fills */
+
+  /* Graphite chip + light text. Shared by Deep and Soft. */
+  --color-bubble-user: #363636;
+  --color-bubble-user-text: #eee;
+
+  --color-border-subtle: #2a2a2a;
+  --color-border-default: #363636;
+  --color-border-strong: #4a4a4a;
+  --color-border-card: #363636;
+
+  --color-surface-subtle: #2a2a2a;
+
+  /* Sky accent — mirrors applyAccent('sky') / buildTokens(230) dark-mode oklch. */
+  --color-accent: oklch(72% 0.15 230);
+  --color-accent-hover: oklch(80% 0.13 232);
+  --color-accent-soft: oklch(72% 0.15 230 / 0.14);
+  --color-editor-selection: oklch(72% 0.15 230 / 0.35);
+  --color-accent-text: oklch(80% 0.13 232);
+  --color-focus-ring: oklch(82% 0.16 230);
+  /* Same chroma-preserving CTA fill as light — the L72% chrome accent is
+     too light for white body copy, but mix-with-black reads muddy. Sky
+     first-paint matches accentFillLight; applyAccent overwrites per preset. */
+  --color-accent-fill: oklch(53% 0.2 230);
+  --grad-accent-fill: linear-gradient(165deg, oklch(46% 0.2 230), oklch(53% 0.2 230));
+
+  --color-danger: #ef4444;
+  --color-success: oklch(68% 0.16 150);
+  /* Warning leans yellow (hue ~92) so it reads distinct from danger's red. */
+  --color-warning: oklch(82% 0.14 92);
+  /* Sky blue — matches the sky accent family for status/info lines. */
+  --color-info: oklch(74% 0.13 230);
+  /* Warm brown for empty / not-started status (0 items, "not built yet"). */
+  --color-empty: oklch(0.65 0.1 59.02);
+  /* Lighter than --color-danger so danger *text* clears AA on raised dark
+     surfaces too, not just on the darkest panels. #ef4444 only manages 4.13:1
+     on --color-surface-hi (#242424) and 3.81:1 on its surface-soft value
+     (#2a2a2a); #f87171 clears 4.5:1 on every dark surface in the ladder
+     (worst case 5.19:1). Mirrors the light-mode intent — that token is
+     *darkened* for AA on paper, this one is lightened for AA on graphite. */
+  --color-danger-text: #f87171;
+  --color-success-text: oklch(68% 0.16 150);
+  --color-warning-text: oklch(82% 0.14 92);
+  --color-info-text: oklch(74% 0.13 230);
+  /* Same as --color-warning-text so empty-state copy matches warning. */
+  --color-empty-text: var(--color-warning-text);
+
+  /* Same recipe as light: bright paper, not a translucent tint. Gold stays
+     yellow (hue ~82) so it does not read as brown on charcoal. */
+  --color-warning-bg: oklch(0.93 0.11 82);
+  --color-warning-border: oklch(0.86 0.12 78);
+  --color-warning-fg: oklch(0.4 0.14 52);
+  --color-danger-bg: oklch(0.91 0.05 20);
+  --color-danger-border: oklch(0.84 0.07 20);
+  --color-danger-fg: oklch(0.4 0.17 25);
+  --color-editor-highlight: oklch(58% 0.14 95 / 0.55);
+
+  /* Mirror applyAccent('sky') / buildTokens(230) dark-mode output. */
+  --grad-primary: linear-gradient(135deg, oklch(0.71 0.17 250.98), oklch(0.59 0.14 237.86));
+  --grad-accent-soft: linear-gradient(
+    135deg,
+    oklch(72% 0.15 230 / 0.14) 0%,
+    oklch(72% 0.15 230 / 0.08) 100%
+  );
+
+  --grad-badge-border: linear-gradient(320deg, #a29c9680, #1e1e1e 20%, #201f1f 80%, #a29c9680 95%);
+
+  --shadow-primary-glow:
+    0 4px 16px -6px oklch(49% 0.27 230 / 0.35), 0 1px 3px oklch(58% 0.25 290 / 0.18);
+
+  --shadow-destructive-glow:
+    0 6px 18px -6px rgba(239, 68, 68, 0.38), 0 2px 4px rgba(239, 68, 68, 0.12);
+
+  /* SuperX shadows — elevation is rare; modals use elev-4 */
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.35);
+  --elev-2: 0 8px 24px rgb(0 0 0 / 0.35);
+  --elev-3: 0 12px 32px rgb(0 0 0 / 0.4);
+  --elev-4: 0 24px 80px rgb(0 0 0 / 0.55);
+  --shadow-glow: 0 0 80px rgb(14 165 233 / 0.18);
+  --shadow-card-rim: rgb(255 255 255 / 0.08);
+
+  --hairline-strong: #363636;
+
+  --selected-border: oklch(72% 0.15 230 / 0.38);
+
+  /* Dark content wash: elevated rail → main canvas (charcoal seam, not violet) */
+  --content-grad-from: var(--color-panel-1);
+  --content-grad-to: var(--color-app);
+
+  /* Ambient top accent halo (hero-only feel; very soft on cards) */
+  --card-glow: radial-gradient(
+    60% 45% at 50% 0%,
+    color-mix(in oklab, var(--color-accent) 14%, transparent) 0%,
+    transparent 70%
+  );
+
+  --shadow-edge-color: 0, 0, 0, 0.35;
+}
+
+/* =========================================================
+   Surface style: "Soft" (dark mode only)
+   ---------------------------------------------------------
+   Optional lighter charcoal ladder within the SuperX family.
+   Default product look is `.dark` (deep #0d0d0d). Soft lifts every
+   layer ~one step so dense UIs feel less cavernous without leaving
+   the warm-neutral charcoal language.
+
+     app / editor     #141414
+     sidebar / list   #1c1c1c
+     cards / modals   #242424
+     hover            #2a2a2a
+     chrome           #0d0d0d  (still darker than canvas)
+
+   Text + borders stay SuperX (shared with `.dark`). Accent untouched. */
+.dark.surface-soft {
+  --color-app: #141414;
+  --color-panel-1: #1c1c1c;
+  --color-panel-2: #1c1c1c;
+  --color-selected-tab: #1c1c1c;
+  --color-panel-3: #141414;
+  --color-chrome: #0d0d0d;
+  --color-elevated: #242424;
+  --color-surface-hi: #2a2a2a;
+  --color-surface-row-hover: #323232;
+  --color-surface-subtle: #363636;
+  /* Same explicit chips as Deep — Soft elevates card bodies, not these. */
+  --color-surface-control: #3f3f3f;
+  --color-surface-control-hover: #575757;
+  --color-surface-group-header: #3c3c3cb8;
+
+  --content-grad-from: var(--color-panel-1);
+  --content-grad-to: var(--color-app);
+}
+
+/* =========================================================
+   Surface style: "Lumen" (dark mode only)
+   ---------------------------------------------------------
+   Optional Night Foundry cool-violet paper within Signature.
+   Default product look is `.dark` (Deep). Lumen is XOR with
+   `.dark.surface-soft` — specificity 0,2,0 is enough; never both
+   classes. There is no light paint block. Selector is
+   `.dark.surface-lumen` (not bare `.surface-lumen`) so the class
+   can be parked on <html> without `.dark`, matching Soft.
+
+   Status-ladder tokens inherit Signature `.dark` via cascade;
+   override here only if the AA matrix rejects a pair. Accent /
+   glow / fill follow applyAccent (same as Signature) — this
+   block does not pin brass.
+   ========================================================= */
+.dark.surface-lumen {
+  color-scheme: dark;
+
+  /* Surfaces — paper 13% / panel 17% / elevated 22% / hi 26%. */
+  --color-app: oklch(13% 0.014 265);
+  --color-panel-1: oklch(17% 0.016 265);
+  --color-panel-2: oklch(17% 0.016 265);
+  --color-selected-tab: oklch(17% 0.016 265);
+  --color-panel-3: oklch(18% 0.017 264);
+  --color-elevated: oklch(22% 0.018 263);
+  --color-chrome: oklch(13% 0.014 265);
+  --color-surface-hi: oklch(26% 0.02 263);
+  --entry-card-idle-bg: var(--color-selected-tab);
+  --entry-card-hover-bg: color-mix(in oklab, var(--color-selected-tab) 92%, #ffffff);
+  --color-surface-row-hover: oklch(30% 0.02 263);
+  --color-surface-control: oklch(32% 0.02 263);
+  --color-surface-control-hover: oklch(38% 0.02 263);
+  --color-surface-subtle: oklch(24% 0.016 265);
+  --nav-active-bg: var(--color-elevated);
+  --color-surface-group-header: oklch(96% 0.006 262 / 6%);
+
+  /* Text — ink 96%. muted/secondary lifted from Night Foundry 60%
+     (fails AA on the 22–26% panels) to 72%. faint is decorative. */
+  --color-fg: oklch(96% 0.006 262);
+  --color-fg-secondary: oklch(72% 0.014 263);
+  --color-fg-muted: oklch(72% 0.014 263);
+  --color-fg-faint: oklch(62% 0.014 263);
+
+  /* Borders — rule 30% / rule-2 42%, plus a quieter subtle step.
+     Hairline 1px feel; structure is the rule, not a thick stroke. */
+  --color-border-subtle: oklch(24% 0.016 265);
+  --color-border-default: oklch(30% 0.018 265);
+  --color-border-strong: oklch(42% 0.02 263);
+  --color-border-card: oklch(30% 0.018 265);
+  --hairline-strong: oklch(42% 0.02 263);
+
+  --color-bubble-user: oklch(22% 0.018 263);
+  --color-bubble-user-text: oklch(96% 0.006 262);
+
+  /* Accent / glow / fill inherit Signature `.dark` until applyAccent
+     writes the user preset inline — same first-paint path as Clean. */
+
+  /* Flat paper — no left-to-right wash. */
+  --content-grad-from: var(--color-app);
+  --content-grad-to: var(--color-app);
+
+  /* Radius — Night Foundry card 10px / input 8px, nearest rem on the
+     15px root (0.625rem / 0.5rem). Button radius stays the Signature
+     pill. --font-title stays Fraunces (not overridden). */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+
+  /* Deep card shadows on elev-3/4 (Night Foundry --shadow-card). */
+  --elev-3: 0 24px 60px -28px oklch(0% 0 0 / 0.55), 0 1px 2px oklch(0% 0 0 / 0.4);
+  --elev-4: 0 24px 60px -28px oklch(0% 0 0 / 0.55), 0 1px 2px oklch(0% 0 0 / 0.4);
+}
+
+/* Unique Lumen decor. @utility x emits .x at (0,1,0), so
+   .dark.surface-lumen .x (0,3,0) wins without !important.
+   All decor is static (no animation). */
+.dark.surface-lumen .card-glow {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-accent) 45%, transparent) 0%,
+    var(--color-border-subtle) 100%
+  );
+  box-shadow:
+    var(--elev-2),
+    0 0 24px color-mix(in oklab, var(--color-accent) 12%, transparent);
+}
+
+.dark.surface-lumen .card-glow-inner {
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in oklab, var(--color-accent) 5%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--color-elevated);
+}
+
+.dark.surface-lumen .xj-root::before {
+  /* Static blueprint grid, 48px cell, 4% ink. */
+  background:
+    repeating-linear-gradient(
+      oklch(96% 0.006 262 / 0.04),
+      oklch(96% 0.006 262 / 0.04) 1px,
+      transparent 1px,
+      transparent 48px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      oklch(96% 0.006 262 / 0.04),
+      oklch(96% 0.006 262 / 0.04) 1px,
+      transparent 1px,
+      transparent 48px
+    );
+}
+
+.dark.surface-lumen .xj-body-decor {
+  background-image: radial-gradient(
+    45% 38% at 78% 36%,
+    color-mix(in oklab, var(--color-accent) 5%, transparent) 0%,
+    transparent 65%
+  );
+  background-size: auto;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.dark.surface-lumen .xj-content-gradient {
+  background: var(--color-app);
+}
+
+.dark.surface-lumen .t-shimmer::before {
+  display: none;
+}
+
+/* =========================================================
+   Design system: Clean (shadcn) — light neutrals
+   ---------------------------------------------------------
+   Additive token-override layer. Selector is `:root.ds-clean`
+   (specificity 0,2,0) so it outranks `:root` and does not tie
+   with `.dark.surface-soft` or `.dark.surface-lumen`. Never use a
+   bare `.ds-clean`.
+
+   shadcn's default light ladder, mapped onto Memlore names.
+   Roles cited from shadcn: --background, --card, --sidebar,
+   --muted, --border.
+
+     --background  →  --color-app, --color-panel-3 (canvas)
+     --card        →  --color-elevated (raised surfaces)
+     --sidebar     →  --color-panel-1, --color-panel-2, --color-chrome
+     --muted       →  --color-surface-hi, --color-surface-control,
+                      --color-surface-subtle (quiet fills)
+     --border      →  --color-border-default, --color-border-card
+
+   Accent, glow and gradient tokens are written inline by
+   applyAccent and are intentionally omitted here.
+   ========================================================= */
+
+:root.ds-clean {
+  /* Surfaces — Clean layout. Every panel (sidebar, second and third panel,
+     active titlebar tab) is white; the titlebar / footer chrome and the
+     outer canvas sit one rung below at 0.985. */
+  --color-app: oklch(0.985 0 0);
+  --color-panel-1: oklch(1 0 0);
+  --color-panel-2: oklch(1 0 0);
+  --color-selected-tab: oklch(1 0 0);
+  --color-panel-3: oklch(1 0 0);
+  --color-elevated: oklch(1 0 0);
+  --color-chrome: oklch(0.95 0 0);
+  --color-surface-hi: oklch(0.97 0 0);
+  /* Entry cards are white at rest and tint on hover; EntryCoverBackdrop paints
+     its wash from the same --entry-card-fill, so the cover stays seamless. */
+  --entry-card-idle-bg: var(--color-panel-2);
+  --entry-card-hover-bg: oklch(0.975 0 0);
+  /* Settings list rows sit on white cards in Clean light (the surface-hi fill
+     is stripped below), so a quiet hover is enough. */
+  --color-surface-row-hover: oklch(0.965 0 0);
+  --color-surface-control: oklch(0.955 0 0);
+  --color-surface-control-hover: oklch(0.93 0 0);
+  --color-surface-subtle: oklch(0.97 0 0);
+  /* Selected nav sits a rung under its hover fill so the selection reads on
+     white without the shadcn hover == active flattening. */
+  --nav-active-bg: oklch(0.93 0 0);
+  --nav-hover-bg: oklch(0.955 0 0);
+  /* Grouped-card header strip (its only consumer is the `bg-surface-group-header`
+     header in ProvidersTab.tsx:414, which sits ON a card). Signature defines this
+     token as a TRANSLUCENT mix; keep it translucent in Clean too, or the strip
+     reads as a solid block over a card it was meant to tint. */
+  --color-surface-group-header: oklch(0 0 0 / 4%);
+
+  /* Text — shadcn foreground 0.145. muted-foreground is darkened from
+     shadcn's 0.556 to 0.45 because 0.556 on white is ~3.5:1 and this
+     project treats WCAG AA 4.5:1 as non-negotiable. */
+  --color-fg: oklch(0.145 0 0);
+  --color-fg-secondary: oklch(0.45 0 0);
+  --color-fg-muted: oklch(0.45 0 0);
+  --color-fg-faint: oklch(0.556 0 0);
+  --color-fg-inverse: oklch(1 0 0);
+
+  /* Borders — shadcn border/input 0.922, plus a quieter and a louder step. */
+  --color-border-subtle: oklch(0.945 0 0);
+  --color-border-default: oklch(0.922 0 0);
+  --color-border-strong: oklch(0.87 0 0);
+  --color-border-card: oklch(0.922 0 0);
+  --hairline-strong: oklch(0.87 0 0);
+
+  /* Chat bubble — Signature splits light (@theme) vs dark (`.dark`);
+     Clean overrides both modes here. */
+  --color-bubble-user: oklch(0.97 0 0);
+  --color-bubble-user-text: oklch(0.205 0 0);
+
+  /* Status ladder — same five roles as Signature, retuned for AA on white.
+     danger is shadcn's --destructive. */
+  --color-danger: oklch(0.577 0.245 27.325);
+  --color-success: oklch(0.52 0.15 150);
+  --color-warning: oklch(0.52 0.13 85);
+  --color-info: oklch(0.52 0.16 250);
+  --color-empty: oklch(0.5 0.045 60);
+  --color-danger-text: oklch(0.51 0.21 27.325);
+  /* Solid destructive-button fill (shadcn `bg-destructive`); white label ≥ AA. */
+  --color-danger-fill: oklch(0.577 0.245 27.325);
+  --color-success-text: oklch(0.5 0.15 150);
+  --color-warning-text: oklch(0.5 0.13 85);
+  --color-info-text: oklch(0.5 0.16 250);
+  --color-empty-text: var(--color-warning-text);
+  /* Shared solid box recipe — same bright yellow / rose as Signature light. */
+  --color-warning-bg: oklch(0.95 0.1 82);
+  --color-warning-border: oklch(0.88 0.11 78);
+  --color-warning-fg: oklch(0.45 0.14 55);
+  --color-danger-bg: oklch(0.95 0.04 22);
+  --color-danger-border: oklch(0.88 0.06 22);
+  --color-danger-fg: oklch(0.45 0.18 25);
+
+  --color-editor-highlight: oklch(0.94 0.12 95);
+  --content-grad-from: oklch(1 0 0);
+  --content-grad-to: oklch(1 0 0);
+}
+
+/* =========================================================
+   Design system: Clean (shadcn) — dark neutrals
+   ---------------------------------------------------------
+   shadcn's dark ladder. Selector is `:root.dark.ds-clean`
+   (specificity 0,3,0) so it outranks `.dark.surface-soft`
+   (0,2,0). Placed immediately after the light block so
+   source order also favours it. Never use a bare `.ds-clean`.
+   ========================================================= */
+
+:root.dark.ds-clean {
+  /* Outer bg is near-black so the elevated card reads as an inset panel. */
+  --color-app: oklch(0.09 0 0);
+  --color-panel-1: oklch(0.205 0 0);
+  --color-panel-2: oklch(0.205 0 0);
+  --color-selected-tab: oklch(0.205 0 0);
+  --color-panel-3: oklch(0.145 0 0);
+  --color-elevated: oklch(0.245 0 0);
+  --color-chrome: oklch(0.09 0 0);
+  --color-surface-hi: oklch(0.269 0 0);
+  --entry-card-idle-bg: var(--color-panel-2);
+  /* One step above elevated so a selected row (elevated fill) still lifts. */
+  --entry-card-hover-bg: var(--color-surface-hi);
+  --color-surface-row-hover: oklch(0.269 0 0);
+  --color-surface-control: oklch(0.269 0 0);
+  --color-surface-control-hover: oklch(0.32 0 0);
+  --color-surface-subtle: oklch(0.269 0 0);
+  --nav-active-bg: oklch(0.269 0 0);
+  /* Dark keeps shadcn's hover == active sidebar-accent. */
+  --nav-hover-bg: oklch(0.269 0 0);
+  /* Translucent, matching Signature's type — see the light block's note. */
+  --color-surface-group-header: oklch(1 0 0 / 6%);
+
+  --color-fg: oklch(0.985 0 0);
+  --color-fg-secondary: oklch(0.708 0 0);
+  --color-fg-muted: oklch(0.708 0 0);
+  --color-fg-faint: oklch(0.6 0 0);
+  --color-fg-inverse: oklch(1 0 0);
+
+  /* shadcn dark borders are white-alpha so they read on both 0.145 and
+     0.205 surfaces without a second token set. */
+  --color-border-subtle: oklch(1 0 0 / 8%);
+  --color-border-default: oklch(1 0 0 / 12%);
+  --color-border-strong: oklch(1 0 0 / 22%);
+  --color-border-card: oklch(1 0 0 / 12%);
+  --hairline-strong: oklch(1 0 0 / 22%);
+
+  --color-bubble-user: oklch(0.269 0 0);
+  --color-bubble-user-text: oklch(0.985 0 0);
+
+  --color-danger: oklch(0.704 0.191 22.216);
+  --color-success: oklch(0.72 0.16 150);
+  --color-warning: oklch(0.79 0.14 85);
+  --color-info: oklch(0.7 0.14 250);
+  --color-empty: oklch(0.68 0.045 60);
+  --color-danger-text: oklch(0.72 0.18 22.216);
+  /* shadcn dark uses destructive/60 alpha, which lands at ~4.3:1 under white
+     on elevated; a solid L0.5 fill keeps the same tone and clears AA. */
+  --color-danger-fill: oklch(0.5 0.19 22.216);
+  --color-success-text: oklch(0.76 0.15 150);
+  --color-warning-text: oklch(0.82 0.13 85);
+  --color-info-text: oklch(0.74 0.13 250);
+  --color-empty-text: var(--color-warning-text);
+  /* Shared solid box recipe — same bright gold / rose as Signature dark. */
+  --color-warning-bg: oklch(0.93 0.11 82);
+  --color-warning-border: oklch(0.86 0.12 78);
+  --color-warning-fg: oklch(0.4 0.14 52);
+  --color-danger-bg: oklch(0.91 0.05 20);
+  --color-danger-border: oklch(0.84 0.07 20);
+  --color-danger-fg: oklch(0.4 0.17 25);
+
+  --color-editor-highlight: oklch(0.48 0.1 95);
+  --content-grad-from: oklch(0.145 0 0);
+  --content-grad-to: oklch(0.145 0 0);
+}
+
+/* =========================================================
+   Design system: Clay — light (Clay Press, docs/design/DESIGN_clay.md)
+   ---------------------------------------------------------
+   Additive token-override layer. Selector is `:root.ds-clay`
+   (specificity 0,2,0) so it outranks `:root` and does not tie
+   with `.dark.surface-soft` or `.dark.surface-lumen`. Never use a
+   bare `.ds-clay`.
+
+   Claymorphism on warm paper: canvas `#ebe3d6` (chrome = app), raised
+   panels `#f7f1e6` (canvas-soft), quiet chips `#e7ddd0`, neutral clay
+   `#efe6d8` for secondary slabs. Text is ink `#2a241c` / `#5c554b`.
+
+   Accent tokens (--color-accent*, --grad-*) are written inline by
+   applyAccent from the kit's accent sheet and are omitted here.
+   ========================================================= */
+
+:root.ds-clay {
+  /* Surfaces — kit §3. canvas = app/chrome/panel-1, canvas-soft = every
+     raised panel and card. Settings rail selected is a chip on the soft
+     tray (soft-on-soft does not read). */
+  --color-app: #ebe3d6;
+  --color-chrome: #ebe3d6;
+  --color-panel-1: #ebe3d6;
+  --color-panel-2: color-mix(in oklab, #f7f1e6 50%, #ebe3d6);
+  --color-selected-tab: #f7f1e6;
+  --color-panel-3: #f7f1e6;
+  --color-elevated: #f7f1e6;
+  /* Grouped settings cards (`bg-surface-hi`) sit on the soft tray — a chip
+     fill read as gray boxes. Entry hover stays a lift, not this fill. */
+  --color-surface-hi: #f7f1e6;
+  --entry-card-idle-bg: var(--color-selected-tab);
+  --entry-card-hover-bg: color-mix(in oklab, #ffffff 40%, #f7f1e6);
+  /* Half-step between canvas-soft and the chip: a full chip fill read too
+     heavy for a hover. */
+  --color-surface-row-hover: #efe7db;
+  /* Neutral clay (`--neu`) — secondary slabs and the switch-off track. */
+  --color-surface-control: #efe6d8;
+  --color-surface-control-hover: #f7f1e6;
+  --color-surface-subtle: #f7f1e6;
+  --nav-active-bg: #f7f1e6;
+  --nav-hover-bg: color-mix(in oklab, #f7f1e6 85%, #ebe3d6);
+  --nav-rail-active-bg: #e7ddd0;
+  --nav-rail-hover-bg: color-mix(in oklab, #e7ddd0 50%, #f7f1e6);
+  /* Grouped-card header strip (its only consumer is the `bg-surface-group-header`
+     header in ProvidersTab.tsx, which sits ON a card). Signature defines this
+     token as a TRANSLUCENT mix; keep it translucent in Clay too. */
+  --color-surface-group-header: #2a241c0a;
+
+  /* Text — kit ink / ink-soft. secondary is ink mixed toward ink-soft. */
+  --color-fg: #2a241c;
+  --color-fg-secondary: #453e34;
+  --color-fg-muted: #5c554b;
+  --color-fg-faint: #8a8177;
+  /* Warm off-white: pure white read harsh on the clay slabs. */
+  --color-fg-inverse: #fbf7f0;
+
+  /* Borders — kit `--line` rgb(42 36 28 / 0.1) as 8-digit hex. */
+  --color-border-subtle: #2a241c14;
+  --color-border-default: #2a241c1a;
+  --color-border-strong: #2a241c2e;
+  --color-border-card: #2a241c1a;
+  --hairline-strong: #2a241c2e;
+
+  /* Chat bubble — quiet chip. */
+  --color-bubble-user: #e7ddd0;
+  --color-bubble-user-text: #2a241c;
+
+  /* Status ladder — kit danger; warning / info stay pastel. Success is a
+     mid mint (not a washed 80% L sage) so badge copy, status dots, and
+     `text-success` all read on cream paper. -text variants clear AA 4.5:1
+     on canvas and canvas-soft. Warning hue 75 is yellow-amber, not the
+     peach/hue-40 that read as danger on gray. */
+  --color-danger: #d45c5c;
+  --color-success: oklch(0.48 0.13 160);
+  --color-warning: oklch(0.78 0.09 75);
+  --color-info: oklch(0.75 0.07 260);
+  --color-empty: oklch(0.7 0.05 55);
+  --color-danger-text: #9e3838;
+  --color-danger-fill: var(--color-danger);
+  --danger-deep: #b34444;
+  --danger-ink: #1a0a0a;
+  --color-success-text: oklch(0.38 0.14 160);
+  --color-warning-text: oklch(0.48 0.1 75);
+  --color-info-text: oklch(0.48 0.1 260);
+  --color-empty-text: oklch(0.49 0.08 55);
+  /* Shared solid box recipe — same bright yellow / rose as Signature light. */
+  --color-warning-bg: oklch(0.95 0.1 82);
+  --color-warning-border: oklch(0.88 0.11 78);
+  --color-warning-fg: oklch(0.45 0.14 55);
+  --color-danger-bg: oklch(0.95 0.04 22);
+  --color-danger-border: oklch(0.88 0.06 22);
+  --color-danger-fg: oklch(0.45 0.18 25);
+
+  /* Fallbacks for the inline Clay accent tokens applyAccent writes (sky,
+     the default preset) — first paint + the token-defined test. */
+  --color-accent-deep: #3486a8;
+  --color-accent-wash: #d9eef5;
+
+  --color-editor-highlight: oklch(0.93 0.06 50);
+  --content-grad-from: #f7f1e6;
+  --content-grad-to: #f7f1e6;
+
+  /* Clay recipe tokens (kit §3/§5) — read only by :root.ds-clay rules. */
+  --neu: #efe6d8;
+  --neu-deep: #cfc3b0;
+  --neu-hi: rgb(255 255 255 / 0.7);
+  --neu-press: rgb(90 70 40 / 0.16);
+  --amb: rgb(70 50 20 / 0.16);
+  --grain: rgb(42 36 28 / 0.035);
+}
+
+/* =========================================================
+   Design system: Clay — dark (Clay Press)
+   ---------------------------------------------------------
+   Selector is `:root.dark.ds-clay` (specificity 0,3,0) so it
+   outranks `.dark.surface-soft` (0,2,0). Placed immediately
+   after the light block so source order also favours it.
+   Never use a bare `.ds-clay`.
+   ========================================================= */
+
+:root.dark.ds-clay {
+  /* canvas `#171513`, canvas-soft `#201d1a`, chip `#2a2622`, neu `#2c2926`. */
+  --color-app: #171513;
+  --color-panel-1: #171513;
+  --color-panel-2: #1c1916;
+  --color-selected-tab: #201d1a;
+  --color-panel-3: #201d1a;
+  --color-elevated: #201d1a;
+  --color-chrome: #171513;
+  --color-surface-hi: #2a2622;
+  --entry-card-idle-bg: var(--color-selected-tab);
+  --entry-card-hover-bg: #2a2622;
+  --color-surface-row-hover: #252220;
+  --color-surface-control: #2c2926;
+  --color-surface-control-hover: #36322d;
+  --color-surface-subtle: #2a2622;
+  --nav-active-bg: #2a2622;
+  --nav-hover-bg: #201d1a;
+  /* Lighter than the soft tray so selected/hover chips read on it. */
+  --nav-rail-active-bg: #3a352f;
+  --nav-rail-hover-bg: #2c2926;
+  /* Translucent, matching Signature's type — see the light block's note. */
+  --color-surface-group-header: #f0ebe30f;
+
+  --color-fg: #f0ebe3;
+  --color-fg-secondary: #d1c9bd;
+  --color-fg-muted: #b3aa9e;
+  --color-fg-faint: #7d766d;
+  --color-fg-inverse: #f0ebe3;
+
+  /* kit `--line` rgb(240 235 227 / 0.1). */
+  --color-border-subtle: #f0ebe314;
+  --color-border-default: #f0ebe31a;
+  --color-border-strong: #f0ebe32e;
+  --color-border-card: #f0ebe31a;
+  --hairline-strong: #f0ebe32e;
+
+  --color-bubble-user: #2a2622;
+  --color-bubble-user-text: #f0ebe3;
+
+  --color-danger: #e07272;
+  --color-success: oklch(0.75 0.09 160);
+  --color-warning: oklch(0.8 0.09 75);
+  --color-info: oklch(0.74 0.08 260);
+  --color-empty: oklch(0.72 0.05 55);
+  /* Lighter than --color-danger so danger *text* (error copy) is not a
+     no-op copy of the fill. #e07272 already clears 4.5:1 on Clay dark
+     elevated; the lift keeps the pair distinct the same way Signature
+     dark #ef4444 → #f87171 does. */
+  --color-danger-text: #f09898;
+  --color-danger-fill: var(--color-danger);
+  --danger-deep: #b34a4a;
+  /* Near-black stamp on the lifted kit fill — same move as Clay dark primary. */
+  --danger-ink: #2a1018;
+  --color-success-text: oklch(0.7 0.1 160);
+  --color-warning-text: oklch(0.72 0.1 75);
+  --color-info-text: oklch(0.71 0.1 260);
+  --color-empty-text: oklch(0.71 0.08 55);
+  /* Shared solid box recipe — same bright gold / rose as Signature dark. */
+  --color-warning-bg: oklch(0.93 0.11 82);
+  --color-warning-border: oklch(0.86 0.12 78);
+  --color-warning-fg: oklch(0.4 0.14 52);
+  --color-danger-bg: oklch(0.91 0.05 20);
+  --color-danger-border: oklch(0.84 0.07 20);
+  --color-danger-fg: oklch(0.4 0.17 25);
+
+  --color-accent-deep: #3d86a3;
+  --color-accent-ink: #0a1e26;
+  --color-accent-wash: #1c323a;
+
+  --color-editor-highlight: oklch(0.42 0.06 50);
+  --content-grad-from: #201d1a;
+  --content-grad-to: #201d1a;
+
+  --neu: #2c2926;
+  --neu-deep: #161412;
+  --neu-hi: rgb(255 250 242 / 0.1);
+  --neu-press: rgb(0 0 0 / 0.45);
+  --amb: rgb(0 0 0 / 0.45);
+  --grain: rgb(255 248 238 / 0.03);
+  /* Same mode-neutral recipe as the light block (var()-driven); repeated
+     here so a dark-only retune later cannot fall through to light values. */
+  --elev-1: 0 1px 0 var(--neu-hi), 0 4px 12px var(--amb);
+  --elev-2: 0 1px 0 var(--neu-hi), 0 10px 24px var(--amb);
+  --elev-3: 0 1px 0 var(--neu-hi), 0 14px 30px var(--amb);
+  --elev-4: 0 1px 0 var(--neu-hi), 0 20px 44px var(--amb);
+  --shadow-cta:
+    0 var(--rise) 0 0 var(--color-accent-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 rgb(255 255 255 / 0.38), inset 0 -2px 5px rgb(0 0 0 / 0.12);
+  --shadow-cta-pressed:
+    0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
+  --shadow-danger:
+    0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 rgb(255 255 255 / 0.5), inset 0 -2px 6px rgb(0 0 0 / 0.18);
+  --shadow-danger-pressed:
+    0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
+  /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
+  --grad-danger-fill:
+    linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 46%), var(--color-danger-fill);
+  --shadow-panel: var(--elev-2);
+  --shadow-card: var(--elev-2);
+  --shadow-control:
+    0 3px 0 0 var(--neu-deep), 0 8px 16px var(--amb), inset 0 1px 0 var(--neu-hi),
+    inset 0 -2px 5px rgb(0 0 0 / 0.06);
+  --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
+  /* Kit sheen (white 35%) shared by every accent slab; the sunken track
+     under the switch-off thumb and the segmented thumb; the knob rim. */
+  --sheen: rgb(255 255 255 / 0.35);
+  --shadow-track: 0 3px 0 0 var(--neu-deep), inset 0 2px 5px var(--neu-press);
+  --shadow-toggle-on: 0 3px 0 0 var(--color-accent-deep), inset 0 1px 0 var(--sheen);
+  --shadow-toggle-knob: 0 1px 0 0 var(--color-accent-deep), 0 1px 3px rgb(0 0 0 / 0.25);
+  /* Nav / tab chips live inside overflow-clipping strips (titlebar tab
+     scroller: 4px of slack; sidebar nav: 6px). A tight shadow stays inside
+     that slack; --elev-1's 12px blur was cut flat by the clip and read as a
+     square shadow under a rounded chip. */
+  --shadow-chip: 0 1px 0 var(--neu-hi), 0 2px 4px var(--amb);
+  --grad-surface: linear-gradient(180deg, var(--neu-hi) 0%, transparent 42%);
+}
+
+:root.ds-clay {
+  /* Radius — kit §2: clay-sm 0.95 / clay 1.15 / clay-lg 1.4 / panel 1.5rem.
+     Buttons are rounded slabs (clay), not pills. */
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 0.95rem;
+  --radius-lg: 1.15rem;
+  --radius-xl: 1.4rem;
+  --radius-2xl: 1.5rem;
+  --button-radius: var(--radius-lg);
+  --button-motion: 280ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* Type — Baloo 2 for UI (product choice over the kit's Nunito; latin +
+     vietnamese subsets self-hosted), Fraunces for display headings. --font-title
+     stays Fraunces Variable. Editor body stays user-controlled.
+     16px root so rem steps land on 12 / 14 / 16. */
+  --font-sans: 'Baloo 2 Variable', 'Nunito Variable', 'Geist Variable', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  /* Kit body is ~16px vs Signature's 15px root (16/15 ≈ 1.067). 1.06 is
+     the chained multiplier so Tailwind-inlined `--text-*` calcs pick it up. */
+  --ds-type-scale: 1.06;
+  --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
+  --text-xs: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
+  --text-sm: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
+  --text-base: calc(1rem * var(--ui-font-scale) * var(--ds-type-scale));
+}
+
+:root.ds-clay {
+  /* Elevation — kit §10 panel: highlight lip + ambient drop. Same
+     recipe in both modes; --neu-hi / --amb carry the mode. */
+  --elev-1: 0 1px 0 var(--neu-hi), 0 4px 12px var(--amb);
+  --elev-2: 0 1px 0 var(--neu-hi), 0 10px 24px var(--amb);
+  --elev-3: 0 1px 0 var(--neu-hi), 0 14px 30px var(--amb);
+  --elev-4: 0 1px 0 var(--neu-hi), 0 20px 44px var(--amb);
+
+  /* Primary slab (kit §6): 4px extrusion + ambient + inner light/ground.
+     Press collapses the extrusion; the button translates by --rise. */
+  --rise: 4px;
+  --shadow-cta:
+    0 var(--rise) 0 0 var(--color-accent-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 rgb(255 255 255 / 0.38), inset 0 -2px 5px rgb(0 0 0 / 0.12);
+  --shadow-cta-pressed:
+    0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
+  /* Danger slab — same recipe as --shadow-cta, accent-deep → --danger-deep. */
+  --shadow-danger:
+    0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 rgb(255 255 255 / 0.5), inset 0 -2px 6px rgb(0 0 0 / 0.18);
+  --shadow-danger-pressed:
+    0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
+  /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
+  --grad-danger-fill:
+    linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 46%), var(--color-danger-fill);
+
+  --shadow-panel: var(--elev-2);
+  --shadow-card: var(--elev-2);
+  /* Neutral slab — secondary buttons, pills. Wells (inputs, switch-off,
+     segmented track) invert this via :root.ds-clay rules below. */
+  --shadow-control:
+    0 3px 0 0 var(--neu-deep), 0 8px 16px var(--amb), inset 0 1px 0 var(--neu-hi),
+    inset 0 -2px 5px rgb(0 0 0 / 0.06);
+  --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
+  /* Kit sheen (white 35%) shared by every accent slab; the sunken track
+     under the switch-off thumb and the segmented thumb; the knob rim. */
+  --sheen: rgb(255 255 255 / 0.35);
+  --shadow-track: 0 3px 0 0 var(--neu-deep), inset 0 2px 5px var(--neu-press);
+  --shadow-toggle-on: 0 3px 0 0 var(--color-accent-deep), inset 0 1px 0 var(--sheen);
+  --shadow-toggle-knob: 0 1px 0 0 var(--color-accent-deep), 0 1px 3px rgb(0 0 0 / 0.25);
+  /* Nav / tab chips live inside overflow-clipping strips (titlebar tab
+     scroller: 4px of slack; sidebar nav: 6px). A tight shadow stays inside
+     that slack; --elev-1's 12px blur was cut flat by the clip and read as a
+     square shadow under a rounded chip. */
+  --shadow-chip: 0 1px 0 var(--neu-hi), 0 2px 4px var(--amb);
+  --grad-surface: linear-gradient(180deg, var(--neu-hi) 0%, transparent 42%);
+}
+
+:root.ds-clean {
+  /* Radius — shadcn's --radius: 0.625rem ladder. Verified against a real
+     build: Tailwind v4 emits `border-radius: var(--radius-lg)` and defines
+     --radius-* in `:root,:host`, so this retunes every rounded-* utility
+     app-wide with no component edits. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  /* Memlore fields, selects and every floating menu use `rounded-xl`;
+     shadcn Input / Popover / DropdownMenu are rounded-md, so the xl rung
+     is pinned to 0.5rem instead of tagging each site. */
+  --radius-xl: 0.5rem;
+  /* shadcn Card is `rounded-xl` (0.75rem); Memlore cards/panels/modal use
+     `rounded-2xl`, so the 2xl rung is pinned to shadcn's card radius. */
+  --radius-2xl: 0.75rem;
+
+  /* --font-title stays Fraunces Variable (not overridden). The editor body
+     font stays user-controlled in both design systems. */
+
+  /* Ambient decoration off — Clean has no dot grid, glow, wash or shimmer. */
+  --shadow-glow: none;
+  --card-glow: none;
+  --shadow-card-rim: transparent;
+  --grad-badge-border: var(--color-surface-hi);
+
+  /* Button shape — shadcn's compact rounded-md, not the Signature pill. */
+  --button-radius: var(--radius-md);
+}
+
+/* Low stamps no class (so it inherits `--button-radius` above and stays
+   pixel-identical). Medium / High retune the token. The sweep matches only
+   uniform `rounded-sm/md/lg/xl` on `<button>` and single-line text `<input>`,
+   which is what excludes `rounded-full` switch tracks and circles,
+   `rounded-none` flush/link buttons, per-side radii, `rounded-2xl`
+   cards/panels, `rounded-xl` popover containers (divs), multi-line
+   textareas, checkbox/radio/range/colour/file inputs, and the editor's
+   tap-to-download media placeholder (`.media-tap-placeholder` — stays
+   small-rounded at every Corner radius setting). */
+:root.ds-clean.rad-medium {
+  --button-radius: 0.75rem;
+}
+
+:root.ds-clean.rad-high {
+  --button-radius: 9999px;
+}
+
+:root.ds-clean:is(.rad-medium, .rad-high)
+  :is(
+    button,
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+        [type='file']
+      )
+  ):is(
+    [class~='rounded-sm'],
+    [class~='rounded-md'],
+    [class~='rounded-lg'],
+    [class~='rounded-xl']
+  ):not(.media-tap-placeholder) {
+  border-radius: var(--button-radius);
+}
+
+:root.ds-clean {
+  /* Elevation — shadcn's tailwind shadow scale, near-flat. */
+  --elev-1: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --elev-2: 0 1px 3px 0 oklch(0 0 0 / 0.1), 0 1px 2px -1px oklch(0 0 0 / 0.1);
+  --elev-3: 0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -2px oklch(0 0 0 / 0.1);
+  --elev-4: 0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
+  --shadow-destructive-glow: 0 1px 3px 0 oklch(0 0 0 / 0.1);
+  --shadow-edge-color: 0, 0, 0, 0.06;
+}
+
+:root.dark.ds-clean {
+  --elev-1: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --elev-2: 0 1px 3px 0 oklch(0 0 0 / 0.4), 0 1px 2px -1px oklch(0 0 0 / 0.4);
+  --elev-3: 0 4px 6px -1px oklch(0 0 0 / 0.45), 0 2px 4px -2px oklch(0 0 0 / 0.45);
+  --elev-4: 0 10px 15px -3px oklch(0 0 0 / 0.5), 0 4px 6px -4px oklch(0 0 0 / 0.5);
+  --shadow-destructive-glow: 0 1px 3px 0 oklch(0 0 0 / 0.4);
+  --shadow-edge-color: 0, 0, 0, 0.4;
+}
+
+/* =========================================================
+   Design system: Clean — flatten decorative utilities
+   ---------------------------------------------------------
+   @utility x emits .x at specificity (0,1,0), so
+   :root.ds-clean .x (0,3,0) wins without !important.
+   Paint only. Layout/shape is left alone: tab/nav chrome
+   corners and strip-end spacers, no-scrollbar, shadow-edge,
+   audio range, map marker.
+   ========================================================= */
+
+:root.ds-clean .gradient-primary {
+  /* AA-safe solid. --grad-primary is already flat from
+     applyAccent; this makes the intent readable. */
+  background: var(--color-accent-fill);
+}
+
+/* Signature — pin the CTA sweep. @utility is (0,1,0); this
+   (0,3,0) matches Clean's solid pin so Signature light and dark
+   actually paint `--grad-accent-fill`. Lumen inherits as a
+   Signature surface. */
+:root.ds-signature .gradient-primary {
+  background: var(--grad-accent-fill);
+}
+
+:root.ds-clean .gradient-accent-soft {
+  background: var(--color-surface-hi);
+}
+
+:root.ds-clean .gradient-border-primary::before {
+  /* Hairline, not a two-stop wash. */
+  background: var(--color-accent);
+}
+
+:root.ds-clean .badge-border {
+  background: var(--color-surface-hi);
+}
+
+:root.ds-clean .shadow-primary-glow {
+  box-shadow: var(--elev-1);
+}
+
+:root.ds-clean .shadow-destructive-glow {
+  box-shadow: var(--elev-1);
+}
+
+:root.ds-clean .card-glow {
+  background: var(--color-border-default);
+  box-shadow: none;
+  border-radius: var(--radius-lg);
+}
+
+:root.ds-clean .card-glow-inner {
+  background: var(--color-elevated);
+  border-radius: calc(var(--radius-lg) - 1px);
+}
+
+:root.ds-clean .xj-root::before {
+  display: none;
+}
+
+:root.ds-clean .xj-body-decor {
+  background: none;
+}
+
+:root.ds-clean .xj-content-gradient {
+  background: var(--color-app);
+}
+
+:root.ds-clean .t-shimmer::before {
+  display: none;
+}
+
+/* =========================================================
+   Design system: Clean — shadcn component shapes
+   ---------------------------------------------------------
+   Hook classes (.xj-tooltip / .xj-scrim) and Button's
+   data-variant carry the shadcn shape into Clean; field and
+   menu radii come from the --radius-xl rung above.
+   Tailwind variants are (0,2,0); these (0,3,x) rules win.
+   ========================================================= */
+
+/* shadcn buttons are font-medium; Button primary ships font-semibold + tracking. */
+:root.ds-clean button[data-variant='primary'] {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* shadcn: bg-destructive text-white hover:bg-destructive/90 (dark: solid AA fill).
+   Button's `hover:bg-danger/10` (0,2,0) loses to these (0,3,1) rules. */
+:root.ds-clean button[data-variant='destructive'] {
+  background-color: var(--color-danger-fill);
+  color: var(--color-fg-inverse);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+:root.ds-clean button[data-variant='destructive']:hover {
+  /* Darken, never fade toward the card: white on a translucent mix drops
+     below AA. Same rule serves light and dark via --color-danger-fill. */
+  background-color: color-mix(in oklab, var(--color-danger-fill) 88%, black);
+}
+
+/* shadcn DialogOverlay: flat scrim, no blur. Modal.tsx already paints
+   `bg-black/60`; only the blur is stripped here. `.xj-scrim` also marks the
+   search and slide-over scrims. */
+:root.ds-clean .xj-scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Clean light: settings cards (AI Providers / Memory / Persona, Sync Devices)
+   are white with a hairline instead of the SuperX surface-hi body. Toggle's
+   off-track also carries `bg-surface-hi border` and is excluded. */
+:root.ds-clean:not(.dark) [id^='settings-panel-'] .bg-surface-hi.border:not([role='switch']) {
+  background-color: transparent;
+}
+
+/* Chat session rows lift to `bg-elevated`, which is the same white as the
+   second panel in Clean light. Dark already lands on surface-hi, so the token
+   below is a no-op there. The Chat list is not inside `.xj-second-panel`, so
+   this matches the row class directly. */
+:root.ds-clean .xj-chat-row:hover {
+  background-color: var(--color-surface-row-hover);
+}
+
+/* Clean light: the segmented track is white, so the active thumb needs the
+   same quiet fill a secondary button uses to read against it. */
+:root.ds-clean:not(.dark) .xj-seg-thumb {
+  background-color: var(--color-surface-control);
+}
+
+/* shadcn tooltip is inverted (bg-foreground text-background). --color-panel-3
+   is 1.0 in Clean light / 0.145 in Clean dark so it inverts in both;
+   --color-fg-inverse stays white in Clean dark. */
+:root.ds-clean .xj-tooltip {
+  background-color: var(--color-fg);
+  color: var(--color-panel-3);
+  border-color: transparent;
+}
+
+/* =========================================================
+   Design system: Clay — clay physics + quiet decorative utilities
+   ---------------------------------------------------------
+   @utility x emits .x at specificity (0,1,0), so
+   :root.ds-clay .x (0,3,0) wins without !important.
+   Paint only. Layout/shape is left alone: tab/nav chrome
+   corners and strip-end spacers ride Signature chrome by
+   design. Kit §5 recipe: raised controls extrude by --rise and
+   translate down by the same amount on press; wells (inputs,
+   switch-off, segmented track) invert to an inset shadow.
+   ========================================================= */
+
+:root.ds-clay .gradient-primary {
+  /* Slab fill from applyAccent (top sheen over --acc). Label stays the
+     caller's `text-fg-inverse` — the kit's white --on-primary. */
+  background: var(--grad-accent-fill);
+}
+
+:root.dark.ds-clay .gradient-primary,
+:root.dark.ds-clay .xj-seg [role='radio'][aria-checked='true'] {
+  /* Dark: the lifted accent fills carry the kit's near-black accent ink
+     instead of white (product choice; white measured 2.3–2.9:1). */
+  color: var(--color-accent-ink);
+}
+
+:root.ds-clay .gradient-accent-soft {
+  background: var(--color-accent-soft);
+}
+
+:root.ds-clay .gradient-border-primary::before {
+  /* Hairline, not a two-stop wash. */
+  background: var(--color-border-default);
+}
+
+:root.ds-clay .badge-border {
+  background: var(--color-surface-hi);
+}
+
+/* ---- Buttons (kit §6). `data-variant` is set by Button.tsx. ---- */
+
+:root.ds-clay button[data-variant] {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    transform var(--button-motion),
+    box-shadow var(--button-motion),
+    background-color var(--button-motion),
+    color var(--button-motion),
+    filter var(--button-motion);
+}
+
+:root.ds-clay button[data-variant]:disabled {
+  opacity: 0.48;
+  filter: grayscale(0.15);
+}
+
+:root.ds-clay button[data-variant='primary'] {
+  box-shadow: var(--shadow-cta);
+}
+
+:root.ds-clay button[data-variant='primary']:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+:root.ds-clay button[data-variant='primary']:active:not(:disabled) {
+  transform: translateY(var(--rise));
+  scale: none;
+  filter: brightness(0.97);
+  box-shadow: var(--shadow-cta-pressed);
+}
+
+/* Selected calendar day (Calendar grid, MiniDatePicker): the same extruded
+   accent slab as the primary CTA. Driven by aria-pressed so the other skins
+   keep their Tailwind selected state untouched. */
+:root.ds-clay .xj-cal-day[aria-pressed='true'] {
+  background: var(--grad-accent-fill);
+  color: var(--color-fg-inverse);
+  border-color: transparent;
+  box-shadow: var(--shadow-cta);
+}
+
+:root.dark.ds-clay .xj-cal-day[aria-pressed='true'] {
+  color: var(--color-accent-ink);
+}
+
+:root.ds-clay .xj-cal-day[aria-pressed='true']:active {
+  transform: translateY(var(--rise));
+  box-shadow: var(--shadow-cta-pressed);
+}
+
+:root.ds-clay .xj-cal-day[aria-pressed='true'] [data-entry-dot] {
+  background-color: currentColor;
+}
+
+:root.ds-clay button[data-variant='secondary'],
+:root.ds-clay button[data-variant='outline-secondary'],
+:root.ds-clay button[data-variant='secondary-outline'] {
+  /* Neutral clay slab: --neu fill + --neu-deep edge via --shadow-control.
+     Also hooks Select's trigger (a field-width slab). Label is ink-soft:
+     full ink read too heavy on the pale slab. */
+  --rise: 3px;
+  background-color: var(--color-surface-control);
+  background-image: var(--grad-surface);
+  border-color: transparent;
+  color: var(--color-fg-secondary);
+}
+
+:root.ds-clay button[data-variant='secondary']:hover:not(:disabled),
+:root.ds-clay button[data-variant='outline-secondary']:hover:not(:disabled),
+:root.ds-clay button[data-variant='secondary-outline']:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+:root.ds-clay button[data-variant='secondary']:active:not(:disabled),
+:root.ds-clay button[data-variant='outline-secondary']:active:not(:disabled),
+:root.ds-clay button[data-variant='secondary-outline']:active:not(:disabled) {
+  transform: translateY(var(--rise));
+  scale: none;
+  box-shadow:
+    0 0 0 0 var(--neu-deep),
+    0 2px 8px var(--amb),
+    inset 0 3px 7px var(--neu-press);
+}
+
+:root.ds-clay button[data-variant='outline'] {
+  /* canvas-soft fill, inset accent ring, edge mixed from accent-deep + neu-deep. */
+  --rise: 3px;
+  background-color: var(--color-elevated);
+  border-color: transparent;
+  color: var(--color-accent-text);
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    0 var(--rise) 0 0 color-mix(in srgb, var(--color-accent-deep) 50%, var(--neu-deep));
+}
+
+:root.ds-clay button[data-variant='outline']:hover:not(:disabled) {
+  background-color: var(--color-accent-wash);
+  color: var(--color-accent-text);
+  transform: translateY(-1px);
+}
+
+:root.ds-clay button[data-variant='outline']:active:not(:disabled) {
+  transform: translateY(var(--rise));
+  scale: none;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+:root.ds-clay button[data-variant='ghost']:hover:not(:disabled) {
+  /* Idle stays flat; hover pops a secondary clay chip so the type
+     still reads quiet at rest and tactile on contact. */
+  --rise: 3px;
+  background-color: var(--color-surface-control);
+  background-image: var(--grad-surface);
+  color: var(--color-fg-secondary);
+  box-shadow: var(--shadow-control);
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+:root.ds-clay button[data-variant='ghost']:active:not(:disabled) {
+  --rise: 3px;
+  background-color: var(--color-surface-control);
+  background-image: var(--grad-surface);
+  color: var(--color-fg-secondary);
+  transform: translateY(var(--rise));
+  scale: none;
+  box-shadow:
+    0 0 0 0 var(--neu-deep),
+    0 2px 8px var(--amb),
+    inset 0 3px 7px var(--neu-press);
+}
+
+:root.ds-clay button[data-variant='destructive'] {
+  /* Kit §6 danger: same slab as primary, --acc → --color-danger-fill.
+     Dark ink (not inverse) so the top sheen stays visible and AA holds
+     on the kit coral — same stamp as Clay dark primary. */
+  background: var(--grad-danger-fill);
+  color: var(--danger-ink);
+  border-color: transparent;
+  box-shadow: var(--shadow-danger);
+}
+
+:root.ds-clay button[data-variant='destructive']:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  /* Beat Button.tsx `hover:bg-danger/10` so the slab fill does not wash out. */
+  background-color: var(--color-danger-fill);
+}
+
+:root.ds-clay button[data-variant='destructive']:active:not(:disabled) {
+  transform: translateY(var(--rise));
+  scale: none;
+  filter: brightness(0.97);
+  box-shadow: var(--shadow-danger-pressed);
+}
+
+/* ---- Switch (kit §7): off = neutral well, on = accent slab. ---- */
+
+:root.ds-clay [role='switch']:not(.gradient-primary) {
+  background-color: var(--neu);
+  border-color: transparent;
+  box-shadow: var(--shadow-track);
+}
+
+:root.ds-clay [role='switch'].gradient-primary {
+  box-shadow: var(--shadow-toggle-on);
+}
+
+:root.ds-clay [role='switch'].gradient-primary span {
+  /* Kit thumb is a white sheen; the --acc-deep rim gives it a boundary
+     on the lighter accent tracks. */
+  background-color: var(--color-fg-inverse);
+  box-shadow: var(--shadow-toggle-knob);
+}
+
+/* ---- Segmented control (kit §8): well track, primary clay thumb. ---- */
+
+:root.ds-clay .xj-seg {
+  background-color: var(--neu);
+  border-color: transparent;
+  box-shadow: var(--shadow-track);
+}
+
+:root.ds-clay .xj-seg-thumb {
+  background: var(--grad-accent-fill);
+  border-color: transparent;
+  box-shadow:
+    0 3px 0 0 var(--color-accent-deep),
+    inset 0 1px 0 var(--sheen);
+}
+
+:root.ds-clay .xj-seg [role='radio'][aria-checked='true'] {
+  color: var(--color-fg-inverse);
+}
+
+/* ---- Inputs (kit §9): wells, not slabs. `.xj-input-bare` opts a chrome-less
+   input inside its own wrapper out. ---- */
+
+:root.ds-clay
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']):not(
+    [type='file']
+  ):not(.xj-input-bare),
+:root.ds-clay textarea:not(.xj-input-bare):not(.xj-entry-title) {
+  background-color: var(--color-app);
+  background-image: none;
+  border-color: transparent;
+  box-shadow: var(--shadow-well);
+}
+
+:root.ds-clay
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']):not(
+    [type='file']
+  ):not(.xj-input-bare):focus-visible,
+:root.ds-clay textarea:not(.xj-input-bare):not(.xj-entry-title):focus-visible {
+  box-shadow:
+    inset 0 2px 5px var(--neu-press),
+    inset 0 0 0 2px var(--color-accent);
+}
+
+:root.ds-clay .xj-entry-title {
+  background-image: none;
+  box-shadow: none;
+}
+
+/* ---- Nav / panels ---- */
+
+:root.ds-clay .xj-second-panel {
+  /* Color-only remap: Settings / rail chips use --nav-rail-active-bg.
+     Callers keep `bg-selected-tab` on the inner face. */
+  --nav-active-bg: var(--nav-rail-active-bg);
+}
+
+:root.ds-clay .xj-second-panel > div {
+  background-image: var(--grad-surface);
+}
+
+:root.ds-clay .xj-second-panel [role='tab']:not(.xj-nav-active):hover {
+  background-color: var(--nav-rail-hover-bg);
+}
+
+:root.ds-clay .xj-second-panel .xj-chat-row:hover {
+  /* Chat session rows sit on the soft tray — elevated hover is invisible.
+     Scoped by class: a `[role='button']` selector also caught entry cards,
+     repainting the row under its own cover wash (hard seam on hover). */
+  background-color: var(--nav-rail-hover-bg);
+}
+
+:root.dark.ds-clay .xj-second-panel .xj-chat-row:hover {
+  background-color: var(--color-surface-hi);
+}
+
+:root.ds-clay .xj-sidebar-nav button:not(.xj-nav-active):hover {
+  background-color: var(--nav-hover-bg);
+}
+
+:root.ds-clay .xj-nav-active {
+  /* Light: raised soft chip (same fill as second/third panels). Dark: wash only.
+     --shadow-chip, not --elev-1: see the token note (clipped by the strip). */
+  background-image: var(--grad-surface);
+  box-shadow: var(--shadow-chip);
+}
+
+:root.ds-clay .xj-second-panel .xj-nav-active {
+  /* Chip wash on the soft tray, not a raised chip. */
+  box-shadow: none;
+}
+
+:root.dark.ds-clay .xj-nav-active,
+:root.dark.ds-clay .xj-second-panel .xj-nav-active {
+  box-shadow: none;
+}
+
+:root.ds-clay .xj-main-panel {
+  /* Third / single panel: same top-lit wash as the second-panel tray. */
+  background-image: var(--grad-surface);
+}
+
+:root.ds-clay .shadow-primary-glow {
+  box-shadow: var(--elev-2);
+}
+
+:root.ds-clay .shadow-destructive-glow {
+  box-shadow: var(--elev-2);
+}
+
+:root.ds-clay .card-glow {
+  background: var(--color-elevated);
+  box-shadow: var(--elev-2);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border-card);
+}
+
+:root.ds-clay .card-glow-inner {
+  background: var(--color-elevated);
+  border-radius: calc(var(--radius-2xl) - 1px);
+}
+
+:root.ds-clay .xj-root::before {
+  /* Kit §10 page shell: two soft accent blobs + 7px grain. */
+  background:
+    radial-gradient(900px 480px at 8% -10%, var(--color-accent-soft), transparent 60%),
+    radial-gradient(700px 420px at 110% 8%, var(--color-accent-wash), transparent 55%),
+    radial-gradient(circle at 1px 1px, var(--grain) 1px, transparent 0);
+  background-size:
+    auto,
+    auto,
+    7px 7px;
+}
+
+:root.ds-clay .xj-body-decor {
+  background: none;
+}
+
+:root.ds-clay .xj-content-gradient {
+  background: var(--color-app);
+}
+
+:root.ds-clay .t-shimmer::before {
+  display: none;
+}
+
+/* =========================================================
+   Design system: Clean — structural overrides
+   ---------------------------------------------------------
+   Chrome corners, tab ears, connected-pill nav shapes, and
+   end-spacers are Signature's visual identity. Clean hides
+   them and substitutes simple bordered layouts.
+   ========================================================= */
+
+:root.ds-clean .xj-nav-chrome-corner,
+:root.ds-clean .xj-tab-chrome-corner,
+:root.ds-clean .xj-nav-strip-end-space,
+:root.ds-clean .xj-tab-strip-end-space,
+:root.ds-clay .xj-nav-chrome-corner,
+:root.ds-clay .xj-tab-chrome-corner,
+:root.ds-clay .xj-nav-strip-end-space,
+:root.ds-clay .xj-tab-strip-end-space {
+  display: none;
+}
+
+/* ---------------------------------------------------------
+   Tailwind v4 Custom Utilities
+   --------------------------------------------------------- */
+
+/* Glass 2.5D gradient surfaces. Sparingly used — primary CTAs, soft
+   active-row tints, gold streak pills. Never on card backgrounds or
+   large panels. */
+/* AA-safe CTA sweep. --grad-primary stays art-directed for decorative
+   borders (gradient-border-primary); both --grad-accent-fill stops
+   must clear 4.5:1 with --color-fg-inverse. Clean pins a solid
+   `--color-accent-fill` over this utility. */
+@utility gradient-primary {
+  background: var(--grad-accent-fill);
+}
+@utility gradient-accent-soft {
+  background: var(--grad-accent-soft);
+}
+
+/* Gradient border using mask-composite. Use this whenever a "selected /
+   active" state needs the brand violet→pink gradient as the border (e.g.
+   chosen emoji, active filter chip, focused card). Works on any background
+   AND respects border-radius (including rounded-full).
+   ----------------------------------------------------------------------
+   Usage:
+     <div className="gradient-border-primary rounded-full" />            // default 1px
+     <div className="gradient-border-primary rounded-lg
+                     [--border-gradient-width:2px]" />                    // custom width
+   ----------------------------------------------------------------------
+   Rules:
+     1. Element MUST have a border-radius (rounded-* utility) — pseudo
+        inherits via `border-radius: inherit`. Plain rectangles work too
+        (no rounded-* needed).
+     2. The utility sets `position: relative`. If the element already has
+        `absolute/fixed/sticky`, that's fine (still a containing block).
+     3. Override thickness with the arbitrary CSS var
+        `[--border-gradient-width:Npx]`. Default is 1px, but 1.5–2px is
+        recommended so the violet→pink two-stop blend reads as a gradient
+        rather than a solid line.
+     4. AVOID LAYOUT SHIFT in toggle/radio groups: the gradient is drawn
+        via ::before (absolute) and does NOT reserve space in the box
+        model. If sibling elements in the same flex/grid use a real
+        Tailwind `border` class, the gradient pill will be Npx narrower
+        and "jump" on selection. Fix by reserving an invisible border on
+        both states:
+          selected ? 'gradient-border-primary border border-transparent'
+                   : 'border-border-default hover:border-accent/50 border'
+     5. NAMING: utility is `gradient-border-*` (NOT `border-gradient-*`).
+        Reason: `tailwind-merge` (used by our `cn()` helper) treats any
+        class starting with `border-` as a border-color/width/style and
+        will silently strip it when combined with another `border-*`
+        utility — leaving the gradient invisible. The `gradient-*` prefix
+        survives side-by-side with `border`. */
+@utility gradient-border-primary {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--border-gradient-width, 1px);
+    background: var(--grad-primary);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* Dashboard cards: rounded-xl on TL/TR/BL; BR is 2× (rounded-2xl). */
+@utility card-wave-edge {
+  border-radius: var(--dashboard-card-r) var(--dashboard-card-r) calc(2 * var(--dashboard-card-r))
+    var(--dashboard-card-r);
+}
+
+/* Clay: same extruded slab as secondary buttons (fill + --shadow-control). */
+:root.ds-clay .dashboard-card-shell {
+  box-shadow: var(--shadow-control);
+}
+:root.ds-clay .dashboard-card-fill {
+  background-color: var(--color-surface-control);
+  background-image: var(--grad-surface);
+  border-color: transparent;
+}
+
+/* Dashboard card titles: clip a two-stop accent gradient to the glyphs. */
+@utility text-rainbow-soft {
+  background-image: var(--gradient-rainbow-soft);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (forced-colors: active) {
+  .text-rainbow-soft {
+    background: none;
+    color: CanvasText;
+    -webkit-text-fill-color: CanvasText;
+  }
+}
+
+/* Badge background — warm hairline shimmer along the long edges. Pairs with
+   rounded pills/chips; draws attention without a solid fill. */
+@utility badge-border {
+  background: var(--grad-badge-border);
+}
+
+/* Primary & destructive CTA glows. Bundled with --elev-2 so both shadow
+   layers remain visible. */
+@utility shadow-primary-glow {
+  box-shadow: var(--elev-2), var(--shadow-primary-glow);
+}
+@utility shadow-destructive-glow {
+  box-shadow: var(--elev-2), var(--shadow-destructive-glow);
+}
+
+/* SuperX featured card frame (docs/context/SURFACE-STYLES-superx.md §3.5).
+   1px gradient outer shell + elevated shadow. Use sparingly (one hero /
+   chart shell per page). Pair with `.xj-card-glow-inner` for the fill.
+   Signature light flattens to a hairline + white fill below — same paint
+   as Clean — so the drop shadow and grey wash do not sit on paper. */
+@utility card-glow {
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--color-border-default) 0%,
+    var(--color-border-subtle) 100%
+  );
+  box-shadow: var(--elev-2);
+}
+@utility card-glow-inner {
+  border-radius: 15px;
+  background: linear-gradient(180deg, var(--color-surface-subtle) 0%, var(--color-panel-1) 100%);
+}
+
+/* Signature light — hairline + elevated (white) fill, no drop shadow.
+   `:root.ds-signature:not(.dark)` beats the @utility (0,1,0) and does
+   not match Clean or any `.dark` surface (Deep / Soft keep the glow;
+   Lumen restyles it under `.dark.surface-lumen`). */
+:root.ds-signature:not(.dark) .card-glow {
+  background: var(--color-border-default);
+  box-shadow: none;
+}
+
+:root.ds-signature:not(.dark) .card-glow-inner {
+  background: var(--color-elevated);
+}
+
+/* Daily Chat attach popover — custom date-range grid: bump the day-number
+   font size only, scoped to this wrapper class. `MiniDatePicker` is a
+   SHARED component (RangePill, editor header, etc.) so its own styles are
+   never touched here — this targets only the day-cell `<button>`s inside
+   the wrapper (the only `<button>` under `.grid-cols-7`; weekday headers
+   are `<div>`s). Written out as `calc()` rather than `var(--text-sm)`
+   directly since nothing else in this file references a `--text-*` token
+   outside `@theme`. */
+.xj-chat-attach-custom-range .grid-cols-7 button {
+  font-size: calc(0.875rem * var(--ui-font-scale));
+}
+
+/* Edge-only shadows — auto-switch light/dark via --shadow-edge-color. Use without dark: prefix. */
+@utility shadow-edge-right {
+  box-shadow: 1px 0 2px 0 rgba(var(--shadow-edge-color));
+}
+@utility shadow-edge-left {
+  box-shadow: -1px 0 2px 0 rgba(var(--shadow-edge-color));
+}
+@utility shadow-edge-top {
+  box-shadow: 0 -2px 8px 0 rgba(var(--shadow-edge-color));
+}
+@utility shadow-edge-bottom {
+  box-shadow: 0 2px 8px 0 rgba(var(--shadow-edge-color));
+}
+
+/* Active titlebar tab — outward chrome-corner ears (browser-tab style).
+   Left chrome  → bottom-right radius (panel-2 fills the cutaway tip)
+   Right chrome → bottom-left radius
+   Ears sit OUTSIDE the tab. Tab strip must reserve 12px flex spacers on
+   both ends so the first/last tab ears paint inside the overflow content
+   box (padding alone is still clipped by overflow-x-auto in WebKit). */
+.xj-tab-chrome-corner {
+  --tab-chrome-corner-size: 12px;
+  position: absolute;
+  bottom: 0;
+  z-index: 1;
+  width: var(--tab-chrome-corner-size);
+  height: var(--tab-chrome-corner-size);
+  pointer-events: none;
+}
+.xj-tab-chrome-corner-left {
+  left: calc(-1 * var(--tab-chrome-corner-size));
+  background: radial-gradient(
+    circle var(--tab-chrome-corner-size) at 0% 0%,
+    transparent calc(var(--tab-chrome-corner-size) - 0.5px),
+    var(--color-selected-tab) var(--tab-chrome-corner-size)
+  );
+}
+.xj-tab-chrome-corner-right {
+  right: calc(-1 * var(--tab-chrome-corner-size));
+  background: radial-gradient(
+    circle var(--tab-chrome-corner-size) at 100% 0%,
+    transparent calc(var(--tab-chrome-corner-size) - 0.5px),
+    var(--color-selected-tab) var(--tab-chrome-corner-size)
+  );
+}
+/* End spacers in the tab strip — keep in sync with --tab-chrome-corner-size */
+.xj-tab-strip-end-space {
+  width: 12px;
+  flex-shrink: 0;
+}
+
+/* Active sidebar nav item — same chrome-corner ears as titlebar tabs,
+   rotated 90° CW (content is to the RIGHT, not below).
+     top neighbor    → bottom-right radius at the content edge
+     bottom neighbor → top-right radius at the content edge
+   Fill uses --color-elevated, NOT panel-2: in SuperX dark mode panel-1 and
+   panel-2 are the same hex, so panel-2 on the sidebar is invisible. Must
+   match the active nav pill (bg-elevated) and the TwoPanelLayout content
+   card fill so the ears read as a continuous cutout.
+   Nav list needs 12px flex spacers on both ends so first/last items are not
+   clipped by overflow-y-auto. */
+.xj-nav-chrome-corner {
+  --nav-chrome-corner-size: 12px;
+  --nav-active-fill: var(--color-elevated);
+  position: absolute;
+  right: 0; /* content-facing edge */
+  z-index: 1;
+  width: var(--nav-chrome-corner-size);
+  height: var(--nav-chrome-corner-size);
+  pointer-events: none;
+}
+.xj-nav-chrome-corner-top {
+  top: calc(-1 * var(--nav-chrome-corner-size));
+  background: radial-gradient(
+    circle var(--nav-chrome-corner-size) at 0% 0%,
+    transparent calc(var(--nav-chrome-corner-size) - 0.5px),
+    var(--nav-active-fill) var(--nav-chrome-corner-size)
+  );
+}
+.xj-nav-chrome-corner-bottom {
+  bottom: calc(-1 * var(--nav-chrome-corner-size));
+  background: radial-gradient(
+    circle var(--nav-chrome-corner-size) at 0% 100%,
+    transparent calc(var(--nav-chrome-corner-size) - 0.5px),
+    var(--nav-active-fill) var(--nav-chrome-corner-size)
+  );
+}
+/* mirror for layouts where the content sits LEFT of the rail */
+.xj-nav-chrome-corner-flip {
+  right: auto;
+  left: 0;
+  transform: scaleX(-1);
+}
+.xj-nav-strip-end-space {
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* Hide scrollbar while preserving scroll functionality — used on tab strip. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Text shimmer — dim base + a bright highlight band sweeping via ::before
+   (content mirrored from data-text). Prefer <ShimmerText> so data-text is
+   always kept in sync with the visible label.
+   Light: near-black dim + dark highlight. Dark: near-white dim + white highlight. */
+.t-shimmer {
+  --shimmer-base: color-mix(in oklab, var(--color-fg) 55%, transparent);
+  --shimmer-highlight: var(--color-fg);
+  position: relative;
+  display: inline-block;
+  color: var(--shimmer-base);
+}
+.t-shimmer::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--shimmer-highlight) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: t-shimmer 2000ms linear infinite;
+}
+@keyframes t-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* ---------------------------------------------------------
+   Base Global Styles
+   (Tailwind v4 preflight already handles box-sizing, margin, padding reset)
+   --------------------------------------------------------- */
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* WKWebView (Tauri/macOS): without overflow:hidden on <html>, WebKit
+     transfers viewport-scroll responsibility to the html element. Focus
+     events (editor .focus(), aria-modal dialogs) then cause WKScrollView
+     to shift window.scrollY by ~the titlebar row height, pushing the TitleBar
+     out of view. Setting overflow:hidden here prevents that scroll. */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-app);
+  color: var(--color-fg);
+  line-height: 1.5;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Dark mode body bg/color is fully driven by the OKLCH tokens above —
+   no separate override needed. */
+
+/* The number-input spinner is drawn by the UA, not by us: without a
+   `color-scheme` it renders with the light palette (near-black arrows) on our
+   dark panels. Scoped to `input[type='number']` rather than set on <html> so
+   only the stepper follows the theme — a root-level `color-scheme: dark`
+   would also repaint checkboxes and other native controls. */
+.dark input[type='number'] {
+  color-scheme: dark;
+}
+
+/* In @layer base so a `font-title`/`font-mono` utility on a heading wins —
+   an unlayered element rule would beat Tailwind's utilities layer and pin
+   every h1–h6 to Geist regardless of the className. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal section dividers — when a footer directly follows the header (no body),
+   keep a single line from the header's bottom border only. */
+[data-modal-part='header'] + [data-modal-part='footer'] {
+  border-top-width: 0;
+}
+
+/* ---------------------------------------------------------
+   Graphite backdrop — flat calm canvas with a very subtle static accent glow.
+   --------------------------------------------------------- */
+.xj-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* `clip`, not `hidden`: WebKit's native scroll-to-caret (fired when focus
+     lands in the editor, e.g. applying a template to a new entry) scrolls the
+     container ~31px, pushing the custom titlebar out of view. `clip` forbids
+     all scrolling — including programmatic/focus — so focus can never shift
+     the chrome. (Blank entries never hit this because they don't focus the
+     editor on create.) */
+  overflow: clip;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Static top accent glow — a very subtle radial wash of the brand accent
+   color tinted at 6% opacity. Non-animated, pointer-events:none, stays
+   behind all content via z-index:0. */
+.xj-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 70% at 50% -10%,
+    color-mix(in oklab, var(--color-accent) 6%, transparent),
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Children of xj-root sit above the static glow layer. */
+.xj-root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Global body decor — a faint dot grid anchored to the TOP-RIGHT corner of the
+   whole content body (sidebar + panels), fading toward the bottom-left. This is
+   a window-level overlay painted ABOVE all content (pointer-events:none) so the
+   texture shows uniformly across every view — including full-width pages
+   (Settings / Statistics / Map) whose panels paint their own opaque
+   backgrounds. z-20 clears the sidebar (z-10); body-portaled modals/tooltips
+   live outside .xj-root and stay above it. Dots only (no glow) so it never
+   hazes foreground content. */
+.xj-body-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--color-accent) 20%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 16px 16px;
+  -webkit-mask-image: radial-gradient(115% 90% at 100% 0%, #000 0%, transparent 55%);
+  mask-image: radial-gradient(115% 90% at 100% 0%, #000 0%, transparent 55%);
+}
+
+/* ---------------------------------------------------------
+   Content gradient — a smooth left→right wash spanning the
+   entry-list + editor area. Stops come from `--content-grad-from`
+   / `--content-grad-to`: light mode uses a faint Tailwind slate
+   wash (slate-100 → slate-50) on the middle entry-list (the editor
+   paints solid white over the right); dark mode keeps the seamless
+   sidebar colour (`--color-panel-1`) → near-black violet wash.
+   --------------------------------------------------------- */
+.xj-content-gradient {
+  background-image: linear-gradient(to right, var(--content-grad-from), var(--content-grad-to));
+}
+
+/* ---------------------------------------------------------
+   Scrollbars
+   --------------------------------------------------------- */
+/* SuperX scrollbars — 8px pill thumb on transparent track (§3.13) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: theme(colors.slate.400);
+}
+
+/* ---------------------------------------------------------
+   TipTap / ProseMirror editor
+   --------------------------------------------------------- */
+
+/* Placeholder extension — renders via ::before so the caret is never pushed
+   away from position 0 in an empty doc. Without this CSS block the browser
+   treats the pseudo-element as inline content, which hides the caret until
+   the user actually types the first character. */
+.ProseMirror p.is-editor-empty:first-child::before,
+.ProseMirror .is-empty::before {
+  color: var(--color-fg-muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+[dir='rtl'] .ProseMirror p.is-editor-empty:first-child::before,
+[dir='rtl'] .ProseMirror .is-empty::before {
+  float: right;
+}
+
+/* ── ProseMirror content styles ──────────────────────────────────────────────
+   Tailwind v4 preflight strips all browser defaults (ul bullets, heading sizes,
+   etc). These rules restore a readable editorial hierarchy scoped to the editor
+   so Tailwind utilities outside the editor are unaffected.
+   Tokens used here auto-switch in dark mode via the .dark overrides above. */
+
+/* Editor body font — driven by the user's Font setting (Settings/Appearance).
+   Scoped to .ProseMirror so the rest of the app keeps --font-sans.
+   --font-editor-size    user-tunable base size in px (default html 15px)
+   --font-editor-scale   per-font visual scale for handwriting fonts
+   --font-editor-fg-alpha foreground opacity (0.8 default, 1.0 = full white)
+
+   color-mix(in oklch) requires Safari 16.2+ / Chrome 111+. The plain
+   `color: var(--color-fg)` line below acts as a fallback for older WKWebView
+   (e.g. macOS 12 Monterey) which silently drops the unparseable color-mix
+   declaration and keeps the previous one in the cascade. */
+.ProseMirror {
+  position: relative;
+  font-family: var(--font-editor-body);
+  font-size: calc(var(--font-editor-size, 1em) * var(--font-editor-scale, 1));
+  /* KaTeX size multiplier — em-based so math tracks the user's editor font size. */
+  --font-editor-math-ratio: 1.15;
+  font-weight: var(--font-editor-weight, 400);
+  color: var(--color-fg);
+  color: color-mix(
+    in oklch,
+    var(--color-fg) calc(var(--font-editor-fg-alpha, 0.8) * 100%),
+    transparent
+  );
+}
+
+/* Editor body text max is pure white in dark mode so the contrast slider has
+   headroom above the previous solid #e2e2e2. Default alpha 0.8 ≈ that older
+   full-strength look; 1.0 is pure white. Scoped override only lifts the
+   editor — UI chrome keeps the global fg. The color-mix above reads this
+   locally redefined --color-fg, so the user's font-contrast slider still
+   applies. */
+.dark .ProseMirror {
+  /* Max editor body at 100% contrast; softer steps via --font-editor-fg-alpha */
+  --color-fg: #ffffff;
+}
+
+/* Text selection — stronger than the global ::selection (accent-soft) so
+   highlighted ranges read clearly in both light and dark mode. */
+.ProseMirror ::selection {
+  background: var(--color-editor-selection);
+  color: var(--color-fg);
+}
+
+/* Inline text highlight (TipTap Highlight mark → <mark>) */
+.ProseMirror mark {
+  background-color: var(--color-editor-highlight);
+  color: inherit;
+  border-radius: 0.125rem;
+  padding: 0.05em 0;
+}
+
+/* KaTeX math (TipTap Mathematics extension) */
+.ProseMirror .tiptap-mathematics-render {
+  color: var(--color-fg);
+}
+
+.ProseMirror .tiptap-mathematics-render[data-type='block-math'] {
+  display: block;
+  text-align: center;
+  margin: 0.75em 0;
+  padding: 0.35em 0;
+  overflow-x: auto;
+}
+
+.ProseMirror .tiptap-mathematics-render--editable {
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+
+.ProseMirror .tiptap-mathematics-render--editable:hover {
+  background: var(--color-accent-soft);
+}
+
+.ProseMirror .katex {
+  font-size: calc(1em * var(--font-editor-math-ratio, 1.15));
+}
+
+/* Editor typography — driven by Settings → Editor → General.
+   `.editor-content` wraps EditorContent; modifier classes set CSS variables. */
+.editor-content--line-compact {
+  --editor-line-height: 1.5;
+}
+.editor-content--line-normal {
+  --editor-line-height: 1.7;
+}
+.editor-content--line-relaxed {
+  --editor-line-height: 1.9;
+}
+
+.editor-content--spacing-compact {
+  --editor-paragraph-gap: 0.5em;
+}
+.editor-content--spacing-normal {
+  --editor-paragraph-gap: 1em;
+}
+.editor-content--spacing-relaxed {
+  --editor-paragraph-gap: 1.5em;
+}
+
+/* Spacing between block nodes */
+.ProseMirror > * + * {
+  margin-top: var(--editor-paragraph-gap, 1em);
+}
+
+/* Paragraphs */
+.ProseMirror p {
+  line-height: var(--editor-line-height, 1.7);
+}
+
+/* Justified body text — toggled via Settings → Editor → General */
+.editor-justify-paragraphs .ProseMirror p {
+  text-align: justify;
+}
+
+.editor-content--first-line-indent .ProseMirror p {
+  text-indent: 1.5em;
+}
+
+.editor-content--hyphenate .ProseMirror p {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Full-width inline media (image/video/audio spanning the column) — extra
+   breathing room above and below so blocky media doesn't crowd neighbors.
+   `.media-node--full-width` is set on the NodeViewWrapper in MediaNodeView. */
+.ProseMirror .media-node:has(.media-node--full-width) {
+  display: block;
+  margin-block: 0.75em;
+}
+
+/* Floated inline images — headings and rules clear below the float */
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6,
+.ProseMirror hr {
+  clear: both;
+}
+
+/* Contain trailing floats inside the editor column */
+.ProseMirror::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+/* Drop target line while dragging block nodes (images, etc.) */
+.ProseMirror .editor-drop-indicator {
+  position: absolute;
+  z-index: 100;
+  display: none;
+  pointer-events: none;
+  background-color: var(--color-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 8px color-mix(in oklch, var(--color-accent) 45%, transparent);
+}
+
+/* Selected block node (image drag source) */
+.ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Inline media (image/video/audio) drives its own toolbar on selection, so the
+   generic selection outline just reads as an unwanted thick border around the
+   media. Suppress it for media node views (marked with `.media-node`). */
+.ProseMirror .ProseMirror-selectednode.media-node {
+  outline: none;
+}
+
+/* Image reposition is click-driven (ImageBubbleMenu ↑/↓) — block the
+   browser's own <img> drag so no half-working native drag competes. */
+.ProseMirror img {
+  -webkit-user-drag: none;
+}
+
+/* While dragging, let pointer events pass through the source image so the
+   drop indicator can resolve positions under floated/overlapping nodes.
+   user-select guards against WebKit growing a text selection mid-drag. */
+.ProseMirror.prosemirror-block-drag {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ProseMirror.prosemirror-block-drag .ProseMirror-selectednode {
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* Headings — em-based so they scale with the user's editor font size
+   (--font-editor-size). Color inherits from .ProseMirror so the contrast
+   alpha applied there flows down to headings too. */
+.ProseMirror h1 {
+  font-family: var(--font-editor-display);
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.4em;
+  margin-bottom: 0.3em;
+}
+.ProseMirror h2 {
+  font-family: var(--font-editor-display);
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 1.2em;
+  margin-bottom: 0.25em;
+}
+.ProseMirror h3 {
+  font-family: var(--font-editor-display);
+  font-size: 1.1em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1em;
+  margin-bottom: 0.2em;
+}
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  font-family: var(--font-editor-display);
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.8em;
+  margin-bottom: 0.2em;
+  /* No `color:` — inherits the contrast-mixed --color-fg from .ProseMirror.
+     Visual distinction from body comes from font-weight: 600 + display font. */
+}
+
+/* Suppress top-margin when heading is the first child */
+.ProseMirror h1:first-child,
+.ProseMirror h2:first-child,
+.ProseMirror h3:first-child,
+.ProseMirror h4:first-child,
+.ProseMirror h5:first-child,
+.ProseMirror h6:first-child {
+  margin-top: 0;
+}
+
+/* Bullet & ordered lists */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-inline-start: 1.5em;
+}
+.ProseMirror ul {
+  list-style: disc;
+}
+.ProseMirror ol {
+  list-style: decimal;
+}
+.ProseMirror li {
+  line-height: 1.65;
+}
+.ProseMirror li + li {
+  margin-top: 0.15em;
+}
+/* Nested list indent */
+.ProseMirror ul ul,
+.ProseMirror ul ol,
+.ProseMirror ol ul,
+.ProseMirror ol ol {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
+/* Task list — TipTap renders <li data-checked> (no data-type on li).
+   Override bullet marker; flex row so checkbox and text share the same line. */
+.ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  padding-inline-start: 0.25em;
+}
+.ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+.ProseMirror ul[data-type='taskList'] li > label {
+  flex-shrink: 0;
+  cursor: pointer;
+  /* Nudge checkbox up so it visually centres on the cap-height of the first line */
+  translate: 0 -1px;
+}
+.ProseMirror ul[data-type='taskList'] li > div {
+  flex: 1;
+}
+.ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--color-fg-muted);
+  text-decoration: line-through;
+}
+
+/* Blockquote */
+.ProseMirror blockquote {
+  border-inline-start: 3px solid var(--color-border-default);
+  padding-inline-start: 1em;
+  color: var(--color-fg-secondary);
+  margin-inline-start: 0;
+}
+
+/* Inline code */
+.ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+}
+
+/* Code block (pre > code) — CodeBlockLowlight */
+.ProseMirror pre {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background-color: color-mix(in oklch, var(--color-fg) 5%, transparent);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.85em 1em;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+.ProseMirror pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--color-border-default);
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* Links */
+.ProseMirror a {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ProseMirror a:hover {
+  color: var(--color-accent);
+}
+
+/* Images */
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 0.375rem;
+}
+
+/* Tables */
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  overflow: hidden;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid var(--color-border-default);
+  padding: 0.45em 0.75em;
+  text-align: start;
+  vertical-align: top;
+}
+.ProseMirror th {
+  background-color: color-mix(in oklch, var(--color-fg) 4%, transparent);
+  font-weight: 600;
+}
+
+/* Syntax highlighting tokens (lowlight / highlight.js class names).
+   Using the existing accent + fg tokens keeps the palette on-brand and
+   auto-switches in dark mode without extra overrides. */
+.ProseMirror .hljs-keyword,
+.ProseMirror .hljs-selector-tag,
+.ProseMirror .hljs-built_in,
+.ProseMirror .hljs-name,
+.ProseMirror .hljs-tag {
+  color: var(--color-accent);
+}
+.ProseMirror .hljs-string,
+.ProseMirror .hljs-attr,
+.ProseMirror .hljs-symbol,
+.ProseMirror .hljs-bullet,
+.ProseMirror .hljs-addition {
+  color: var(--color-success);
+}
+.ProseMirror .hljs-title,
+.ProseMirror .hljs-section,
+.ProseMirror .hljs-attribute {
+  color: var(--color-info);
+}
+.ProseMirror .hljs-variable,
+.ProseMirror .hljs-template-variable,
+.ProseMirror .hljs-class .hljs-title {
+  color: var(--color-warning);
+}
+.ProseMirror .hljs-comment,
+.ProseMirror .hljs-quote,
+.ProseMirror .hljs-deletion,
+.ProseMirror .hljs-meta {
+  color: var(--color-fg-muted);
+}
+
+/* ---------------------------------------------------------
+   Focus & Selection
+   --------------------------------------------------------- */
+/* Instant keyboard ring — do not transition outline (keyboard users
+   need the indicator on the first frame). Unlayered, so it beats
+   Tailwind `outline-none` utilities. Suppress the ring only with a
+   more-specific unlayered rule (text fields and `.ProseMirror:focus-visible`
+   below) — a utility class cannot hide it. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Text fields — caret is the focus indicator. The offset ring reads as a
+   second box around the field (including mouse focus: :focus-visible
+   matches text inputs even without a keyboard). Beats the unlayered
+   :focus-visible ring (0,2,0 vs 0,1,0). Checkbox / radio / range / file
+   and native <select> keep the global ring. */
+input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='color'],
+    [type='image']
+  ):focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+/* Writing canvas — caret is the focus indicator. Beats the unlayered
+   :focus-visible ring (0,2,0 vs 0,1,0) so the ring does not wrap the
+   whole editor column. */
+.ProseMirror:focus,
+.ProseMirror:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+/* ---------------------------------------------------------
+   Tab slide-in animations
+   ---------------------------------------------------------
+   Applied to a tabpanel when it becomes active, to slide the
+   new content in from the side the user came from:
+   - moving forward (left → right) → new panel slides in from the right
+   - moving backward (right → left) → new panel slides in from the left
+   Auto-disabled by the reduced-motion rule below.
+*/
+@keyframes tab-slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes tab-slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.tab-slide-in-right {
+  animation: tab-slide-in-from-right 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tab-slide-in-left {
+  animation: tab-slide-in-from-left 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------------------------------------------------------
+   Media auto-download indicator
+
+   Used by the "downloading" placeholder in MediaAttachment: a cloud icon
+   sitting still with a down-arrow that bounces from inside the cloud toward
+   the bottom of the box, signalling "bytes are flowing in from the cloud".
+   The arrow is absolutely positioned over the cloud so the two glyphs
+   visually compose into a single download-cloud affordance.
+   --------------------------------------------------------- */
+@keyframes media-download-arrow {
+  0% {
+    opacity: 0;
+    transform: translateY(-30%);
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(45%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+}
+.media-download-arrow {
+  animation: media-download-arrow 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+/* The global Reduced-Motion block further below already disables animation
+   on every element, so no per-class override is required here. */
+
+/* ---------------------------------------------------------
+   Leaflet map container background
+
+   Leaflet ships `.leaflet-container { background: #ddd }` — a light-grey
+   rectangle wherever tiles do not cover the viewport (zoomed out past the
+   world bounds, offline, and before tiles load). Repaint it with the panel
+   colour the map sits on; the token resolves per surface style on its own.
+   Maps on a different surface (e.g. the preview inside a card) override
+   `--map-surface` on the container instead of adding another rule here.
+
+   Equal specificity with Leaflet's own rule, so this only wins because
+   `main.tsx` imports `leaflet.css` BEFORE `globals.css`. Flip that order
+   and this rule silently dies. It is also unlayered, so it outranks any
+   Tailwind `bg-*` utility put on a map container — use `--map-surface`.
+   --------------------------------------------------------- */
+.leaflet-container {
+  background: var(--map-surface, var(--color-panel-2));
+}
+
+/* ---------------------------------------------------------
+   Leaflet map markers (Locations view)
+
+   `xj-map-marker` is the className we hand to `L.divIcon`. Leaflet by
+   default applies its own `leaflet-div-icon` class with a white background
+   and a 1px grey border — bleed-through that fights every custom marker we
+   draw. Reset those defaults so our own ring/colour from the div content
+   is the only thing on screen.
+   --------------------------------------------------------- */
+.leaflet-div-icon.xj-map-marker,
+.xj-map-marker {
+  background: transparent;
+  border: 0;
+}
+/* Suppress leaflet.markercluster's bundled cluster-icon backgrounds —
+   we render our own thumbnail/badge inside the divIcon. */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large,
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  background-color: transparent;
+}
+
+/* Compact zoom control (+/-) — Leaflet's defaults (30px on desktop,
+   44px on touch) feel oversized inside our small map panels. Shrink to
+   22px and scale the icon glyph proportionally. */
+.leaflet-touch .leaflet-bar a,
+.leaflet-bar a {
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  font-size: 16px;
+}
+
+/* ---------------------------------------------------------
+   Reduced Motion
+   --------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .t-shimmer {
+    color: var(--color-fg);
+  }
+  /* `*` does not match pseudo-elements — kill .t-shimmer's ::before explicitly. */
+  .t-shimmer::before {
+    animation: none !important;
+    content: none;
+  }
+}
+
+/* JS-driven reduced-motion class — mirrors the @media rule above.
+   Applied by useReducedMotion() hook when either the user's explicit store
+   toggle is on OR the OS media query matches. Coexists with the @media rule
+   for defense-in-depth: OS preference works even if JS fails, and the user
+   can force reduced motion even if OS says "no preference". */
+.reduce-motion * {
+  animation: none !important;
+  transition: none !important;
+}
+/* `*` does not match pseudo-elements. */
+.reduce-motion .t-shimmer {
+  color: var(--color-fg);
+}
+.reduce-motion .t-shimmer::before {
+  animation: none !important;
+  content: none;
+}
+
+/* ---------------------------------------------------------
+   Command Palette — cmdk group heading
+   Styled via attribute selector because the heading element is
+   rendered internally by cmdk and we don't control its className.
+   cmdk emits [cmdk-group-heading] as a bare attribute on every
+   Group's heading element. Scoped here instead of via Tailwind
+   arbitrary-attribute variants to guarantee the styles compile
+   regardless of Tailwind v4 version constraints.
+   --------------------------------------------------------- */
+[cmdk-group-heading] {
+  color: var(--color-fg-muted);
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------------------------------------------------------
+   In-editor Find — highlight decorations
+   Applied by the Find ProseMirror plugin (extensions/Find.ts)
+   to matched text ranges. Both light and dark modes tested:
+   - .find-match: subtle accent-soft wash for all matches
+   - .find-match-current: stronger accent wash for the active match
+   --------------------------------------------------------- */
+.find-match {
+  background-color: var(--color-accent-soft);
+  border-radius: 2px;
+}
+
+.find-match-current {
+  /* Fallback for Safari < 16.4 / older WKWebView: hardcoded oklch literal
+     (no relative-color syntax — just a literal, broadly supported).
+     Updated to match new accent hue 280 (was 290). */
+  background-color: oklch(55% 0.18 280 / 0.4);
+  border-radius: 2px;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 0px;
+}
+
+/* Modern relative-color override (Safari 16.4+, Chromium 119+). */
+@supports (background-color: oklch(from black l c h)) {
+  .find-match-current {
+    background-color: oklch(from var(--color-accent) l c h / 0.4);
+  }
+}
+
+/* ---------------------------------------------------------
+   Audio seek slider (AudioPlayer transport)
+   A native <input type="range"> is styled here instead of
+   with Tailwind so the track/thumb pseudo-elements render
+   identically in Chromium (dev web/) and WKWebView (the
+   packaged app) — both honor the -webkit- prefixes. The
+   filled portion is driven by the inline --xj-audio-pct var
+   the component sets from currentTime/duration.
+   --------------------------------------------------------- */
+.xj-audio-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--color-accent) 0%,
+    var(--color-accent) var(--xj-audio-pct, 0%),
+    var(--color-border-default) var(--xj-audio-pct, 0%),
+    var(--color-border-default) 100%
+  );
+}
+
+.xj-audio-range:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.xj-audio-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-elevated);
+  box-shadow: var(--elev-1);
+}
+
+.xj-audio-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-elevated);
+}
+
+/* ── Settings deep-link anchor flash ──────────────────────────────────
+   Applied by SettingsPanel's scroll-to-anchor effect, removed on
+   animationend (or after a timeout for reduced-motion). Uses only
+   semantic tokens — no hardcoded hex. */
+@keyframes settings-anchor-pulse {
+  0% {
+    outline-color: var(--color-accent);
+    background-color: var(--color-accent-soft);
+  }
+  100% {
+    outline-color: transparent;
+    background-color: transparent;
+  }
+}
+
+.settings-anchor-flash {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+  animation: settings-anchor-pulse 1.2s var(--motion-ease-out-expo) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-anchor-flash {
+    animation: none;
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Clay press physics honour reduced motion (kit §11): OS preference and
+   the JS-driven `.reduce-motion` mirror (see useReducedMotion). Transitions
+   are already killed by the global rules; only the transform jump remains. */
+@media (prefers-reduced-motion: reduce) {
+  :root.ds-clay button[data-variant]:hover:not(:disabled),
+  :root.ds-clay button[data-variant]:active:not(:disabled) {
+    transform: none;
+  }
+}
+:root.ds-clay.reduce-motion button[data-variant]:hover:not(:disabled),
+:root.ds-clay.reduce-motion button[data-variant]:active:not(:disabled) {
+  transform: none;
+}

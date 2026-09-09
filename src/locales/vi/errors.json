@@ -1,0 +1,19 @@
+{
+  "network": {
+    "offline": "Bạn đang ngoại tuyến. Vui lòng kiểm tra kết nối.",
+    "timeout": "Yêu cầu đã hết thời gian. Vui lòng thử lại."
+  },
+  "crypto": {
+    "password_required": "Cần có mật khẩu để thực hiện hành động này.",
+    "invalid_key": "Khóa mã hóa không hợp lệ.",
+    "decrypt_failed": "Giải mã dữ liệu thất bại."
+  },
+  "sync": {
+    "failed": "Đồng bộ thất bại. Vui lòng thử lại.",
+    "conflict": "Phát hiện xung đột đồng bộ."
+  },
+  "generic": {
+    "unknown": "Đã xảy ra lỗi không mong đợi.",
+    "try_again": "Vui lòng thử lại."
+  }
+}

@@ -1,0 +1,1384 @@
+{
+  "categories": {
+    "general": {
+      "label": "Tổng quát",
+      "description": "Ngôn ngữ, định dạng giờ và tùy chọn cơ bản của ứng dụng."
+    },
+    "editor": {
+      "label": "Trình soạn thảo",
+      "description": "Công thức toán, mã emoji và kiểu chữ trong trình soạn thảo."
+    },
+    "appearance": {
+      "label": "Giao diện",
+      "description": "Chủ đề, màu nhấn và tùy chọn hiển thị."
+    },
+    "security": {
+      "label": "Bảo mật",
+      "description": "Mã hóa, mật khẩu và mở khóa sinh trắc học."
+    },
+    "sync": {
+      "label": "Đồng bộ",
+      "description": "Nhà cung cấp đồng bộ đám mây và lịch biểu."
+    },
+    "media": {
+      "label": "Phương tiện",
+      "description": "Kích thước bộ nhớ đệm phương tiện cục bộ và quản lý."
+    },
+    "location": {
+      "label": "Vị trí",
+      "description": "Nhà cung cấp gợi ý địa chỉ khi nhập vị trí."
+    },
+    "journals": {
+      "label": "Nhật ký",
+      "description": "Quản lý các nhật ký của bạn."
+    },
+    "templates": {
+      "label": "Mẫu",
+      "description": "Mẫu cho mục nhật ký — sẵn có và do bạn tạo."
+    },
+    "reminders": {
+      "label": "Nhắc nhở",
+      "description": "Đặt lịch nhắc nhẹ nhàng để viết nhật ký."
+    },
+    "ai": {
+      "label": "AI",
+      "description": "Tính năng AI dùng API key của riêng bạn — chạy cục bộ (Ollama, LM Studio, llama.cpp) hoặc qua dịch vụ đám mây (OpenAI, Anthropic, Gemini, …)."
+    },
+    "data": {
+      "label": "Dữ liệu",
+      "description": "Xuất, nhập và quản lý các tệp đã tải xuống trên thiết bị này."
+    }
+  },
+  "rail_label": "Cài đặt",
+  "general": {
+    "groups": {
+      "locale": "Ngôn ngữ & khu vực",
+      "app": "Ứng dụng",
+      "danger": "Vùng nguy hiểm"
+    },
+    "start_at_login": {
+      "title": "Khởi động cùng hệ thống",
+      "hint": "Mở Memlore khi bạn đăng nhập."
+    },
+    "uninstall": {
+      "title": "Gỡ cài đặt Memlore",
+      "hint": "Xóa vĩnh viễn mọi nhật ký, mục viết, ảnh và cài đặt được lưu trên máy này.",
+      "button": "Gỡ cài đặt…",
+      "modal_title": "Gỡ cài đặt Memlore?",
+      "modal_body": "Thao tác này xóa kho dữ liệu đã mã hóa và toàn bộ nội dung bên trong. Không thể hoàn tác, và không có bản sao nào được giữ lại trên máy này.",
+      "export_first": "Xuất nhật ký của bạn trước đã",
+      "removes_label": "Sẽ bị xóa ({{size}})",
+      "also_remove_app": "Xóa luôn cả ứng dụng",
+      "app_path_hint": "Xóa {{path}} sau khi Memlore thoát.",
+      "app_not_removable_macos": "Ứng dụng không thể tự xóa từ vị trí này. Hãy tự chuyển Memlore vào Thùng rác sau khi nó thoát.",
+      "app_not_removable_windows": "Dữ liệu của bạn sẽ bị xóa. Hãy gỡ ứng dụng trong Settings → Apps → Installed apps.",
+      "app_not_removable_linux": "Dữ liệu của bạn sẽ bị xóa. Hãy gỡ ứng dụng bằng trình quản lý gói của bạn.",
+      "app_not_removable_other": "Dữ liệu của bạn sẽ bị xóa. Nền tảng này không hỗ trợ tự gỡ ứng dụng.",
+      "cloud_note": "Dữ liệu đã đồng bộ lên Google Drive hoặc iCloud vẫn được giữ nguyên — các thiết bị khác vẫn hoạt động. Hãy ngắt đồng bộ trước nếu bạn muốn xóa cả phần đó.",
+      "skipped_label": "SẼ KHÔNG bị xóa — nằm ngoài phạm vi Memlore được phép xóa",
+      "stalled": "Memlore không tự thoát được. Dữ liệu của bạn vẫn đang được xóa ở chế độ nền — hãy tự thoát ứng dụng.",
+      "confirm_hint": "Để xác nhận, hãy nhập {{token}} bên dưới.",
+      "confirm_button": "Xóa tất cả và thoát",
+      "cancel": "Hủy",
+      "running": "Đang xóa…",
+      "loading": "Đang kiểm tra dữ liệu lưu trên máy này…"
+    }
+  },
+  "version_history": {
+    "title": "Lịch sử phiên bản",
+    "hint": "Thời gian lưu giữ các phiên bản cũ của một mục trước khi bị xóa bớt.",
+    "days": "{{count}} ngày"
+  },
+  "editor": {
+    "tabs": {
+      "font": "Phông chữ",
+      "general": "Chung",
+      "layout": "Bố cục"
+    },
+    "math": {
+      "title": "Công thức toán học",
+      "hint": "Hiển thị KaTeX: $…$ nội tuyến, $$…$$ khối. Mặc định tắt."
+    },
+    "emoji_shortcodes": {
+      "title": "Mã emoji",
+      "hint": "Gõ :từ_khóa: để chèn emoji. Mặc định tắt."
+    },
+    "fixed_title": {
+      "title": "Cố định tiêu đề mục",
+      "hint": "Ghim tiêu đề khi nội dung cuộn. Mặc định tắt."
+    },
+    "right_to_left": {
+      "title": "Viết từ phải sang trái",
+      "hint": "Viết nội dung mục theo hướng từ phải sang trái. Mặc định tắt."
+    },
+    "justify_paragraphs": {
+      "title": "Căn đều đoạn văn",
+      "hint": "Căn chữ sát cả lề trái và phải, giống Word. Mặc định tắt."
+    },
+    "line_height": {
+      "title": "Chiều cao dòng",
+      "hint": "Khoảng cách dọc bên trong mỗi đoạn văn.",
+      "compact": "Gọn",
+      "normal": "Bình thường",
+      "relaxed": "Thoáng"
+    },
+    "paragraph_spacing": {
+      "title": "Khoảng cách đoạn",
+      "hint": "Khoảng cách giữa các đoạn văn và khối nội dung khác.",
+      "compact": "Gọn",
+      "normal": "Bình thường",
+      "relaxed": "Thoáng"
+    },
+    "first_line_indent": {
+      "title": "Thụt dòng đầu",
+      "hint": "Thụt dòng đầu mỗi đoạn văn, giống sách in. Mặc định tắt."
+    },
+    "hyphenation": {
+      "title": "Ngắt từ",
+      "hint": "Ngắt từ dài xuống dòng. Hữu ích khi căn đều. Mặc định tắt."
+    },
+    "distraction_mode": {
+      "title": "Chế độ không gây phân tâm",
+      "hint": "Nút ở chân để ẩn thanh bên và danh sách. Mặc định bật."
+    },
+    "font": {
+      "title": "Phông chữ",
+      "hint": "Chọn kiểu chữ cho trình soạn thảo — chỉ áp dụng cho khu vực viết, không ảnh hưởng phần còn lại của ứng dụng. Bản xem trước bên dưới hiển thị chính xác cách chữ sẽ trông trong trình soạn thảo.",
+      "radiogroup_label": "Họ phông chữ",
+      "geist": "Geist",
+      "inter": "Inter",
+      "nunito": "Nunito",
+      "open_sans": "Open Sans",
+      "fuzzy_bubbles": "Fuzzy Bubbles",
+      "custom": "Tùy chỉnh",
+      "custom_with_name": "Tùy chỉnh ({{name}})",
+      "custom_modal": {
+        "title": "Chọn một font Google",
+        "preview_on_google": "Xem trước {{name}} trên Google Fonts",
+        "search_placeholder": "Tìm font…",
+        "weight_label": "Độ đậm",
+        "cancel": "Hủy",
+        "apply": "Áp dụng",
+        "downloading": "Đang tải…",
+        "download_error": "Không thể tải font. Vui lòng kiểm tra kết nối internet.",
+        "offline_error": "Tính năng này yêu cầu kết nối internet. Kết nối internet và thử lại.",
+        "offline_close": "Đóng",
+        "loading_catalog": "Đang tải danh sách font, vui lòng chờ…",
+        "empty_query_hint": "Nhập tên font hoặc một phần bất kỳ — danh sách lọc theo từng ký tự bạn gõ. Hỗ trợ fuzzy match (ví dụ \"opnsns\" tìm ra \"Open Sans\").",
+        "no_results": "Không tìm thấy font cho \"{{query}}\". Thử cập nhật danh sách bên dưới.",
+        "catalog_last_updated": "Danh sách cập nhật lần cuối {{time}}.",
+        "refresh_link": "Cập nhật",
+        "refreshing": "Đang cập nhật…",
+        "refresh_failed": "Không thể cập nhật danh sách. Kiểm tra kết nối internet.",
+        "api_key_missing": "Chưa cấu hình khóa Google Fonts API. Đặt biến môi trường GOOGLE_FONTS_API_KEY trước khi chạy ứng dụng."
+      },
+      "sample": "Con cáo nâu nhanh nhẹn nhảy qua con chó lười biếng.",
+      "size_label": "Cỡ chữ",
+      "size_decrease_aria": "Giảm cỡ chữ",
+      "size_increase_aria": "Tăng cỡ chữ",
+      "size_reset_aria": "Đặt lại cỡ chữ",
+      "contrast_label": "Độ tương phản",
+      "contrast_decrease_aria": "Giảm độ tương phản chữ",
+      "contrast_increase_aria": "Tăng độ tương phản chữ",
+      "contrast_reset_aria": "Đặt lại độ tương phản chữ",
+      "preview": {
+        "aria_label": "Xem trước phông chữ",
+        "heading_1": "Con cáo nâu nhanh nhẹn",
+        "heading_2": "Nhảy qua chú chó lười biếng",
+        "paragraph_1": "Một trang nhật ký là ô cửa nhỏ nhìn vào một ngày. Hãy chọn phông chữ khiến bạn muốn mở lại nó vào ngày mai.",
+        "styled_lead": "Thử xem:",
+        "styled_bold": "Đậm",
+        "styled_italic": "nghiêng",
+        "styled_code": "mã",
+        "quote": "Typography là tiếng nói của con chữ."
+      }
+    },
+    "font_cache": {
+      "hint": "Google Font tùy chỉnh bạn đã tải sẽ được lưu cục bộ để hoạt động khi không có mạng. Cỡ chữ và độ tương phản được dùng chung cho mọi font tùy chỉnh.",
+      "current_usage": "{{size}} trên {{count}} font",
+      "current_usage_empty": "Chưa có font nào được lưu.",
+      "clear_button": "Xóa font đã lưu",
+      "clear_confirm": "Xóa tất cả Google Font đã lưu? Font hiện tại sẽ về mặc định nếu đó là font tùy chỉnh.",
+      "clear_error": "Không thể xóa bộ nhớ."
+    }
+  },
+  "language": {
+    "title": "Ngôn ngữ",
+    "hint": "Ngôn ngữ giao diện của ứng dụng.",
+    "english": "Tiếng Anh",
+    "vietnamese": "Tiếng Việt"
+  },
+  "appearance": {
+    "tabs": {
+      "theme": "Chủ đề & màu",
+      "display": "Hiển thị",
+      "layout": "Bố cục"
+    },
+    "groups": {
+      "theme": "Chủ đề & màu",
+      "display": "Hiển thị"
+    },
+    "design_system": {
+      "title": "Hệ thống thiết kế",
+      "hint": "Signature là giao diện đặc trưng của Memlore. Clean là giao diện tối giản, tương phản cao, có cả chế độ sáng và tối.",
+      "radiogroup_label": "Hệ thống thiết kế",
+      "signature": {
+        "label": "Signature",
+        "aria": "Hệ thống thiết kế Signature"
+      },
+      "clean": {
+        "label": "Clean",
+        "aria": "Hệ thống thiết kế Clean"
+      },
+      "clay": {
+        "label": "Clay",
+        "aria": "Chuyển sang hệ thiết kế Clay"
+      }
+    },
+    "theme": {
+      "title": "Chủ đề",
+      "hint": "Sáng hoặc tối.",
+      "hint_locked": "Signature chỉ có chế độ tối. Chuyển hệ thống thiết kế sang Clean để chọn sáng hoặc tối — lựa chọn ở Clean vẫn được ghi nhớ.",
+      "hint_locked_lumen": "Lumen chỉ có chế độ tối. Chuyển bề mặt sang Đậm hoặc Dịu để chọn sáng hoặc tối — lựa chọn sáng vẫn được ghi nhớ.",
+      "radiogroup_label": "Chủ đề",
+      "light": {
+        "label": "Sáng",
+        "aria": "Chủ đề sáng"
+      },
+      "dark": {
+        "label": "Tối",
+        "aria": "Chủ đề tối"
+      }
+    },
+    "surface": {
+      "title": "Bề mặt",
+      "hint": "Nền chế độ tối. \"Đậm\" là charcoal mặc định; \"Dịu\" nâng mỗi lớp lên một nấc; Lumen là giao diện tối theo phong cách Night Foundry.",
+      "hint_light": "Chỉ áp dụng cho chế độ tối. Đậm, Dịu và Lumen thay đổi nền tối.",
+      "radiogroup_label": "Kiểu bề mặt",
+      "deep": {
+        "label": "Đậm",
+        "aria": "Bề mặt charcoal đậm"
+      },
+      "soft": {
+        "label": "Dịu",
+        "aria": "Bề mặt charcoal dịu hơn"
+      },
+      "lumen": {
+        "label": "Lumen",
+        "aria": "Bề mặt tối Lumen theo phong cách Night Foundry"
+      }
+    },
+    "corner_radius": {
+      "title": "Bo góc",
+      "hint": "Đổi hình các nút và điều khiển dạng nút trong giao diện Clean.",
+      "radiogroup_label": "Bo góc",
+      "low": {
+        "label": "Thấp",
+        "aria": "Bo góc thấp"
+      },
+      "medium": {
+        "label": "Vừa",
+        "aria": "Bo góc vừa"
+      },
+      "high": {
+        "label": "Cao",
+        "aria": "Bo góc cao"
+      }
+    },
+    "layout": {
+      "title": "Bố cục",
+      "hint": "Vị trí của thanh bên và bảng danh sách. Bảng danh sách chỉ hiện ở các trang có nó.",
+      "radiogroup_label": "Bố cục ứng dụng",
+      "sidebar-panel-main": {
+        "label": "Thanh bên · Danh sách · Nội dung",
+        "aria": "Thanh bên bên trái, bảng danh sách ở giữa, nội dung bên phải (mặc định)"
+      },
+      "sidebar-main-panel": {
+        "label": "Thanh bên · Nội dung · Danh sách",
+        "aria": "Thanh bên bên trái, nội dung ở giữa, bảng danh sách bên phải"
+      },
+      "main-panel-sidebar": {
+        "label": "Nội dung · Danh sách · Thanh bên",
+        "aria": "Nội dung bên trái, bảng danh sách ở giữa, thanh bên bên phải"
+      }
+    },
+    "font_scale": {
+      "title": "Cỡ giao diện",
+      "hint": "Phóng to chữ giao diện và biểu tượng thanh bên. Tiêu đề giữ nguyên cỡ.",
+      "radiogroup_label": "Cỡ giao diện",
+      "normal": {
+        "label": "Thường",
+        "aria": "Cỡ giao diện thường, gấp 1 lần"
+      },
+      "big": {
+        "label": "Lớn",
+        "aria": "Cỡ giao diện lớn, gấp 1.05 lần"
+      },
+      "bigger": {
+        "label": "Lớn hơn",
+        "aria": "Cỡ giao diện lớn hơn, gấp 1.1 lần"
+      }
+    },
+    "reduce_motion": {
+      "title": "Giảm chuyển động",
+      "hint": "Tắt hoạt ảnh và hiệu ứng chuyển tiếp."
+    },
+    "gradient_primary": {
+      "title": "Màu gradient",
+      "hint": "Dùng gradient thay vì màu đơn sắc.",
+      "hint_clean": "Chỉ áp dụng cho Signature và Clay. Clean chỉ dùng màu phẳng."
+    },
+    "logo_follows_cursor": {
+      "title": "Logo theo con trỏ",
+      "hint": "Chú chó trên thanh tiêu đề sẽ dõi theo con trỏ chuột."
+    },
+    "time_format": {
+      "title": "Định dạng giờ",
+      "hint": "Cách hiển thị giờ trong ứng dụng.",
+      "radiogroup_label": "Định dạng giờ",
+      "24h": "14:30",
+      "12h": "2:30 CH"
+    },
+    "accent": {
+      "title": "Màu nhấn",
+      "hint": "Màu cho nút, liên kết và phần nổi bật.",
+      "radiogroup_label": "Màu nhấn",
+      "orange": "Cam",
+      "violet": "Tím",
+      "rose": "Hồng",
+      "sky": "Xanh dương",
+      "emerald": "Xanh lá",
+      "gray": "Xám",
+      "custom": "Tùy chọn…",
+      "hex_label": "Mã màu hex",
+      "hex_placeholder": "#EA580C"
+    }
+  },
+  "journals_section": {
+    "empty": "Chưa có nhật ký nào.",
+    "new": "Nhật ký mới",
+    "edit_aria": "Sửa {{name}}",
+    "lock_aria": "Khóa phụ {{name}}",
+    "unlock_aria": "Gỡ khóa phụ khỏi {{name}}",
+    "lock_tooltip": "Ẩn {{name}} sau khóa phụ",
+    "unlock_tooltip": "Gỡ khóa phụ khỏi {{name}}",
+    "unlock_title": "Gỡ khóa phụ",
+    "unlock_description": "Nhập mật khẩu khóa phụ để gỡ khóa phụ khỏi {{name}}.",
+    "delete_aria": "Xóa {{name}}",
+    "delete_title": "Xóa nhật ký này?",
+    "delete_removed": "sẽ bị xóa.",
+    "delete_with_entries": "{{count}} {{noun}} bên trong cũng sẽ bị xóa.",
+    "delete_sync_warning": "Không thể hoàn tác. Ảnh và tệp đính kèm sẽ bị xóa khỏi thiết bị này và khỏi bản sao đã đồng bộ trên cloud. Trên các thiết bị khác, mọi bài viết trong nhật ký này cũng bị xóa — kể cả những bài chưa đồng bộ về đây, mà ảnh của chúng có thể không còn bản nào khác.",
+    "entry_one": "mục",
+    "entry_other": "mục",
+    "save_failed": "Lưu nhật ký thất bại",
+    "delete_failed": "Xóa nhật ký thất bại",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "form": {
+      "title_new": "Nhật ký mới",
+      "title_edit": "Chỉnh sửa nhật ký",
+      "name_label": "Tên",
+      "name_placeholder": "Nhật ký của tôi",
+      "name_required": "Tên nhật ký là bắt buộc",
+      "color_label": "Màu",
+      "auto_tags_label": "Tự động áp dụng các thẻ",
+      "auto_tags_hint": "Gắn các thẻ này vào mọi mục mới trong nhật ký này.",
+      "auto_tags_required": "Chọn ít nhất một thẻ, hoặc tắt tự động áp dụng.",
+      "auto_tags_search_aria": "Tìm thẻ",
+      "auto_tags_search_placeholder": "Tìm hoặc tạo thẻ mới…",
+      "auto_tags_remove_aria": "Bỏ thẻ {{name}}",
+      "auto_tags_empty": "Chưa có thẻ nào — nhập tên để tạo mới.",
+      "auto_tags_no_matches": "Không có thẻ phù hợp",
+      "auto_tags_all_added": "Đã chọn hết — nhập để tạo thẻ mới.",
+      "auto_tags_create": "Tạo \"{{name}}\"",
+      "save": "Lưu",
+      "create": "Tạo",
+      "cancel": "Hủy"
+    }
+  },
+  "delete_modal": {
+    "cancel": "Hủy",
+    "delete": "Xóa"
+  },
+  "templates_section": {
+    "loading": "Đang tải mẫu…",
+    "builtin_heading": "Sẵn có",
+    "builtin_badge": "Sẵn có",
+    "custom_heading": "Tùy chỉnh",
+    "empty": "Chưa có mẫu tùy chỉnh nào.",
+    "new": "Mẫu mới",
+    "edit_aria": "Sửa {{name}}",
+    "delete_aria": "Xóa {{name}}",
+    "delete_title": "Xóa mẫu này?",
+    "delete_removed": "sẽ bị xóa.",
+    "cancel": "Hủy",
+    "delete": "Xóa"
+  },
+  "data_section": {
+    "title": "Xuất / nhập",
+    "hint": "Sắp ra mắt trong giai đoạn sau.",
+    "export_title": "Xuất dữ liệu",
+    "export_hint": "Lưu các mục nhật ký ra file trên thiết bị của bạn.",
+    "import_title": "Nhập dữ liệu",
+    "import_hint": "Khôi phục từ bản sao lưu hoặc mang dữ liệu từ ứng dụng khác vào.",
+    "local_data_notice": "Nhật ký của bạn được lưu cục bộ trên thiết bị này. Gỡ cài đặt Memlore hoặc xoá dữ liệu của ứng dụng sẽ xoá vĩnh viễn — hãy giữ an toàn bằng cách đồng bộ lên {{provider}} và/hoặc export một bản sao lưu.",
+    "local_data_notice_provider_fallback": "dịch vụ đám mây",
+    "tabs": {
+      "import": "Nhập dữ liệu",
+      "export": "Xuất dữ liệu",
+      "downloads": "Tải xuống"
+    },
+    "downloads": {
+      "title": "Tải xuống",
+      "hint": "Mô hình on-device, bản đồ offline và font tùy chỉnh bạn đã tải. Xóa một tệp đang dùng sẽ tắt các tính năng phụ thuộc vào nó.",
+      "empty": "Chưa có gì được tải xuống.",
+      "in_use": "Đang dùng",
+      "remove": "Xóa",
+      "open_in_settings": "Mở trong cài đặt",
+      "remove_idle": "Tệp đã tải sẽ bị xóa khỏi thiết bị này. Bạn có thể tải lại sau.",
+      "remove_in_use_title": "Tệp này đang được dùng",
+      "remove_in_use_body": "Xóa tệp sẽ tắt {{impact}}.",
+      "offline_map": "Bản đồ offline",
+      "custom_fonts": "Font tùy chỉnh",
+      "groups": {
+        "maps": "Bản đồ",
+        "ai": "AI",
+        "editor": "Trình soạn thảo"
+      },
+      "impact": {
+        "embed_model": "tìm kiếm ngữ nghĩa, gợi ý cảm xúc, và bộ nhớ RAG / Daily Chat",
+        "llm_model": "Daily Chat và sinh nội dung on-device",
+        "llm_binary": "Daily Chat và sinh nội dung on-device",
+        "basemap": "Vị trí, bản xem trước bản đồ, và heatmap",
+        "fonts": "font tùy chỉnh của trình soạn thảo (sẽ trở về font mặc định)"
+      }
+    }
+  },
+  "about_section": {
+    "heading_title": "Memlore",
+    "heading_description": "Lore riêng của bạn, cuộc đời bạn, được ghi nhớ.",
+    "description": "Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
+    "principles_title": "Nguyên tắc cốt lõi",
+    "principles": {
+      "local_first": "Ưu tiên cục bộ — hoạt động hoàn toàn ngoại tuyến. Các mục nằm trên thiết bị của bạn.",
+      "private": "Riêng tư — mã hóa khi lưu. Không máy chủ Memlore, không tài khoản, không telemetry.",
+      "ai_optional": "AI tùy chọn — tắt cho đến khi bạn bật. Nhà cung cấp của bạn, kể cả trên thiết bị.",
+      "yours": "Của bạn — đồng bộ qua Drive của riêng bạn nếu muốn. Xuất bất cứ lúc nào."
+    },
+    "author_title": "Tác giả",
+    "author_name": "Anh-Thi Dinh",
+    "author_website": "dinhanhthi.com",
+    "author_email": "me@dinhanhthi.com",
+    "repo_title": "Mã nguồn mở",
+    "repo_label": "github.com/dinhanhthi/memlore",
+    "license": "Miễn phí & mã nguồn mở theo AGPL-3.0-or-later — xem LICENSE trong repository."
+  },
+  "location": {
+    "tabs": {
+      "geocoding": "Vị trí & gợi ý địa chỉ",
+      "default": "Vị trí mặc định",
+      "saved": "Vị trí đã lưu"
+    },
+    "mapDisplay": {
+      "title": "Hiển thị bản đồ",
+      "hint": "Chọn cách vẽ bản đồ trong nhật ký. Locations, xem trước, và bản đồ nhiệt hiện bảng chọn cho đến khi có nguồn sẵn sàng.",
+      "radiogroup_label": "Nguồn bản đồ",
+      "sources": {
+        "offline": {
+          "label": "Bản đồ ngoại tuyến",
+          "aria": "Dùng bản đồ thế giới ngoại tuyến miễn phí"
+        },
+        "maptiler": {
+          "label": "MapTiler",
+          "aria": "Dùng MapTiler với API key của bạn"
+        },
+        "mapkit": {
+          "label": "Apple Maps",
+          "aria": "Dùng Apple Maps (trực tuyến, bậc miễn phí)"
+        }
+      },
+      "offline": {
+        "download": "Tải xuống ({{size}} GB)",
+        "delete": "Xóa bản đồ ngoại tuyến",
+        "delete_confirm_title": "Xóa bản đồ ngoại tuyến?",
+        "delete_confirm_body": "Thao tác này sẽ gỡ bản đồ đã tải khỏi thiết bị. Bạn có thể tải lại sau.",
+        "ready": "Đã tải · {{size}} GB",
+        "size_note": "Tải một lần {{size}} GB. Sau đó hoàn toàn riêng tư — không có yêu cầu ô bản đồ rời khỏi thiết bị này."
+      },
+      "maptiler_key": {
+        "label": "API key MapTiler",
+        "placeholder": "Key MapTiler của bạn",
+        "helper_link_label": "Lấy key miễn phí →",
+        "restriction_hint": "Key lưu trên thiết bị này. Tạo key tại MapTiler Cloud."
+      },
+      "mapkit": {
+        "note": "Dùng Apple Maps trực tuyến, bậc miễn phí. Không cần tải — cần kết nối internet."
+      }
+    },
+    "mapSourceGate": {
+      "title": "Chọn nguồn bản đồ",
+      "body": "Chưa cấu hình nguồn bản đồ. Chọn một tùy chọn bên dưới để hiện Locations, xem trước, và bản đồ nhiệt.",
+      "offline": {
+        "label": "Bản đồ ngoại tuyến",
+        "label_compact": "Bản đồ ngoại tuyến · {{size}} GB",
+        "description": "{{size}} GB, tải một lần. Hoàn toàn riêng tư sau đó.",
+        "action": "Tải xuống",
+        "use": "Dùng"
+      },
+      "maptiler": {
+        "label": "MapTiler",
+        "description": "API key của bạn. Bậc miễn phí đủ cho dùng cá nhân.",
+        "action": "Thiết lập"
+      },
+      "mapkit": {
+        "label": "Apple Maps",
+        "description": "Trực tuyến, không cần tải.",
+        "action": "Dùng"
+      },
+      "downloading": "Đang tải… {{percent}}%"
+    },
+    "title": "Vị trí & Gợi ý địa chỉ",
+    "hint": "Chọn cách tra cứu gợi ý địa chỉ khi bạn nhập. Các mục đã lưu không phụ thuộc vào lựa chọn này — chỉ văn bản địa chỉ và tọa độ được giữ lại.",
+    "radiogroup_label": "Nhà cung cấp gợi ý vị trí",
+    "providers": {
+      "nominatim": {
+        "label": "OpenStreetMap",
+        "aria": "Dùng OpenStreetMap (miễn phí, không cần khóa)",
+        "description": "Dịch vụ geocoding công cộng, chỉ dùng khi bạn chủ động chọn. Giới hạn tần suất khoảng một yêu cầu mỗi giây. Miễn phí, không cần API key. Dùng nút Check để xác nhận dịch vụ đang truy cập được (có thể tạm ngừng)."
+      },
+      "photon": {
+        "label": "Photon (mặc định)",
+        "aria": "Dùng Photon bởi Komoot (miễn phí, không cần khóa, mặc định)",
+        "description": "Nhà cung cấp mặc định. Miễn phí, không cần API key. Gợi ý tốt hơn OpenStreetMap. Dùng nút Check để xác nhận dịch vụ đang truy cập được."
+      },
+      "maptiler": {
+        "label": "MapTiler",
+        "aria": "Dùng MapTiler (API key của bạn)",
+        "description": "Dùng API key của riêng bạn. Bậc miễn phí đủ cho dùng cá nhân. Cùng key với bản đồ MapTiler. Dùng nút Check để xác minh key trước khi lưu."
+      },
+      "mapbox": {
+        "label": "Mapbox",
+        "aria": "Dùng Mapbox (API key của bạn)",
+        "description": "Dùng API key của riêng bạn. Dùng nút Check để xác minh key trước khi lưu."
+      },
+      "google": {
+        "label": "Google Places",
+        "aria": "Dùng Google Places (API key của bạn)",
+        "description": "Dùng API key của riêng bạn. Dùng nút Check để xác minh key trước khi lưu."
+      }
+    },
+    "mapbox_key": {
+      "label": "Mapbox access token",
+      "placeholder": "pk.eyJ...",
+      "helper_link_label": "Lấy token miễn phí →",
+      "restriction_hint": "Dùng token không giới hạn. Token bị giới hạn URL sẽ bị từ chối."
+    },
+    "google_key": {
+      "label": "Google API key",
+      "placeholder": "AIza...",
+      "helper_link_label": "Bật Places API →",
+      "restriction_hint": "Dùng key không giới hạn. Key bị giới hạn HTTP referrer / IP sẽ bị từ chối."
+    },
+    "show_password": "Hiện",
+    "hide_password": "Ẩn",
+    "check": {
+      "button": "Kiểm tra",
+      "button_checking": "Đang kiểm tra…",
+      "button_aria": "Kiểm tra kết nối {{provider}}",
+      "success": "Hoạt động tốt",
+      "errors": {
+        "missing_api_key": "Cần API key.",
+        "invalid_key": "API key bị từ chối.",
+        "rate_limited": "Bị giới hạn tần suất — thử lại sau.",
+        "network_error": "Lỗi mạng. Kiểm tra kết nối.",
+        "server_error": "Provider trả về lỗi.",
+        "invalid_response": "Phản hồi không hợp lệ từ provider.",
+        "unknown": "Kiểm tra thất bại."
+      }
+    },
+    "defaultLocation": {
+      "title": "Vị trí mặc định",
+      "description": "Tự động thêm vị trí mặc định khi tạo mục mới.",
+      "toggle": "Tự động thêm vị trí mặc định",
+      "labelPlaceholder": "Nhà, Văn phòng…",
+      "addressPlaceholder": "Tìm kiếm địa chỉ…",
+      "save": "Lưu vị trí",
+      "clear": "Xóa",
+      "saved": "Đã lưu vị trí",
+      "mapPreviewAria": "Xem trước bản đồ vị trí đã chọn",
+      "mapPreviewEmpty": "Chọn địa chỉ để xem trước trên bản đồ.",
+      "mapPreviewLive": "Đã cập nhật xem trước bản đồ cho {{label}}",
+      "noAddress": "Chưa có địa chỉ",
+      "savedLocations": "Vị trí đã lưu",
+      "noSavedLocations": "Chưa có vị trí nào được lưu",
+      "deleteAlias": "Xóa vị trí",
+      "useAsDefault": "Dùng làm mặc định",
+      "suggestions_unavailable": "Không dùng được gợi ý địa chỉ. Bạn vẫn có thể tự nhập địa chỉ."
+    },
+    "savedLocationsSection": {
+      "title": "Vị trí đã lưu",
+      "hint": "Các vị trí bạn đã lưu để dùng nhanh.",
+      "noSavedLocations": "Chưa có vị trí nào được lưu.",
+      "deleteAlias": "Xóa vị trí",
+      "addNew": "Thêm vị trí mới",
+      "addPopup": {
+        "title": "Thêm vị trí",
+        "close": "Đóng",
+        "labelPlaceholder": "Tên (vd: Nhà, Văn phòng)",
+        "addressPlaceholder": "Tìm kiếm địa chỉ",
+        "save": "Lưu",
+        "cancel": "Hủy",
+        "searching": "Đang tìm…",
+        "noResults": "Không tìm thấy kết quả.",
+        "searchUnavailable": "Không thể tìm kiếm.",
+        "validationError": "Tên và địa chỉ là bắt buộc.",
+        "saveError": "Lưu vị trí thất bại.",
+        "mapPreviewAria": "Xem trước bản đồ vị trí đã chọn",
+        "mapPreviewEmpty": "Chọn địa chỉ để xem trước trên bản đồ.",
+        "mapPreviewLive": "Đã cập nhật xem trước bản đồ cho {{label}}"
+      }
+    }
+  },
+  "sync_section": {
+    "tabs": {
+      "cloud": "Nhà cung cấp đám mây",
+      "devices": "Thiết bị",
+      "schedule": "Lịch đồng bộ"
+    }
+  },
+  "sync_scheduler": {
+    "groups": {
+      "master": "Đồng bộ",
+      "triggers": "Khi nào đồng bộ"
+    },
+    "enable_title": "Bật đồng bộ",
+    "enable_hint_connected": "Bật hoặc tắt đồng bộ nền mà không ngắt kết nối.",
+    "enable_hint_no_provider": "Kết nối một dịch vụ đám mây trong tab Nhà cung cấp đám mây để bật đồng bộ.",
+    "enable_aria": "Bật đồng bộ",
+    "after_save_title": "Đồng bộ sau khi lưu",
+    "after_save_hint": "Đẩy thay đổi ~30 giây sau khi trình soạn thảo ngừng hoạt động.",
+    "after_save_aria": "Đồng bộ sau khi lưu",
+    "on_launch_title": "Đồng bộ khi khởi động",
+    "on_launch_hint": "Kéo cập nhật một lần khi ứng dụng khởi động.",
+    "on_launch_aria": "Đồng bộ khi khởi động",
+    "interval_title": "Chu kỳ đồng bộ",
+    "interval_hint": "Tần suất bộ lên lịch kiểm tra thay đổi để đẩy và kéo."
+  },
+  "media_groups": {
+    "gallery": "Thư viện",
+    "cache": "Bộ nhớ đệm",
+    "compression": "Nén ảnh",
+    "upload_limits": "Giới hạn tải lên"
+  },
+  "media_view": {
+    "title": "Bố cục thư viện",
+    "description": "Cách mở màn hình Media. Toàn trang hiển thị lưới rộng; Hai bảng giữ trình soạn thảo bên cạnh lưới.",
+    "full": "Toàn trang",
+    "panel": "Hai bảng"
+  },
+  "media_cache": {
+    "limit_title": "Giới hạn bộ nhớ đệm",
+    "limit_hint": "Kích thước tối đa cho media đã lưu; file cũ nhất bị xóa trước.",
+    "current_usage": "Đang dùng",
+    "clear_title": "Xóa bộ nhớ đệm",
+    "clear_hint": "Xóa tất cả file phương tiện đã lưu. Ảnh trên đám mây sẽ được tải lại khi xem.",
+    "clear_button": "Xóa bộ nhớ đệm",
+    "clear_confirm": "Xóa bộ nhớ đệm ảnh kích thước đầy đủ? Ảnh trên đám mây sẽ được tải lại khi xem lần tiếp theo. Ảnh thu nhỏ vẫn được giữ để duyệt nhanh, và ảnh đang chờ tải lên không bao giờ bị ảnh hưởng."
+  },
+  "media_upload_limits": {
+    "title": "Giới hạn kích thước tải lên mỗi file",
+    "hint": "Kích thước tối đa cho từng ảnh hoặc video riêng lẻ trước khi vào nhật ký — không phải tổng dung lượng media.",
+    "help": "Mỗi file được kiểm tra khi bạn chèn media. Backend lưu giới hạn theo byte; giá trị nhỏ nhất cho phép là 1 MB. Dùng \"Không giới hạn\" để tắt giới hạn mỗi file.",
+    "photo_label": "Mỗi ảnh (MB)",
+    "video_label": "Mỗi video (MB)",
+    "unlimited_label": "Không giới hạn",
+    "photo_hint": "Ảnh vượt giới hạn được tự động nén lại và chỉ bị chặn nếu vẫn không vừa.",
+    "video_hint": "Video vượt giới hạn bị chặn — Memlore không transcode video.",
+    "warning": "Media cỡ lớn tiêu tốn dung lượng đám mây của bạn rất nhanh. Nên chọn giới hạn nhỏ hơn.",
+    "unlimited_warning_title": "Cả hai giới hạn đều không giới hạn",
+    "unlimited_warning_dismiss": "Đã hiểu",
+    "loading": "Đang tải…"
+  },
+  "cloud": {
+    "title": "Dịch vụ đám mây",
+    "hint": "Đồng bộ mục nhật ký qua dịch vụ đám mây do bạn kiểm soát. Dữ liệu được mã hóa đầu cuối trước khi rời khỏi thiết bị.",
+    "picker_title": "Chọn nơi đồng bộ",
+    "providers": {
+      "gdrive": {
+        "name": "Google Drive",
+        "description": "Đồng bộ qua thư mục riêng trên tài khoản Google của bạn."
+      },
+      "icloud": {
+        "name": "iCloud Drive",
+        "description": "Đồng bộ qua iCloud Drive trên máy Mac này."
+      },
+      "local": {
+        "name": "Thư mục cục bộ",
+        "description": "Đồng bộ qua thư mục bạn chọn — ổ đĩa, NAS, hoặc thư mục dùng chung."
+      }
+    },
+    "choose_folder": "Chọn thư mục…",
+    "folder_path_label": "Thư mục",
+    "icloud_unavailable_hint": "Đăng nhập iCloud Drive trong Cài đặt hệ thống để dùng tùy chọn này",
+    "errors": {
+      "already_connected": "Hãy ngắt kết nối dịch vụ đám mây hiện tại trước khi kết nối dịch vụ khác.",
+      "permission_denied": "Cấp quyền cho Memlore truy cập iCloud Drive trong Cài đặt hệ thống › Quyền riêng tư và Bảo mật › Tệp và thư mục, rồi thử lại.",
+      "folder_required": "Hãy chọn một thư mục trước khi kết nối."
+    },
+    "connect_with": "Kết nối {{provider}}",
+    "badge_connected": "Đã kết nối"
+  },
+  "gdrive": {
+    "signed_in_as": "Đăng nhập với",
+    "storage_app_usage_tooltip": "Dung lượng Memlore chiếm trên Google Drive",
+    "storage_drive_free_short": "còn {{free}} ({{percentage}}%)",
+    "storage_drive_free_tooltip": "Còn {{free}} / {{total}} trên tài khoản Google của bạn",
+    "storage_quota_notice": {
+      "title": "Dung lượng Google Drive gần đầy",
+      "body": "Các media mới có thể không tải lên được. Hãy xem lại cài đặt bộ nhớ đệm media và giới hạn kích thước tải lên.",
+      "media_settings": "Mở cài đặt phương tiện",
+      "dismiss": "Đóng"
+    },
+    "last_sync": "Lần đồng bộ cuối:",
+    "password_placeholder": "Nhập mật khẩu nhật ký của bạn",
+    "connecting": "Đang kết nối…",
+    "cancel_connect": "Hủy",
+    "loading": "Đang tải…",
+    "disconnect": "Ngắt kết nối",
+    "disconnecting": "Đang ngắt kết nối…",
+    "disconnect_modal": {
+      "title": "Ngắt kết nối {{provider}}?",
+      "body": "Dừng đồng bộ trên thiết bị này. Các mục nhật ký, ảnh và ghi chú trên thiết bị vẫn được giữ nguyên. Các tệp đã có trên bản đám mây không bị xóa.",
+      "body_gdrive_note": "Để kết nối lại, bạn sẽ cần đăng nhập Google một lần nữa.",
+      "confirm": "Ngắt kết nối"
+    },
+    "success": "Đã kết nối {{provider}}. Đang đồng bộ các mục nhật ký…",
+    "errors": {
+      "load_status": "Không thể tải trạng thái đồng bộ",
+      "password_required": "Nhập mật khẩu nhật ký để kết nối {{provider}}.",
+      "timed_out": "Hết thời gian xác thực. Vui lòng thử lại và hoàn tất đăng nhập trong vòng 5 phút.",
+      "keyring_mismatch": "Khóa mã hóa trên {{provider}} được tạo bằng mật khẩu khác. Nhập mật khẩu bạn đã dùng khi thiết lập Memlore trên thiết bị khác.",
+      "keyring_corrupted": "File khóa mã hóa trên {{provider}} bị hỏng. Hãy ngắt kết nối, xóa thủ công .meta/keyring.json trong thư mục Memlore, sau đó kết nối lại.",
+      "invalid_password": "Mật khẩu không đúng. Vui lòng thử lại.",
+      "v1_wiped_reconnect": "Đã xóa định dạng khóa cũ. Vui lòng kết nối lại Google Drive để hoàn tất nâng cấp.",
+      "connect_failed": "Không thể kết nối {{provider}}: {{message}}"
+    },
+    "help": {
+      "open_from_error": "Mở trợ giúp đồng bộ",
+      "reset": {
+        "modal_title": "Đặt lại trạng thái đồng bộ?",
+        "modal_body": "Đánh dấu các mục nhật ký, sổ và media do thiết bị này quản lý để tải lại trong lần đồng bộ tới. Không xóa gì trên thiết bị hoặc bản đám mây. Chỉ đặt lại theo dõi đồng bộ — không thay thế toàn bộ bản ở hai phía.",
+        "modal_confirm": "Đặt lại",
+        "success": "Đặt lại hoàn tất. {{entries}} mục nhật ký, {{media}} media và {{journals}} sổ sẽ được tải lại trong lần đồng bộ tới.",
+        "queued": "Đã xếp hàng đặt lại. Thao tác sẽ chạy khi lượt đồng bộ hiện tại hoàn tất.",
+        "error": "Không thể đặt lại trạng thái đồng bộ: {{message}}"
+      },
+      "cloud_to_local": {
+        "modal_title": "Thay thế thiết bị này bằng {{provider}}?",
+        "modal_body": "Memlore sẽ tải xuống và kiểm tra đầy đủ bản đám mây, tạo bản sao lưu khôi phục trên máy, rồi thay thế dữ liệu đồng bộ trên thiết bị này. Nếu tải xuống hoặc kiểm tra thất bại, dữ liệu local hiện tại vẫn giữ nguyên. Các cài đặt và secret chỉ thuộc thiết bị này được bảo toàn. Sau khi thành công, đồng bộ bình thường tiếp tục từ bản đã khôi phục. Hãy đóng Memlore trên các thiết bị khác trước để chúng không đẩy dữ liệu cũ.",
+        "modal_confirm": "Thay thế thiết bị này",
+        "checking": "Đang kiểm tra sẵn sàng và chuẩn bị bản sao lưu trên máy…",
+        "ready": "Sẵn sàng. Đã chuẩn bị bản sao lưu khôi phục trên máy. Xác nhận để tải xuống, kiểm tra và thay thế dữ liệu đồng bộ trên thiết bị này.",
+        "running": "Đang thay thế thiết bị này từ {{provider}}…",
+        "success": "Thiết bị này đã được thay thế từ {{provider}}. Có thể tiếp tục đồng bộ bình thường.",
+        "error": "Không thể thay thế thiết bị này: {{message}}"
+      },
+      "local_to_cloud": {
+        "modal_title": "Thay thế {{provider}} bằng thiết bị này?",
+        "modal_body": "Memlore sẽ tạo bản sao lưu khôi phục trên máy, kiểm tra mọi mục trên thiết bị này đã đầy đủ, rồi xóa vĩnh viễn dữ liệu Memlore trên {{provider}} và tạo lại từ thiết bị này. Dữ liệu local trên thiết bị này được giữ nguyên. Nếu kiểm tra thất bại trước khi xóa, {{provider}} không bị thay đổi. Các thiết bị khác phải kết nối lại trước khi tiếp tục đồng bộ. Hãy đóng Memlore trên các thiết bị khác trước.",
+        "modal_confirm": "Thay thế {{provider}}",
+        "checking": "Đang kiểm tra sẵn sàng và tạo bản sao lưu khôi phục trên máy…",
+        "ready": "Sẵn sàng. Đã tạo bản sao lưu khôi phục trên máy. Xác nhận để xóa dữ liệu {{provider}} và tạo lại từ thiết bị này.",
+        "running": "Đang thay thế {{provider}} từ thiết bị này…",
+        "success": "{{provider}} đã được tạo lại từ thiết bị này. Các thiết bị khác phải kết nối lại trước khi tiếp tục đồng bộ.",
+        "error": "Không thể thay thế {{provider}}: {{message}}"
+      },
+      "delete_and_disconnect": {
+        "modal_title": "Xóa dữ liệu {{provider}} và ngắt kết nối?",
+        "modal_body": "Xóa vĩnh viễn dữ liệu Memlore trên {{provider}} và ngắt kết nối thiết bị này. Dữ liệu local trên thiết bị vẫn được giữ và sẽ không tải lên lại cho đến khi bạn kết nối lại. Các thiết bị khác vẫn kết nối có thể tải lên lại ở lần đồng bộ tới — hãy ngắt kết nối chúng nếu bạn muốn cloud hoàn toàn trống.",
+        "modal_confirm": "Xóa và ngắt kết nối",
+        "backup_warning": "Thao tác này xóa vĩnh viễn bản trên đám mây. Sau khi xóa, bản trên thiết bị này là bản duy nhất — hãy xuất bản sao lưu trước (Cài đặt → Dữ liệu → Xuất) nếu bạn cần.",
+        "success": "Đã xóa dữ liệu {{provider}}. Bạn đã ngắt kết nối.",
+        "dismiss_success": "Đóng",
+        "error": "Không thể xóa dữ liệu {{provider}}: {{message}}",
+        "error_sync_in_progress": "Đang có một phiên đồng bộ chạy. Đợi nó hoàn tất rồi thử lại."
+      },
+      "recovery": {
+        "title": "Đang khôi phục",
+        "interrupted_title": "Khôi phục bị gián đoạn",
+        "operation_local_to_cloud": "Thay thế {{provider}} từ thiết bị này",
+        "operation_cloud_to_local": "Thay thế thiết bị này từ {{provider}}",
+        "phase_created": "Đang bắt đầu…",
+        "phase_preflight": "Đang kiểm tra sẵn sàng…",
+        "phase_backup": "Đang tạo bản sao lưu trên máy…",
+        "phase_fenced": "Đang chuẩn bị {{provider}}…",
+        "phase_transfer": "Đang chuyển dữ liệu…",
+        "phase_verify": "Đang kiểm tra…",
+        "phase_commit": "Đang áp dụng thay đổi…",
+        "phase_finalize": "Đang hoàn tất…",
+        "phase_fence_release_pending": "Đang gỡ khóa khôi phục…",
+        "phase_unknown": "Đang xử lý…",
+        "status_running": "Đang chạy",
+        "status_failed": "Cần xử lý",
+        "status_pending": "Đang chờ",
+        "backup_path": "Sao lưu: {{path}}",
+        "resume": "Tiếp tục",
+        "cancel": "Hủy khôi phục",
+        "resuming": "Đang tiếp tục…",
+        "cancelling": "Đang hủy…",
+        "error": "{{message}}",
+        "busy": "Đã có một thao tác khôi phục đang chạy.",
+        "blocked_sync_in_progress": "Đang có một phiên đồng bộ chạy. Đợi nó hoàn tất rồi thử lại.",
+        "blocked_not_connected": "Thiết bị này chưa kết nối {{provider}}. Hãy kết nối rồi thử lại.",
+        "blocked_force_re_pair": "Thiết bị này cần kết nối lại với {{provider}} trước. Hoàn tất kết nối lại rồi thử lại.",
+        "blocked_rotation_active": "Việc đổi khóa bảo mật vẫn đang chạy. Đợi nó hoàn tất rồi thử lại.",
+        "blocked_competing_recovery": "Đã có một thao tác khôi phục đang chạy trên {{provider}}. Hãy đợi nó hoàn tất trước khi tiếp tục.",
+        "blocked_cloud_outdated": "Bản đám mây cũ hơn những gì thiết bị này ghi nhận, khôi phục từ đó sẽ mất dữ liệu.",
+        "blocked_cloud_outdated_use_local": "Bản đám mây cũ hơn những gì thiết bị này ghi nhận, khôi phục từ đó sẽ mất dữ liệu. Hãy dùng “Thay thế {{provider}} bằng thiết bị này”.",
+        "blocked_cloud_inconsistent": "Bản đám mây đang ở trạng thái không nhất quán. Hãy để các thiết bị đồng bộ xong rồi thử lại.",
+        "blocked_other_job_active": "Thiết bị này đã có một thao tác khôi phục đang chạy. Hoàn tất hoặc hủy nó rồi thử lại.",
+        "blocked_insufficient_disk": "Không đủ dung lượng trống — cần khoảng {{needed}} nhưng chỉ còn {{available}}. Hãy giải phóng bớt dung lượng rồi thử lại.",
+        "blocked_media_incomplete": "Một số tệp media trên thiết bị này bị thiếu hoặc hỏng ({{missing}} thiếu, {{corrupt}} hỏng). Hãy khôi phục hoặc xóa chúng rồi thử lại.",
+        "blocked_cloud_unreadable": "Memlore không đọc được bản đám mây. Hãy kiểm tra kết nối mạng rồi thử lại.",
+        "blocked_backup_failed": "Memlore không tạo được bản sao lưu khôi phục trên máy nên đã dừng trước khi thay đổi bất cứ thứ gì.",
+        "blocked_unknown": "Chưa thể bắt đầu. Chi tiết: {{message}}",
+        "failed_lease_lost": "Thiết bị này đã mất quyền khôi phục — có thể một thiết bị khác đã tiếp quản trên {{provider}}. Hãy đóng Memlore trên các thiết bị khác trước khi tiếp tục.",
+        "failed_local_media_unreadable": "Một số tệp media trên thiết bị này không đọc được từ ổ đĩa. Hãy khôi phục hoặc xóa chúng trước khi tiếp tục.",
+        "failed_key_unavailable": "Memlore không truy cập được khóa mã hóa của thiết bị này. Hãy đảm bảo ứng dụng đang mở khóa rồi tiếp tục.",
+        "failed_cloud_media_incomplete": "Một số tệp media không tải được từ {{provider}} ({{missing}} thiếu, {{corrupt}} hỏng). Dữ liệu trên thiết bị này chưa bị thay thế.",
+        "failed_upload_incomplete": "Một số mục không tải lên được {{provider}}. Hãy kiểm tra kết nối mạng rồi tiếp tục khôi phục.",
+        "failed_fence_release": "Việc chuyển dữ liệu đã xong, nhưng Memlore không gỡ được khóa khôi phục trên {{provider}}. Hãy đóng Memlore trên các thiết bị khác rồi tiếp tục.",
+        "failed_lease_unconfirmed": "Memlore không xác nhận được trạng thái khóa khôi phục trên {{provider}}. Hãy thử tiếp tục lại.",
+        "failed_recovery_superseded": "Thao tác khôi phục này đã kết thúc — một lượt khôi phục khác đã tiếp quản bản đám mây trong lúc nó đang hoàn tất. Bạn có thể bắt đầu lại nếu vẫn cần."
+      }
+    },
+    "recovery_wizard": {
+      "card_button": "Trợ giúp và khôi phục đồng bộ",
+      "modal_title": "Trợ giúp và khôi phục đồng bộ",
+      "back": "Quay lại",
+      "close": "Đóng",
+      "done": "Hoàn tất",
+      "cancel": "Hủy",
+      "errors": {
+        "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+      },
+      "triage": {
+        "question": "Chuyện gì đang xảy ra?",
+        "stuck_title": "Đồng bộ có vẻ bị kẹt hoặc một số mục không bao giờ tải lên",
+        "stuck_hint": "Tải lại những mục do thiết bị này quản lý trong lần đồng bộ tới. Không xóa gì ở bất kỳ đâu.",
+        "device_wrong_title": "Thiết bị này sai — {{provider}} có bản tôi tin cậy",
+        "device_wrong_hint": "Tải xuống và kiểm tra bản đám mây, rồi thay thế dữ liệu đồng bộ trên thiết bị này.",
+        "cloud_wrong_title": "{{provider}} sai — thiết bị này có bản tôi tin cậy",
+        "cloud_wrong_hint": "Xóa dữ liệu Memlore trên {{provider}} và tạo lại từ thiết bị này.",
+        "stop_title": "Tôi muốn dừng đồng bộ trên thiết bị này",
+        "stop_hint": "Ngắt kết nối {{provider}} và chọn có giữ bản đám mây hay không."
+      },
+      "stop": {
+        "question": "Bản trên {{provider}} nên được xử lý thế nào?",
+        "keep_title": "Giữ lại — chỉ ngắt kết nối thiết bị này",
+        "keep_hint": "Dừng đồng bộ trên thiết bị này. Dữ liệu trên thiết bị và dữ liệu đã có trên {{provider}} đều được giữ lại.",
+        "delete_title": "Xóa và ngắt kết nối",
+        "delete_hint": "Xóa vĩnh viễn dữ liệu Memlore trên {{provider}} và ngắt kết nối thiết bị này. Dữ liệu local vẫn được giữ và sẽ không tải lên lại cho đến khi bạn kết nối lại."
+      },
+      "reset": {
+        "running": "Đang đặt lại trạng thái đồng bộ…",
+        "done_title": "Đã đặt lại trạng thái đồng bộ"
+      },
+      "disconnect": {
+        "running": "Đang ngắt kết nối {{provider}}…",
+        "done": "Thiết bị này đã ngắt kết nối khỏi {{provider}}. Nhật ký trên máy vẫn nguyên vẹn; các tệp đã có trên {{provider}} được giữ lại."
+      },
+      "delete": {
+        "running": "Đang xóa dữ liệu {{provider}} và ngắt kết nối…"
+      }
+    },
+    "scope_upgrade": {
+      "title": "Đồng bộ Google Drive đã được nâng cấp",
+      "body": "Chúng tôi đã chuyển dữ liệu đồng bộ của bạn vào một thư mục riêng tư do Google quản lý chỉ cho Memlore — thư mục này không còn hiển thị trong My Drive. Bấm Kết nối để tải lại các mục nhật ký. Dữ liệu trên máy của bạn vẫn an toàn.",
+      "note": "Thư mục Memlore cũ trong My Drive không còn được sử dụng. Bạn có thể tự xóa nếu muốn.",
+      "dismiss": "Đóng"
+    },
+    "token_revoked": {
+      "title": "Phiên Google Drive đã hết hạn",
+      "body": "Đăng nhập Google Drive của bạn không còn hiệu lực — có thể bạn đã thu hồi quyền truy cập trên tài khoản Google, hoặc phiên đã hết hạn sau thời gian dài không đồng bộ. Hãy kết nối lại để tiếp tục đồng bộ.",
+      "cta": "Kết nối lại Google Drive",
+      "busy": "Đang ngắt kết nối…"
+    },
+    "cross_mode": {
+      "needs_password_title": "Thư mục đồng bộ đang được mã hóa bằng mật khẩu",
+      "needs_password_body": "Thiết bị này đang ở chế độ không mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị có bảo vệ bằng mật khẩu. Hãy đặt một mật khẩu trong Bảo mật để mở khóa các mục đã đồng bộ — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_password_note": "Muốn thư mục trên Drive cũng không có mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật bỏ mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
+      "needs_no_password_title": "Thư mục đồng bộ không được mã hóa",
+      "needs_no_password_body": "Thiết bị này đang ở chế độ mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị không có mật khẩu. Hãy bỏ mật khẩu trong Bảo mật để đọc các mục này — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_no_password_note": "Muốn thư mục trên Drive cũng được bảo vệ bằng mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật đặt mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
+      "cta": "Mở cài đặt Bảo mật"
+    }
+  },
+  "security": {
+    "encryption_callout": "Nhật ký của bạn được mã hóa đầu cuối với AES-256-GCM. Cần có mật khẩu và không thể tắt — chúng tôi không có cách khôi phục dữ liệu nếu bạn mất mật khẩu.",
+    "tabs": {
+      "device_password": "Mật khẩu thiết bị",
+      "second_lock": "Khóa thứ hai",
+      "invisible_lock": "Khóa vô hình",
+      "recovery_devices": "Hành động bảo mật"
+    },
+    "secure_wizard": {
+      "card_caption": "Cho Memlore biết chuyện gì đã xảy ra để nhận đúng các bước bảo vệ nhật ký.",
+      "card_button": "Bảo vệ nhật ký của tôi",
+      "modal_title": "Bảo vệ nhật ký của tôi",
+      "step_counter": "Bước {{current}} / {{total}}",
+      "back": "Quay lại",
+      "close": "Đóng",
+      "done": "Hoàn tất",
+      "errors": {
+        "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+        "sync_in_progress": "Đang có một phiên đồng bộ chạy. Đợi nó hoàn tất rồi thử lại."
+      },
+      "diagrams": {
+        "two_devices": "Hai thiết bị kết nối với cùng một nhật ký đã mã hóa qua đám mây",
+        "key_rotated": "Khóa mã hóa cũ được thay bằng khóa mã hóa mới",
+        "cloud_cut": "Thiết bị kia bị ngắt kết nối khỏi đám mây",
+        "phrase_new": "Cụm từ khôi phục 24 từ mới thay thế cụm từ cũ"
+      },
+      "triage": {
+        "question": "Chuyện gì đã xảy ra?",
+        "words_title": "Tôi nghĩ 24 từ khôi phục đã bị lộ",
+        "words_hint": "Ai đó có thể đã xem hoặc sao chép các từ mở khóa toàn bộ nhật ký.",
+        "password_title": "Tôi nghĩ mật khẩu thiết bị đã bị lộ",
+        "password_hint": "Ai đó có thể biết mật khẩu mở khóa Memlore trên thiết bị này.",
+        "device_title": "Một thiết bị bị mất, đánh cắp hoặc xâm phạm",
+        "device_hint": "Ngăn thiết bị khác đọc mục mới hoặc truy cập các tệp đám mây.",
+        "routine_title": "Không có sự cố — xoay khóa định kỳ",
+        "routine_hint": "Tạo master key mới cho các mục về sau để phòng ngừa, không đổi các từ khôi phục."
+      },
+      "words": {
+        "body": "24 từ là chiếc khóa thứ hai cho toàn bộ nhật ký. Đặt lại chúng sẽ tạo master key mới và 24 từ mới cho các mục về sau.",
+        "reset_body": "Nhập mật khẩu thiết bị hiện tại. Memlore chỉ hiển thị các từ mới một lần, vì vậy hãy sẵn sàng lưu chúng an toàn.",
+        "running": "Đang tạo master key và cụm từ khôi phục mới…",
+        "done_body": "Các mục mới hiện dùng master key mới. Hãy giữ an toàn 24 từ mới và ghép nối lại các thiết bị khác."
+      },
+      "password": {
+        "body": "Mật khẩu này mở khóa nhật ký được lưu trên thiết bị này. Nó không được gửi sang thiết bị khác và bản thân nó không làm lộ dữ liệu đã đồng bộ.",
+        "device_question": "Bạn có nghĩ ai đó có thể đã truy cập một thiết bị?",
+        "device_yes": "Có",
+        "device_no": "Không, chỉ mật khẩu bị lộ",
+        "change_body": "Chọn mật khẩu mới cho thiết bị này. Các thiết bị khác giữ mật khẩu riêng.",
+        "change_success_body": "Thiết bị này hiện được mở khóa bằng mật khẩu mới.",
+        "rotate_too": "Xoay thêm master key"
+      },
+      "device": {
+        "picker_title": "Thiết bị nào bị ảnh hưởng?",
+        "picker_empty": "Không có thiết bị nào khác được ghép nối với nhật ký này.",
+        "picker_empty_routine": "Thay vào đó, xoay master key",
+        "select": "Chọn {{device}}",
+        "words_question": "24 từ khôi phục có được lưu trên hoặc để cùng thiết bị này không?",
+        "words_yes": "Có, các từ cũng có thể đã bị lộ",
+        "words_no": "Không, các từ khôi phục vẫn an toàn",
+        "scope_title": "Bạn cần cắt quyền thiết bị này triệt để đến mức nào?",
+        "scope_revoke_title": "Ngăn thiết bị đọc các mục mới",
+        "scope_revoke_hint": "Xoay master key. Thiết bị vẫn giữ dữ liệu local cũ và quyền truy cập Google.",
+        "scope_cutoff_title": "Cắt hoàn toàn quyền truy cập Google",
+        "scope_cutoff_hint": "Thu hồi thiết bị, ngắt kết nối Memlore, gỡ quyền Google rồi kết nối lại thiết bị này.",
+        "words_remove_title": "Không có gì xảy ra — chỉ cần xóa khỏi danh sách",
+        "words_remove_hint": "Không đổi khóa, không cần mật khẩu. Dùng khi thiết bị đã ngừng sử dụng hoặc đã xóa dữ liệu và vẫn nằm trong tay bạn."
+      },
+      "remove": {
+        "confirm_body": "Chỉ xóa thiết bị khỏi danh sách. Không đổi khóa, không hỏi mật khẩu. Thiết bị vẫn giữ dữ liệu và quyền truy cập.",
+        "confirm_reappear": "Nếu đồng bộ lại, nó sẽ xuất hiện lại. Quay lại và chọn phương án bảo mật nếu bạn cần cắt quyền.",
+        "confirm_button": "Xóa khỏi danh sách",
+        "busy_other": "Một yêu cầu xóa thiết bị khác đang chạy — hãy chờ nó hoàn tất trước.",
+        "queued_sync": "Đồng bộ đang chạy — yêu cầu xóa đã được đưa vào hàng đợi và sẽ tự chạy ngay khi đồng bộ xong.",
+        "running": "Đang xóa thiết bị khỏi danh sách…",
+        "done_title": "Đã xóa thiết bị",
+        "done_fact_list": "Thiết bị không còn xuất hiện trong danh sách thiết bị của bạn.",
+        "done_fact_unchanged": "Không có gì khác thay đổi — thiết bị vẫn giữ dữ liệu local, khóa và quyền truy cập đám mây.",
+        "done_fact_reappear": "Nếu nó đồng bộ với nhật ký này lần nữa, nó sẽ xuất hiện lại trong danh sách."
+      },
+      "revoke": {
+        "confirm_body": "Xác nhận bằng cụm từ khôi phục hiện tại và mật khẩu thiết bị để thu hồi {{device}}. Thao tác này xoay master key cho các mục mới.",
+        "running": "Đang thu hồi thiết bị và xoay master key…",
+        "done_title": "Đã thu hồi thiết bị",
+        "done_fact_new_entries": "Thiết bị đó không còn đọc được các mục mới.",
+        "done_fact_old_data": "Thiết bị vẫn đọc được mọi mục đã viết trước thời điểm này — cả dữ liệu đã lưu trên đó lẫn dữ liệu nó tải về từ đám mây, vì phần dữ liệu đó vẫn giữ khóa cũ.",
+        "done_fact_cloud_access": "Quyền truy cập Google của thiết bị vẫn hoạt động, nên nó vẫn có thể xóa hoặc ghi đè các tệp đám mây trực tiếp qua Google Drive.",
+        "cutoff_google": "Cắt cả quyền truy cập Google"
+      },
+      "cutoff": {
+        "step1_body": "Trước tiên, xoay master key để thiết bị bị ảnh hưởng không thể đọc các mục mới.",
+        "step2_body": "Ngắt kết nối Google Drive trong Memlore, sau đó gỡ quyền truy cập của Memlore khỏi Tài khoản Google.",
+        "step2_not_sufficient": "Ngắt kết nối trong Memlore có thể không hủy login token được lưu trên thiết bị kia. Bắt buộc phải thực hiện cả ngắt kết nối trong ứng dụng và gỡ quyền truy cập tại Google.",
+        "step2_no_delete_reassurance": "Không có gì bị xóa khỏi thiết bị này hoặc Google Drive. Bước 3 kết nối lại thiết bị này và sẽ không yêu cầu 24 từ khôi phục.",
+        "disconnect_button": "Ngắt kết nối trong Memlore",
+        "disconnect_done": "Đã ngắt kết nối trong Memlore",
+        "open_google_button": "Mở quyền truy cập Tài khoản Google",
+        "step2_confirm_gate": "Tôi đã gỡ quyền truy cập tại Google",
+        "step3_title": "Kết nối lại Google Drive",
+        "step3_body": "Kết nối lại thiết bị này bằng mật khẩu hiện tại. Dữ liệu nhật ký vẫn còn trong Google Drive, nên dự kiến không cần tải lên lại toàn bộ hoặc nhập cụm từ khôi phục.",
+        "password_label": "Mật khẩu hiện tại của bạn",
+        "password_placeholder": "Mật khẩu hiện tại",
+        "connect": "Kết nối",
+        "connecting": "Đang kết nối…",
+        "skip": "Bỏ qua lúc này",
+        "step3_open_sync_settings": "Mở cài đặt Đồng bộ",
+        "done_body": "Thiết bị không thể đọc mục mới và quyền truy cập Google đã lưu của nó đã bị gỡ. Dữ liệu đã lưu local trên thiết bị đó vẫn có thể đọc được."
+      },
+      "routine": {
+        "intro_body": "Không có sự cố. Thao tác này tạo master key mới, chỉ mã hóa những mục bạn viết từ giờ trở đi — các mục đã có vẫn giữ khóa cũ và không bị mã hóa lại. 24 từ khôi phục không thay đổi, và các thiết bị khác phải ghép nối lại bằng các từ đó.",
+        "confirm_body": "Nhập cụm từ khôi phục hiện tại và mật khẩu thiết bị để tiếp tục."
+      },
+      "chain": {
+        "next_words_reset": "Tiếp theo: tạo các từ khôi phục mới"
+      }
+    },
+    "status_password_on_label": "Mã hóa: Bật",
+    "status_password_on_desc": "Các mục nhật ký được mã hóa bằng mật khẩu của bạn.",
+    "invisible_lock": {
+      "title": "Khóa vô hình",
+      "description": "Ẩn các mục và nhật ký trong các vault riêng theo mật khẩu. Chỉ một vault mở tại một thời điểm; khi khóa, ứng dụng xử lý như nội dung đó không tồn tại.",
+      "open_title": "Mở hoặc tạo vault",
+      "open_description": "Nhập mật khẩu để mở vault khớp, hoặc tạo vault trống mới nếu không có vault nào khớp. Ứng dụng không cho biết đã mở hay tạo mới.",
+      "open_placeholder": "Mật khẩu vault",
+      "open_button": "Mở",
+      "open_success": "Đã mở khóa.",
+      "generic_empty": "Không có gì để hiện.",
+      "no_recovery_warning": "Hãy nhớ mật khẩu từng vault — không thể khôi phục hay đặt lại. Nếu quên, bạn mất vĩnh viễn quyền truy cập nội dung vault đó. Khóa vô hình không phải mã hóa thêm.",
+      "change_title": "Đổi mật khẩu",
+      "change_description": "Đổi mật khẩu vault đang mở. Nếu mật khẩu mới đã mở vault khác, các mục của vault này sẽ gộp vào vault đó.",
+      "change_button": "Đổi mật khẩu",
+      "change_modal_title": "Đổi mật khẩu vault",
+      "change_modal_description": "Nhập mật khẩu hiện tại của vault đang mở, rồi chọn mật khẩu mới.",
+      "current_placeholder": "Mật khẩu hiện tại",
+      "new_placeholder": "Mật khẩu mới ({{count}}+ ký tự)",
+      "confirm_placeholder": "Xác nhận mật khẩu mới",
+      "password_save": "Lưu mật khẩu",
+      "password_updated": "Đã cập nhật mật khẩu.",
+      "mismatch": "Mật khẩu không khớp.",
+      "too_short": "Dùng ít nhất {{count}} ký tự.",
+      "remove_empty_title": "Xóa vault trống",
+      "remove_empty_description": "Xóa các vault không có mục và không có nhật ký. Luôn sẵn sàng; không hiện số lượng.",
+      "remove_empty_button": "Xóa vault trống",
+      "remove_empty_confirm_title": "Xóa vault trống?",
+      "remove_empty_confirm_body": "Các vault không có mục và không có nhật ký sẽ bị xóa. Không thể hoàn tác.",
+      "remove_empty_confirm": "Xóa",
+      "remove_empty_done": "Xong.",
+      "auto_lock_title": "Tự khóa khi không hoạt động",
+      "auto_lock_description": "Đóng vault đang mở sau khoảng thời gian không hoạt động này.",
+      "auto_lock_failed": "Không thể cập nhật tự khóa.",
+      "cancel": "Hủy"
+    },
+    "how_security_works": {
+      "title": "Bảo mật hoạt động như thế nào",
+      "close": "Đóng",
+      "help_aria": "Mở hướng dẫn bảo mật",
+      "groups": {
+        "vault": "Nhật ký & thiết bị",
+        "extra_locks": "Khóa phụ & Khóa vô hình",
+        "scenarios": "Ví dụ thực tế",
+        "security_actions": "Thu hồi thiết bị & xoay khóa",
+        "emergencies": "Khi có sự cố"
+      },
+      "sections": {
+        "your_password": {
+          "title": "Mật khẩu thiết bị làm gì?",
+          "body": "Mật khẩu mở khóa Memlore trên thiết bị này. Mỗi điện thoại hoặc máy tính có thể có mật khẩu riêng — bạn không cần chia sẻ. Đổi mật khẩu ở đây chỉ cập nhật khóa trên thiết bị này. Các mục nhật ký giữ nguyên."
+        },
+        "recovery_phrase": {
+          "title": "Cụm từ khôi phục 24 từ là gì?",
+          "body": "Khi thiết lập, chúng tôi hiển thị 24 từ một lần duy nhất. Hãy lưu ở nơi an toàn — cụm từ liên kết mọi thiết bị với cùng một nhật ký. Bạn cần cụm từ để thêm thiết bị mới hoặc kết nối lại sau thay đổi bảo mật. Memlore không lưu cụm từ; chỉ bạn mới có."
+        },
+        "on_device_and_cloud": {
+          "title": "Nhật ký được bảo vệ thế nào trên thiết bị và trên đám mây?",
+          "body": "Trên thiết bị, nhật ký được mã hóa trước khi lưu xuống ổ đĩa. Khi bật đồng bộ, mỗi mục được mã hóa lần nữa trước khi rời thiết bị. Google Drive hoặc iCloud chỉ nhận bản đã bị làm rối — họ không thể đọc nhật ký của bạn."
+        },
+        "adding_device": {
+          "title": "Làm sao thêm thiết bị khác?",
+          "body": "Cài Memlore trên thiết bị mới và đăng nhập cùng tài khoản đám mây. Nhập cụm từ khôi phục 24 từ và chọn mật khẩu cho thiết bị đó. Mật khẩu trên thiết bị cũ vẫn riêng tư — bạn không cần chia sẻ."
+        },
+        "changing_password": {
+          "title": "Đổi mật khẩu thì chuyện gì xảy ra?",
+          "body": "Chỉ khóa trên thiết bị này thay đổi. Các mục vẫn được mã hóa như cũ, và thiết bị khác giữ mật khẩu riêng. Thao tác này không cắt thiết bị khác và không xoay khóa mã hóa."
+        },
+        "second_lock": {
+          "title": "Khóa phụ hoạt động thế nào?",
+          "body": "Khóa phụ là mật khẩu bổ sung trong ứng dụng, nằm sau mật khẩu thiết bị. Đánh dấu mục hoặc nhật ký là second-locked thì chúng ẩn khỏi thanh bên, lịch, tìm kiếm và thư viện ảnh cho đến khi bạn nhập mật khẩu khóa phụ trong phiên này. Nó ẩn nội dung khỏi giao diện — không thêm lớp mã hóa riêng. Bạn có thể hiện placeholder che phủ để biết có nội dung bị khóa, hoặc ẩn hoàn toàn. Tự khóa khi không hoạt động sẽ ẩn lại sau một khoảng thời gian. Không thể khôi phục nếu quên mật khẩu này."
+        },
+        "invisible_lock": {
+          "title": "Khóa vô hình hoạt động thế nào?",
+          "body": "Khóa vô hình dùng các vault riêng theo mật khẩu. Mỗi mật khẩu mở (hoặc tạo) một vault; chỉ một vault mở tại một thời điểm. Khi vault đóng, mục và nhật ký của nó không xuất hiện ở đâu — danh sách, tìm kiếm, lịch, thẻ, biểu tượng mắt ở footer — ứng dụng xử lý như chúng không tồn tại. Mở vault theo kiểu open-or-create: mật khẩu khớp thì mở vault đó; mật khẩu mới thì tạo vault trống. Biểu tượng mắt footer chỉ hiện khi vault đang mở và chỉ để khóa. Bạn có thể đánh dấu một mục invisible khi đang khóa (mật khẩu + xác nhận) mà không lộ phần còn lại của vault. Đổi mật khẩu trùng vault khác sẽ gộp mục vào vault đó. Khóa vô hình không phải mã hóa và không có khôi phục. Dùng mật khẩu khác với khóa phụ."
+        },
+        "second_vs_invisible": {
+          "title": "Khóa phụ hay invisible lock — nên dùng cái nào?",
+          "body": "Dùng khóa phụ khi muốn ẩn nội dung cụ thể nhưng vẫn có thể muốn gợi ý rằng có gì đó ở đó (placeholder che phủ). Dùng invisible lock khi cần kín đáo tối đa — các vault riêng không để lại dấu vết cho đến khi nhập đúng mật khẩu. Bạn có thể dùng cả hai cho các mục khác nhau. Cả hai đều cần mật khẩu thiết bị trước."
+        },
+        "scenario_shared_device": {
+          "title": "Đôi khi người khác dùng máy tính của tôi",
+          "body": "Đặt mật khẩu thiết bị để ứng dụng khóa khi đóng. Second-lock các mục hoặc nhật ký không muốn lộ khi ứng dụng đang mở. Bật tự khóa để nội dung khóa phụ ẩn lại khi bạn rời máy."
+        },
+        "scenario_private_entries": {
+          "title": "Tôi muốn ẩn một số mục nhưng vẫn dễ tìm các mục khác",
+          "body": "Để các mục hàng ngày không khóa. Second-lock các mục nhạy cảm. Tùy chọn bật \"Hiện sự tồn tại của mục bị khóa\" để thấy placeholder che phủ trên lịch và danh sách như lời nhắc."
+        },
+        "scenario_hidden_journal": {
+          "title": "Tôi muốn cả một nhật ký mà không ai biết là có",
+          "body": "Mở hoặc tạo vault invisible bằng mật khẩu, rồi đánh dấu nhật ký invisible khi vault đó đang mở. Cho đến khi mở lại vault đó, nhật ký và các mục biến mất khỏi mọi chế độ xem — kể cả footer, nơi chỉ hiện biểu tượng mắt khi đã mở khóa."
+        },
+        "removing_device": {
+          "title": "Thu hồi thiết bị bị mất thì sao?",
+          "body": "Mở Bảo vệ nhật ký của tôi và chọn “Một thiết bị bị mất, đánh cắp hoặc xâm phạm”. Thu hồi thiết bị xoay master key để thiết bị đó không đọc được mục mới. Thiết bị vẫn có thể đọc dữ liệu nhật ký đã lưu trên nó, và vẫn có thể với tới bản đám mây — qua Google Drive, iCloud, hoặc thư mục đồng bộ — cho đến khi bạn cắt phiên đó. Trình hướng dẫn sẽ dẫn đúng bước cắt cho dịch vụ bạn đang dùng: ngắt trong Memlore, rồi gỡ quyền Google hoặc đăng xuất thiết bị bị mất khỏi iCloud (hoặc đổi mật khẩu Apple ID). Thiết bị khác phải kết nối lại bằng cụm từ khôi phục. Nếu thiết bị chỉ ngừng sử dụng và vẫn nằm trong tay bạn, bạn không cần các bước trên — chọn “Không có gì xảy ra — chỉ cần xóa khỏi danh sách” trong cùng trình hướng dẫn để dọn danh sách thiết bị mà không đụng đến khóa."
+        },
+        "rotating_master_key": {
+          "title": "Xoay master key thì chuyện gì xảy ra?",
+          "body": "Mở Bảo vệ nhật ký của tôi và chọn “Không có sự cố — xoay khóa định kỳ”. Memlore tạo khóa mới cho mục mới. Cụm từ khôi phục 24 từ không đổi. Các mục cũ không được tải lên lại hay mã hóa lại. Thiết bị khác phải nhập cụm từ khôi phục để kết nối lại trước khi đọc được mục mới."
+        },
+        "secure_my_journal": {
+          "title": "Bảo vệ nhật ký của tôi hỗ trợ thế nào?",
+          "body": "Dùng Bảo vệ nhật ký của tôi trong Hành động bảo mật cho mọi sự cố. Trình hướng dẫn hỏi chuyện gì đã xảy ra — 24 từ khôi phục bị lộ, mật khẩu thiết bị bị lộ, thiết bị bị mất hoặc bị xâm phạm, hoặc bạn chỉ muốn xoay khóa định kỳ — rồi dẫn bạn đến các bước phù hợp, bao gồm điều mỗi bước không thể hoàn tác."
+        },
+        "if_you_lose": {
+          "title": "Nếu quên mật khẩu và mất cụm từ khôi phục?",
+          "body": "Nhật ký không thể khôi phục. Không có cửa hậu và không có cách đặt lại từ hỗ trợ. Hãy lưu cụm từ khôi phục ở nơi an toàn — trình quản lý mật khẩu hoặc giấy ghi trong ngăn kéo."
+        },
+        "scenario_lost_extra_lock": {
+          "title": "Nếu quên mật khẩu khóa phụ hoặc invisible lock?",
+          "body": "Các mật khẩu này không thể đặt lại hay khôi phục. Nếu quên mật khẩu khóa phụ hoặc bất kỳ mật khẩu vault invisible nào, quyền truy cập nội dung bị khóa đó mất vĩnh viễn. Phần còn lại của nhật ký vẫn truy cập được qua mật khẩu thiết bị và cụm từ khôi phục."
+        }
+      }
+    },
+    "password": {
+      "title": "Mật khẩu",
+      "hint": "Đổi mật khẩu mở khóa trên thiết bị này.",
+      "change": "Thay đổi",
+      "current_placeholder": "Mật khẩu hiện tại",
+      "new_placeholder": "Mật khẩu mới (tối thiểu {{count}} ký tự)",
+      "confirm_placeholder": "Xác nhận mật khẩu mới",
+      "mismatch": "Mật khẩu mới không khớp.",
+      "min_length": "Mật khẩu mới phải có ít nhất {{count}} ký tự.",
+      "failed": "Thay đổi mật khẩu thất bại",
+      "updating": "Đang cập nhật…",
+      "update": "Cập nhật mật khẩu",
+      "cancel": "Hủy",
+      "updated": "Đã cập nhật mật khẩu.",
+      "sync_note": "Mỗi thiết bị có mật khẩu riêng. Thay đổi ở đây chỉ ảnh hưởng đến thiết bị này — các thiết bị khác giữ mật khẩu riêng của chúng và không bị ảnh hưởng."
+    },
+    "biometric": {
+      "title": "Mở khóa sinh trắc học",
+      "hint": "Mở khóa bằng Touch ID thay vì nhập mật khẩu.",
+      "aria": "Mở khóa sinh trắc học",
+      "failed": "Cập nhật mở khóa sinh trắc học thất bại",
+      "unavailable": "Mở khóa sinh trắc học không có sẵn trên thiết bị này."
+    },
+    "devices": {
+      "title": "Thiết bị đã kết nối",
+      "subtitle": "Các thiết bị có thể mở khóa và đồng bộ nhật ký này. Để thêm thiết bị, hãy cài Memlore trên thiết bị mới và đăng nhập cùng một dịch vụ đám mây.",
+      "this_device": "Thiết bị này",
+      "created_at": "Đã thêm {{date}}",
+      "last_seen": "Đồng bộ lần cuối {{relative}}",
+      "rename": "Đổi tên",
+      "rename_modal_title": "Đổi tên thiết bị",
+      "rename_label": "Tên thiết bị",
+      "rename_cancel": "Hủy",
+      "rename_save": "Lưu",
+      "renaming": "Đang đổi tên thiết bị…",
+      "rename_blocked": "Không thể đổi tên khi đang có thao tác bảo mật hoặc đổi tên khác.",
+      "refresh": "Làm mới",
+      "refreshing": "Đang làm mới…",
+      "revoke": "Thu hồi quyền truy cập",
+      "remove_or_revoke": "Xóa hoặc thu hồi thiết bị này",
+      "remove_outcome_ok": "Đã xóa thiết bị khỏi danh sách.",
+      "remove_outcome_error": "Không xóa được thiết bị. Đợi đồng bộ đang chạy hoàn tất rồi thử lại.",
+      "remove_outcome_dismiss": "Đóng",
+      "relative": {
+        "just_now": "vừa xong",
+        "minutes_ago_one": "{{count}} phút trước",
+        "minutes_ago_other": "{{count}} phút trước",
+        "hours_ago_one": "{{count}} giờ trước",
+        "hours_ago_other": "{{count}} giờ trước",
+        "days_ago_one": "{{count}} ngày trước",
+        "days_ago_other": "{{count}} ngày trước"
+      }
+    },
+    "revoke": {
+      "modal_title": "Thu hồi quyền truy cập thiết bị",
+      "warning": "Thao tác này sẽ xóa vĩnh viễn thiết bị được chọn khỏi vault. Các mục mới sẽ được bảo vệ bằng khóa mới. Thiết bị bị thu hồi không thể đọc dữ liệu mới. Không thể hoàn tác.",
+      "warning_repair": "Thao tác này xoay khóa của bạn — mọi thiết bị khác phải ghép nối lại bằng cụm từ khôi phục và sẽ biến mất khỏi danh sách này cho đến khi ghép nối lại.",
+      "passphrase_label": "Cụm từ khôi phục",
+      "passphrase_placeholder": "Nhập hoặc dán 24 từ, cách nhau bằng dấu cách…",
+      "passphrase_word_count": "{{count}} / 24 từ",
+      "passphrase_unknown_words": "Từ không hợp lệ: {{words}}",
+      "password_label": "Mật khẩu hiện tại của bạn",
+      "password_placeholder": "Mật khẩu hiện tại",
+      "confirm_type_label": "Nhập REVOKE để xác nhận",
+      "confirm_type_placeholder": "REVOKE",
+      "confirm_word": "REVOKE",
+      "revoke": "Thu hồi quyền truy cập",
+      "cancel": "Hủy",
+      "error_fallback": "Không thể thu hồi thiết bị. Vui lòng thử lại.",
+      "cloud_guidance_google_title": "Google Drive — thu hồi phiên đăng nhập",
+      "cloud_guidance_google_step1": "Mở myaccount.google.com và đăng nhập.",
+      "cloud_guidance_google_step2": "Vào Bảo mật → Ứng dụng bên thứ ba có quyền truy cập tài khoản.",
+      "cloud_guidance_google_step3": "Tìm Memlore và nhấn \"Xóa quyền truy cập\".",
+      "cloud_guidance_google_step4": "Token OAuth của thiết bị bị mất sẽ bị vô hiệu ngay lập tức.",
+      "cloud_guidance_icloud_title": "iCloud — đăng xuất hoặc đổi mật khẩu",
+      "cloud_guidance_icloud_step1": "Trên thiết bị bị mất, vào Cài đặt → [tên của bạn] → Đăng xuất. Hoặc đổi mật khẩu Apple ID tại appleid.apple.com để vô hiệu hóa tất cả phiên đăng nhập.",
+      "cloud_guidance_icloud_step2": "Quyền truy cập iCloud Drive gắn với phiên Apple ID — đăng xuất hoặc thu hồi phiên sẽ xóa toàn bộ quyền truy cập iCloud.",
+      "cloud_guidance_generic": "Đăng xuất thiết bị bị mất khỏi nhà cung cấp đám mây đang dùng, hoặc đổi thông tin xác thực tài khoản để vô hiệu hóa phiên đăng nhập của nó."
+    },
+    "reset": {
+      "modal_title": "Đặt lại cụm từ khôi phục?",
+      "forward_only": "Thao tác này chỉ có tác dụng về sau: nó bảo vệ mọi thứ được viết sau khi đặt lại, không bảo vệ những gì đã viết trước đó. Các mục cũ vẫn đọc được bằng cụm từ mà chúng đã được lưu.",
+      "other_devices": "Cụm từ hiện tại của bạn sẽ ngừng hoạt động. Mỗi thiết bị khác sẽ cần nhập 24 từ mới một lần để tiếp tục đọc được các mục mới.",
+      "password_label": "Mật khẩu hiện tại của bạn",
+      "password_placeholder": "Mật khẩu hiện tại",
+      "cancel": "Hủy",
+      "confirm": "Đặt lại cụm từ khôi phục",
+      "error_fallback": "Không thể đặt lại cụm từ khôi phục. Vui lòng thử lại.",
+      "error_no_phrase": "Việc đặt lại đã hoàn tất nhưng không hiển thị được cụm từ khôi phục mới. Chưa nên thêm mục mới — hãy kiểm tra khôi phục trên một thiết bị khác trước khi tiếp tục.",
+      "new_phrase_title": "Cụm từ khôi phục mới — hãy lưu 24 từ này ngay",
+      "new_phrase_body": "Cụm từ khôi phục của bạn đã được đặt lại. Đây là 24 từ MỚI — cụm từ cũ không còn dùng được nữa. Đây là lần duy nhất chúng được hiển thị, hãy lưu lại ngay. Mọi thiết bị khác sẽ cần 24 từ mới này một lần để tiếp tục đọc được các mục mới."
+    },
+    "rotate": {
+      "modal_title": "Xoay vòng master key",
+      "warning": "Xoay vòng master key tạo ra khóa mã hóa mới cho các mục mới. Cụm từ khôi phục 24 từ hiện tại của bạn không thay đổi. Tất cả các thiết bị đồng bộ khác sẽ cần ghép nối lại trước khi đọc được các mục mới.",
+      "passphrase_label": "Cụm từ khôi phục hiện tại của bạn",
+      "passphrase_placeholder": "Nhập hoặc dán 24 từ, cách nhau bằng dấu cách…",
+      "passphrase_word_count": "{{count}} / 24 từ",
+      "passphrase_unknown_words": "Từ không hợp lệ: {{words}}",
+      "password_label": "Mật khẩu hiện tại của bạn",
+      "password_placeholder": "Mật khẩu hiện tại",
+      "busy": "Đang xoay vòng…",
+      "rotate": "Xoay vòng master key",
+      "cancel": "Hủy",
+      "done": "Hoàn tất",
+      "error_fallback": "Không thể xoay vòng master key. Vui lòng thử lại.",
+      "success_title": "Đã xoay vòng khóa — dữ liệu mới dùng khóa mới.",
+      "success_repair_hint": "Cụm từ khôi phục không thay đổi. Các thiết bị khác cần ghép nối lại bằng cụm từ 24 từ hiện có để truy cập các mục mới.",
+      "new_phrase_title": "Đã xoay khóa — cụm từ khôi phục không thay đổi",
+      "new_phrase_body": "Các khóa mã hóa của bạn đã được xoay vòng. Cụm từ khôi phục 24 từ của bạn không thay đổi. Các thiết bị khác phải ghép nối lại bằng cụm từ hiện có trước khi đọc được các mục mới.",
+      "copy": "Sao chép tất cả các từ",
+      "copied": "Đã sao chép",
+      "i_saved_checkbox": "Tôi đã ghi lại và lưu trữ an toàn cụm từ khôi phục của mình."
+    },
+    "rotation_resume": {
+      "modal_title": "Tiếp tục xoay khóa bị gián đoạn",
+      "warning": "Quá trình xoay khóa đã bị gián đoạn (ví dụ do ứng dụng bị tắt đột ngột) và cần hoàn tất trước khi kho lưu trữ được bảo mật đầy đủ. Nhập mật khẩu và cụm từ khôi phục để hoàn tất.",
+      "warning_rotate": "Quá trình xoay khóa đã bị gián đoạn (ví dụ do ứng dụng bị tắt đột ngột) và cần hoàn tất trước khi kho lưu trữ được bảo mật đầy đủ. Nhập mật khẩu để hoàn tất.",
+      "password_label": "Mật khẩu hiện tại của bạn",
+      "password_placeholder": "Mật khẩu hiện tại",
+      "passphrase_label": "Cụm từ khôi phục",
+      "passphrase_placeholder": "Nhập hoặc dán 24 từ, phân cách bằng khoảng trắng…",
+      "passphrase_word_count": "{{count}} / 24 từ",
+      "passphrase_unknown_words": "Từ không hợp lệ: {{words}}",
+      "resume": "Hoàn tất xoay khóa",
+      "resuming": "Đang hoàn tất…",
+      "error_fallback": "Không thể tiếp tục xoay khóa. Vui lòng kiểm tra mật khẩu và cụm từ khôi phục."
+    },
+    "second_lock": {
+      "auto_lock_failed": "Không cập nhật được tự khóa.",
+      "auto_lock_hint": "Khóa lại nội dung khóa thứ hai sau khoảng thời gian không hoạt động này.",
+      "auto_lock_minutes": "{{count}} phút",
+      "auto_lock_never": "Không bao giờ",
+      "auto_lock_title": "Tự khóa khi không hoạt động",
+      "cancel": "Hủy",
+      "change_button": "Đổi mật khẩu",
+      "change_confirm_placeholder": "Xác nhận mật khẩu mới",
+      "change_failed": "Không đổi được mật khẩu khóa thứ hai.",
+      "change_new_placeholder": "Mật khẩu mới ({{count}}+ ký tự)",
+      "confirm_placeholder": "Xác nhận mật khẩu khóa thứ hai",
+      "current_placeholder": "Mật khẩu khóa thứ hai hiện tại",
+      "current_required": "Hãy nhập mật khẩu khóa thứ hai hiện tại.",
+      "description": "Ẩn các mục và nhật ký đã chọn khỏi giao diện và tìm kiếm cho đến khi bạn nhập mật khẩu này — một lớp chặn bổ sung trong ứng dụng phía sau mật khẩu chính, không phải một lớp mã hóa riêng.",
+      "disable_failed": "Không tắt được khóa thứ hai.",
+      "disable_hint": "Xóa mọi đánh dấu khóa thứ hai trên mục và nhật ký. Tất cả sẽ hiện lại.",
+      "disable_modal_description": "Nhập mật khẩu khóa thứ hai để tắt lớp này và xóa mọi đánh dấu khóa thứ hai trên mục và nhật ký.",
+      "disable_title": "Tắt khóa thứ hai",
+      "enable_button": "Bật khóa thứ hai",
+      "mismatch": "Mật khẩu không khớp.",
+      "new_placeholder": "Mật khẩu khóa thứ hai ({{count}}+ ký tự)",
+      "no_recovery_warning": "Hãy nhớ mật khẩu này — nó không thể khôi phục hay đặt lại. Nếu quên, bạn sẽ mất vĩnh viễn quyền truy cập vào nội dung đã khóa.",
+      "password_hint": "Đổi mật khẩu dùng để hiện các mục đã khóa.",
+      "password_title": "Mật khẩu",
+      "password_updated": "Đã cập nhật mật khẩu khóa thứ hai.",
+      "set_button": "Đặt mật khẩu khóa thứ hai",
+      "set_failed": "Không đặt được mật khẩu khóa thứ hai.",
+      "show_existence_hint": "Hiển thị mục đã khóa dưới dạng ô trống trung tính thay vì ẩn hoàn toàn.",
+      "show_existence_title": "Hiện sự tồn tại của mục đã khóa",
+      "too_short": "Dùng ít nhất {{count}} ký tự.",
+      "update_button": "Cập nhật mật khẩu",
+      "visibility_failed": "Không cập nhật được chế độ hiển thị.",
+      "intro_title": "Thiết lập khóa thứ hai",
+      "intro_body": "Khóa thứ hai ẩn các mục và nhật ký đã chọn khỏi mọi giao diện và khỏi tìm kiếm cho đến khi bạn nhập mật khẩu thứ hai. Nó nằm sau mật khẩu chính, không phải một lớp mã hóa riêng.",
+      "intro_open_settings": "Mở cài đặt Bảo mật"
+    }
+  },
+  "ai": {
+    "on_device_llm": {
+      "warmup": {
+        "generic_model": "Mô hình cục bộ",
+        "title": "Đang làm nóng mô hình cục bộ",
+        "explainer": "Mô hình cục bộ của bạn đang được làm nóng. Việc này mất vài giây và chỉ xảy ra ở lần dùng đầu tiên trong phiên hoặc sau khoảng 10 phút không hoạt động — các phản hồi sau đó là tức thì.",
+        "more_info": "Thêm thông tin",
+        "size_label": "Dung lượng mô hình",
+        "min_ram": "tối thiểu",
+        "privacy_note": "Chạy hoàn toàn trên thiết bị — không có dữ liệu nào rời khỏi máy của bạn.",
+        "continue_background": "Tiếp tục ở nền",
+        "failed_body": "Không thể khởi động mô hình cục bộ.",
+        "failed_title": "Mô hình cục bộ không khả dụng",
+        "error_code_label": "Lỗi",
+        "close": "Đóng"
+      }
+    }
+  },
+  "basemap": {
+    "status": {
+      "downloading": "Đang tải bản đồ… {{percent}}%",
+      "cancel": "Hủy",
+      "tooltip": "Bản đồ thế giới ngoại tuyến đang được tải ở nền."
+    }
+  },
+  "media_compression": {
+    "custom_photo_hint": "Cạnh tối đa và chất lượng thấp hơn cho tệp nhỏ hơn nhưng hao hụt rõ hơn.",
+    "custom_photo_title": "Nén tuỳ chỉnh",
+    "custom_video_hint": "Cạnh tối đa thấp hơn cho tệp nhỏ hơn nhưng độ phân giải thấp hơn.",
+    "custom_video_title": "Kích thước video tuỳ chỉnh",
+    "max_edge_hint": "Ảnh có cạnh dài lớn hơn giá trị này sẽ được thu nhỏ.",
+    "max_edge_label": "Cạnh tối đa (px)",
+    "mode": {
+      "aggressive": "Mạnh",
+      "custom": "Tuỳ chỉnh",
+      "off": "Tắt",
+      "standard": "Tiêu chuẩn"
+    },
+    "photo_desc": {
+      "aggressive": "Đổi kích thước về 1600 px và mã hóa lại ở chất lượng JPEG 75. Tệp nhỏ hơn, nén thấy rõ hơn một chút — phù hợp khi băng thông đồng bộ hạn chế.",
+      "custom": "Tự đặt cạnh dài tối đa và chất lượng JPEG bên dưới.",
+      "off": "Lưu mọi ảnh ở kích thước và chất lượng gốc. Phù hợp khi bạn có nhiều dung lượng đĩa và muốn giữ bản gốc nguyên vẹn từng điểm ảnh.",
+      "standard": "Đổi kích thước về 2400 px (cạnh dài) và mã hóa lại ở chất lượng JPEG 85. Ảnh iPhone thường nhỏ đi khoảng 6 lần với mức hao hụt gần như không nhận ra."
+    },
+    "photo_help": "Ngày EXIF và GPS được giữ nguyên để các luồng gợi ý metadata vẫn hoạt động. HEIC và SVG được giữ nguyên không đổi.",
+    "photo_hint": "Thu nhỏ ảnh được chèn vào để tiết kiệm dung lượng đĩa và đồng bộ.",
+    "photo_title": "Nén ảnh",
+    "quality_hint": "40 = nhỏ và mờ rõ rệt. 100 = gần như không mất chất lượng, tệp hầu như không nhỏ đi.",
+    "quality_label": "Chất lượng JPEG",
+    "video_desc": {
+      "aggressive": "Giảm xuống 640 × 480 H.264 .mp4. Tệp nhỏ nhất, nén thấy rõ hơn — phù hợp khi băng thông đồng bộ hạn chế. Chỉ trên macOS.",
+      "custom": "Tự đặt cạnh tối đa bên dưới; giá trị sẽ được quy về preset H.264 gần nhất. Chỉ trên macOS.",
+      "off": "Lưu mọi video ở kích thước và chất lượng gốc. Phù hợp khi bạn có nhiều dung lượng đĩa.",
+      "standard": "Giảm xuống 960 × 540 và mã hóa lại thành H.264 .mp4. Tiết kiệm nhiều cho video quay bằng điện thoại với hao hụt không đáng kể. Chỉ trên macOS."
+    },
+    "video_help": "Chuyển mã sang H.264 .mp4 bằng bộ xử lý video của hệ điều hành. Chỉ trên macOS — trên nền tảng khác video được lưu nguyên vẹn. Đoạn phim không nhỏ đi được sẽ giữ tệp gốc.",
+    "video_hint": "Thu nhỏ video được chèn vào để tiết kiệm dung lượng đĩa và đồng bộ.",
+    "video_max_edge_hint": "Được quy về preset H.264 gần nhất (480p, 540p, 720p, 1080p).",
+    "video_title": "Nén video"
+  },
+  "tab_sections": {
+    "appearance": "Các mục Cài đặt giao diện",
+    "categories": "Danh mục cài đặt",
+    "data": "Các mục Cài đặt dữ liệu",
+    "editor": "Các mục Cài đặt trình soạn thảo",
+    "location": "Các mục Cài đặt vị trí",
+    "security": "Các mục Cài đặt bảo mật",
+    "sync": "Các mục Cài đặt đồng bộ",
+    "templates": "Các mục Mẫu"
+  }
+}

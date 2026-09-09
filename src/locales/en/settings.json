@@ -1,0 +1,1384 @@
+{
+  "categories": {
+    "general": {
+      "label": "General",
+      "description": "Language, time format, and basic app preferences."
+    },
+    "editor": {
+      "label": "Editor",
+      "description": "Math, emoji shortcodes, and editor typography."
+    },
+    "appearance": {
+      "label": "Appearance",
+      "description": "Theme, accent color, and display preferences."
+    },
+    "security": {
+      "label": "Security",
+      "description": "Encryption, password, and biometric unlock."
+    },
+    "sync": {
+      "label": "Sync",
+      "description": "Cloud sync providers and schedule."
+    },
+    "media": {
+      "label": "Media",
+      "description": "Local media cache size and management."
+    },
+    "location": {
+      "label": "Location",
+      "description": "Geocoding provider for address suggestions."
+    },
+    "journals": {
+      "label": "Journals",
+      "description": "Manage your journals."
+    },
+    "templates": {
+      "label": "Templates",
+      "description": "Entry templates — built-in and your custom ones."
+    },
+    "reminders": {
+      "label": "Reminders",
+      "description": "Schedule gentle nudges to write in your journal."
+    },
+    "ai": {
+      "label": "AI",
+      "description": "Bring-your-own-key AI features powered by your chosen provider — local (Ollama, LM Studio, llama.cpp) or hosted (OpenAI, Anthropic, Gemini, …)."
+    },
+    "data": {
+      "label": "Data",
+      "description": "Export, import, and manage downloaded files on this device."
+    }
+  },
+  "rail_label": "Settings",
+  "general": {
+    "groups": {
+      "locale": "Language & region",
+      "app": "Application",
+      "danger": "Danger zone"
+    },
+    "start_at_login": {
+      "title": "Start at login",
+      "hint": "Launch Memlore when you log in."
+    },
+    "uninstall": {
+      "title": "Uninstall Memlore",
+      "hint": "Permanently erase every journal, entry, photo and setting stored on this computer.",
+      "button": "Uninstall…",
+      "modal_title": "Uninstall Memlore?",
+      "modal_body": "This deletes your encrypted vault and everything in it. There is no undo, and no copy is kept anywhere on this computer.",
+      "export_first": "Export your journals first",
+      "removes_label": "Will be deleted ({{size}})",
+      "also_remove_app": "Also delete the application itself",
+      "app_path_hint": "Removes {{path}} once Memlore quits.",
+      "app_not_removable_macos": "The application cannot delete itself from this location. Move Memlore to the Trash manually after it quits.",
+      "app_not_removable_windows": "Your data will be erased. Remove the application itself from Settings → Apps → Installed apps.",
+      "app_not_removable_linux": "Your data will be erased. Remove the application itself with your package manager.",
+      "app_not_removable_other": "Your data will be erased. Removing the application itself is not supported on this platform.",
+      "cloud_note": "Data synced to Google Drive or iCloud is left untouched — other devices keep working. Disconnect sync first if you want it gone too.",
+      "skipped_label": "Will NOT be deleted — outside the area Memlore is allowed to erase",
+      "stalled": "Memlore could not quit on its own. Your data is being erased in the background — please quit the app manually.",
+      "confirm_hint": "To confirm, type {{token}} below.",
+      "confirm_button": "Erase everything and quit",
+      "cancel": "Cancel",
+      "running": "Erasing…",
+      "loading": "Checking what is stored on this computer…"
+    }
+  },
+  "version_history": {
+    "title": "Version history",
+    "hint": "How long past versions of an entry are kept before being pruned.",
+    "days": "{{count}} days"
+  },
+  "editor": {
+    "tabs": {
+      "font": "Font",
+      "general": "General",
+      "layout": "Layout"
+    },
+    "math": {
+      "title": "Math equations",
+      "hint": "Render KaTeX: $…$ inline, $$…$$ block. Off by default."
+    },
+    "emoji_shortcodes": {
+      "title": "Emoji shortcodes",
+      "hint": "Type :keyword: to insert emojis. Off by default."
+    },
+    "fixed_title": {
+      "title": "Fixed entry title",
+      "hint": "Pin the title while the body scrolls. Off by default."
+    },
+    "right_to_left": {
+      "title": "Right-to-left writing",
+      "hint": "Write entry text from right to left. Off by default."
+    },
+    "justify_paragraphs": {
+      "title": "Justify paragraphs",
+      "hint": "Align body text to both left and right margins, like in Word. Off by default."
+    },
+    "line_height": {
+      "title": "Line height",
+      "hint": "Vertical spacing within each paragraph.",
+      "compact": "Compact",
+      "normal": "Normal",
+      "relaxed": "Relaxed"
+    },
+    "paragraph_spacing": {
+      "title": "Paragraph spacing",
+      "hint": "Space between paragraphs and other blocks.",
+      "compact": "Compact",
+      "normal": "Normal",
+      "relaxed": "Relaxed"
+    },
+    "first_line_indent": {
+      "title": "First-line indent",
+      "hint": "Indent the first line of each paragraph, like a printed book. Off by default."
+    },
+    "hyphenation": {
+      "title": "Hyphenation",
+      "hint": "Break long words across lines. Especially helpful with justified text. Off by default."
+    },
+    "distraction_mode": {
+      "title": "Distraction free mode",
+      "hint": "Footer button to hide sidebar and list. On by default."
+    },
+    "font": {
+      "title": "Font",
+      "hint": "Pick a typeface for the editor — this only affects the writing area, not the rest of the app. The preview below shows exactly how text will look in the editor.",
+      "radiogroup_label": "Font family",
+      "geist": "Geist",
+      "inter": "Inter",
+      "nunito": "Nunito",
+      "open_sans": "Open Sans",
+      "fuzzy_bubbles": "Fuzzy Bubbles",
+      "custom": "Custom",
+      "custom_with_name": "Custom ({{name}})",
+      "custom_modal": {
+        "title": "Choose a Google Font",
+        "preview_on_google": "Preview {{name}} on Google Fonts",
+        "search_placeholder": "Search fonts…",
+        "weight_label": "Weight",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "downloading": "Downloading…",
+        "download_error": "Could not download font. Check your internet connection.",
+        "offline_error": "This feature requires an internet connection. Connect to the internet and try again.",
+        "offline_close": "Close",
+        "loading_catalog": "Loading font catalog, please wait…",
+        "empty_query_hint": "Type a font name or any part of it — the list filters as you type. Fuzzy match works too (e.g. \"opnsns\" finds \"Open Sans\").",
+        "no_results": "No fonts found for \"{{query}}\". Try refreshing the catalog below.",
+        "catalog_last_updated": "Catalog last updated {{time}}.",
+        "refresh_link": "Refresh",
+        "refreshing": "Refreshing…",
+        "refresh_failed": "Could not refresh the catalog. Check your internet connection.",
+        "api_key_missing": "Google Fonts API key is not configured. Set the GOOGLE_FONTS_API_KEY environment variable before launching the app."
+      },
+      "sample": "The quick brown fox jumps over the lazy dog.",
+      "size_label": "Size",
+      "size_decrease_aria": "Decrease font size",
+      "size_increase_aria": "Increase font size",
+      "size_reset_aria": "Reset font size",
+      "contrast_label": "Contrast",
+      "contrast_decrease_aria": "Decrease text contrast",
+      "contrast_increase_aria": "Increase text contrast",
+      "contrast_reset_aria": "Reset text contrast",
+      "preview": {
+        "aria_label": "Font preview",
+        "heading_1": "The quick brown fox",
+        "heading_2": "Jumps over the lazy dog",
+        "paragraph_1": "A journal entry is a small window into a single day. Choose a typeface that makes you want to open it again tomorrow.",
+        "styled_lead": "Try it:",
+        "styled_bold": "Bold",
+        "styled_italic": "italic",
+        "styled_code": "code",
+        "quote": "Typography is the voice of the written word."
+      }
+    },
+    "font_cache": {
+      "hint": "Custom Google Fonts you've downloaded are cached locally so they work offline. Size and contrast settings are shared across all custom fonts.",
+      "current_usage": "{{size}} across {{count}} fonts",
+      "current_usage_empty": "No fonts cached yet.",
+      "clear_button": "Clear cached fonts",
+      "clear_confirm": "Remove all cached Google Fonts? Your current font will reset to the default if it was a custom font.",
+      "clear_error": "Could not clear the cache."
+    }
+  },
+  "language": {
+    "title": "Language",
+    "hint": "Interface language for the app.",
+    "english": "English",
+    "vietnamese": "Vietnamese"
+  },
+  "appearance": {
+    "tabs": {
+      "theme": "Theme & color",
+      "display": "Display",
+      "layout": "Layout"
+    },
+    "groups": {
+      "theme": "Theme & color",
+      "display": "Display"
+    },
+    "design_system": {
+      "title": "Design system",
+      "hint": "Signature is the expressive Memlore look. Clean is a plain, high-contrast interface with light and dark modes.",
+      "radiogroup_label": "Design system",
+      "signature": {
+        "label": "Signature",
+        "aria": "Signature design system"
+      },
+      "clean": {
+        "label": "Clean",
+        "aria": "Clean design system"
+      },
+      "clay": {
+        "label": "Clay",
+        "aria": "Switch to the Clay design system"
+      }
+    },
+    "theme": {
+      "title": "Theme",
+      "hint": "Light or dark.",
+      "hint_locked": "Signature is dark only. Switch the design system to Clean to choose light or dark — your Clean choice is remembered.",
+      "hint_locked_lumen": "Lumen is dark only. Switch the surface to Deep or Soft to choose light or dark — your light choice is remembered.",
+      "radiogroup_label": "Theme",
+      "light": {
+        "label": "Light",
+        "aria": "Light theme"
+      },
+      "dark": {
+        "label": "Dark",
+        "aria": "Dark theme"
+      }
+    },
+    "surface": {
+      "title": "Surface",
+      "hint": "Dark mode canvas. Deep is the default charcoal look; Soft lifts every layer slightly; Lumen is a dark Night Foundry look.",
+      "hint_light": "Applies to dark mode only. Deep, Soft, and Lumen restyle the dark canvas.",
+      "radiogroup_label": "Surface style",
+      "deep": {
+        "label": "Deep",
+        "aria": "Deep charcoal surfaces"
+      },
+      "soft": {
+        "label": "Soft",
+        "aria": "Soft lifted charcoal surfaces"
+      },
+      "lumen": {
+        "label": "Lumen",
+        "aria": "Lumen dark Night Foundry surfaces"
+      }
+    },
+    "corner_radius": {
+      "title": "Corner radius",
+      "hint": "Reshapes buttons and button-like controls in the Clean design.",
+      "radiogroup_label": "Corner radius",
+      "low": {
+        "label": "Low",
+        "aria": "Low corner radius"
+      },
+      "medium": {
+        "label": "Medium",
+        "aria": "Medium corner radius"
+      },
+      "high": {
+        "label": "High",
+        "aria": "High corner radius"
+      }
+    },
+    "layout": {
+      "title": "Layout",
+      "hint": "Where the sidebar and the list panel sit. The list panel is only shown on pages that have one.",
+      "radiogroup_label": "App layout",
+      "sidebar-panel-main": {
+        "label": "Sidebar · List · Content",
+        "aria": "Sidebar on the left, list panel in the middle, content on the right (default)"
+      },
+      "sidebar-main-panel": {
+        "label": "Sidebar · Content · List",
+        "aria": "Sidebar on the left, content in the middle, list panel on the right"
+      },
+      "main-panel-sidebar": {
+        "label": "Content · List · Sidebar",
+        "aria": "Content on the left, list panel in the middle, sidebar on the right"
+      }
+    },
+    "font_scale": {
+      "title": "Interface size",
+      "hint": "Enlarge interface text and sidebar icons. Headings keep their size.",
+      "radiogroup_label": "Interface size",
+      "normal": {
+        "label": "Normal",
+        "aria": "Normal interface size, 1×"
+      },
+      "big": {
+        "label": "Big",
+        "aria": "Big interface size, 1.05×"
+      },
+      "bigger": {
+        "label": "Bigger",
+        "aria": "Bigger interface size, 1.1×"
+      }
+    },
+    "reduce_motion": {
+      "title": "Reduce motion",
+      "hint": "Disable animations and transitions."
+    },
+    "gradient_primary": {
+      "title": "Color gradient",
+      "hint": "Gradient fills instead of a solid color.",
+      "hint_clean": "Applies to Signature and Clay. Clean uses solid fills only."
+    },
+    "logo_follows_cursor": {
+      "title": "Logo follows cursor",
+      "hint": "The dog in the title bar watches your cursor."
+    },
+    "time_format": {
+      "title": "Time format",
+      "hint": "How times display across the app.",
+      "radiogroup_label": "Time format",
+      "24h": "14:30",
+      "12h": "2:30 PM"
+    },
+    "accent": {
+      "title": "Accent color",
+      "hint": "Color for buttons, links, and highlights.",
+      "radiogroup_label": "Accent color",
+      "orange": "Orange",
+      "violet": "Violet",
+      "rose": "Rose",
+      "sky": "Sky",
+      "emerald": "Emerald",
+      "gray": "Gray",
+      "custom": "Custom…",
+      "hex_label": "Hex color",
+      "hex_placeholder": "#EA580C"
+    }
+  },
+  "journals_section": {
+    "empty": "No journals yet.",
+    "new": "New journal",
+    "edit_aria": "Edit {{name}}",
+    "lock_aria": "Second-lock {{name}}",
+    "unlock_aria": "Remove second lock from {{name}}",
+    "lock_tooltip": "Hide {{name}} behind second lock",
+    "unlock_tooltip": "Remove second lock from {{name}}",
+    "unlock_title": "Remove second lock",
+    "unlock_description": "Enter the second-lock password to remove the second lock from {{name}}.",
+    "delete_aria": "Delete {{name}}",
+    "delete_title": "Delete this journal?",
+    "delete_removed": "will be removed.",
+    "delete_with_entries": "Its {{count}} {{noun}} will also be deleted.",
+    "delete_sync_warning": "This can't be undone. Photos and attachments are deleted from this device and from your synced cloud copy. On your other devices, every entry in this journal is deleted too — including entries that haven't synced here yet, whose photos may exist nowhere else.",
+    "entry_one": "entry",
+    "entry_other": "entries",
+    "save_failed": "Failed to save journal",
+    "delete_failed": "Failed to delete journal",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "form": {
+      "title_new": "New Journal",
+      "title_edit": "Edit Journal",
+      "name_label": "Name",
+      "name_placeholder": "My Journal",
+      "name_required": "Journal name is required",
+      "color_label": "Color",
+      "auto_tags_label": "Auto apply tags",
+      "auto_tags_hint": "Attach these tags to every new entry in this journal.",
+      "auto_tags_required": "Pick at least one tag, or turn off auto-apply.",
+      "auto_tags_search_aria": "Search tags",
+      "auto_tags_search_placeholder": "Search or create a tag…",
+      "auto_tags_remove_aria": "Remove tag {{name}}",
+      "auto_tags_empty": "No tags yet — type a name to create one.",
+      "auto_tags_no_matches": "No matching tags",
+      "auto_tags_all_added": "All tags added — type to create a new one.",
+      "auto_tags_create": "Create \"{{name}}\"",
+      "save": "Save",
+      "create": "Create",
+      "cancel": "Cancel"
+    }
+  },
+  "delete_modal": {
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "templates_section": {
+    "loading": "Loading templates…",
+    "builtin_heading": "Built-in",
+    "builtin_badge": "Built-in",
+    "custom_heading": "Custom",
+    "empty": "No custom templates yet.",
+    "new": "New template",
+    "edit_aria": "Edit {{name}}",
+    "delete_aria": "Delete {{name}}",
+    "delete_title": "Delete this template?",
+    "delete_removed": "will be removed.",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "data_section": {
+    "title": "Export / import",
+    "hint": "Coming in a later phase.",
+    "export_title": "Export",
+    "export_hint": "Save your journal entries to a file on your device.",
+    "import_title": "Import",
+    "import_hint": "Restore from a backup or bring in entries from another app.",
+    "local_data_notice": "Your journal is stored locally on this device. Uninstalling Memlore or clearing its data permanently deletes it — keep it safe by syncing to {{provider}} and/or exporting a backup.",
+    "local_data_notice_provider_fallback": "a cloud service",
+    "tabs": {
+      "import": "Import",
+      "export": "Export",
+      "downloads": "Downloads"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "hint": "On-device models, the offline map, and custom fonts you have downloaded. Removing a file that is in use will disable the features that depend on it.",
+      "empty": "Nothing downloaded yet.",
+      "in_use": "In use",
+      "remove": "Remove",
+      "open_in_settings": "Open in settings",
+      "remove_idle": "This deletes the downloaded file from this device. You can download it again later.",
+      "remove_in_use_title": "This file is in use",
+      "remove_in_use_body": "Removing it will disable {{impact}}.",
+      "offline_map": "Offline map",
+      "custom_fonts": "Custom fonts",
+      "groups": {
+        "maps": "Maps",
+        "ai": "AI",
+        "editor": "Editor"
+      },
+      "impact": {
+        "embed_model": "semantic search, emotion suggestions, and RAG / Daily Chat memory",
+        "llm_model": "on-device Daily Chat and generation",
+        "llm_binary": "on-device Daily Chat and generation",
+        "basemap": "Locations, map previews, and the heatmap",
+        "fonts": "the custom editor font, which will fall back to the default"
+      }
+    }
+  },
+  "about_section": {
+    "heading_title": "Memlore",
+    "heading_description": "Your personal lore, your life, remembered.",
+    "description": "A cross-platform, privacy-first, local-first journal — with rich, optional AI.",
+    "principles_title": "Core principles",
+    "principles": {
+      "local_first": "Local-first — works fully offline. Your entries stay on your device.",
+      "private": "Private — encrypted at rest. No Memlore server, no account, no telemetry.",
+      "ai_optional": "Optional AI — off until you opt in. Your provider, including on-device.",
+      "yours": "Yours — sync through your own Drive if you want. Export anytime."
+    },
+    "author_title": "Author",
+    "author_name": "Anh-Thi Dinh",
+    "author_website": "dinhanhthi.com",
+    "author_email": "me@dinhanhthi.com",
+    "repo_title": "Open Source",
+    "repo_label": "github.com/dinhanhthi/memlore",
+    "license": "Free & open source under AGPL-3.0-or-later — see LICENSE in the repository."
+  },
+  "location": {
+    "tabs": {
+      "geocoding": "Location & geocoding",
+      "default": "Default location",
+      "saved": "Saved locations"
+    },
+    "mapDisplay": {
+      "title": "Map display",
+      "hint": "Choose how journal maps are drawn. Locations, previews, and the heatmap stay behind a chooser until a source is ready.",
+      "radiogroup_label": "Map source",
+      "sources": {
+        "offline": {
+          "label": "Offline map",
+          "aria": "Use the free offline world map"
+        },
+        "maptiler": {
+          "label": "MapTiler",
+          "aria": "Use MapTiler with your own API key"
+        },
+        "mapkit": {
+          "label": "Apple Maps",
+          "aria": "Use Apple Maps (online, free tier)"
+        }
+      },
+      "offline": {
+        "download": "Download ({{size}} GB)",
+        "delete": "Delete offline map",
+        "delete_confirm_title": "Delete the offline map?",
+        "delete_confirm_body": "This removes the downloaded map from this device. You can download it again later.",
+        "ready": "Downloaded · {{size}} GB",
+        "size_note": "One-time {{size}} GB download. Fully private after that — no tile requests leave this device."
+      },
+      "maptiler_key": {
+        "label": "MapTiler API key",
+        "placeholder": "Your MapTiler key",
+        "helper_link_label": "Get a free key →",
+        "restriction_hint": "The key stays on this device. Create one at MapTiler Cloud."
+      },
+      "mapkit": {
+        "note": "Uses Apple Maps online, free tier. No download — requires an internet connection."
+      }
+    },
+    "mapSourceGate": {
+      "title": "Choose a map source",
+      "body": "No map source is configured. Pick an option below to show Locations, previews, and the heatmap.",
+      "offline": {
+        "label": "Offline map",
+        "label_compact": "Offline map · {{size}} GB",
+        "description": "{{size}} GB, one-time download. Fully private after that.",
+        "action": "Download",
+        "use": "Use"
+      },
+      "maptiler": {
+        "label": "MapTiler",
+        "description": "Your own API key. Free tier is enough for personal use.",
+        "action": "Set up"
+      },
+      "mapkit": {
+        "label": "Apple Maps",
+        "description": "Online, no download.",
+        "action": "Use"
+      },
+      "downloading": "Downloading… {{percent}}%"
+    },
+    "title": "Location & Geocoding",
+    "hint": "Choose how address suggestions are looked up while you type. Saved entries don't depend on this choice — only the address text and coordinates are kept.",
+    "radiogroup_label": "Geocoding provider",
+    "providers": {
+      "nominatim": {
+        "label": "OpenStreetMap",
+        "aria": "Use OpenStreetMap (free, no key)",
+        "description": "Opt-in public geocoding service. Rate-limited to about one request per second. Free, no API key needed. Use Check to confirm the service is reachable (it can be temporarily down)."
+      },
+      "photon": {
+        "label": "Photon (default)",
+        "aria": "Use Photon by Komoot (free, no key, default)",
+        "description": "Default provider. Free, no API key needed. Better autocomplete than OpenStreetMap. Use Check to confirm the service is reachable."
+      },
+      "maptiler": {
+        "label": "MapTiler",
+        "aria": "Use MapTiler (your own API key)",
+        "description": "Bring your own API key. Free tier is enough for personal use. The same key works for MapTiler map tiles. Use Check to verify the key is accepted before saving."
+      },
+      "mapbox": {
+        "label": "Mapbox",
+        "aria": "Use Mapbox (your own API key)",
+        "description": "Bring your own API key. Use Check to verify the key is accepted before saving."
+      },
+      "google": {
+        "label": "Google Places",
+        "aria": "Use Google Places (your own API key)",
+        "description": "Bring your own API key. Use Check to verify the key is accepted before saving."
+      }
+    },
+    "mapbox_key": {
+      "label": "Mapbox access token",
+      "placeholder": "pk.eyJ...",
+      "helper_link_label": "Get a free token →",
+      "restriction_hint": "Use an unrestricted token. URL-restricted tokens will be rejected here."
+    },
+    "google_key": {
+      "label": "Google API key",
+      "placeholder": "AIza...",
+      "helper_link_label": "Enable Places API →",
+      "restriction_hint": "Use an unrestricted key. HTTP-referrer / IP-restricted keys will be rejected here."
+    },
+    "show_password": "Show",
+    "hide_password": "Hide",
+    "check": {
+      "button": "Check",
+      "button_checking": "Checking…",
+      "button_aria": "Check {{provider}} connection",
+      "success": "Working",
+      "errors": {
+        "missing_api_key": "API key required.",
+        "invalid_key": "API key rejected.",
+        "rate_limited": "Rate limited — try again later.",
+        "network_error": "Network error. Check your connection.",
+        "server_error": "Provider returned an error.",
+        "invalid_response": "Unexpected response from provider.",
+        "unknown": "Check failed."
+      }
+    },
+    "defaultLocation": {
+      "title": "Default location",
+      "description": "Automatically add a default location when creating new entries.",
+      "toggle": "Auto-add default location",
+      "labelPlaceholder": "Home, Office…",
+      "addressPlaceholder": "Search address…",
+      "save": "Save location",
+      "clear": "Clear",
+      "saved": "Location saved",
+      "mapPreviewAria": "Map preview of selected location",
+      "mapPreviewEmpty": "Pick an address to preview it on the map.",
+      "mapPreviewLive": "Map preview updated for {{label}}",
+      "noAddress": "No address set",
+      "savedLocations": "Saved locations",
+      "noSavedLocations": "No saved locations yet",
+      "deleteAlias": "Delete location",
+      "useAsDefault": "Use as default",
+      "suggestions_unavailable": "Address suggestions unavailable. You can still type an address manually."
+    },
+    "savedLocationsSection": {
+      "title": "Saved locations",
+      "hint": "Locations you have saved for quick reuse.",
+      "noSavedLocations": "No saved locations yet.",
+      "deleteAlias": "Delete location",
+      "addNew": "Add new location",
+      "addPopup": {
+        "title": "Add location",
+        "close": "Close",
+        "labelPlaceholder": "Label (e.g. Home, Office)",
+        "addressPlaceholder": "Search address",
+        "save": "Save",
+        "cancel": "Cancel",
+        "searching": "Searching…",
+        "noResults": "No results found.",
+        "searchUnavailable": "Search unavailable.",
+        "validationError": "Label and address are required.",
+        "saveError": "Failed to save location.",
+        "mapPreviewAria": "Map preview of selected location",
+        "mapPreviewEmpty": "Pick an address to preview it on the map.",
+        "mapPreviewLive": "Map preview updated for {{label}}"
+      }
+    }
+  },
+  "sync_section": {
+    "tabs": {
+      "cloud": "Cloud Provider",
+      "devices": "Devices",
+      "schedule": "Schedule"
+    }
+  },
+  "sync_scheduler": {
+    "groups": {
+      "master": "Sync",
+      "triggers": "When to sync"
+    },
+    "enable_title": "Enable sync",
+    "enable_hint_connected": "Turn background sync on or off without disconnecting.",
+    "enable_hint_no_provider": "Connect a cloud service in the Cloud Provider tab to enable sync.",
+    "enable_aria": "Enable sync",
+    "after_save_title": "Sync after save",
+    "after_save_hint": "Push changes ~30s after the editor goes quiet.",
+    "after_save_aria": "Sync after save",
+    "on_launch_title": "Sync on launch",
+    "on_launch_hint": "Pull updates once when the app starts.",
+    "on_launch_aria": "Sync on launch",
+    "interval_title": "Sync interval",
+    "interval_hint": "How often the scheduler checks for changes to push & pull."
+  },
+  "media_groups": {
+    "gallery": "Gallery",
+    "cache": "Cache",
+    "compression": "Compression",
+    "upload_limits": "Upload limits"
+  },
+  "media_view": {
+    "title": "Gallery layout",
+    "description": "How the Media view opens. Full page shows a wide grid; Two panel keeps the entry editor beside the grid.",
+    "full": "Full page",
+    "panel": "Two panel"
+  },
+  "media_cache": {
+    "limit_title": "Cache limit",
+    "limit_hint": "Max size for cached media; oldest files are evicted first.",
+    "current_usage": "Current usage",
+    "clear_title": "Clear cache",
+    "clear_hint": "Remove all cached media files. Cloud-backed images will be re-downloaded on next view.",
+    "clear_button": "Clear cache",
+    "clear_confirm": "Clear the cache of full-size images? Cloud-backed images will be re-downloaded on next view. Small thumbnails are kept for fast browsing, and images waiting to be uploaded are never affected."
+  },
+  "media_upload_limits": {
+    "title": "Per-file upload size limits",
+    "hint": "Maximum size for each individual photo or video before it enters your journal — not a total across media.",
+    "help": "Each file is checked when you insert media. The backend stores limits in bytes; the smallest allowed value is 1 MB. Use Unlimited to disable a per-file limit.",
+    "photo_label": "Each photo (MB)",
+    "video_label": "Each video (MB)",
+    "unlimited_label": "Unlimited",
+    "photo_hint": "Photos over the limit are recompressed automatically and only blocked if they still don't fit.",
+    "video_hint": "Videos over the limit are blocked — Memlore does not transcode video.",
+    "warning": "Large media consumes your cloud storage quota fast. Consider a smaller limit.",
+    "unlimited_warning_title": "Both limits are unlimited",
+    "unlimited_warning_dismiss": "Got it",
+    "loading": "Loading…"
+  },
+  "cloud": {
+    "title": "Cloud Service",
+    "hint": "Sync entries through a cloud service you control. Your data is end-to-end encrypted before leaving your device.",
+    "picker_title": "Choose where to sync",
+    "providers": {
+      "gdrive": {
+        "name": "Google Drive",
+        "description": "Sync through a private folder on your Google account."
+      },
+      "icloud": {
+        "name": "iCloud Drive",
+        "description": "Sync through iCloud Drive on this Mac."
+      },
+      "local": {
+        "name": "Local folder",
+        "description": "Sync through a folder you choose — a drive, NAS, or shared directory."
+      }
+    },
+    "choose_folder": "Choose folder…",
+    "folder_path_label": "Folder",
+    "icloud_unavailable_hint": "Sign in to iCloud Drive in System Settings to use this option",
+    "errors": {
+      "already_connected": "Disconnect the current cloud service before connecting another.",
+      "permission_denied": "Grant Memlore access to iCloud Drive in System Settings › Privacy & Security › Files and Folders, then retry.",
+      "folder_required": "Choose a folder before connecting."
+    },
+    "connect_with": "Connect {{provider}}",
+    "badge_connected": "Connected"
+  },
+  "gdrive": {
+    "signed_in_as": "Signed in as",
+    "storage_app_usage_tooltip": "Space used by Memlore on Google Drive",
+    "storage_drive_free_short": "{{free}} free ({{percentage}}%)",
+    "storage_drive_free_tooltip": "{{free}} free of {{total}} on your Google account",
+    "storage_quota_notice": {
+      "title": "Google Drive storage is almost full",
+      "body": "New media uploads may fail. Review your media cache settings and upload size limits.",
+      "media_settings": "Open media settings",
+      "dismiss": "Dismiss"
+    },
+    "last_sync": "Last sync:",
+    "password_placeholder": "Enter your journal password",
+    "connecting": "Connecting…",
+    "cancel_connect": "Cancel",
+    "loading": "Loading…",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnect_modal": {
+      "title": "Disconnect {{provider}}?",
+      "body": "Stop syncing this device. Your local journal entries, photos, and notes stay intact. Files already on the cloud copy are not deleted.",
+      "body_gdrive_note": "To reconnect, you will need to sign in to Google again.",
+      "confirm": "Disconnect"
+    },
+    "success": "Connected to {{provider}}. Syncing your entries…",
+    "errors": {
+      "load_status": "Failed to load sync status",
+      "password_required": "Enter your journal password to connect {{provider}}.",
+      "timed_out": "Authorization timed out. Please try again and complete sign-in within 5 minutes.",
+      "keyring_mismatch": "The encryption key on {{provider}} was created with a different password. Enter the password you used when you first set up Memlore on your other device.",
+      "keyring_corrupted": "The encryption key file on {{provider}} is corrupted. Disconnect, manually delete .meta/keyring.json from the Memlore folder, then reconnect.",
+      "invalid_password": "Incorrect password. Please try again.",
+      "v1_wiped_reconnect": "An older keyring format was found and removed. Please reconnect Google Drive to complete the upgrade.",
+      "connect_failed": "Failed to connect {{provider}}: {{message}}"
+    },
+    "help": {
+      "open_from_error": "Open sync help",
+      "reset": {
+        "modal_title": "Reset sync status?",
+        "modal_body": "Marks entries, journals, and media this device owns for re-upload on the next sync. Nothing is deleted on this device or the cloud copy. This only resets sync tracking — it does not replace the full copy on either side.",
+        "modal_confirm": "Reset",
+        "success": "Reset complete. {{entries}} entries, {{media}} media items, and {{journals}} journals will re-upload on the next sync.",
+        "queued": "Reset queued. It will run when the current sync finishes.",
+        "error": "Failed to reset sync status: {{message}}"
+      },
+      "cloud_to_local": {
+        "modal_title": "Replace this device with {{provider}}?",
+        "modal_body": "Memlore will download and verify the complete cloud copy, create a local recovery backup, then replace synced data on this device. If download or verification fails, your current local data stays unchanged. Settings and secrets that only belong to this device are preserved. After success, normal sync continues from the restored copy. Close Memlore on other devices first so they do not push stale data.",
+        "modal_confirm": "Replace this device",
+        "checking": "Checking readiness and preparing a local backup…",
+        "ready": "Ready. A local recovery backup has been prepared. Confirm to download, verify, and replace synced data on this device.",
+        "running": "Replacing this device from {{provider}}…",
+        "success": "This device was replaced from {{provider}}. Normal sync can continue.",
+        "error": "Could not replace this device: {{message}}"
+      },
+      "local_to_cloud": {
+        "modal_title": "Replace {{provider}} with this device?",
+        "modal_body": "Memlore will create a local recovery backup, check that every item on this device is complete, then permanently delete Memlore data on {{provider}} and rebuild it from this device. Your local data on this device is preserved. If a check fails before deletion, {{provider}} is left unchanged. Other devices must reconnect before they can sync again. Close Memlore on other devices first.",
+        "modal_confirm": "Replace {{provider}}",
+        "checking": "Checking readiness and creating a local recovery backup…",
+        "ready": "Ready. A local recovery backup was created. Confirm to delete {{provider}} data and rebuild it from this device.",
+        "running": "Replacing {{provider}} from this device…",
+        "success": "{{provider}} was rebuilt from this device. Other devices must reconnect before they can sync again.",
+        "error": "Could not replace {{provider}}: {{message}}"
+      },
+      "delete_and_disconnect": {
+        "modal_title": "Delete {{provider}} data and disconnect?",
+        "modal_body": "Permanently deletes Memlore data from {{provider}} and disconnects this device. Local data on this device stays and will not upload again until you reconnect. Other devices that remain connected may re-upload on their next sync — disconnect them too if you want a fully empty cloud.",
+        "modal_confirm": "Delete and disconnect",
+        "backup_warning": "This permanently deletes the cloud copy. After deletion, the copy on this device is your only copy — export a backup first (Settings → Data → Export) if you need one.",
+        "success": "{{provider}} data deleted. You are now disconnected.",
+        "dismiss_success": "Dismiss",
+        "error": "Failed to delete {{provider}} data: {{message}}",
+        "error_sync_in_progress": "A sync is currently running. Wait for it to finish, then try again."
+      },
+      "recovery": {
+        "title": "Recovery in progress",
+        "interrupted_title": "Recovery interrupted",
+        "operation_local_to_cloud": "Replacing {{provider}} from this device",
+        "operation_cloud_to_local": "Replacing this device from {{provider}}",
+        "phase_created": "Starting…",
+        "phase_preflight": "Checking readiness…",
+        "phase_backup": "Creating local backup…",
+        "phase_fenced": "Preparing {{provider}}…",
+        "phase_transfer": "Transferring data…",
+        "phase_verify": "Verifying…",
+        "phase_commit": "Applying changes…",
+        "phase_finalize": "Finishing…",
+        "phase_fence_release_pending": "Releasing recovery lock…",
+        "phase_unknown": "Working…",
+        "status_running": "In progress",
+        "status_failed": "Needs attention",
+        "status_pending": "Waiting",
+        "backup_path": "Backup: {{path}}",
+        "resume": "Resume",
+        "cancel": "Cancel recovery",
+        "resuming": "Resuming…",
+        "cancelling": "Cancelling…",
+        "error": "{{message}}",
+        "busy": "Another recovery action is already in progress.",
+        "blocked_sync_in_progress": "A sync is running right now. Wait for it to finish, then try again.",
+        "blocked_not_connected": "{{provider}} is not connected on this device. Connect it, then try again.",
+        "blocked_force_re_pair": "This device has to reconnect to {{provider}} first. Finish reconnecting, then try again.",
+        "blocked_rotation_active": "A security key change is still running. Wait for it to finish, then try again.",
+        "blocked_competing_recovery": "A recovery is already in progress on {{provider}}. Wait for it to finish before continuing.",
+        "blocked_cloud_outdated": "The cloud copy is older than what this device expects, so restoring from it would lose data.",
+        "blocked_cloud_outdated_use_local": "The cloud copy is older than what this device expects, so restoring from it would lose data. Use “Replace {{provider}} with this device” instead.",
+        "blocked_cloud_inconsistent": "The cloud copy is in an inconsistent state. Let your devices finish syncing, then try again.",
+        "blocked_other_job_active": "Another recovery is already in progress on this device. Finish or cancel it, then try again.",
+        "blocked_insufficient_disk": "Not enough free disk space — about {{needed}} is needed but only {{available}} is free. Free up some space, then try again.",
+        "blocked_media_incomplete": "Some media files on this device are missing or damaged ({{missing}} missing, {{corrupt}} damaged). Restore or remove them, then try again.",
+        "blocked_cloud_unreadable": "Memlore could not read the cloud copy. Check your internet connection, then try again.",
+        "blocked_backup_failed": "Memlore could not create the local recovery backup, so it stopped before changing anything.",
+        "blocked_unknown": "This cannot start yet. Details: {{message}}",
+        "failed_lease_lost": "This device lost its claim on the recovery — another device may have taken over on {{provider}}. Close Memlore on your other devices before continuing.",
+        "failed_local_media_unreadable": "Some media files on this device could not be read from disk. Restore or remove them before continuing.",
+        "failed_key_unavailable": "Memlore could not access this device's encryption key. Make sure the app is unlocked, then continue.",
+        "failed_cloud_media_incomplete": "Some media files could not be downloaded from {{provider}} ({{missing}} missing, {{corrupt}} damaged). Nothing on this device was replaced.",
+        "failed_upload_incomplete": "Some items could not be uploaded to {{provider}}. Check your internet connection, then continue the recovery.",
+        "failed_fence_release": "The transfer finished, but Memlore could not release the recovery lock on {{provider}}. Close Memlore on your other devices, then continue.",
+        "failed_lease_unconfirmed": "Memlore could not confirm the state of the recovery lock on {{provider}}. Try continuing again.",
+        "failed_recovery_superseded": "This recovery was ended — another recovery took over the cloud copy while this one was finishing. You can start again if you still need to."
+      }
+    },
+    "recovery_wizard": {
+      "card_button": "Sync help & recovery",
+      "modal_title": "Sync help & recovery",
+      "back": "Back",
+      "close": "Close",
+      "done": "Done",
+      "cancel": "Cancel",
+      "errors": {
+        "generic": "Something went wrong. Please try again."
+      },
+      "triage": {
+        "question": "What is going wrong?",
+        "stuck_title": "Sync seems stuck or some items never upload",
+        "stuck_hint": "Re-upload what this device owns on the next sync. Nothing is deleted anywhere.",
+        "device_wrong_title": "This device is wrong — {{provider}} has the copy I trust",
+        "device_wrong_hint": "Download and verify the cloud copy, then replace synced data on this device.",
+        "cloud_wrong_title": "{{provider}} is wrong — this device has the copy I trust",
+        "cloud_wrong_hint": "Delete Memlore data on {{provider}} and rebuild it from this device.",
+        "stop_title": "I want to stop syncing on this device",
+        "stop_hint": "Disconnect {{provider}}, and choose whether the cloud copy stays."
+      },
+      "stop": {
+        "question": "What should happen to the copy on {{provider}}?",
+        "keep_title": "Keep it — just disconnect this device",
+        "keep_hint": "Stop syncing this device. Data on this device and data already on {{provider}} are both kept.",
+        "delete_title": "Delete it and disconnect",
+        "delete_hint": "Permanently delete Memlore data from {{provider}} and disconnect this device. Local data stays on this device and will not upload again until you reconnect."
+      },
+      "reset": {
+        "running": "Resetting sync status…",
+        "done_title": "Sync status reset"
+      },
+      "disconnect": {
+        "running": "Disconnecting {{provider}}…",
+        "done": "This device is disconnected from {{provider}}. Your local journal stays intact; files already on {{provider}} were kept."
+      },
+      "delete": {
+        "running": "Deleting {{provider}} data and disconnecting…"
+      }
+    },
+    "scope_upgrade": {
+      "title": "Google Drive sync upgraded",
+      "body": "We moved your synced data into a private folder Google manages just for Memlore — it is no longer visible in your My Drive. Click Connect to re-upload your journal entries. Your local data is safe.",
+      "note": "Your previous Memlore folder inside My Drive is no longer used. You can delete it manually if you want.",
+      "dismiss": "Dismiss"
+    },
+    "token_revoked": {
+      "title": "Google Drive access expired",
+      "body": "Your Google Drive sign-in is no longer valid — it was revoked from your Google account, or it expired after a long period without syncing. Reconnect to continue syncing.",
+      "cta": "Reconnect to Google Drive",
+      "busy": "Disconnecting…"
+    },
+    "cross_mode": {
+      "needs_password_title": "Sync folder is encrypted with a password",
+      "needs_password_body": "This device is in no-password mode, but the cloud folder was set up by a password-protected device. Set a password in Security to unlock the synced entries — or disconnect from this cloud folder.",
+      "needs_password_note": "Want the cloud folder to be unencrypted too? Open the device that set up the cloud folder, remove its password in Settings → Security, then sync once. After that, this device can disconnect, wipe the cloud folder manually from drive.google.com, and reconnect.",
+      "needs_no_password_title": "Sync folder is unencrypted",
+      "needs_no_password_body": "This device is in password mode, but the cloud folder was set up by a no-password device. Remove the password in Security to read these entries — or disconnect from this cloud folder.",
+      "needs_no_password_note": "Want the cloud folder to be password-protected too? Open the device that set up the cloud folder, set a password in Settings → Security, then sync once. After that, this device can disconnect, wipe the cloud folder manually from drive.google.com, and reconnect.",
+      "cta": "Open Security settings"
+    }
+  },
+  "security": {
+    "encryption_callout": "Your journal is end-to-end encrypted with AES-256-GCM. A password is required and cannot be disabled — we have no way to recover your data if you lose it.",
+    "tabs": {
+      "device_password": "Device password",
+      "second_lock": "Second lock",
+      "invisible_lock": "Invisible lock",
+      "recovery_devices": "Security actions"
+    },
+    "secure_wizard": {
+      "card_caption": "Tell Memlore what happened and get the right steps to secure your journal.",
+      "card_button": "Secure my journal",
+      "modal_title": "Secure my journal",
+      "step_counter": "Step {{current}} of {{total}}",
+      "back": "Back",
+      "close": "Close",
+      "done": "Done",
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "sync_in_progress": "A sync is currently running. Wait for it to finish, then try again."
+      },
+      "diagrams": {
+        "two_devices": "Two devices connected to the same encrypted journal through the cloud",
+        "key_rotated": "An old encryption key replaced by a new encryption key",
+        "cloud_cut": "The other device disconnected from the cloud",
+        "phrase_new": "A new 24-word recovery phrase replacing the old phrase"
+      },
+      "triage": {
+        "question": "What happened?",
+        "words_title": "I think my 24 recovery words leaked",
+        "words_hint": "Someone may have seen or copied the words that unlock your whole journal.",
+        "password_title": "I think my device password leaked",
+        "password_hint": "Someone may know the password that unlocks Memlore on this device.",
+        "device_title": "A device is lost, stolen, or compromised",
+        "device_hint": "Stop another device from reading new entries or reaching your cloud files.",
+        "routine_title": "Nothing happened — routine key rotation",
+        "routine_hint": "Create a fresh master key for future entries as a precaution, without changing your recovery words."
+      },
+      "words": {
+        "body": "The 24 words are a second key to your whole journal. Resetting them creates a new master key and 24 new words for future entries.",
+        "reset_body": "Enter your current device password. Memlore will show the new words once, so be ready to save them safely.",
+        "running": "Creating a new master key and recovery phrase…",
+        "done_body": "New entries now use the new master key. Keep the new 24 words safe and re-pair your other devices."
+      },
+      "password": {
+        "body": "This password unlocks the journal stored on this device. It does not travel to other devices and, by itself, does not expose your synced data.",
+        "device_question": "Do you think someone may have reached a device?",
+        "device_yes": "Yes",
+        "device_no": "No, only password was leaked",
+        "change_body": "Choose a new password for this device. Other devices keep their own passwords.",
+        "change_success_body": "This device now unlocks with your new password.",
+        "rotate_too": "Also rotate the master key"
+      },
+      "device": {
+        "picker_title": "Which device is affected?",
+        "picker_empty": "No other devices are paired with this journal.",
+        "picker_empty_routine": "Rotate the master key instead",
+        "select": "Select {{device}}",
+        "words_question": "Were the 24 recovery words stored on or kept with this device?",
+        "words_yes": "Yes, the words may have leaked too",
+        "words_no": "No, the recovery words are safe",
+        "scope_title": "How completely do you need to cut off this device?",
+        "scope_revoke_title": "Stop it reading new entries",
+        "scope_revoke_hint": "Rotate the master key. The device keeps old local data and its Google access.",
+        "scope_cutoff_title": "Cut it off from Google completely",
+        "scope_cutoff_hint": "Revoke it, disconnect Memlore, remove Google access, then reconnect this device.",
+        "words_remove_title": "Nothing happened — just remove it from the list",
+        "words_remove_hint": "No keys change and no credentials are needed. Use this when the device is retired or wiped and still in your hands."
+      },
+      "remove": {
+        "confirm_body": "This only removes the device from the list. No keys change, and you won't be asked for a password. The device keeps its data and access.",
+        "confirm_reappear": "If it syncs again, it will reappear. Go back and pick a security option if you need to cut it off.",
+        "confirm_button": "Remove from the list",
+        "busy_other": "Another device removal is still in progress — wait for it to finish first.",
+        "queued_sync": "Sync is running — the removal has been queued and will run as soon as sync finishes.",
+        "running": "Removing the device from the list…",
+        "done_title": "Device removed",
+        "done_fact_list": "The device no longer appears in your device list.",
+        "done_fact_unchanged": "Nothing else changed — it keeps its local data, its keys, and its cloud access.",
+        "done_fact_reappear": "If it syncs with this journal again, it will show up in the list again."
+      },
+      "revoke": {
+        "confirm_body": "Confirm with your current recovery phrase and device password to revoke {{device}}. This rotates the master key for new entries.",
+        "running": "Revoking the device and rotating the master key…",
+        "done_title": "Device revoked",
+        "done_fact_new_entries": "That device can no longer read new entries.",
+        "done_fact_old_data": "It can still read every entry written before now — both what is stored on it and anything it downloads from the cloud, because that data keeps its old key.",
+        "done_fact_cloud_access": "Its Google access is still live, so it can delete or overwrite cloud files through Google Drive.",
+        "cutoff_google": "Cut it off from Google too"
+      },
+      "cutoff": {
+        "step1_body": "First, rotate the master key so the affected device cannot read new entries.",
+        "step2_body": "Disconnect Google Drive inside Memlore, then remove Memlore's access from your Google Account.",
+        "step2_not_sufficient": "Disconnecting inside Memlore may not cancel the login token stored on the other device. Both the in-app disconnect and removing access at Google are required.",
+        "step2_no_delete_reassurance": "Nothing is deleted from this device or Google Drive. Step 3 reconnects this device and will not ask for your 24 recovery words.",
+        "disconnect_button": "Disconnect in Memlore",
+        "disconnect_done": "Disconnected in Memlore",
+        "open_google_button": "Open Google account permissions",
+        "step2_confirm_gate": "I've removed access at Google",
+        "step3_title": "Reconnect Google Drive",
+        "step3_body": "Reconnect this device with its current password. Your journal data stays in Google Drive, so no full re-upload or recovery phrase is expected.",
+        "password_label": "Your current password",
+        "password_placeholder": "Current password",
+        "connect": "Connect",
+        "connecting": "Connecting…",
+        "skip": "Skip for now",
+        "step3_open_sync_settings": "Open Sync settings",
+        "done_body": "It cannot read new entries and its saved Google access has been removed. Data already stored locally on that device may still be readable."
+      },
+      "routine": {
+        "intro_body": "Nothing is wrong. This creates a fresh master key that encrypts only the entries you write from now on — entries you already have keep the old key and are not re-encrypted. Your 24 recovery words do not change, and other devices must re-pair with them.",
+        "confirm_body": "Enter your current recovery phrase and device password to continue."
+      },
+      "chain": {
+        "next_words_reset": "Next: create new recovery words"
+      }
+    },
+    "status_password_on_label": "Encryption: On",
+    "status_password_on_desc": "Entries are encrypted with your password.",
+    "invisible_lock": {
+      "title": "Invisible lock",
+      "description": "Hide selected entries and journals in separate password-protected vaults. Only one vault is open at a time; while locked, the app behaves as if that content does not exist.",
+      "open_title": "Open or create a vault",
+      "open_description": "Enter a password to open a matching vault, or create a new empty one if none matches. The app never tells you which happened.",
+      "open_placeholder": "Vault password",
+      "open_button": "Open",
+      "open_success": "Unlocked.",
+      "generic_empty": "Nothing to reveal.",
+      "no_recovery_warning": "Remember each vault password — they cannot be recovered or reset. If you forget a password, you permanently lose access to that vault's content. Invisible lock is not extra encryption.",
+      "change_title": "Change password",
+      "change_description": "Re-key the open vault. If the new password already opens another vault, this vault's items merge into that one.",
+      "change_button": "Change password",
+      "change_modal_title": "Change vault password",
+      "change_modal_description": "Enter the current password for the open vault, then choose a new one.",
+      "current_placeholder": "Current password",
+      "new_placeholder": "New password ({{count}}+ characters)",
+      "confirm_placeholder": "Confirm new password",
+      "password_save": "Save password",
+      "password_updated": "Password updated.",
+      "mismatch": "Passwords do not match.",
+      "too_short": "Use at least {{count}} characters.",
+      "remove_empty_title": "Remove empty vaults",
+      "remove_empty_description": "Delete vaults that have no entries and no journals. Always available; no counts are shown.",
+      "remove_empty_button": "Remove empty vaults",
+      "remove_empty_confirm_title": "Remove empty vaults?",
+      "remove_empty_confirm_body": "Vaults with no entries and no journals will be deleted. This cannot be undone.",
+      "remove_empty_confirm": "Remove",
+      "remove_empty_done": "Done.",
+      "auto_lock_title": "Auto-lock when idle",
+      "auto_lock_description": "Close the open vault after this much inactivity.",
+      "auto_lock_failed": "Could not update auto-lock.",
+      "cancel": "Cancel"
+    },
+    "how_security_works": {
+      "title": "How security works",
+      "close": "Close",
+      "help_aria": "Open how security works guide",
+      "groups": {
+        "vault": "Your journal & devices",
+        "extra_locks": "Second lock & invisible lock",
+        "scenarios": "Example situations",
+        "security_actions": "Revoking devices & rotating keys",
+        "emergencies": "If something goes wrong"
+      },
+      "sections": {
+        "your_password": {
+          "title": "What does my device password do?",
+          "body": "It unlocks Memlore on this device. Each phone or computer can have its own password — you never share it. Changing your password here only updates the lock on this device. Your entries stay as they are."
+        },
+        "recovery_phrase": {
+          "title": "What is the 24-word recovery phrase?",
+          "body": "During setup we show you 24 words once. Save them somewhere safe — they link all your devices to the same journal. You need this phrase to add a new device or to reconnect after a security change. Memlore never stores it; only you have it."
+        },
+        "on_device_and_cloud": {
+          "title": "How is my journal protected on this device and in the cloud?",
+          "body": "On this device, your journal is encrypted before it is saved to disk. When you turn on sync, each entry is encrypted again before it leaves your device. Google Drive or iCloud only receives scrambled copies — they cannot read your journal."
+        },
+        "adding_device": {
+          "title": "How do I add another device?",
+          "body": "Install Memlore on the new device and sign in to the same cloud account. Enter your 24-word recovery phrase and choose a password for that device. Your password on your other device stays private — you never need to share it."
+        },
+        "changing_password": {
+          "title": "What happens when I change my password?",
+          "body": "Only the lock on this device changes. Your entries stay encrypted as they are, and other devices keep their own passwords. This does not cut off other devices and does not rotate encryption keys."
+        },
+        "second_lock": {
+          "title": "How does second lock work?",
+          "body": "Second lock is an extra password inside the app, behind your device password. Mark entries or whole journals as second-locked and they stay hidden from the sidebar, calendar, search, and media gallery until you enter the second-lock password for this session. It hides content from view — it does not add separate encryption. You can show covered placeholders so you know something is locked, or hide locked items completely. Auto-lock hides them again after idle time. There is no recovery if you forget this password."
+        },
+        "invisible_lock": {
+          "title": "How does invisible lock work?",
+          "body": "Invisible lock uses separate password-protected vaults. Each password opens (or creates) its own vault; only one vault can be open at a time. While a vault is closed, its entries and journals do not appear anywhere — lists, search, calendar, tags, footer eye — the app behaves as if they do not exist. Opening a vault uses open-or-create: a matching password opens that vault; a new password creates an empty vault. The footer eye appears only while a vault is unlocked and only locks it. You can mark an entry invisible while locked (password + confirm) without revealing the rest of that vault. Changing a password to one that already opens another vault merges items into that vault. Invisible lock is not encryption and has no recovery. Use a different password from second lock."
+        },
+        "second_vs_invisible": {
+          "title": "Second lock or invisible lock — which should I use?",
+          "body": "Use second lock when you want to hide specific content but may still want a hint that something is there (covered placeholders). Use invisible lock when you need maximum discretion — separate vaults that leave no trace until the right password is entered. You can use both on different items. Both require a device password first."
+        },
+        "scenario_shared_device": {
+          "title": "Someone else sometimes uses my computer",
+          "body": "Set a device password so the app locks when closed. Second-lock entries or journals you do not want visible while the app is open. Turn on auto-lock so second-locked content hides again when you step away."
+        },
+        "scenario_private_entries": {
+          "title": "I want some entries hidden but others easy to find",
+          "body": "Leave everyday entries unlocked. Second-lock the sensitive ones. Optionally turn on \"Show existence of locked entries\" to see covered placeholders in the calendar and lists as a reminder."
+        },
+        "scenario_hidden_journal": {
+          "title": "I want a whole journal that nobody should know exists",
+          "body": "Open or create an invisible vault with a password, then mark the journal invisible while that vault is open. Until you open that vault again, the journal and its entries vanish from every view — including the footer, which shows the eye only while unlocked."
+        },
+        "removing_device": {
+          "title": "What happens when I revoke a lost device?",
+          "body": "Open Secure my journal and pick “A device is lost, stolen, or compromised”. Revoking a device rotates the master key so it cannot read new entries. It can still read journal data already stored on it, and it may still reach the cloud copy — through Google Drive, iCloud, or a synced folder — until you also cut off that session. The wizard walks you through the right cutoff for the cloud service you use: disconnect inside Memlore, then revoke Google access or sign the lost device out of iCloud (or change the Apple ID password). Your other devices must re-pair with your recovery phrase. If a device is simply retired and still in your hands, none of this is needed — pick “Nothing happened — just remove it from the list” in the same wizard to tidy the device list without touching your keys."
+        },
+        "rotating_master_key": {
+          "title": "What happens when I rotate the master key?",
+          "body": "Open Secure my journal and pick “Nothing happened — routine key rotation”. Memlore creates fresh keys for new entries. Your 24-word recovery phrase stays the same. Older entries are not re-uploaded or re-encrypted. Your other devices must enter the recovery phrase to reconnect before they can read new entries."
+        },
+        "secure_my_journal": {
+          "title": "How does Secure my journal help?",
+          "body": "Use Secure my journal in Security actions for any incident. It asks what happened — your 24 recovery words leaked, your device password leaked, a device is lost or compromised, or you just want a routine key rotation — then guides you to the right steps, including what each step cannot undo."
+        },
+        "if_you_lose": {
+          "title": "What if I forget my password and lose my recovery phrase?",
+          "body": "Your journal cannot be recovered. There is no backdoor and no support reset. Save your recovery phrase somewhere safe — a password manager or paper in a drawer."
+        },
+        "scenario_lost_extra_lock": {
+          "title": "What if I forget my second-lock or invisible-lock password?",
+          "body": "Those passwords cannot be reset or recovered. If you forget a second-lock password or any invisible-vault password, access to that locked content is permanently lost. The rest of your journal remains available through your device password and recovery phrase."
+        }
+      }
+    },
+    "password": {
+      "title": "Password",
+      "hint": "Change the password that unlocks this device.",
+      "change": "Change",
+      "current_placeholder": "Current password",
+      "new_placeholder": "New password (min {{count}} chars)",
+      "confirm_placeholder": "Confirm new password",
+      "mismatch": "New passwords do not match.",
+      "min_length": "New password must be at least {{count}} characters.",
+      "failed": "Failed to change password",
+      "updating": "Updating…",
+      "update": "Update Password",
+      "cancel": "Cancel",
+      "updated": "Password updated.",
+      "sync_note": "Each device has its own password. Changing it here only affects this device — your other devices keep their own passwords and are unaffected."
+    },
+    "biometric": {
+      "title": "Biometric unlock",
+      "hint": "Unlock with Touch ID instead of typing your password.",
+      "aria": "Biometric unlock",
+      "failed": "Failed to update biometric unlock",
+      "unavailable": "Biometric unlock is not available on this device."
+    },
+    "devices": {
+      "title": "Connected devices",
+      "subtitle": "Devices that can unlock and sync this journal. To add another, install Memlore on a new device and sign in to the same cloud.",
+      "this_device": "This device",
+      "created_at": "Added {{date}}",
+      "last_seen": "Last synced {{relative}}",
+      "rename": "Rename",
+      "rename_modal_title": "Rename device",
+      "rename_label": "Device name",
+      "rename_cancel": "Cancel",
+      "rename_save": "Save",
+      "renaming": "Renaming device…",
+      "rename_blocked": "Cannot rename while another security or rename operation is in progress.",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "revoke": "Revoke access",
+      "remove_or_revoke": "Remove or revoke this device",
+      "remove_outcome_ok": "Device removed from the list.",
+      "remove_outcome_error": "Could not remove the device. Wait for any running sync to finish, then try again.",
+      "remove_outcome_dismiss": "Dismiss",
+      "relative": {
+        "just_now": "just now",
+        "minutes_ago_one": "{{count}} minute ago",
+        "minutes_ago_other": "{{count}} minutes ago",
+        "hours_ago_one": "{{count}} hour ago",
+        "hours_ago_other": "{{count}} hours ago",
+        "days_ago_one": "{{count}} day ago",
+        "days_ago_other": "{{count}} days ago"
+      }
+    },
+    "revoke": {
+      "modal_title": "Revoke device access",
+      "warning": "This will permanently remove the selected device from your vault. New entries will be protected by a fresh key. The revoked device can no longer read new data. This cannot be undone.",
+      "warning_repair": "This rotates your keys — every other device must re-pair with the recovery phrase and will disappear from this list until it does.",
+      "passphrase_label": "Recovery phrase",
+      "passphrase_placeholder": "Type or paste your 24 words, separated by spaces…",
+      "passphrase_word_count": "{{count}} / 24 words",
+      "passphrase_unknown_words": "Unknown words: {{words}}",
+      "password_label": "Your current password",
+      "password_placeholder": "Current password",
+      "confirm_type_label": "Type REVOKE to confirm",
+      "confirm_type_placeholder": "REVOKE",
+      "confirm_word": "REVOKE",
+      "revoke": "Revoke access",
+      "cancel": "Cancel",
+      "error_fallback": "Failed to revoke device. Please try again.",
+      "cloud_guidance_google_title": "Google Drive — revoke the session",
+      "cloud_guidance_google_step1": "Open myaccount.google.com and sign in.",
+      "cloud_guidance_google_step2": "Go to Security → Third-party apps with account access.",
+      "cloud_guidance_google_step3": "Find Memlore and tap \"Remove access\".",
+      "cloud_guidance_google_step4": "The lost device's OAuth token will be invalidated immediately.",
+      "cloud_guidance_icloud_title": "iCloud — sign out or change your password",
+      "cloud_guidance_icloud_step1": "On the lost device, go to Settings → [your name] → Sign Out. Or change your Apple ID password at appleid.apple.com to invalidate all sessions.",
+      "cloud_guidance_icloud_step2": "iCloud Drive access is tied to the Apple ID session — signing out or revoking the session removes all iCloud access.",
+      "cloud_guidance_generic": "Sign out the lost device from the cloud provider it uses, or change the account credentials to invalidate its session."
+    },
+    "reset": {
+      "modal_title": "Reset recovery phrase?",
+      "forward_only": "This is forward-only: it protects everything written after the reset and nothing written before it. Older entries stay readable with the phrase they were saved under.",
+      "other_devices": "Your current phrase stops working. Every other device will need the new 24 words once to keep reading new entries.",
+      "password_label": "Your current password",
+      "password_placeholder": "Current password",
+      "cancel": "Cancel",
+      "confirm": "Reset recovery phrase",
+      "error_fallback": "Failed to reset the recovery phrase. Please try again.",
+      "error_no_phrase": "The reset finished but the new recovery words could not be shown. Do not add new entries yet — check your recovery on another device before continuing.",
+      "new_phrase_title": "Your new recovery phrase — save these 24 words now",
+      "new_phrase_body": "Your recovery phrase has been reset. These are your NEW 24 words — your old phrase no longer works. This is the only time they are shown, so save them now. Every other device will need these new words once to keep reading new entries."
+    },
+    "rotate": {
+      "modal_title": "Rotate master key",
+      "warning": "Rotating the master key generates a new encryption key for new entries. Your current 24-word recovery phrase is unchanged. Every other synced device will need to re-pair before it can read new entries.",
+      "passphrase_label": "Your current recovery phrase",
+      "passphrase_placeholder": "Type or paste your 24 words, separated by spaces…",
+      "passphrase_word_count": "{{count}} / 24 words",
+      "passphrase_unknown_words": "Unknown words: {{words}}",
+      "password_label": "Your current password",
+      "password_placeholder": "Current password",
+      "busy": "Rotating…",
+      "rotate": "Rotate master key",
+      "cancel": "Cancel",
+      "done": "Done",
+      "error_fallback": "Failed to rotate master key. Please try again.",
+      "success_title": "Keys rotated — new data uses a fresh key.",
+      "success_repair_hint": "Your recovery phrase is unchanged. Other devices will need to re-pair with the existing 24-word phrase to access new entries.",
+      "new_phrase_title": "Keys rotated — recovery phrase unchanged",
+      "new_phrase_body": "Your encryption keys have been rotated. Your 24-word recovery phrase is unchanged. Other devices must re-pair using your existing phrase before they can read new entries.",
+      "copy": "Copy all words",
+      "copied": "Copied",
+      "i_saved_checkbox": "I have written down and safely stored my recovery phrase."
+    },
+    "rotation_resume": {
+      "modal_title": "Resume interrupted key rotation",
+      "warning": "A key rotation was interrupted (e.g. by an app crash) and must be completed before the vault is fully secured. Enter your password and recovery phrase to finish.",
+      "warning_rotate": "A key rotation was interrupted (e.g. by an app crash) and must be completed before the vault is fully secured. Enter your password to finish.",
+      "password_label": "Your current password",
+      "password_placeholder": "Current password",
+      "passphrase_label": "Recovery phrase",
+      "passphrase_placeholder": "Type or paste your 24 words, separated by spaces…",
+      "passphrase_word_count": "{{count}} / 24 words",
+      "passphrase_unknown_words": "Unknown words: {{words}}",
+      "resume": "Complete rotation",
+      "resuming": "Completing…",
+      "error_fallback": "Failed to resume rotation. Please check your password and recovery phrase."
+    },
+    "second_lock": {
+      "description": "Hide selected entries and journals from views and search until you enter this password — an extra in-app gate behind the master password, not separate encryption.",
+      "no_recovery_warning": "Remember this password — it can't be recovered or reset. If you forget it, you permanently lose access to your locked content.",
+      "set_button": "Set second-lock password",
+      "new_placeholder": "Second-lock password ({{count}}+ characters)",
+      "confirm_placeholder": "Confirm second-lock password",
+      "enable_button": "Enable second lock",
+      "cancel": "Cancel",
+      "password_title": "Password",
+      "password_hint": "Change the password used to reveal locked items.",
+      "change_button": "Change password",
+      "current_placeholder": "Current second-lock password",
+      "change_new_placeholder": "New password ({{count}}+ characters)",
+      "change_confirm_placeholder": "Confirm new password",
+      "update_button": "Update password",
+      "password_updated": "Second-lock password updated.",
+      "show_existence_title": "Show existence of locked entries",
+      "show_existence_hint": "Show locked entries as neutral placeholders instead of hiding them.",
+      "auto_lock_title": "Auto-lock when idle",
+      "auto_lock_hint": "Re-lock second-locked content after this much inactivity.",
+      "auto_lock_never": "Never",
+      "auto_lock_minutes": "{{count}}m",
+      "disable_title": "Disable second lock",
+      "disable_hint": "Clears every second-locked entry and journal flag. All items become visible again.",
+      "disable_modal_description": "Enter the second-lock password to disable this layer and clear every second-locked entry and journal flag.",
+      "too_short": "Use at least {{count}} characters.",
+      "mismatch": "Passwords do not match.",
+      "current_required": "Enter the current second-lock password.",
+      "set_failed": "Could not set the second-lock password.",
+      "change_failed": "Could not change the second-lock password.",
+      "visibility_failed": "Could not update visibility.",
+      "auto_lock_failed": "Could not update auto-lock.",
+      "disable_failed": "Could not disable second lock.",
+      "intro_title": "Set up second lock",
+      "intro_body": "Second lock hides selected entries and journals from every view and from search until you enter a second password. It sits behind the master password; it is not separate encryption.",
+      "intro_open_settings": "Open Security settings"
+    }
+  },
+  "ai": {
+    "on_device_llm": {
+      "warmup": {
+        "generic_model": "Local model",
+        "title": "Warming up your local model",
+        "explainer": "Your local model is warming up. This takes a few seconds and only happens on first use of the session or after about 10 minutes of inactivity — subsequent replies are instant.",
+        "more_info": "More info",
+        "size_label": "Model size",
+        "min_ram": "min.",
+        "privacy_note": "Runs fully on-device — nothing leaves your machine.",
+        "continue_background": "Continue in background",
+        "failed_body": "The local model could not start.",
+        "failed_title": "Local model unavailable",
+        "error_code_label": "Error",
+        "close": "Close"
+      }
+    }
+  },
+  "basemap": {
+    "status": {
+      "downloading": "Downloading map… {{percent}}%",
+      "cancel": "Cancel",
+      "tooltip": "Offline world map downloading in the background."
+    }
+  },
+  "media_compression": {
+    "mode": {
+      "off": "Off",
+      "standard": "Standard",
+      "aggressive": "Aggressive",
+      "custom": "Custom"
+    },
+    "photo_title": "Photo compression",
+    "photo_hint": "Shrink inserted photos to save disk and sync space.",
+    "photo_help": "EXIF date and GPS are preserved so the metadata suggestion flows keep working. HEIC and SVG pass through untouched.",
+    "photo_desc": {
+      "off": "Store every photo at its original size and quality. Best when you have plenty of disk space and want to keep pixel-perfect originals.",
+      "standard": "Resize to 2400 px (longer edge) and re-encode at JPEG quality 85. Typical iPhone photos drop ~6× in size with negligible visible loss.",
+      "aggressive": "Resize to 1600 px and re-encode at JPEG quality 75. Smaller files, slightly more visible compression — good for sync-bandwidth-constrained setups.",
+      "custom": "Set your own maximum edge length and JPEG quality below."
+    },
+    "custom_photo_title": "Custom compression",
+    "custom_photo_hint": "Lower max edge and quality give smaller files but more visible loss.",
+    "max_edge_label": "Max edge (px)",
+    "max_edge_hint": "Photos with the longer side bigger than this are scaled down.",
+    "quality_label": "JPEG quality",
+    "quality_hint": "40 = small + noticeably soft. 100 = near-lossless, files barely shrink.",
+    "video_title": "Video compression",
+    "video_hint": "Shrink inserted videos to save disk and sync space.",
+    "video_help": "Transcodes to H.264 .mp4 using the OS video engine. macOS only — on other platforms videos are stored unchanged. A clip that would not get smaller keeps its original file.",
+    "video_desc": {
+      "off": "Store every video at its original size and quality. Best when you have plenty of disk space.",
+      "standard": "Downscale to 960 × 540 and re-encode as H.264 .mp4. Big savings for phone clips with little visible loss. macOS only.",
+      "aggressive": "Downscale to 640 × 480 H.264 .mp4. Smallest files, more visible compression — good for sync-bandwidth-constrained setups. macOS only.",
+      "custom": "Set your own maximum edge below; it maps to the nearest H.264 preset. macOS only."
+    },
+    "custom_video_title": "Custom video size",
+    "custom_video_hint": "Lower max edge gives smaller files but lower resolution.",
+    "video_max_edge_hint": "Mapped to the nearest H.264 preset (480p, 540p, 720p, 1080p)."
+  },
+  "tab_sections": {
+    "location": "Location Settings sections",
+    "security": "Security Settings sections",
+    "editor": "Editor Settings sections",
+    "sync": "Sync Settings sections",
+    "appearance": "Appearance Settings sections",
+    "data": "Data Settings sections",
+    "templates": "Templates sections",
+    "categories": "Settings categories"
+  }
+}

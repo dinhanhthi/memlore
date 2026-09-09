@@ -1,0 +1,19 @@
+{
+  "network": {
+    "offline": "You are offline. Please check your connection.",
+    "timeout": "The request timed out. Please try again."
+  },
+  "crypto": {
+    "password_required": "A password is required to perform this action.",
+    "invalid_key": "Invalid encryption key.",
+    "decrypt_failed": "Failed to decrypt data."
+  },
+  "sync": {
+    "failed": "Sync failed. Please try again.",
+    "conflict": "Sync conflict detected."
+  },
+  "generic": {
+    "unknown": "An unexpected error occurred.",
+    "try_again": "Please try again."
+  }
+}

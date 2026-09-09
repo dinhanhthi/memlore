@@ -1,0 +1,22 @@
+/* Tell Tailwind v4 to scan src/ for utility classes.
+   Without this, the Vite root is web/ and src/components/ never get scanned,
+   so no utility classes (flex, h-screen, bg-elevated, etc.) are generated. */
+@source '../src';
+
+@import '../src/styles/globals.css';
+
+/* Docked ScenarioPicker reserves a right-edge gutter: the sidebar sits in the
+   last `--xj-web-dock-width` pixels and the app shrinks to fill the rest,
+   giving a 2-panel layout. Floating mode leaves the var unset (→ 0px), so
+   `#root` spans the full viewport again. Set by ScenarioPicker. */
+#root {
+  width: calc(100vw - var(--xj-web-dock-width, 0px));
+}
+
+/* Dev badge: override global ::selection (color: var(--color-fg) is black on
+   light theme). Must beat the unscoped rule in globals.css. */
+.scenario-component-file-badge::selection,
+.scenario-component-file-badge *::selection {
+  background: #7c3aed;
+  color: #ffffff;
+}

@@ -1,0 +1,34 @@
+{
+  "modal": {
+    "title": "Xuất nhật ký",
+    "description": "Xuất các mục nhật ký ra tệp trên thiết bị của bạn.",
+    "format_label": "Định dạng",
+    "scope_label": "Phạm vi xuất",
+    "destination_label": "Thư mục đích",
+    "browse": "Duyệt",
+    "choose_folder": "Chọn thư mục…",
+    "no_destination": "Chưa chọn thư mục",
+    "export_button": "Xuất",
+    "cancel_button": "Hủy",
+    "exporting": "Đang xuất…",
+    "catchup_incomplete": "Chưa thể xuất cho đến khi đồng bộ hoàn tất (đã đồng bộ {{pulled}} / {{total}} mục).",
+    "success": "Xuất hoàn tất",
+    "error": "Xuất thất bại"
+  },
+  "format": {
+    "memlore_json": "Memlore JSON (sao lưu đầy đủ)",
+    "markdown": "Markdown (mỗi mục một tệp)",
+    "plain_text": "Văn bản thuần"
+  },
+  "scope": {
+    "all": "Tất cả nhật ký",
+    "journal": "Nhật ký này",
+    "date_range": "Khoảng thời gian"
+  },
+  "progress": {
+    "collecting": "Đang thu thập dữ liệu…",
+    "writing": "Đang ghi tệp…",
+    "done": "Hoàn tất"
+  },
+  "reveal": "Hiển thị trong Finder"
+}

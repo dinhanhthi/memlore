@@ -1,0 +1,126 @@
+{
+  "title": "Tổng quan",
+  "customize": "Tùy chỉnh",
+  "customize_title": "Tùy chỉnh Tổng quan",
+  "customize_hint": "Bật hoặc tắt thẻ rồi kéo để sắp xếp lại. Thay đổi được lưu ngay.",
+  "customize_reorder": "Sắp xếp lại {{card}}",
+  "customize_ai_hint": "Cần bật một tính năng AI trong Cài đặt → AI",
+  "empty_all_hidden": "Tất cả thẻ đang ẩn. Hãy tùy chỉnh Tổng quan để hiện lại một số thẻ.",
+  "cards": {
+    "streak": "Chuỗi ngày",
+    "quick_stats": "Thống kê nhanh",
+    "prompt": "Gợi ý viết",
+    "on_this_day": "Ngày này năm xưa",
+    "mood_trend": "Xu hướng cảm xúc",
+    "recent_entries": "Mục gần đây",
+    "ai_insights": "Phân tích AI",
+    "today": "Hôm nay",
+    "heatmap": "Bản đồ nhiệt",
+    "top_tags": "Thẻ phổ biến",
+    "places": "Địa điểm",
+    "photos": "Ảnh",
+    "weekly_review": "Tổng kết tuần",
+    "chat": "Trò chuyện"
+  },
+  "actions": {
+    "calendar": "Lịch",
+    "stats": "Thống kê",
+    "entries": "Tất cả mục",
+    "onthisday": "Kỷ niệm",
+    "tags": "Thẻ",
+    "map": "Bản đồ",
+    "media": "Thư viện",
+    "reviews": "Tổng kết",
+    "insights": "Phân tích",
+    "chat": "Mở trò chuyện",
+    "write": "Viết"
+  },
+  "quick_stats": {
+    "entries_7d": "Mục · 7 ngày qua",
+    "entries_30d": "Mục · 30 ngày qua",
+    "words_7d": "Từ · 7 ngày qua"
+  },
+  "prompt": {
+    "another": "Gợi ý khác",
+    "write_now": "Viết ngay"
+  },
+  "on_this_day": {
+    "empty": "Không có mục nào từ ngày này trong các năm trước."
+  },
+  "recent": {
+    "empty": "Chưa có mục nào.",
+    "open": "Mở"
+  },
+  "insights": {
+    "generate": "Tạo phân tích",
+    "regenerate": "Tạo lại",
+    "enable_hint": "Bật Insight trên Tổng quan trong Cài đặt → AI để tạo chủ đề tại đây.",
+    "enable_link": "Mở Cài đặt AI",
+    "range_hint": "30 ngày qua"
+  },
+  "today": {
+    "entries_one": "{{count}} mục hôm nay",
+    "entries_other": "{{count}} mục hôm nay",
+    "none": "Hôm nay chưa viết gì"
+  },
+  "heatmap": {
+    "hint": "16 tuần gần nhất",
+    "summary": "{{days}} ngày có mục trong 16 tuần gần nhất"
+  },
+  "top_tags": {
+    "empty": "Chưa có thẻ nào."
+  },
+  "places": {
+    "summary_one": "{{count}} địa điểm · {{entries}} mục",
+    "summary_other": "{{count}} địa điểm · {{entries}} mục",
+    "empty": "Chưa có địa điểm nào."
+  },
+  "photos": {
+    "empty": "Chưa có ảnh nào."
+  },
+  "weekly_review": {
+    "generate": "Tạo",
+    "generating": "Đang tạo…",
+    "empty": "Chưa có tổng kết cho tuần trước"
+  },
+  "chat": {
+    "start": "Bắt đầu",
+    "empty": "Chưa có hội thoại nào.",
+    "untitled": "Chat mới"
+  },
+  "ai_hint": {
+    "body": "Bật {{feature}} trong Cài đặt → AI để hiện thẻ này"
+  },
+  "prompts": [
+    "Hôm nay điều gì đè nặng lòng bạn, và điều gì làm nó nhẹ đi?",
+    "Tuần này lúc nào bạn cảm thấy đúng là mình nhất?",
+    "Câu chuyện nào vẫn còn vương vấn trong đầu?",
+    "Bạn đang né tránh điều gì? Nếu đối diện nhẹ nhàng thì sao?",
+    "Hôm nay có vẻ đẹp nào bạn suýt bỏ qua?",
+    "Hôm nay bạn cần gì mà chưa dám nói ra?",
+    "Suy nghĩ nào cứ lặp đi lặp lại — liệu nó còn đúng không?",
+    "Ai khiến bạn cảm thấy được nhìn thấy gần đây? Họ đã làm gì?",
+    "Nếu nói với bản thân hôm qua, bạn sẽ nói gì dịu dàng hơn?",
+    "Điều nhỏ nào đã ổn mà bạn chưa kịp ghi nhận?",
+    "Bạn đã cho đi quá nhiều ở đâu? “Đủ” với bạn là thế nào?",
+    "Bạn tự hào về điều gì mà chẳng ai để ý?",
+    "Nếu hôm nay là một kiểu trời, trời đó thế nào và vì sao?",
+    "Bạn đang mang giúp ai một gánh không phải của mình?",
+    "Lần cuối bạn nghỉ ngơi mà không cần “xứng đáng” là khi nào?",
+    "Câu hỏi nào đang đi cùng bạn lúc này?",
+    "Thói quen nào đang âm thầm định hình ngày của bạn?",
+    "Tuần này, thế nào là “đủ tốt”?",
+    "Nỗi sợ nào đang lớn hơn sự thật?",
+    "Cơ thể bạn muốn nói gì hôm nay?",
+    "Bạn đang nhớ ai? Nếu họ ở đây, bạn sẽ nói gì?",
+    "Điều gì bạn đã sẵn sàng khép lại?",
+    "Lúc nào hôm nay bạn chọn sự dễ chịu thay vì sự thật?",
+    "Bạn tò mò về điều gì mà cứ mãi để sau?",
+    "Bạn đã chăm sóc ai — và đã chăm sóc chính mình chưa?",
+    "Ký ức nào cứ đòi được viết ra giấy?",
+    "Nếu làm lại một khoảnh khắc hôm nay, bạn chọn khoảnh khắc nào?",
+    "Bạn đang trở thành người như thế nào, chậm rãi?",
+    "Thực ra bạn muốn dành thêm thời gian cho điều gì?",
+    "Bạn biết ơn điều gì mà suýt coi là chuyện đương nhiên?"
+  ]
+}

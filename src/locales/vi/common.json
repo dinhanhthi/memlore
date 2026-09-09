@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "Memlore"
+  },
+  "sync_catchup": {
+    "incomplete": "Dữ liệu tổng quan vẫn đang được cập nhật trong khi các mục cũ đồng bộ.",
+    "progress": "Đã đồng bộ {{pulled}} / {{total}} mục"
+  },
+  "map": {
+    "aria_label": "Bản đồ địa điểm",
+    "empty": "Chưa có mục nào gắn vị trí"
+  },
+  "mini_date_picker": {
+    "apply": "Áp dụng",
+    "cancel": "Hủy",
+    "date_input": "Ngày",
+    "extract_from_media": "Lấy từ media",
+    "hour": "Giờ",
+    "minute": "Phút",
+    "next_month": "Tháng sau",
+    "prev_month": "Tháng trước",
+    "time": "Giờ",
+    "today": "Hôm nay",
+    "toggle_am_pm": "Chuyển AM/PM"
+  },
+  "combobox": {
+    "toggle_aria": "Bật/tắt gợi ý"
+  }
+}

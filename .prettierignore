@@ -1,0 +1,9 @@
+dist/
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+# Swift Package Manager build artefacts for the PhotoPicker bridge
+src-tauri/swift/**/.build/
+src-tauri/swift/**/.swiftpm/
+pnpm-lock.yaml
+*.gen.ts

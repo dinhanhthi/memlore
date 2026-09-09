@@ -1,0 +1,126 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+/**
+ * Grep-guards for paint that silently skips both design systems.
+ * A class with no matching `--color-*` token (or a literal black/white
+ * chrome fork) only paints Signature-by-accident — or paints nothing.
+ */
+
+const SRC = resolve(__dirname, '..')
+
+function walk(dir: string, acc: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name.startsWith('.')) continue
+    const p = join(dir, name)
+    const st = statSync(p)
+    if (st.isDirectory()) {
+      walk(p, acc)
+      continue
+    }
+    if (/\.(tsx|ts|css)$/.test(name) && !name.includes('.test.')) acc.push(p)
+  }
+  return acc
+}
+
+const FILES = walk(join(SRC, 'components')).concat(walk(join(SRC, 'styles')))
+
+function hits(re: RegExp): string[] {
+  const out: string[] = []
+  for (const file of FILES) {
+    const text = readFileSync(file, 'utf8')
+    if (re.test(text)) out.push(relative(SRC, file))
+  }
+  return out
+}
+
+describe('token discipline — banned dead classes', () => {
+  it('does not use bg-surface (no --color-surface token)', () => {
+    expect(hits(/(?<![\w-])bg-surface(?!-[a-z])/)).toEqual([])
+  })
+
+  it('does not use the legacy text-text-* ladder', () => {
+    expect(hits(/\btext-text-(?:muted|primary|secondary)\b/)).toEqual([])
+  })
+
+  it('does not use bare text-muted (not text-fg-muted)', () => {
+    expect(hits(/(?<![\w-])text-muted(?![\w-])/)).toEqual([])
+  })
+
+  it('does not use bg-surface-lo (no such token)', () => {
+    expect(hits(/\bbg-surface-lo\b/)).toEqual([])
+  })
+})
+
+describe('token discipline — light-mode chrome', () => {
+  it('does not paint skeletons with white-alpha (invisible on paper)', () => {
+    // Photo overlays on decoded media keep white-alpha — those sit on pixels,
+    // not on paper. Chrome skeletons must not.
+    expect(
+      hits(/\bbg-white\/(?:10|15|20)\b/).filter((f) => !f.startsWith('components/media/')),
+    ).toEqual([])
+  })
+
+  it('does not fork Signature nav with literal text-black', () => {
+    expect(hits(/\btext-black\//)).toEqual([])
+  })
+
+  it('does not use Tailwind stone on Signature chrome', () => {
+    expect(hits(/\bstone-200\b/)).toEqual([])
+  })
+
+  it('does not paint chart chrome with Tailwind Slate hex', () => {
+    expect(hits(/#1e293b|#f1f5f9|#64748b|#94a3b8|#334155|#e2e8f0/i)).toEqual([])
+  })
+})
+
+describe('token discipline — CTA ink', () => {
+  it('primary Button uses text-fg-inverse, not literal text-white', () => {
+    const src = readFileSync(resolve(SRC, 'components/common/Button.tsx'), 'utf8')
+    expect(src).toMatch(/\btext-fg-inverse\b/)
+    expect(src).not.toMatch(/\btext-white\b/)
+  })
+})
+
+describe('token discipline — Hallmark P2 patterns', () => {
+  it('does not use the 3px accent side-stripe on selected rows', () => {
+    expect(hits(/inset_3px_0_0_0_var\(--color-accent\)/)).toEqual([])
+  })
+
+  it('does not keep the dead .xj-rainbow wordmark gradient', () => {
+    expect(hits(/xj-rainbow/)).toEqual([])
+  })
+
+  it('does not fall back tag colour to leftover violet #a78bfa', () => {
+    expect(hits(/:\s*'#a78bfa'/)).toEqual([])
+  })
+
+  it('does not use hover:scale-110 on chrome', () => {
+    expect(hits(/hover:scale-110/)).toEqual([])
+  })
+
+  it('Tooltip hover delay is 300ms and stacking uses --z-tooltip', () => {
+    const src = readFileSync(resolve(SRC, 'components/common/Tooltip.tsx'), 'utf8')
+    expect(src).toMatch(/delay\s*=\s*300/)
+    expect(src).toMatch(/z-\(--z-tooltip\)/)
+    expect(src).not.toMatch(/z-9999/)
+  })
+})
+
+describe('token discipline — danger copy', () => {
+  // `text-danger` is the chrome/fill token. Copy uses `text-danger-text`
+  // (AA on panels) or `text-danger-fg` (ink on the solid danger box).
+  it('does not put text-danger (the fill token) on <p> or <label> copy', () => {
+    expect(hits(/<(?:p|label)\b[^>]{0,400}\btext-danger(?![\w-])/)).toEqual([])
+  })
+
+  it('does not put text-danger (the fill token) on role=alert copy', () => {
+    expect(hits(/role="alert"[^>]{0,200}\btext-danger(?![\w-])/)).toEqual([])
+    expect(hits(/\btext-danger(?![\w-])[^>]{0,200}role="alert"/)).toEqual([])
+  })
+
+  it('does not fade danger-text below AA with /N alpha', () => {
+    expect(hits(/\btext-danger-text\/\d+\b/)).toEqual([])
+  })
+})

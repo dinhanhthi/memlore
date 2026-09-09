@@ -1,0 +1,34 @@
+{
+  "modal": {
+    "title": "Export Journal",
+    "description": "Export your entries to a file on your device.",
+    "format_label": "Format",
+    "scope_label": "What to export",
+    "destination_label": "Destination",
+    "browse": "Browse",
+    "choose_folder": "Choose folder…",
+    "no_destination": "No folder chosen",
+    "export_button": "Export",
+    "cancel_button": "Cancel",
+    "exporting": "Exporting…",
+    "catchup_incomplete": "Export is unavailable until sync finishes ({{pulled}} / {{total}} entries synced).",
+    "success": "Export complete",
+    "error": "Export failed"
+  },
+  "format": {
+    "memlore_json": "Memlore JSON (full backup)",
+    "markdown": "Markdown (one file per entry)",
+    "plain_text": "Plain text"
+  },
+  "scope": {
+    "all": "All journals",
+    "journal": "This journal",
+    "date_range": "Date range"
+  },
+  "progress": {
+    "collecting": "Collecting data…",
+    "writing": "Writing files…",
+    "done": "Done"
+  },
+  "reveal": "Reveal in Finder"
+}

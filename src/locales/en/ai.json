@@ -1,0 +1,1280 @@
+{
+  "privacy_banner_local": "All AI requests will go to {{host}} on your computer. No data leaves your machine.",
+  "privacy_banner_remote": "Entries you process with AI will be sent to {{host}}. The provider may log requests per their ToS.",
+  "privacy_banner_subscription_short": "Your local CLI handles auth. Memlore never sees your API key; AI calls count against your subscription quota.",
+  "privacy_banner_subscription": "Your prompts are handed to your local {{cli}} CLI, which forwards them to {{upstream}} using your subscription. Memlore never sees your API key.",
+  "embed_slot_pair_hint": "💡 {{label}} is chat-only. To unlock semantic search, emotion suggestions, and using your entries in Daily Chat, configure an embedding provider (Voyage / Ollama / OpenAI) on the Models tab.",
+  "cli_slow_warning": "CLI providers spawn a local process. Processing may take longer than usual.",
+  "cli_health": {
+    "checking_status": "Checking CLI status…",
+    "checking_button": "Checking…",
+    "error_prefix": "Health check failed:",
+    "try_again": "Try again",
+    "not_found": "CLI not found.",
+    "not_signed_in": "CLI is installed but not signed in.",
+    "version_label": "Version: {{version}}",
+    "recheck": "Recheck",
+    "recheck_after": "Recheck after",
+    "ready": "CLI ready — signed in via subscription."
+  },
+  "provider_picker": {
+    "needs_api_key": "Needs API key",
+    "hosted_not_allowed": "Hosted providers not allowed for memory"
+  },
+  "section": {
+    "provider": "Provider",
+    "privacy": "Privacy",
+    "features": "Features",
+    "features_rag": "Features that need indexing (RAG)",
+    "features_general": "General AI features"
+  },
+  "group": {
+    "local": "Privacy-first / fully local",
+    "subscription": "Subscription CLI",
+    "hosted": "Hosted",
+    "cli": "Subscription CLI",
+    "integrated": "On-device"
+  },
+  "providers_tab": {
+    "test_local_button": "Check reachability",
+    "test_local_hint": "Checks the server is reachable and lists its models — no chat or embedding call is made.",
+    "test_model_label": "Test model",
+    "test_model_placeholder": "Model id to probe",
+    "test_detail_latency": "{{ms}} ms",
+    "test_detail_embed": "{{dim}}-dim · {{ms}} ms",
+    "test_models_found_one": "{{count}} model found · {{ms}} ms",
+    "test_models_found_other": "{{count}} models found · {{ms}} ms",
+    "integrated_chat_title": "Integrated chat models",
+    "integrated_embed_title": "Integrated embedding models",
+    "connected_title": "Connected providers",
+    "available_title": "Available providers",
+    "connected_empty": "No providers connected yet.",
+    "available_empty": "All providers are connected.",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "disconnect_confirm_title": "Disconnect this provider?",
+    "disconnect_confirm_body": "It will be removed from your connected providers. Nothing is deleted from your device — you can connect it again at any time.",
+    "config": "Config",
+    "downloaded_models": "Downloaded:",
+    "desc": {
+      "ollama": "Runs models locally via the Ollama app — nothing leaves your machine.",
+      "lmstudio": "Local server from the LM Studio app.",
+      "llama-server": "A llama.cpp server you run yourself.",
+      "other-local": "Any OpenAI-compatible server on your machine or LAN.",
+      "claude-cli": "Uses the claude CLI and your Claude subscription. Chat only.",
+      "codex-cli": "Uses the codex CLI and your ChatGPT subscription. Chat only.",
+      "openai": "Hosted API — chat, images, and embeddings. Requires an API key.",
+      "anthropic": "Hosted API — chat only. Requires an API key.",
+      "gemini": "Hosted API — chat and embeddings. Requires an API key.",
+      "xai": "Hosted API — chat and images. Requires an API key.",
+      "openrouter": "One API key for hundreds of hosted models.",
+      "together": "Hosted API for open-weight models. Requires an API key.",
+      "groq": "Fast hosted inference — chat only. Requires an API key.",
+      "voyage": "Hosted embeddings — pairs well with Anthropic.",
+      "custom": "Your own OpenAI-compatible endpoint.",
+      "on-device-llm": "Offline chat models managed by Memlore — no server, no API key.",
+      "on-device": "Offline embedding model managed by Memlore — no server, no API key."
+    }
+  },
+  "provider_hint": {
+    "ollama": "Recommended — runs on your own computer, so no data leaves your machine. Install Ollama, then pull a chat and an embedding model; the pickers also detect models you already have.",
+    "lmstudio": "Runs on your own computer — no data leaves your machine. Install LM Studio, load a chat + embedding model, then click \"Start Server\" (default port 1234).",
+    "llama-server": "Runs on your own computer — no data leaves your machine. Build llama.cpp and run `llama-server -m <model.gguf> -c 4096`; add `--embedding` for the embeddings endpoint.",
+    "other-local": "Runs on your own computer — no data leaves your machine. Any OpenAI-compatible server on localhost or your private LAN; override the endpoint to match your setup.",
+    "on-device": "Runs fully offline on this device — no server, no API key, no token cost. Download a model below to get started.",
+    "on-device-llm": "Runs fully offline on this device — no server, no API key, no token cost. Download a chat model below; a bundled llama-server sidecar starts automatically on first use and stops after about 10 minutes idle.",
+    "claude-cli": "Reuses the `claude` CLI you already signed in to — Memlore never sees your API key, and requests count against your Claude subscription. Run `claude /login` once. Chat only: pair it with an embedding provider.",
+    "codex-cli": "Reuses the `codex` CLI you already signed in to — Memlore never sees your API key, and requests count against your ChatGPT subscription. Run `codex login` once. Replies arrive in one shot, without streaming.",
+    "openai": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at platform.openai.com → API keys.",
+    "anthropic": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at console.anthropic.com → Settings → API keys. No embeddings or image generation here.",
+    "gemini": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at aistudio.google.com → Get API key.",
+    "xai": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at console.x.ai → API keys. No embeddings or image generation on this endpoint.",
+    "openrouter": "Better quality, no setup — but your entry text leaves your computer. One key, hundreds of models: generate it at openrouter.ai → Keys.",
+    "together": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at api.together.ai → Settings → API keys.",
+    "groq": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at console.groq.com → API keys. Groq has no embeddings — pick another provider for those features.",
+    "voyage": "Better quality, no setup — but your entry text leaves your computer. Generate an API key at dashboard.voyageai.com → API Keys. Pairs well with Anthropic (Claude) for generation.",
+    "custom": "Bring your own OpenAI-compatible endpoint — handy for self-hosted gateways (Cloudflare AI Gateway, Portkey, …). Whether your text leaves your computer depends on where it points."
+  },
+  "field": {
+    "preset": "Provider",
+    "endpoint": "Endpoint",
+    "api_key": "API key",
+    "api_key_optional": "API key (optional)",
+    "api_key_set": "Saved (a key is stored)",
+    "api_key_replace": "Replace key",
+    "api_key_paste": "Paste your key",
+    "chat_model": "Chat model",
+    "embedding_model": "Embedding model",
+    "image_model": "Image model",
+    "on_device_no_models": "No models downloaded yet.",
+    "on_device_no_models_link": "Download one on the Providers tab"
+  },
+  "models": {
+    "group_suggested": "Suggested",
+    "badge_installed": "Installed",
+    "badge_recommended": "Recommended",
+    "custom": "Custom…",
+    "ollama_unreachable": "Couldn't reach the local Ollama server at 127.0.0.1:11434. Start Ollama to see your installed models here."
+  },
+  "action": {
+    "test": "Test connection",
+    "testing": "Testing…",
+    "save": "Save",
+    "saving": "Saving…",
+    "forget_confirm_title": "Forget your AI provider?",
+    "forget_confirm_body": "This wipes your saved provider, endpoint, and API key from this device. AI features will be disabled until you configure a provider again.",
+    "forget_cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "accept_privacy": "I understand and agree",
+    "save_no_changes": "No unsaved changes",
+    "accepted": "Accepted {{when}}",
+    "read_more": "Read more",
+    "save_invalidated_privacy": "Endpoint changed — please re-accept the privacy notice below."
+  },
+  "test_result": {
+    "fail": "Test failed: {{message}}",
+    "ok_chat": "The connection is well configured",
+    "ok_embed": "The connection is well configured",
+    "ok_local": "The server is reachable"
+  },
+  "feature": {
+    "semantic_search": {
+      "title": "Semantic Search",
+      "description": "Find entries by meaning, not just keywords."
+    },
+    "emotion_suggestions": {
+      "title": "Emotion Suggestions",
+      "description": "Suggest an emotion as you write."
+    },
+    "title_suggestions": {
+      "title": "Title Generation",
+      "description": "One-line titles for entries."
+    },
+    "entry_highlights": {
+      "title": "Entry Highlights",
+      "description": "Themes and moments after you save."
+    },
+    "go_deeper": {
+      "title": "Go Deeper Prompts",
+      "description": "Reflection prompts from what you wrote."
+    },
+    "continue_writing": {
+      "title": "Continue & Rewrite",
+      "description": "Continue your entry from the footer, or rewrite selected text — both in your own voice."
+    },
+    "daily_chat": {
+      "title": "Daily Chat",
+      "description": "Chat about your day; save as an entry."
+    },
+    "user_memory": {
+      "title": "User Memory",
+      "description": "Remembers facts about you for Daily Chat. Stays on-device unless you opt into a hosted model."
+    },
+    "image_generation": {
+      "title": "AI Image Generation",
+      "description": "Cover images and inline illustrations.",
+      "requires_model": "Configure an Image model above to enable this feature."
+    },
+    "multi_entry_summary": {
+      "title": "AI Summaries",
+      "description": "Summarise one or many entries."
+    },
+    "periodic_review": {
+      "title": "Periodic reviews",
+      "description": "Weekly/monthly recaps in Statistics → Reviews."
+    },
+    "theme_insights": {
+      "title": "Theme insights",
+      "description": "Recurring themes in Statistics → Insights."
+    },
+    "dashboard_insights": {
+      "title": "Dashboard insights",
+      "description": "Reuses Theme insights for the last 30 days. Generated only when you press Generate."
+    },
+    "tag_suggestions": {
+      "title": "AI tag suggestions",
+      "description": "Suggest tags from entry text."
+    },
+    "disabled": {
+      "configure_generation": "Configure the generation provider in the Models tab first.",
+      "configure_image": "Configure the image provider in the Models tab first.",
+      "configure_embedding": "Configure the embedding provider in the Models tab first.",
+      "accept_privacy": "Accept the AI privacy notice in Settings → AI first.",
+      "needs_persona": "Needs Persona — turn it on in Settings → AI → Persona."
+    },
+    "rag_group": {
+      "warning_needs_provider": "No embedding provider is connected on this device — connect one in the Providers tab.",
+      "warning_many_pending": "Many entries still need indexing — results may be incomplete.",
+      "warning_needs_consent": "Hosted indexing needs consent — review it in the Models tab."
+    },
+    "accordion": {
+      "enable_to_configure": "Turn on to configure."
+    },
+    "chat_rag": {
+      "title": "Use my entries in the discussion",
+      "description": "Let Daily Chat use past entries. Sends entry text to your AI provider each turn."
+    },
+    "chat_memory": {
+      "title": "Memory in Chat",
+      "description": "Retrieve your saved memories and add them to Daily Chat replies."
+    }
+  },
+  "usage_warning": {
+    "daily_chat": "Long chats resend full history each turn — cost grows with length.",
+    "image_generation": "Each image is usually the priciest call type.",
+    "multi_entry_summary": "Sends every selected entry in one call — cost scales with count.",
+    "periodic_review": "Sends every entry in the period in one call.",
+    "theme_insights": "Sends every entry in the range in one call.",
+    "dashboard_insights": "Sends every entry from the last 30 days in one call.",
+    "rebuild_index": "Re-embeds every entry — costly on a hosted provider.",
+    "chat_rag": "Each turn retrieves and sends matching entries — cost repeats per message.",
+    "user_memory": "Extraction + small embeds; on-device by default."
+  },
+  "empty": {
+    "title": "No AI provider configured",
+    "body": "Pick a provider above to enable AI features. We recommend a 🔒 local server (Ollama / LM Studio / llama-server) so your entries stay on your computer."
+  },
+  "privacy_locked": {
+    "title": "Accept the privacy notice to enable features",
+    "body": "Once you've configured a provider and clicked \"I understand and agree\" below, the per-feature toggles will unlock."
+  },
+  "no_providers_banner": {
+    "title": "No AI provider configured",
+    "body": "AI features are off because no provider is set up yet. Add a provider to turn chat, semantic search, and other AI features back on.",
+    "action": "Go to Providers"
+  },
+  "setup_attention": {
+    "slot_chat": "Chat",
+    "slot_image": "Image",
+    "slot_embed": "Embedding",
+    "slot_list_sep": ", ",
+    "privacy": {
+      "title": "Privacy notice required",
+      "body": "A non-local AI provider is set up, but AI features stay locked until you accept the privacy notice.",
+      "action": "Review notice"
+    },
+    "slots_not_connected": {
+      "title": "Provider not connected on this device",
+      "body": "These model slots still need a credential here: {{slots}}. Connect the matching provider on the Providers tab (API keys do not sync across devices).",
+      "action": "Go to Providers"
+    },
+    "embed_not_configured": {
+      "title": "No embedding model selected",
+      "body": "Chat can run, but semantic search, memory, and related features need an embedding provider and model on the Models tab.",
+      "action": "Go to Models"
+    }
+  },
+  "adopt_setup": {
+    "title": "Set up AI on this device?",
+    "body": "Another device already configured AI ({{slots}}). API keys stay on each machine, so this device still needs credentials.",
+    "yes": "Set it up",
+    "cancel": "Cancel",
+    "wizard_title": "Finish AI setup"
+  },
+  "privacy_top_banner": {
+    "already_accepted_prefix": "You already accepted ",
+    "already_accepted_link": "the AI privacy notice",
+    "review_notice": "Review the AI privacy notice",
+    "aria_view_notice": "Open the AI privacy notice",
+    "aria_review": "Review the AI privacy notice before using a non-local provider."
+  },
+  "privacy_modal": {
+    "title": "AI privacy notice",
+    "sections_title": "How providers handle your data",
+    "intro": "Memlore can use three kinds of AI providers. Local models keep your entries on your computer. Subscription CLIs and hosted APIs may send entry text to external services. Please review how each kind handles your data before continuing with a non-local provider.",
+    "local_title": "Local model — stays on your computer",
+    "local_description": "Your entries are sent to a server running on your own machine (Ollama, LM Studio, llama.cpp, …). Nothing leaves the computer; no network upload.",
+    "subscription_title": "Subscription CLI — uses your Claude / ChatGPT plan",
+    "subscription_description": "Memlore hands your prompt to a local CLI (claude / codex) you have signed in to. The CLI then forwards it to Anthropic or OpenAI under your subscription. Memlore never sees your API key, and AI calls count against your plan quota.",
+    "remote_title": "External / hosted model — entries leave your computer",
+    "remote_description": "Your entries are uploaded to a hosted provider (OpenAI, Anthropic, Voyage, …) over HTTPS. The provider receives the entry text plus any query you make. Their privacy policy and the terms of your account apply to that data.",
+    "scope_footnote": "You only need to accept this notice once. After that, every non-local provider and every multi-entry AI feature is covered — including switching between hosted APIs and subscription CLIs.",
+    "bullet_remote_text": "Decrypted entry text is sent to the provider so it can answer your request.",
+    "bullet_remote_query": "Search query strings and image prompts also leave your device.",
+    "bullet_remote_log": "The provider may log requests indefinitely per their terms of service.",
+    "bullet_remote_cache": "Generated embeddings are cached locally so subsequent searches don't repay the cost.",
+    "bullet_local_loop": "Requests stay inside your computer — no internet round-trip.",
+    "bullet_local_server": "The local server you configured handles all inference.",
+    "bullet_local_cache": "Generated embeddings are cached locally so subsequent searches don't recompute.",
+    "bullet_subscription_cli": "Memlore spawns the {{cli}} CLI as a subprocess. The CLI reuses its own login (run `claude /login` / `codex login` once); Memlore never sees an API key.",
+    "bullet_subscription_upstream": "The CLI then sends your prompt to {{upstream}}'s servers as if you typed it in the CLI yourself. {{upstream}}'s privacy policy and the terms of your subscription apply.",
+    "bullet_subscription_quota": "AI features count against your subscription quota — the same as if you used the CLI directly.",
+    "bullet_subscription_tools": "Memlore disables CLI tools (filesystem, shell, MCP). The model can only return text replies."
+  },
+  "error": {
+    "AI_NOT_CONFIGURED": "Set up an AI provider first.",
+    "AI_PRIVACY_NOT_ACCEPTED": "Accept the privacy notice to enable this feature.",
+    "AI_PROVIDER_UNSUPPORTED": "This provider doesn't support that operation.",
+    "AI_PROVIDER_ERROR": "Something went wrong talking to the provider.",
+    "AI_AUTH_FAILED": "Your API key was rejected — re-enter it.",
+    "AI_RATE_LIMITED": "The provider rate-limited you — try again later.",
+    "AI_BACKFILL_ALREADY_RUNNING": "Indexing is already running.",
+    "AI_BACKFILL_FAILED": "Indexing failed — try again.",
+    "AI_GO_DEEPER_DISABLED": "Go Deeper is turned off in Settings → AI.",
+    "AI_CONTINUE_WRITING_DISABLED": "Continue & Rewrite is turned off in Settings → AI.",
+    "AI_GO_DEEPER_TOO_SHORT": "Write a bit more (at least 80 words) before asking for prompts.",
+    "AI_DAILY_CHAT_DISABLED": "Daily Chat is turned off in Settings → AI.",
+    "AI_IMAGE_GENERATION_DISABLED": "Image generation is turned off in Settings → AI.",
+    "AI_IMAGE_PROMPT_EMPTY": "Type a prompt before generating.",
+    "AI_PERSONA_DISABLED": "Turn on Persona in Settings → AI → Persona to use this."
+  },
+  "backfill": {
+    "title": "Embedding index",
+    "description": "Powers Semantic Search, Emotion Suggestions, and using your entries in Daily Chat. Pause / Resume / Index now control the queue; Rebuild re-embeds everything from scratch (useful after changing models).",
+    "indexed_count": "Indexed {{indexed}} / {{total}} entries",
+    "reindex_needed": "Embedding model changed — re-index entries so semantic search and emotion suggestions use the new vectors.",
+    "reindex_start": "Re-index now",
+    "reindex_dismiss": "Not now",
+    "pending": "{{count}} entries waiting to be indexed",
+    "in_progress": "Indexing {{indexed}} of {{total}} entries…",
+    "pause": "Pause",
+    "resume": "Resume",
+    "index_now": "Index now",
+    "rebuild": "Rebuild index",
+    "rebuild_confirm_title": "Rebuild the embedding index?",
+    "rebuild_confirm_body": "This wipes existing vectors for the current model and re-embeds every entry from scratch. It may take a while, and with a hosted provider it will call that provider again for every entry.",
+    "rebuild_confirm_yes": "Rebuild index",
+    "review_consent": "Review & enable",
+    "complete": "All entries indexed.",
+    "status_up_to_date": "Up to date",
+    "status_needs_provider": "Embedding provider required",
+    "status_waiting": "Waiting for edits to settle",
+    "status_waiting_help": "After you stop editing, indexing waits a few minutes so continuous typing does not re-embed repeatedly. Only changed chunks are re-embedded. Use “Index now” to skip the wait.",
+    "status_stuck": "Some entries are stuck — Index now re-queues them",
+    "status_indexing": "Indexing {{count}} pending",
+    "status_paused": "Paused",
+    "status_needs_consent": "Needs consent",
+    "status_error": "Provider error",
+    "status_downloading_model": "Downloading… {{percent}}%",
+    "status_model_error": "Model download failed",
+    "status_needs_decision": "Needs a decision"
+  },
+  "embedding_decision": {
+    "title": "Embedding sync needs a decision",
+    "intro": "Another device uses a different embedding model or this device cannot index yet. Choose what to do — Memlore will not re-embed silently (that can spend API tokens). Pause stops re-embedding what other devices sent; new local edits keep indexing.",
+    "slot_entry": "Journal entry embeddings",
+    "slot_memory": "Memory embeddings",
+    "reason_model_mismatch": "Peer devices have vectors for a different model. Adopted vectors only work when the model matches yours.",
+    "reason_missing_key": "The embedding provider is configured but its API key is missing on this device. Keys never sync.",
+    "reason_invalid_key": "The embedding provider rejected the API key on this device. Check or re-enter it in Settings.",
+    "reason_unconfigured": "No embedding provider is configured on this device, so pending work cannot run.",
+    "local_model": "This device’s model",
+    "peer_models": "Models seen on other devices",
+    "pending_units": "Work waiting",
+    "pending_units_value": "{{count}} unit(s)",
+    "action_reembed": "Re-embed with this device’s model",
+    "action_switch": "Switch to selected peer model",
+    "action_pause": "Pause sync backfill",
+    "pause_keeps_local": "New local edits keep indexing. Only peer-mismatch re-embed is paused.",
+    "pause_all_close": "Pause pending & close",
+    "open_ai_settings": "Open AI settings",
+    "needs_key_hint": "That model needs an API key on this device. Open AI settings to add it, then try again.",
+    "error_select_peer": "Select a peer model before switching.",
+    "error_generic": "Something went wrong. Try again."
+  },
+  "background": {
+    "title": "Background indexing",
+    "description": "Keeps the embedding index up to date as you write. After you stop editing, it waits a few minutes before indexing so continuous typing does not re-embed repeatedly. Only changed chunks are re-embedded — unchanged text is skipped.",
+    "local_note": "Runs locally — no token cost.",
+    "consent_title": "Hosted indexing spends tokens",
+    "consent_body": "Background indexing will call your configured hosted provider to embed new and edited entries as you write. This uses your API quota, and cost scales with how many entries you write and how long they are — unchanged text is skipped.",
+    "consent_accept": "I understand, enable background indexing",
+    "consent_cancel": "Cancel",
+    "protected_title": "Include locked entries",
+    "protected_description": "Off by default. When on, background indexing also embeds your locked entries. Invisible entries are always excluded.",
+    "protected_risk_title": "Risk",
+    "protected_risk_body": "Vectors from these entries are stored (and synced) encrypted like everything else, but with a hosted provider the entry text is sent to that provider to compute them.",
+    "protected_benefit_title": "Benefit",
+    "protected_benefit_body": "Semantic Search and Daily Chat can then cover your locked entries too, not just those currently unlocked.",
+    "protected_read_note": "Locked and invisible entries stay excluded from search results and from anything Daily Chat retrieves while they're locked or hidden — this setting only affects what gets embedded in the background.",
+    "protected_confirm_enable": "Enable"
+  },
+  "on_device_models": {
+    "section_description": "Runs fully offline on this device once downloaded.",
+    "recommended_badge": "Recommended",
+    "ready_badge": "Ready",
+    "current_model": "Active model",
+    "download_size_label": "Download size",
+    "approx_ram_label": "Approx. RAM",
+    "dim_context_label": "Dim / context",
+    "dim_context_value": "{{dim}}d / {{ctx}} tokens",
+    "multilingual_yes": "Multilingual",
+    "multilingual_no": "English-focused",
+    "high_ram_warning": "This model needs more RAM than the others here — check your machine can spare it before downloading.",
+    "status_downloading": "Downloading… {{percent}}%",
+    "status_error": "Download failed",
+    "status_error_detail": "Download failed: {{detail}}",
+    "eta": "about {{seconds}}s left",
+    "action_download": "Download",
+    "action_retry": "Retry",
+    "action_remove": "Remove",
+    "action_use_for_embedding": "Use for embedding",
+    "remove_confirm_title": "Remove {{name}}?",
+    "remove_confirm_description": "{{name}} will be deleted from this device. You can download it again later.",
+    "remove_confirm_description_active": "{{name}} is your active embedding model. Removing it deletes it from this device and stops on-device embedding until you download it again or pick another model.",
+    "error_not_available_yet": "On-device downloads arrive with the on-device runtime update.",
+    "error_not_supported": "Not supported yet on this platform.",
+    "models": {
+      "multilingual-e5-base": {
+        "display_name": "multilingual-e5-base",
+        "when_to_choose": "Best balance for multilingual/Vietnamese journals.",
+        "download_size": "~1.1 GB",
+        "approx_ram": "~1.5-2 GB"
+      },
+      "multilingual-e5-small": {
+        "display_name": "multilingual-e5-small",
+        "when_to_choose": "Lightest multilingual option; best for low-RAM machines.",
+        "download_size": "~470 MB",
+        "approx_ram": "~0.6-1 GB"
+      },
+      "multilingual-e5-large": {
+        "display_name": "multilingual-e5-large",
+        "when_to_choose": "Highest multilingual quality; needs a capable machine.",
+        "download_size": "~2.2 GB",
+        "approx_ram": "~3-4 GB"
+      },
+      "nomic-embed-text-v1.5": {
+        "display_name": "nomic-embed-text-v1.5",
+        "when_to_choose": "Long entries (8K context); strongest for English.",
+        "download_size": "~275 MB",
+        "approx_ram": "~0.5-1 GB"
+      }
+    }
+  },
+  "on_device_llm": {
+    "section_description": "Download once, then chat fully offline on this device.",
+    "binary_failed": "On-device engine download failed",
+    "start_failed_toast": "On-device AI engine failed to start ({{code}})",
+    "recommended_badge": "Recommended",
+    "ready_badge": "Ready",
+    "selected": "Selected",
+    "download_size_label": "Size",
+    "min_ram_label": "Min. RAM",
+    "context_label": "Context",
+    "multilingual_yes": "Multilingual",
+    "multilingual_no": "Single-language",
+    "action_download": "Download",
+    "action_cancel": "Cancel",
+    "action_retry": "Retry",
+    "action_select": "Select",
+    "action_delete": "Delete",
+    "delete_confirm_title": "Delete \"{{name}}\"?",
+    "delete_confirm_description": "This removes the downloaded model files from your device. You can download it again later.",
+    "delete_confirm_description_active": "{{name}} is your active on-device chat model. Deleting it removes it from this device and stops on-device chat until you download it again or pick another model.",
+    "status_downloading": "Downloading… {{percent}}%",
+    "status_error": "Download failed",
+    "server_starting": "Starting on-device engine…",
+    "server_ready": "On-device engine ready",
+    "server_failed": "On-device engine failed to start",
+    "error_code_aria": "Error code",
+    "terms": {
+      "title": "Gemma Terms of Use",
+      "summary": "Gemma models are licensed under Google's Gemma Terms of Use. You must accept these terms before downloading a model to this device. Memlore stores a local acceptance receipt; it is not synced.",
+      "accept": "Accept",
+      "cancel": "Cancel",
+      "link_label": "Read the Gemma Terms of Use"
+    },
+    "models": {
+      "gemma-4-e2b-it": {
+        "display_name": "Gemma 4 E2B (QAT Q4_0)",
+        "when_to_choose": "Lightest and fastest; good for short entries on 8 GB machines."
+      },
+      "gemma-4-e4b-it": {
+        "display_name": "Gemma 4 E4B (QAT Q4_0)",
+        "when_to_choose": "Best balance of quality and speed; the recommended default."
+      },
+      "gemma-4-12b-it": {
+        "display_name": "Gemma 4 12B (QAT Q4_0)",
+        "when_to_choose": "Highest quality; needs a 16 GB machine for the weights + KV cache."
+      }
+    }
+  },
+  "emotion": {
+    "suggestion_label": "AI Suggestion",
+    "suggestion_text": "✨ {{emoji}} {{emotion}} (intensity {{intensity}})",
+    "apply": "Apply",
+    "dismiss": "Dismiss"
+  },
+  "emotion_suggestions": {
+    "language": {
+      "label": "Language",
+      "hint": "Auto follows the AI response language in General.",
+      "auto": "Auto",
+      "en": "English",
+      "vi": "Tiếng Việt",
+      "fr": "Français",
+      "es": "Español",
+      "zh-Hans": "简体中文",
+      "zh-Hant": "繁體中文"
+    }
+  },
+  "highlights": {
+    "title": "Highlights",
+    "regenerate": "Regenerate",
+    "clear": "Clear",
+    "close": "Close",
+    "cancel": "Cancel generation",
+    "streaming": "Generating…",
+    "cancelled": "Generation cancelled.",
+    "empty_hint": "No highlights yet. Click the header above to generate a summary.",
+    "needs_more_words": "Write {{remaining}} more word(s) to unlock Highlights.",
+    "error_unknown": "Couldn't generate highlights. Try again."
+  },
+  "feature_prompt": {
+    "customize": "Customize prompt",
+    "input_label": "Custom prompt for {{feature}}",
+    "using_custom": "Using custom prompt",
+    "using_default": "Using default prompt",
+    "save": "Save prompt",
+    "reset": "Reset to default"
+  },
+  "reflection_lens": {
+    "label": "Reflection lens",
+    "default": "Default",
+    "default_hint": "Open-ended reflection",
+    "cbt_reframe": "CBT reframe",
+    "cbt_reframe_hint": "Gentle cognitive reframing",
+    "gratitude": "Gratitude",
+    "gratitude_hint": "Notice what went well",
+    "inversion": "Inversion",
+    "inversion_hint": "Challenge assumptions",
+    "stoic": "Stoic",
+    "stoic_hint": "Control, virtue, acceptance"
+  },
+  "go_deeper": {
+    "button": "Go deeper",
+    "loading": "Thinking…",
+    "use_prompt": "Use",
+    "dismiss": "Dismiss",
+    "close": "Close",
+    "regenerate": "Regenerate",
+    "cards_label": "Reflection prompts",
+    "error_unknown": "Couldn't generate prompts. Try again.",
+    "needs_more_words": "Write {{remaining}} more word(s) to unlock Go Deeper."
+  },
+  "image_gen": {
+    "button": "Generate image",
+    "dialog_title": "Generate image",
+    "prompt_label": "Prompt",
+    "prompt_placeholder": "Describe the image you want…",
+    "placement_label": "Position",
+    "placement_attach": "Attach",
+    "placement_attach_hint": "Add to the attachments strip at the bottom.",
+    "placement_inline": "Inline",
+    "placement_inline_hint": "Insert at the cursor position in the text.",
+    "size_label": "Size",
+    "size_square": "Square",
+    "size_portrait": "Portrait",
+    "size_landscape": "Landscape",
+    "generate": "Generate",
+    "guide_label": "Guide to create",
+    "from_entry": "From this entry",
+    "custom_prompt": "Custom prompt",
+    "from_entry_hint": "Uses the entry body as inspiration and always draws something warm and positive — even if the writing is hard.",
+    "from_entry_empty": "Write something in this entry first.",
+    "generating": "Generating… this can take 1–4 minutes.",
+    "generating_short": "Generating…",
+    "cancel": "Cancel",
+    "cancel_confirm_title": "Stop generating?",
+    "cancel_confirm_body": "The image is still being generated. Stopping now discards the result. The request may keep running in the background.",
+    "cancel_confirm_action": "Stop generating",
+    "error_unknown": "Couldn't generate the image.",
+    "unsupported": "This provider doesn't support image generation.",
+    "needs_setup": "Finish setting up an image provider in Settings → AI to generate images."
+  },
+  "daily_chat": {
+    "title": "Daily Chat",
+    "save_as_entry": "Save as entry",
+    "saved_as_entry_indicator": "Saved as entry",
+    "update_entry": "Update the entry",
+    "update_no_new": "No new messages since you last saved this conversation.",
+    "update_marker": "Updated from Daily Chat · {{date}}",
+    "update_target_unavailable_title": "Can't update that entry",
+    "update_target_unavailable_body": "The entry this conversation created is no longer available (deleted or locked). Save the new messages as a separate entry instead?",
+    "save_as_new_entry": "Save as a new entry",
+    "entry_link_label": "Open the generated entry",
+    "input_placeholder": "Tell me about your day…",
+    "empty_hint": "Tell me about your day. I'll ask follow-up questions to help you reflect.",
+    "error_unknown": "Couldn't continue the conversation.",
+    "sessions_title": "Conversations",
+    "new_chat": "New",
+    "new_chat_short": "New",
+    "loading_sessions": "Loading…",
+    "empty_sessions": "No conversations yet. Click \"New chat\".",
+    "gate_no_provider": "Set up an AI provider to chat",
+    "gate_privacy": "Accept the AI privacy notice to chat",
+    "gate_open_settings": "Go to Providers",
+    "search_placeholder": "Search conversations…",
+    "search_aria": "Search conversations",
+    "clear_search": "Clear conversation search",
+    "no_search_results": "No conversations match your search.",
+    "selected_outside_search": "Selected conversation is outside these search results.",
+    "untitled": "New chat",
+    "message_count_one": "{{count}} message",
+    "message_count_other": "{{count}} messages",
+    "rename": "Rename",
+    "pin_to_top": "Pin to top",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "session_actions": "Conversation actions",
+    "delete_session": "Delete chat",
+    "delete_confirm_title": "Delete this chat?",
+    "delete_confirm_body": "This conversation will be permanently removed.",
+    "no_session_title": "No conversation selected",
+    "no_session_hint": "Click \"New\" on the left to start a new conversation.",
+    "send": "Send",
+    "stop": "Stop",
+    "thinking": "Thinking…",
+    "copy": "Copy",
+    "copied": "Copied",
+    "attach": "Attach",
+    "attach_search_placeholder": "Search entries…",
+    "attach_search_aria": "Search entries",
+    "attach_tab_entries": "Entries",
+    "attach_tab_date": "Date",
+    "attach_tab_aria": "Attachment type",
+    "attach_dialog_aria": "Attach content",
+    "attach_searching": "Searching…",
+    "attach_no_results": "No entries found",
+    "attach_preset_this_week": "This week",
+    "attach_preset_this_month": "This month",
+    "attach_preset_this_year": "This year",
+    "attach_preset_custom": "Custom",
+    "attach_preset_aria": "Date range preset",
+    "attach_custom_from": "From",
+    "attach_custom_to": "To",
+    "attach_custom_range_aria": "Custom date range",
+    "attach_invalid_range": "End date must be on or after the start date.",
+    "attach_counting": "Counting…",
+    "attach_entry_count_one": "{{count}} entry",
+    "attach_entry_count_other": "{{count}} entries",
+    "attach_confirm": "Attach",
+    "attach_entry_unavailable": "This entry can't be attached to a chat.",
+    "attach_cap_reached": "You've reached the {{max}}-attachment limit for this message.",
+    "attach_remove": "Remove \"{{label}}\"",
+    "rag_toggle_label": "Journal context",
+    "rag_toggle_tooltip_on": "Journal context is on — turn off",
+    "rag_toggle_tooltip_off": "Turn on journal context for this chat",
+    "rag_toggle_tooltip_not_configured": "Set up an AI provider in Settings to use journal context.",
+    "rag_toggle_tooltip_privacy_not_accepted": "Accept the AI privacy notice in Settings to use journal context.",
+    "rag_toggle_tooltip_error": "Could not change this setting.",
+    "context_size": "up to {{kb}} KB",
+    "context_size_trimmed": "up to {{kb}} KB — may be trimmed",
+    "context_confirm_title": "Send this much context?",
+    "context_confirm_body_one": "\"{{label}}\" has {{count}} entry (≈ {{totalKb}} KB). Only excerpts from about {{entriesIncluded}} of them will be sent (≈ {{estimatedKb}} KB). Continue?",
+    "context_confirm_body_other": "\"{{label}}\" has {{count}} entries (≈ {{totalKb}} KB). Only excerpts from about {{entriesIncluded}} of them will be sent (≈ {{estimatedKb}} KB). Continue?",
+    "context_confirm_body_no_period_one": "These attachments total {{count}} entry (≈ {{totalKb}} KB). Only excerpts from about {{entriesIncluded}} of them will be sent (≈ {{estimatedKb}} KB). Continue?",
+    "context_confirm_body_no_period_other": "These attachments total {{count}} entries (≈ {{totalKb}} KB). Only excerpts from about {{entriesIncluded}} of them will be sent (≈ {{estimatedKb}} KB). Continue?",
+    "context_confirm_send": "Send anyway",
+    "context_confirm_cancel": "Cancel",
+    "period_too_large": "\"{{label}}\" has {{count}} entries — too many to send in one message. Enable and index embeddings, or pick a shorter range.",
+    "period_no_budget": "\"{{label}}\" couldn't fit — other attachments used up the available space. Remove one to make room.",
+    "needs_confirmation": "Sending ~{{kb}} KB from {{count}} entries needs confirmation.",
+    "consent_required": "Accept the bulk-context notice to send multiple entries.",
+    "sources_heading_one": "Source ({{count}})",
+    "sources_heading_other": "Sources ({{count}})",
+    "sources_truncated_hint": "Showing {{shown}} of {{total}}",
+    "entry_badge_resolving": "Entry…",
+    "entry_badge_unavailable": "Entry unavailable",
+    "entry_badge_open": "Open \"{{title}}\"",
+    "entry_preview": {
+      "title": "Entry",
+      "loading": "Opening entry…",
+      "unavailable": "This entry can't be opened — it may have been deleted or locked.",
+      "empty": "This entry has no text.",
+      "edit": "Edit"
+    },
+    "sources_trigger_aria_one": "{{count}} source used for this reply",
+    "sources_trigger_aria_other": "{{count}} sources used for this reply",
+    "sources_trigger_tooltip": "Sources",
+    "source_chip": "Entry \"{{title}}\"",
+    "selected_on_other_page": "Selected conversation is on another page.",
+    "persona": {
+      "label": "AI Friend persona",
+      "empathetic": "Empathetic Friend",
+      "empathetic_hint": "Warm, listens for feelings",
+      "tough": "Tough Coach",
+      "tough_hint": "Direct, accountability-driven",
+      "jolly": "Jolly Friend",
+      "jolly_hint": "Playful, finds the bright side",
+      "wise": "Wise Mentor",
+      "wise_hint": "Philosophical, listens deeply",
+      "custom": "Custom",
+      "custom_hint": "Write your own prompt",
+      "custom_placeholder": "Describe how the AI should sound. e.g. \"You are a no-nonsense fitness coach who…\""
+    },
+    "ai_title_label": "AI-generated titles",
+    "ai_title_description": "Extra LLM call for a title (off = short first message).",
+    "convert_modal": {
+      "title": "Save as journal entry",
+      "loading": "Drafting your entry…",
+      "hint": "Review the draft below. You can edit it before saving — the conversation itself will not be kept.",
+      "edit_label": "Edit",
+      "split_label": "Edit + preview",
+      "show_preview": "Show preview",
+      "hide_preview": "Hide preview",
+      "save": "Save entry",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Couldn't draft an entry from the conversation.",
+      "update_title": "Update your journal entry",
+      "update_save": "Update entry"
+    },
+    "show_message_meta": {
+      "title": "Show model info on replies",
+      "description": "Model, provider, tokens, and latency on AI replies."
+    },
+    "use_memory_label": "Use Memory in Chat",
+    "use_memory_description": "Retrieves notable facts about you and adds them to each reply.",
+    "use_memory_needs_master": "Memory is turned off in Settings → AI → Memory. Turn it on to enable this."
+  },
+  "summary": {
+    "suggest_title": "Suggest title",
+    "suggesting": "Suggesting…",
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "error_busy": "Another suggestion is in progress — try again in a moment.",
+    "error_unknown": "Couldn't generate a title. Try again."
+  },
+  "multi_summary": {
+    "button": "AI summary",
+    "loading": "Summarising…",
+    "banner_label": "AI summary",
+    "dismiss": "Dismiss",
+    "warning": {
+      "title": "Large summary",
+      "body": "These entries are larger than usual ({{kb}} KB). You can ask the AI to truncate (cap at 48 KB) or send the full content as-is.",
+      "truncate": "Truncate",
+      "send_raw": "Send raw"
+    },
+    "errors": {
+      "no_entries": "No entries selected to summarise.",
+      "no_content": "These entries have no text content to summarise.",
+      "payload_too_large": "Even the raw payload is too large. Try a smaller selection.",
+      "disabled": "Multi-entry summary is turned off. Enable it in Settings → AI.",
+      "not_configured": "Configure an AI provider in Settings → AI first.",
+      "privacy_not_accepted": "Accept the AI privacy notice in Settings → AI first.",
+      "auth_failed": "AI provider rejected the request. Check your API key in Settings.",
+      "rate_limited": "AI provider is rate-limiting. Try again in a moment.",
+      "empty_response": "AI returned no content. Try again.",
+      "unknown": "Couldn't generate a summary. Try again."
+    }
+  },
+  "search": {
+    "tab_keyword": "Keyword",
+    "tab_meaning": "Meaning",
+    "tab_meaning_disabled_hint": "Enable Semantic Search in Settings → AI",
+    "toggle_meaning": "Search by meaning",
+    "toggle_meaning_aria": "Toggle semantic (meaning-based) search",
+    "toggle_keep_results": "Keep results",
+    "toggle_keep_results_aria": "Keep last search results when the panel is closed",
+    "toggle_keep_results_help": "When on, reopening search shows your last query, filters, and results.",
+    "default_mode_title": "Default to meaning search",
+    "default_mode_description": "On = meaning search; off = keyword search.",
+    "default_mode_aria": "Default search overlay to meaning mode",
+    "score_label": "score",
+    "relevance_label": "{{percent}}% match",
+    "relevance_strong": "Strong match",
+    "relevance_good": "Good match",
+    "relevance_loose": "Loose match",
+    "relevance_weak": "Weak match",
+    "loading": "Searching…",
+    "failed": "Search failed: {{message}}",
+    "placeholder_title": "Type to search your entries",
+    "placeholder_hint": "Full-text search across all entries",
+    "placeholder_hint_meaning_needs_query": "Type something — semantic search needs a phrase to match against",
+    "placeholder_hint_meaning_needs_query_with_filters": "Filters are set — type a phrase to search semantically.",
+    "empty": "No semantically similar entries — try different wording.",
+    "empty_keyword": "No results for \"{{query}}\"",
+    "empty_filtered_no_query": "No entries match the selected filters.",
+    "result_count_one": "{{count}} result",
+    "result_count_other": "{{count}} results",
+    "filter": {
+      "journal_pill": "Journal",
+      "journal_pill_count": "Journal ({{count}})",
+      "journal_empty": "No journals available",
+      "tags_pill": "Tags",
+      "tags_pill_count": "Tags ({{count}})",
+      "tags_empty": "No tags yet",
+      "emotion_pill": "Emotion",
+      "emotion_pill_count": "Emotion ({{count}})",
+      "has_media_any": "All",
+      "has_media_has": "With media",
+      "has_media_none": "Without media"
+    },
+    "overlay_aria": "Search",
+    "input_aria": "Search entries",
+    "input_placeholder": "Search entries...",
+    "results_aria": "Search results"
+  },
+  "page": {
+    "ai_settings_title": "AI Settings",
+    "ai_settings_description": "Configure providers and per-feature toggles for AI-powered features."
+  },
+  "tabs": {
+    "models": "Models",
+    "features": "Features",
+    "audit_log": "Audit log",
+    "usage": "Usage",
+    "general": "General",
+    "providers": "Providers",
+    "memory": "Memory",
+    "persona": "Persona"
+  },
+  "privacy_banner": {
+    "host_not_set": "(not set)",
+    "host_empty": "(empty)",
+    "host_unparseable": "(unparseable)"
+  },
+  "usage": {
+    "title": "AI Usage",
+    "period": {
+      "label": "Period",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d",
+      "90d": "90d",
+      "all": "All time"
+    },
+    "headline": {
+      "calls": "Calls",
+      "tokens_in": "Tokens in",
+      "tokens_out": "Tokens out",
+      "bytes_sent": "Bytes sent"
+    },
+    "null_tokens_hint_one": "{{count}} call without provider-reported tokens",
+    "null_tokens_hint_other": "{{count}} calls without provider-reported tokens",
+    "by_provider": "By provider",
+    "by_provider_help": "Totals for the selected period, split by AI provider. When a provider does not report token counts (common with local or CLI models), tokens show as —.",
+    "per_provider_calls": "{{count}} calls",
+    "per_provider_tokens": "{{in}} in / {{out}} out",
+    "per_provider_untracked_one": "and {{count}} untracked",
+    "per_provider_untracked_other": "and {{count}} untracked",
+    "daily_chart_title": "Daily tokens out",
+    "daily_chart_help": "Output tokens generated per calendar day in your local timezone. Only calls inside the selected period are included.",
+    "chart_loading": "Loading chart…",
+    "no_data": "No AI calls yet.",
+    "no_data_chart": "No data for this period.",
+    "breakdown_title": "Breakdown",
+    "breakdown_help": "Aggregated by provider, model, and feature — not one row per message. Multiple Daily Chat replies with the same model share one row; only Calls and token totals increase.",
+    "table": {
+      "col_provider": "Provider",
+      "col_model": "Model",
+      "col_feature": "Feature",
+      "col_calls": "Calls",
+      "col_tokens_in": "Tokens in",
+      "col_tokens_out": "Tokens out",
+      "col_bytes": "Bytes",
+      "col_avg_latency": "Avg latency",
+      "col_error_rate": "Error rate",
+      "null_display": "—"
+    },
+    "no_cost_note": "We don't show estimated cost because provider pricing changes too often to keep accurate. Token counts here match what your provider's billing dashboard sees."
+  },
+  "audit": {
+    "privacy_note_label": "Privacy:",
+    "privacy_note_desc": "we never store call content — only metadata.",
+    "empty": "No AI calls logged yet.",
+    "empty_filtered": "No AI calls match the current filter.",
+    "load_more": "Load more",
+    "loading": "Loading…",
+    "filter": {
+      "feature_label": "Feature",
+      "feature_placeholder": "All features",
+      "provider_label": "Provider",
+      "provider_placeholder": "All providers",
+      "options_empty_hint": "Load more rows to see more filter options.",
+      "class_label": "Class",
+      "class_all": "All",
+      "class_local": "Local",
+      "class_remote": "Remote",
+      "class_subscription": "Subscription",
+      "class_on-device": "On-device",
+      "range_label": "Range",
+      "range_24h": "24h",
+      "range_7d": "7d",
+      "range_30d": "30d",
+      "range_all": "All"
+    },
+    "table": {
+      "col_time": "Time",
+      "col_feature": "Feature",
+      "col_operation": "Operation",
+      "col_provider": "Provider",
+      "col_class": "Class",
+      "col_tokens": "Tokens",
+      "col_status": "Status",
+      "tokens_format": "{{in}}→{{out}}",
+      "tokens_none": "—",
+      "status_ok": "OK",
+      "status_err": "Error"
+    },
+    "row_detail": {
+      "host": "Host",
+      "payload": "Payload",
+      "latency": "Latency",
+      "error_code": "Error code",
+      "timestamp": "Timestamp",
+      "provider": "Provider",
+      "model": "Model",
+      "device": "Device"
+    },
+    "retention": {
+      "label": "Keep entries for",
+      "option_30": "1mo",
+      "option_30_aria": "1 month",
+      "option_90": "3mo",
+      "option_90_aria": "3 months",
+      "option_180": "6mo",
+      "option_180_aria": "6 months",
+      "option_365": "1y",
+      "option_365_aria": "1 year",
+      "save_error": "Could not save retention: {{error}}"
+    },
+    "clear": {
+      "button": "Clear log",
+      "confirm_title": "Clear AI audit log?",
+      "confirm_body": "This permanently deletes all recorded AI call metadata. Your journal entries are not affected.",
+      "confirm_action": "Yes, clear",
+      "cancel": "Cancel"
+    }
+  },
+  "bulk_context_modal": {
+    "title": "Send multiple entries to AI?",
+    "intro": "This feature sends the full text of several journal entries to your AI provider in one request. Review the details below before continuing.",
+    "intro_excerpts": "This feature sends selected excerpts from relevant journal entries to your AI provider in one request. Review the details below before continuing.",
+    "entries_label": "Entries",
+    "entries_value": "{{count}} entries",
+    "entries_value_excerpts": "Up to {{count}} relevant entries",
+    "range_label": "Date range",
+    "provider_label": "Provider",
+    "class_label": "Data handling",
+    "class_remote": "Your entries are uploaded to the hosted provider over HTTPS. Their privacy policy and your account terms apply.",
+    "class_subscription": "Your entries are handed to your local CLI, which forwards them to the subscription provider. Memlore never sees your API key.",
+    "class_remote_excerpts": "Selected excerpts are uploaded to the hosted provider over HTTPS. Their privacy policy and your account terms apply.",
+    "class_subscription_excerpts": "Selected excerpts are handed to your local CLI, which forwards them to the subscription provider. Memlore never sees your API key.",
+    "scope_footnote": "Accepting this notice once covers every non-local provider and every multi-entry AI feature.",
+    "accept": "I understand — send {{count}} entries",
+    "accept_excerpts": "I understand — send selected excerpts"
+  },
+  "period_review": {
+    "title": "Period reviews",
+    "description": "AI-written recaps of your journal — highlights, lowlights, recurring themes, and one insight for the period.",
+    "kind_weekly": "Week",
+    "kind_monthly": "Month",
+    "kind_aria": "Review period kind",
+    "prev_period": "Previous {{kind}}",
+    "next_period": "Next {{kind}}",
+    "generate": "Generate review",
+    "generating": "Generating…",
+    "regenerate": "Regenerate",
+    "loading_settings": "Loading AI settings…",
+    "disabled_title": "Periodic reviews are off",
+    "disabled_body": "Enable “Periodic reviews” in Settings → AI to generate weekly or monthly recaps.",
+    "needs_provider_title": "Set up an AI provider",
+    "needs_provider_body": "Configure a generation provider in Settings → AI before generating a period review.",
+    "needs_privacy_title": "Privacy notice required",
+    "needs_privacy_body": "Accept the AI privacy notice in Settings → AI first.",
+    "generated_at": "Generated {{date}}",
+    "section_highlights": "Highlights",
+    "section_lowlights": "Lowlights",
+    "section_themes": "Recurring themes",
+    "section_insight": "Insight",
+    "section_empty": "None noted.",
+    "entry_count": "Based on {{count}} entries",
+    "errors": {
+      "unknown": "Could not generate review ({{code}}).",
+      "AI_NOT_CONFIGURED": "Set up an AI provider in Settings → AI.",
+      "AI_PRIVACY_NOT_ACCEPTED": "Accept the privacy notice in Settings → AI.",
+      "AI_BULK_CONTEXT_NOT_ACCEPTED": "Accept the bulk-context notice to send multiple entries.",
+      "AI_PERIODIC_REVIEW_DISABLED": "Periodic reviews are turned off in Settings → AI.",
+      "AI_NO_ENTRIES_WITH_CONTENT": "No entries with text in this period.",
+      "AI_PAYLOAD_TOO_LARGE": "Too much text in this period — try a shorter range.",
+      "AI_AUTH_FAILED": "AI provider auth failed. Check your API key.",
+      "AI_RATE_LIMITED": "Rate limited — try again in a moment.",
+      "AI_EMPTY_RESPONSE": "AI provider returned an empty response."
+    }
+  },
+  "theme_insights": {
+    "errors": {
+      "unknown": "Could not generate insights ({{code}}).",
+      "AI_NOT_CONFIGURED": "Set up an AI provider in Settings → AI.",
+      "AI_PRIVACY_NOT_ACCEPTED": "Accept the privacy notice in Settings → AI.",
+      "AI_BULK_CONTEXT_NOT_ACCEPTED": "Accept the bulk-context notice to send multiple entries.",
+      "AI_INSIGHTS_DISABLED": "Theme insights are turned off in Settings → AI.",
+      "AI_NO_ENTRIES_WITH_CONTENT": "No entries with text in this period.",
+      "AI_PAYLOAD_TOO_LARGE": "Too much text in this period — try a shorter range.",
+      "AI_AUTH_FAILED": "AI provider auth failed. Check your API key.",
+      "AI_RATE_LIMITED": "Rate limited — try again in a moment.",
+      "AI_EMPTY_RESPONSE": "AI provider returned an empty response."
+    }
+  },
+  "embedding_explainer": {
+    "title": "How AI works in Memlore",
+    "help_aria": "Learn how AI works in Memlore",
+    "close": "Close",
+    "groups": {
+      "privacy": "Privacy & control",
+      "providers": "Providers",
+      "features": "What AI can do",
+      "indexing": "Embeddings & search",
+      "data": "What gets sent"
+    },
+    "sections": {
+      "opt_in": {
+        "title": "Off until you turn it on",
+        "body": "Every AI feature starts off. Nothing is sent anywhere until you connect a provider, accept the privacy notice when needed, and enable the features you want — each feature has its own toggle."
+      },
+      "no_server": {
+        "title": "Memlore has no AI cloud",
+        "body": "There is no Memlore AI server and no telemetry. You bring your own provider — on this device, a local server, a subscription CLI, or a hosted API key. Your journal stays encrypted on your device; AI only sees text you deliberately process."
+      },
+      "locked": {
+        "title": "Locked & invisible entries",
+        "body": "Locked and invisible entries are excluded from AI by default. You can optionally include locked entries for embedding or memory; invisible entries are always excluded. Even if something was indexed while unlocked, it is not shown in search or chat while it is locked or hidden."
+      },
+      "kinds": {
+        "title": "Four ways to run AI",
+        "body": "On-device models download once and run fully offline. Local servers (Ollama, LM Studio, and similar) keep data on your machine. Subscription CLIs (Claude CLI, Codex CLI) use tools already signed in on your computer. Hosted APIs (OpenAI, Anthropic, and others) send requests over the internet and may spend tokens."
+      },
+      "slots": {
+        "title": "Separate slots for chat, images, and embeddings",
+        "body": "Chat/generation, image generation, and embedding are configured independently on the Models tab. You can chat with one provider and embed with another — for example a subscription CLI for chat and an on-device model for search."
+      },
+      "writing": {
+        "title": "Writing helpers",
+        "body": "Title suggestions, Highlights, Go Deeper reflection prompts, Continue & Rewrite, multi-entry summaries, period reviews, theme insights, and image generation each make a request when you use them. They use the generation or image model and do not need the embedding index."
+      },
+      "chat": {
+        "title": "Daily Chat",
+        "body": "A multi-turn conversation about your day. You can attach specific entries or date ranges, optionally pull related journal context when embeddings are set up, and use Memory & Persona so replies can draw on lasting facts about you. Conversations can be saved as journal entries."
+      },
+      "retrieval": {
+        "title": "Meaning-based features",
+        "body": "Semantic Search, Emotion Suggestions, and journal context in Daily Chat need an embedding index — they match by meaning, not just keywords. Attaching a specific entry or date range in chat does not need embeddings; those are read directly."
+      },
+      "what": {
+        "title": "What embeddings are",
+        "body": "Embeddings turn journal text into vectors so Memlore can compare meaning locally. That local index powers Semantic Search, Emotion Suggestions, and optional journal context in Daily Chat. Details of how indexing runs live next to the embedding controls in Settings → AI."
+      },
+      "background": {
+        "title": "Background indexing",
+        "body": "While the app is open and indexing is allowed, a background worker keeps the index up to date as you write. Hosted embedding providers need an extra token-cost consent before background indexing runs. Pause, resume, index-now, and rebuild sit next to the embedding model in Settings."
+      },
+      "when_sent": {
+        "title": "When text leaves this device",
+        "body": "Only when you use a hosted or subscription provider for a feature you trigger — or when hosted background indexing is on. On-device and local-server paths keep text on your machine. Changing a remote provider or endpoint re-prompts the privacy notice."
+      },
+      "tokens": {
+        "title": "Tokens, usage & audit",
+        "body": "Hosted providers may charge per call (chat, embeddings, images). On-device and local servers have no token cost. Statistics → AI Usage and Audit log show call metadata only — never the content of your entries."
+      }
+    }
+  },
+  "general": {
+    "response_language": {
+      "label": "AI response language",
+      "hint": "Applies to every AI feature — title suggestions, highlights, Go Deeper, summaries, and more.",
+      "auto": "Auto",
+      "en": "English",
+      "vi": "Tiếng Việt",
+      "custom": "Custom",
+      "custom_placeholder": "e.g. French, Japanese"
+    }
+  },
+  "message_info": {
+    "title": "Model info",
+    "trigger_tooltip": "Model info",
+    "model": "Model",
+    "provider": "Provider",
+    "type": "Type",
+    "tokens_in": "Tokens in",
+    "tokens_out": "Tokens out",
+    "latency": "Latency",
+    "latency_ms": "{{ms}} ms",
+    "latency_s": "{{s}} s",
+    "endpoint": {
+      "local": "Local",
+      "remote": "Hosted",
+      "subscription": "Subscription",
+      "on_device": "On-device"
+    }
+  },
+  "user_memory": {
+    "master_toggle_title": "Enable User Memory",
+    "master_toggle_description": "When off, memories are not scanned, extracted, or used in Daily Chat.",
+    "memory_gen_model_label": "Memory generation model",
+    "gen_model_quality_hint": "Tip: pick a high-quality model here — it distills your entries into memories, merges duplicates, and builds your persona, so accuracy matters more than speed. It runs only on memory scans and persona rebuilds, not on every chat.",
+    "memory_embed_model_label": "Memory embedding model",
+    "scan_button": "Scan memories",
+    "scan_running": "Scanning & tidying…",
+    "scan_help": {
+      "aria": "How \"Scan memories\" works",
+      "title": "How \"Scan memories\" works",
+      "close": "Close",
+      "scan_title": "Scan for new sources",
+      "scan_body": "Looks through recent journal entries and Daily Chat sessions for new or changed text, then queues those sources for extraction into short memory facts. This pass always runs when you press \"Scan memories\". The background worker also scans automatically on a short interval — scan is not limited to the button.",
+      "tidy_title": "Tidy the list",
+      "tidy_body": "Uses the memory generation model to merge duplicates, combine related fragments, and drop trivia across your whole memory list. Tidy only runs when you press \"Scan memories\" — the background worker does not tidy automatically. It is a separate cleanup pass, not the same as claiming new sources.",
+      "cooldown_title": "6-hour tidy cooldown",
+      "cooldown_body": "Tidy runs at most once every 6 hours. If you press \"Scan memories\" again inside that window, new sources are still claimed, but tidy is skipped. A skipped tidy does not reset the cooldown clock — only a real tidy advances it — so mid-window presses do not push the next tidy further out.",
+      "last_scanned_title": "What \"Last scanned\" means",
+      "last_scanned_body": "The timestamp next to the memory count updates whenever a scan runs — both when you press \"Scan memories\" and when the background worker scans automatically. It does not mean the tidy pass ran.",
+      "manage_title": "Manage memories",
+      "manage_body": "Opens the full list so you can search, edit text, enable or disable items, or delete them. Pressing \"Manage memories\" does not start a scan or tidy."
+    },
+    "last_scanned": "Last scanned {{when}}",
+    "never_scanned": "Not scanned yet",
+    "memories_list_title": "Memories",
+    "edit": "Edit",
+    "delete": "Delete",
+    "delete_confirm": "Delete this memory?",
+    "enable": "Enable",
+    "disable": "Disable",
+    "empty_state": "No memories yet. Scan to extract notable facts from your entries.",
+    "search_placeholder": "Search memories…",
+    "search_aria": "Search memories",
+    "clear_search": "Clear search",
+    "search_empty": "No memories match your search.",
+    "search_count": "{{shown}} of {{total}}",
+    "feature_off_title": "Models not configured",
+    "slot_missing_gen": "Memory needs a generation model — pick one above.",
+    "slot_missing_embed": "Memory needs an embedding model — pick one above.",
+    "feature_off_body": "Configure both models (generation + embedding) for Memory to run.",
+    "memories_used_count_one": "{{count}} memory used",
+    "memories_used_count_other": "{{count}} memories used",
+    "memories_used_tooltip": "Memories",
+    "edit_memory_placeholder": "Edit memory text…",
+    "memory_text_label": "Memory",
+    "manage_button": "Manage memories",
+    "manage_count": "{{count}} memories",
+    "created_at": "Created {{when}}",
+    "updated_at": "Updated {{when}}",
+    "protected_title": "Include locked entries",
+    "protected_description": "Off by default. When on, locked entries become eligible for memory extraction and persona style sampling. Invisible entries are always excluded.",
+    "protected_risk_title": "Risk",
+    "protected_risk_body": "Facts and writing style from these locked entries can still appear in your memories and persona.",
+    "protected_risk_body_hosted_active": "Facts and writing style from these locked entries can still appear in your memories and persona. Memory is on a hosted or CLI provider, so the full text of those entries is sent there too — not just short facts.",
+    "protected_benefit_title": "Benefit",
+    "protected_benefit_body": "Memory extraction and Build Your Persona can then draw on your locked entries too, not just the ones currently unlocked.",
+    "protected_read_note": "Invisible entries are always excluded, whether this is on or off.",
+    "protected_confirm_enable": "Enable",
+    "hosted_active_indicator": "Memory is running on a hosted or CLI provider — raw journal entries and chat transcripts are sent to it during extraction and persona building.",
+    "hosted_confirm_title": "Send your raw journal and chat data off this machine?",
+    "hosted_confirm_body": "Memory and persona send your raw journal entries and Daily Chat transcripts to the provider — not just short facts. That goes further than Daily Chat alone.",
+    "hosted_confirm_body_protected_active": "Memory and persona send your raw journal entries and Daily Chat transcripts to the provider — not just short facts. Locked entries are included, so their text leaves this machine too.",
+    "hosted_confirm_footer": "You can switch back to an on-machine provider at any time.",
+    "hosted_confirm_confirm": "I understand, continue",
+    "persona": {
+      "title": "Build Your Persona",
+      "description": "A profile used to help entry-writing features sound more like you.",
+      "enabled": "Use persona",
+      "edited_badge": "Edited by you",
+      "manage_button": "Manage persona",
+      "summary_empty": "Not built yet — answer a few questions or rebuild from memories.",
+      "needs_generation_model_title": "Pick a chat model to use Persona",
+      "needs_generation_model_body": "Your persona is added to the AI's instructions when it writes for you, so it needs a chat model. Choose one in the Models tab.",
+      "needs_generation_title": "Connect your chat provider to use Persona",
+      "needs_generation_body": "Your persona is added to the AI's instructions when it writes for you. The chat model is chosen, but this device has no credential for its provider — add one in the Providers tab.",
+      "needs_memory_slots_title": "Rebuild needs the memory models",
+      "needs_memory_slots_body": "Your persona still works, but rebuilding it from your memories needs a generation and an embedding model. Pick them in the Memory tab.",
+      "summary_built": "Persona ready",
+      "summary_answers_only": "{{count}} answers saved",
+      "answers_title": "Your answers",
+      "answers_empty": "Answer a few questions to describe what you want your writing to sound like.",
+      "answer_questions": "Answer a few questions",
+      "edit_answers": "Edit your answers",
+      "traits_label": "Traits & preferences",
+      "traits_placeholder": "No generated traits yet.",
+      "style_label": "Writing style",
+      "style_placeholder": "No generated writing style yet.",
+      "last_built": "Last built {{when}}",
+      "not_enough_material_title": "Not enough material yet",
+      "not_enough_material_body": "Add a few memories or entries, then rebuild your persona. You can also answer the questions now.",
+      "not_enough_style_material_body": "Add at least three eligible journal entries, then rebuild to generate a Writing style.",
+      "rebuild": "Rebuild persona",
+      "rebuild_confirm_title": "Replace your persona edits?",
+      "rebuild_confirm_body": "This will replace the Traits & preferences and Writing style sections you edited. Your answers will stay unchanged.",
+      "rebuild_confirm_yes": "Replace and rebuild",
+      "continue_writing": "Continue writing with your voice",
+      "continue_writing_busy": "Writing…",
+      "continue_writing_failed": "Couldn’t continue writing.",
+      "interview": {
+        "title": "Answer a few questions",
+        "description": "Every answer is optional. Your answers help entry-writing features follow your preferences from day one.",
+        "save": "Save answers",
+        "cancel": "Cancel",
+        "privacy": "These answers stay on this device. They are sent to a provider only when you use a feature that applies your persona.",
+        "character_count": "{{count}}/{{max}}",
+        "questions": {
+          "preferred_name": {
+            "label": "What should the AI call you, and how should it address you?",
+            "help": "For example: Minh, and use informal Vietnamese."
+          },
+          "journal_goal": {
+            "label": "What do you mainly journal for?",
+            "help": "Choose the closest fit, or leave it blank."
+          },
+          "voice_preference": {
+            "label": "When the AI rewrites or continues your text, should it keep your voice as-is or polish it?",
+            "help": "Choose the default you prefer."
+          },
+          "languages": {
+            "label": "Which language(s) do you write in, and do you mix them?",
+            "help": "Mention any language switching you want preserved."
+          },
+          "three_words": {
+            "label": "Three words that describe you.",
+            "help": "A few qualities, values, or moods are enough."
+          },
+          "life_priorities": {
+            "label": "What matters most in your life right now?",
+            "help": "People, projects, goals, or anything else important."
+          },
+          "avoid_topics": {
+            "label": "Anything the AI should NOT bring up or speculate about?",
+            "help": "This is a hard preference for persona-based writing."
+          },
+          "length_preference": {
+            "label": "How long should AI-written text be?",
+            "help": "Choose the default length you prefer."
+          }
+        },
+        "options": {
+          "venting": "Venting",
+          "memories": "Keeping memories",
+          "tracking": "Self-tracking",
+          "reflection": "Reflection",
+          "keep_voice": "Keep my voice",
+          "polish": "Polish it",
+          "brief": "Brief",
+          "medium": "Medium",
+          "detailed": "Detailed"
+        }
+      },
+      "used_by": "Used by Continue & Rewrite in the editor and Save as entry in Daily Chat — they write in your voice. Works independently of Memory.",
+      "answers_description": "Your own words about how the AI should write for you. These are authoritative — they win over anything generated.",
+      "traits_description": "A short profile of you, generated from your memories and answers. Edit it if something is off.",
+      "style_description": "How your writing sounds — sentence length, tone, language mixing. Generated from your entries."
+    },
+    "used_by": "Used by Daily Chat — notable facts about you are retrieved and added to the conversation."
+  },
+  "announcer": {
+    "generating": "Generating…",
+    "done": "Done",
+    "summary_ready": "Summary ready",
+    "review_ready": "Review ready",
+    "image_ready": "Image ready",
+    "writing_ready": "Writing ready",
+    "reply_ready": "Reply ready",
+    "entry_saved": "Entry saved",
+    "export_ready": "Export ready"
+  },
+  "tab_sections": {
+    "ai": "AI Settings sections"
+  },
+  "settings_panel": {
+    "loading": "Loading…"
+  }
+}
