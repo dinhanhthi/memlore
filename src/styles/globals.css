@@ -3042,45 +3042,273 @@ textarea:focus-visible {
 }
 
 /* ══ Design-system preview thumbnails ══════════════════════════════════════
-   Onboarding "Choose your look" paints a tiny mock of each skin so the user
-   can compare Signature / Clean / Clay side by side.
+   Onboarding "Choose your look" paints a tiny mock of each skin — sidebar +
+   main panel + CTA — so the user can compare Signature / Clean / Clay side by
+   side. Consumed by `ThemeStep.tsx`.
 
    These are FIXED DEPICTIONS, not skinnable UI: the whole point is to show
-   what Clean and Clay look like while the app itself is painted in
-   Signature, so they cannot go through the semantic tokens. Values mirror
-   `--color-app` / `--color-elevated` / `--color-fg` from the `:root`,
-   `.dark`, `:root(.dark).ds-clean` and `:root(.dark).ds-clay` blocks above —
-   change them together. Scoped to `.dsp` so no design-system override layer
-   picks them up. Accent is intentionally omitted: thumbnails use the live
-   `bg-accent` so they react to the accent picker on the same screen. */
-.dsp {
-  --dsp-sig-app: #f4f3f1;
-  --dsp-sig-card: #ffffff;
-  --dsp-sig-fg: #1a1917;
-  --dsp-clean-app: oklch(0.985 0 0);
-  --dsp-clean-card: oklch(1 0 0);
-  --dsp-clean-fg: oklch(0.145 0 0);
-  --dsp-clay-app: #ebe3d6;
-  --dsp-clay-card: #f7f1e6;
-  --dsp-clay-fg: #2a241c;
+   what Clean and Clay look like while the app itself is painted in Signature,
+   so they cannot go through the semantic tokens (those always paint the
+   *current* skin, which is exactly what a comparison must not do) — and not
+   through `rounded-*`/`--elev-*` either, since Clay redefines both ladders.
+   Values mirror the `:root`, `.dark`, `:root(.dark).ds-clean` and
+   `:root(.dark).ds-clay` blocks above — change them together.
 
-  /* Thumbnail radii — scaled-down depictions of each skin's `--radius-*`
-     ladder (Signature/Clean 0.625rem, Clay 1.15rem). They must NOT use
-     `rounded-md`/`rounded-lg`: `:root.ds-clay` redefines those, so the
-     Signature thumbnail would turn Clay-round whenever Clay is active. */
-  --dsp-sig-radius: 0.375rem;
-  --dsp-clean-radius: 0.125rem;
-  --dsp-clay-radius: 0.75rem;
+   What each thumbnail is meant to convey, i.e. the three skins' actual
+   sidebar / main-panel identities:
+     Signature — warm neutrals, no hairlines, main panel floats on the canvas
+                 with a soft drop shadow, pill CTA (`--button-radius: 9999px`)
+                 filled with the live accent gradient.
+     Clean     — shadcn hairlines are the identity: 1px frame + 1px sidebar
+                 divider, square-ish radii, zero shadow, solid-fill CTA. In
+                 dark the sidebar is *lighter* than the main panel (0.205 vs
+                 0.145) — the inverse of Signature.
+     Clay      — warm paper, sidebar and canvas the same colour
+                 (`--color-panel-1 == --color-app`), main panel a raised slab
+                 with a top sheen and a `--neu-deep` lip, big radii, and an
+                 extruded CTA (`--shadow-cta`).
+
+   Accent is intentionally NOT frozen: the CTA reads the live accent tokens so
+   the thumbnails react to the accent picker on the same screen.
+   ========================================================================= */
+
+/* Geometry — identical across the three, so only the paint differs. */
+.dsp-frame {
+  display: flex;
+  height: 5rem;
+  width: 8rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+.dsp-side {
+  display: flex;
+  width: 34%;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 5px;
+  border-right: 1px solid transparent;
+}
+.dsp-nav {
+  height: 4px;
+  opacity: 0.28;
+}
+.dsp-nav-on {
+  opacity: 1;
+}
+.dsp-mainwrap {
+  /* Bottom padding leaves room for Clay's 3px extrusion lip inside the
+     `overflow: hidden` frame. */
+  flex: 1;
+  padding: 5px 5px 7px;
+}
+.dsp-slab {
+  display: flex;
+  height: 100%;
+  border: 1px solid transparent;
+}
+/* Nested container inside the main panel. Transparent for Clean and Clay
+   (they have no such nesting at this altitude); Signature paints it — see
+   below. */
+.dsp-inner {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+}
+.dsp-bar {
+  height: 3px;
+  border-radius: 9999px;
+}
+.dsp-bar-1 {
+  width: 74%;
+  opacity: 0.9;
+}
+.dsp-bar-2 {
+  width: 52%;
+  opacity: 0.4;
+}
+.dsp-cta {
+  margin-top: 3px;
+  height: 8px;
+  width: 46%;
 }
 
-.dark .dsp {
-  --dsp-sig-app: #0d0d0d;
-  --dsp-sig-card: #1c1c1c;
-  --dsp-sig-fg: #eeeeee;
-  --dsp-clean-app: oklch(0.09 0 0);
-  --dsp-clean-card: oklch(0.245 0 0);
-  --dsp-clean-fg: oklch(0.985 0 0);
-  --dsp-clay-app: #171513;
-  --dsp-clay-card: #201d1a;
-  --dsp-clay-fg: #f0ebe3;
+/* ── Signature ─────────────────────────────────────────────────────────── */
+.dsp-signature .dsp-frame {
+  background: #f4f3f1;
+  border-radius: 0.375rem;
+}
+.dsp-signature .dsp-side {
+  background: #fafaf8;
+  /* No right padding: the active row runs to the content edge (below). */
+  padding-right: 0;
+}
+/* Signature's defining move — the selected sidebar row is filled with the
+   *content* fill and butts straight into the main panel (the real thing adds
+   `.xj-nav-chrome-corner` ears above and below), so tab and panel read as one
+   continuous surface. Hence: no gap between sidebar and slab, active row
+   rounded on its left only, slab rounded on its right only. */
+.dsp-signature .dsp-mainwrap {
+  /* No gutter at all: the panel is as tall as the sidebar and butts into it. */
+  padding: 0;
+}
+.dsp-signature .dsp-slab {
+  background: #ffffff;
+  border-radius: 0 0.25rem 0.25rem 0;
+  padding: 4px;
+}
+/* …and the panel's own content sits in a smaller rounded container one step
+   off the panel fill (the entry list / entry cards on `--color-selected-tab`),
+   so Signature reads as tab → panel → card rather than a single flat surface. */
+.dsp-signature .dsp-inner {
+  background: oklch(0.95 0 0);
+  border-radius: 0.1875rem;
+}
+.dsp-signature .dsp-nav,
+.dsp-signature .dsp-bar {
+  background: #1a1917;
+  border-radius: 9999px;
+}
+.dsp-signature .dsp-nav {
+  margin-right: 5px;
+}
+.dsp-signature .dsp-nav-on {
+  height: 10px;
+  margin-right: 0;
+  background: #ffffff;
+  border-radius: 5px 0 0 5px;
+}
+.dsp-signature .dsp-cta {
+  background: var(--grad-accent-fill);
+  border-radius: 9999px;
+}
+
+.dark .dsp-signature .dsp-frame {
+  background: #0d0d0d;
+}
+.dark .dsp-signature .dsp-side {
+  background: #141414;
+}
+.dark .dsp-signature .dsp-slab {
+  background: #1c1c1c;
+}
+.dark .dsp-signature .dsp-inner {
+  background: oklch(0.28 0 0);
+}
+.dark .dsp-signature .dsp-nav,
+.dark .dsp-signature .dsp-bar {
+  background: #eeeeee;
+}
+.dark .dsp-signature .dsp-nav-on {
+  background: #1c1c1c;
+}
+
+/* ── Clean ─────────────────────────────────────────────────────────────── */
+.dsp-clean .dsp-frame {
+  background: oklch(0.985 0 0);
+  border-color: oklch(0.922 0 0);
+  border-radius: 0.25rem;
+}
+.dsp-clean .dsp-side {
+  background: oklch(1 0 0);
+  border-right-color: oklch(0.922 0 0);
+}
+.dsp-clean .dsp-slab {
+  background: oklch(1 0 0);
+  border-color: oklch(0.922 0 0);
+  border-radius: 0.1875rem;
+}
+.dsp-clean .dsp-nav,
+.dsp-clean .dsp-bar {
+  background: oklch(0.145 0 0);
+}
+.dsp-clean .dsp-nav {
+  border-radius: 0.125rem;
+}
+.dsp-clean .dsp-nav-on {
+  background: oklch(0.93 0 0);
+}
+.dsp-clean .dsp-cta {
+  background: var(--color-accent-fill);
+  border-radius: 0.1875rem;
+}
+
+.dark .dsp-clean .dsp-frame {
+  background: oklch(0.09 0 0);
+  border-color: oklch(1 0 0 / 14%);
+}
+.dark .dsp-clean .dsp-side {
+  background: oklch(0.205 0 0);
+  border-right-color: oklch(1 0 0 / 14%);
+}
+.dark .dsp-clean .dsp-slab {
+  background: oklch(0.145 0 0);
+  border-color: oklch(1 0 0 / 14%);
+}
+.dark .dsp-clean .dsp-nav,
+.dark .dsp-clean .dsp-bar {
+  background: oklch(0.985 0 0);
+}
+.dark .dsp-clean .dsp-nav-on {
+  background: oklch(0.32 0 0);
+}
+
+/* ── Clay ──────────────────────────────────────────────────────────────── */
+.dsp-clay .dsp-frame {
+  background: #ebe3d6;
+  border-radius: 0.75rem;
+}
+.dsp-clay .dsp-side {
+  /* Clay's sidebar IS the canvas — no step, unlike the other two. */
+  background: #ebe3d6;
+}
+.dsp-clay .dsp-slab {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.7) 0%, transparent 42%), #f7f1e6;
+  border-radius: 0.625rem;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.7),
+    0 3px 0 #cfc3b0,
+    0 5px 9px rgb(70 50 20 / 0.16);
+}
+.dsp-clay .dsp-nav,
+.dsp-clay .dsp-bar {
+  background: #2a241c;
+}
+.dsp-clay .dsp-nav {
+  border-radius: 0.3125rem;
+}
+.dsp-clay .dsp-nav-on {
+  background: #e7ddd0;
+  box-shadow: 0 1.5px 0 #cfc3b0;
+}
+.dsp-clay .dsp-cta {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.35), transparent 46%), var(--color-accent-fill);
+  border-radius: 0.375rem;
+  box-shadow:
+    0 2px 0 var(--color-accent-deep),
+    inset 0 -1px 3px rgb(0 0 0 / 0.12);
+}
+
+.dark .dsp-clay .dsp-frame,
+.dark .dsp-clay .dsp-side {
+  background: #171513;
+}
+.dark .dsp-clay .dsp-slab {
+  background: linear-gradient(180deg, rgb(255 250 242 / 0.1) 0%, transparent 42%), #201d1a;
+  box-shadow:
+    0 1px 0 rgb(255 250 242 / 0.14),
+    0 3px 0 #0a0806,
+    0 5px 9px rgb(0 0 0 / 0.45);
+}
+.dark .dsp-clay .dsp-nav,
+.dark .dsp-clay .dsp-bar {
+  background: #f0ebe3;
+}
+.dark .dsp-clay .dsp-nav-on {
+  background: #3a352f;
+  box-shadow: 0 1.5px 0 #0a0806;
 }
