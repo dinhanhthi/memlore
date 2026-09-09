@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { PasswordInput } from '../common/PasswordInput'
-import { IconCustom } from '../common/IconCustom'
 import { Button } from '../common/Button'
 import { Callout } from '../common/Callout'
 import { MIN_PASSWORD_LEN, passwordStrength, type Strength } from '../../lib/passwordStrength'
@@ -84,7 +83,20 @@ export function SetPasswordScreen({
   return (
     <AuthPageCard data-testid="set-password-screen" className="max-w-120 p-8">
       <div className="mb-6 flex flex-col items-center gap-3 text-center">
-        <IconCustom name="XjLogo" size={100} />
+        {/* Same mascot as the lock screen: eyes shut while a password is typed. */}
+        <img
+          src={
+            pwLen > 0 || confirm.length > 0
+              ? '/logo-without-container/logo-straight-close-eyes-256.png'
+              : '/logo-without-container/logo-straight-256.png'
+          }
+          width={100}
+          height={100}
+          className="block shrink-0"
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
         <h1 className="font-title text-fg mb-1 text-3xl font-extrabold">
           {t('set_password.title')}
         </h1>
