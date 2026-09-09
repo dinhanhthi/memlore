@@ -52,8 +52,8 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   loadingError?: boolean
 }
 
-/* Native-style control ladder on the 15px root: h-6.5/h-8/h-9/h-11 render
-   at 24.375 / 30 / 33.75 / 41.25px. Icon-only buttons become squares via
+/* Native-style control ladder on the shared 16px root: h-6.5/h-8/h-9/h-11
+   render at 26 / 32 / 36 / 44px. Icon-only buttons become squares via
    the width class of the same step. */
 const sizeClass: Record<ButtonSize, string> = {
   xs: 'h-6.5 text-xs',

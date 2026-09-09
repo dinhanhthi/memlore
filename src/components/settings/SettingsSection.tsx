@@ -3,10 +3,11 @@ import type { ReactNode } from 'react'
 /// `SettingsSection` — titled section wrapper for settings panels.
 ///
 /// Props:
-///   title          — optional section heading (Nunito 700, 15px). Omit when the
-///                    parent tab/panel already provides the heading.
+///   title          — optional section heading (font-display bold, text-lg =
+///                    18px). Omit when the parent tab/panel already provides
+///                    the heading.
 ///   titleAccessory — optional node rendered to the right of the title (same row)
-///   hint           — optional subtitle below the title (12px muted)
+///   hint           — optional subtitle below the title (text-sm muted)
 ///   children       — section content
 ///   inline         — when true, title+hint appear left, children appear right (flex-row)
 ///   id             — optional id on the root <section>

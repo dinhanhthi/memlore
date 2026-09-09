@@ -50,7 +50,7 @@ const SIZE_CLASSES: Record<
     track: 'h-5.5 w-9',
     knob: 'h-4 w-4',
     knobOff: 'left-[2px]',
-    knobOn: 'left-[15px]',
+    knobOn: 'left-4.5',
     label: 'text-sm',
   },
   xs: {
@@ -60,7 +60,7 @@ const SIZE_CLASSES: Record<
     track: 'h-4.5 w-7 ',
     knob: 'h-3.5 w-3.5',
     knobOff: 'left-[2px]',
-    knobOn: 'left-[13px]',
+    knobOn: 'left-3',
     label: 'text-xs',
   },
 }

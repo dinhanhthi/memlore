@@ -762,6 +762,11 @@ describe('Typography token overrides', () => {
     )
     expect(clayLightTokenBodies).toMatch(/--ds-type-scale:\s*1\.06/)
   })
+
+  it('pins the shared html root to 16px (all three skins scale off it)', () => {
+    const htmlRule = css.match(/\nhtml\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(htmlRule).toMatch(/font-size:\s*16px;/)
+  })
 })
 
 describe('Gradients & primary glow', () => {

@@ -64,7 +64,7 @@
      app-wide `text-xs` (settings copy, badges, hints) read too small. */
   --text-xs: calc(0.8125rem * var(--ui-font-scale) * var(--ds-type-scale));
 
-  /* Micro step below text-xs (0.75rem ≈ 11.25px on the 15px root) for
+  /* Micro step below text-xs (0.75rem = 12px on the 16px root) for
      badges, counters and kbd hints. Replaces the ad-hoc text-[9..11px]
      arbitrary values so the whole UI ladder is: 2xs → xs → sm → base → lg. */
   --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
@@ -601,9 +601,10 @@
   --content-grad-from: var(--color-app);
   --content-grad-to: var(--color-app);
 
-  /* Radius — Night Foundry card 10px / input 8px, nearest rem on the
-     15px root (0.625rem / 0.5rem). Button radius stays the Signature
-     pill. --font-title stays Fraunces (not overridden). */
+  /* Radius — Night Foundry card 10px / input 8px. The rem steps
+     (0.625rem / 0.5rem) now land on those px exactly on the shared 16px
+     root. Button radius stays the Signature pill. --font-title stays
+     Fraunces (not overridden). */
   --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
@@ -1116,12 +1117,17 @@
   /* Type — Baloo 2 for UI (product choice over the kit's Nunito; latin +
      vietnamese subsets self-hosted), Fraunces for display headings. --font-title
      stays Fraunces Variable. Editor body stays user-controlled.
-     16px root so rem steps land on 12 / 14 / 16. */
+     Restates the shared 16px root (see the `html` rule) — kept as the kit's
+     own body-size record. */
   --font-sans: 'Baloo 2 Variable', 'Nunito Variable', 'Geist Variable', system-ui, sans-serif;
   --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 16px;
-  /* Kit body is ~16px vs Signature's 15px root (16/15 ≈ 1.067). 1.06 is
-     the chained multiplier so Tailwind-inlined `--text-*` calcs pick it up. */
+  /* Originally written to bridge Signature's old 15px root up to the kit's
+     16px — but `:root.ds-clay` already set a 16px root, so the two stacked
+     and Clay has always shipped at a 16.96px body. Kept at 1.06 to preserve
+     that shipped size now that 16px is the shared root: Clay stays ~6% above
+     Signature/Clean. Chained multiplier so Tailwind-inlined `--text-*`
+     calcs pick it up. */
   --ds-type-scale: 1.06;
   --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
   --text-xs: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
@@ -2101,7 +2107,12 @@
    --------------------------------------------------------- */
 html {
   font-family: var(--font-sans);
-  font-size: 15px;
+  /* Shared 16px root for all three skins. The @theme UI ladder then lands on
+     12 (2xs) / 13 (xs, bumped to 0.8125rem) / 14 (sm) / 16 (base) / 18 (lg).
+     `:root.ds-clay` restates the same 16px (redundant but kept — it documents
+     the Clay kit's own body size); Clay still renders ~6% larger than
+     Signature/Clean via its `--ds-type-scale: 1.06`. */
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -2288,7 +2299,8 @@ body {
 
 /* Editor body font — driven by the user's Font setting (Settings/Appearance).
    Scoped to .ProseMirror so the rest of the app keeps --font-sans.
-   --font-editor-size    user-tunable base size in px (default html 15px)
+   --font-editor-size    user-tunable base size, always written as explicit px
+                         by applyFontSize() — independent of the 16px html root
    --font-editor-scale   per-font visual scale for handwriting fonts
    --font-editor-fg-alpha foreground opacity (0.8 default, 1.0 = full white)
 

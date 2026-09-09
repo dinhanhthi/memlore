@@ -102,9 +102,10 @@ export function DashboardView() {
             data-testid="dashboard-grid"
             className="grid grid-flow-dense auto-rows-(--dashboard-row) grid-cols-1 gap-4 @min-[480px]:grid-cols-2 @min-[720px]:grid-cols-3 @min-[960px]:grid-cols-4"
           >
-            {/* Px CQs, not @lg/@3xl/@5xl: rem follows html font-size (Clay
-                16px) and mixing named rem with arbitrary px lets @3xl win
-                the cascade. 480/720/960 = Signature 15px @lg/@3xl/@5xl. */}
+            {/* Px CQs, not @lg/@3xl/@5xl: mixing named rem steps with
+                arbitrary px lets @3xl win the cascade. These literals do NOT
+                scale with the 16px root, so the column breaks stay at
+                480/720/960px while card content tracks the root. */}
             {visible.map((pref) => {
               const Card = CARD_COMPONENTS[pref.id]
               const enabled = isAiGatedCardId(pref.id) ? aiEnabled[pref.id] : true

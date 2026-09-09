@@ -15,8 +15,8 @@ test('collapsed sidebar is w-12 (3rem) wide', async ({ page }) => {
       const [sidebarBox, shellBox] = await Promise.all([sidebar.boundingBox(), shell.boundingBox()])
       return [sidebarBox?.width, shellBox?.width]
     })
-    // Root font-size is 15px (`globals.css`), so Tailwind `w-12` (3rem) is 45px.
-    .toEqual([45, 45])
+    // Root font-size is 16px (`globals.css`), so Tailwind `w-12` (3rem) is 48px.
+    .toEqual([48, 48])
 })
 
 test('sidebar shows a primary New Entry button', async ({ page }) => {
@@ -50,5 +50,5 @@ test('sidebar shows a primary New Entry button', async ({ page }) => {
       const iconBox = await newEntryButton.locator('svg').boundingBox()
       return [iconBox?.width, iconBox?.height]
     })
-    .toEqual([15, 15])
+    .toEqual([16, 16])
 })

@@ -82,8 +82,9 @@ test('logged-in entry cards use compact metadata dots, tag bars, and roomier row
   ])
   await expect.soft(timeLabel).toHaveClass(/\btext-2xs\b/, { timeout: 500 })
   await expect.soft(journalMarker).toHaveClass(/\btext-2xs\b/, { timeout: 500 })
-  expect.soft(timeFontSize).toBeLessThan(12)
-  expect.soft(journalFontSize).toBeLessThan(12)
+  // text-2xs (0.75rem = 12px on the 16px root) must stay below text-xs (0.8125rem = 13px).
+  expect.soft(timeFontSize).toBeLessThan(13)
+  expect.soft(journalFontSize).toBeLessThan(13)
 
   const dayHeaderPresentation = await groupHeader.evaluate((element) => {
     const base = getComputedStyle(element)
