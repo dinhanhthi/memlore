@@ -18,6 +18,37 @@ const DESIGN_SYSTEM_OPTIONS: DesignSystem[] = [...DESIGN_SYSTEMS]
 const THEME_OPTIONS: Theme[] = ['light', 'dark']
 const SURFACE_OPTIONS: SurfaceStyle[] = [...SURFACE_STYLES]
 
+/// Static Tailwind classes for each design-system thumbnail. The colours come
+/// from the `.dsp` custom properties in `globals.css` (fixed depictions — the
+/// semantic tokens always paint the *current* skin, which is exactly what a
+/// comparison must not do), including the radii — `rounded-md` & friends
+/// resolve against the *active* skin's `--radius-*` ladder, which Clay
+/// redefines. Radius differs per skin on purpose: Clean is shadcn-flat,
+/// Clay is heavily rounded.
+const DESIGN_SYSTEM_PREVIEWS: Record<
+  DesignSystem,
+  { app: string; card: string; fg: string; radius: string }
+> = {
+  signature: {
+    app: 'bg-(--dsp-sig-app)',
+    card: 'bg-(--dsp-sig-card)',
+    fg: 'bg-(--dsp-sig-fg)',
+    radius: 'rounded-(--dsp-sig-radius)',
+  },
+  clean: {
+    app: 'bg-(--dsp-clean-app)',
+    card: 'bg-(--dsp-clean-card)',
+    fg: 'bg-(--dsp-clean-fg)',
+    radius: 'rounded-(--dsp-clean-radius)',
+  },
+  clay: {
+    app: 'bg-(--dsp-clay-app)',
+    card: 'bg-(--dsp-clay-card)',
+    fg: 'bg-(--dsp-clay-fg)',
+    radius: 'rounded-(--dsp-clay-radius)',
+  },
+}
+
 /// `ThemeStep` — design system, appearance (light/dark), accent color and
 /// dark surface style, all with live preview via the same setters
 /// Settings > Appearance uses.
@@ -52,16 +83,58 @@ export function ThemeStep() {
         <span className="text-fg mb-1.5 block text-sm font-medium">
           {t('onboarding.theme.design_system_label')}
         </span>
-        <SegmentedControl<DesignSystem>
-          ariaLabel={t('settings:appearance.design_system.radiogroup_label')}
-          value={designSystem}
-          onChange={setDesignSystem}
-          options={DESIGN_SYSTEM_OPTIONS.map((id) => ({
-            value: id,
-            label: t(`settings:appearance.design_system.${id}.label`),
-            ariaLabel: t(`settings:appearance.design_system.${id}.aria`),
-          }))}
-        />
+        <div
+          role="radiogroup"
+          aria-label={t('settings:appearance.design_system.radiogroup_label')}
+          className="dsp flex items-start gap-2"
+        >
+          {DESIGN_SYSTEM_OPTIONS.map((id) => {
+            const selected = designSystem === id
+            const pv = DESIGN_SYSTEM_PREVIEWS[id]
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={t(`settings:appearance.design_system.${id}.aria`)}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setDesignSystem(id)}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-xl border p-1.5 outline-none',
+                  'transition-[box-shadow,border-color] duration-150',
+                  selected
+                    ? 'border-accent ring-accent ring-1'
+                    : 'border-border-default hover:border-border-strong',
+                )}
+              >
+                {/* Miniature app: canvas → card → two text bars + accent pill. */}
+                <span
+                  className={cn(
+                    'flex h-14 w-20 items-end justify-center overflow-hidden p-1.5',
+                    pv.radius,
+                    pv.app,
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex h-full w-full flex-col justify-center gap-1 p-1.5',
+                      pv.radius,
+                      pv.card,
+                    )}
+                  >
+                    <span className={cn('h-1 w-3/4 rounded-full opacity-90', pv.fg)} />
+                    <span className={cn('h-1 w-1/2 rounded-full opacity-40', pv.fg)} />
+                    <span className={cn('bg-accent mt-0.5 h-1.5 w-2/5', pv.radius)} />
+                  </span>
+                </span>
+                <span className={cn('text-xs font-medium', selected ? 'text-fg' : 'text-fg-muted')}>
+                  {t(`settings:appearance.design_system.${id}.label`)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Always mounted, like Settings: when light isn't allowed (Signature +

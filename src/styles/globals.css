@@ -3040,3 +3040,47 @@ textarea:focus-visible {
 :root.ds-clay.reduce-motion button[data-variant]:active:not(:disabled) {
   transform: none;
 }
+
+/* ══ Design-system preview thumbnails ══════════════════════════════════════
+   Onboarding "Choose your look" paints a tiny mock of each skin so the user
+   can compare Signature / Clean / Clay side by side.
+
+   These are FIXED DEPICTIONS, not skinnable UI: the whole point is to show
+   what Clean and Clay look like while the app itself is painted in
+   Signature, so they cannot go through the semantic tokens. Values mirror
+   `--color-app` / `--color-elevated` / `--color-fg` from the `:root`,
+   `.dark`, `:root(.dark).ds-clean` and `:root(.dark).ds-clay` blocks above —
+   change them together. Scoped to `.dsp` so no design-system override layer
+   picks them up. Accent is intentionally omitted: thumbnails use the live
+   `bg-accent` so they react to the accent picker on the same screen. */
+.dsp {
+  --dsp-sig-app: #f4f3f1;
+  --dsp-sig-card: #ffffff;
+  --dsp-sig-fg: #1a1917;
+  --dsp-clean-app: oklch(0.985 0 0);
+  --dsp-clean-card: oklch(1 0 0);
+  --dsp-clean-fg: oklch(0.145 0 0);
+  --dsp-clay-app: #ebe3d6;
+  --dsp-clay-card: #f7f1e6;
+  --dsp-clay-fg: #2a241c;
+
+  /* Thumbnail radii — scaled-down depictions of each skin's `--radius-*`
+     ladder (Signature/Clean 0.625rem, Clay 1.15rem). They must NOT use
+     `rounded-md`/`rounded-lg`: `:root.ds-clay` redefines those, so the
+     Signature thumbnail would turn Clay-round whenever Clay is active. */
+  --dsp-sig-radius: 0.375rem;
+  --dsp-clean-radius: 0.125rem;
+  --dsp-clay-radius: 0.75rem;
+}
+
+.dark .dsp {
+  --dsp-sig-app: #0d0d0d;
+  --dsp-sig-card: #1c1c1c;
+  --dsp-sig-fg: #eeeeee;
+  --dsp-clean-app: oklch(0.09 0 0);
+  --dsp-clean-card: oklch(0.245 0 0);
+  --dsp-clean-fg: oklch(0.985 0 0);
+  --dsp-clay-app: #171513;
+  --dsp-clay-card: #201d1a;
+  --dsp-clay-fg: #f0ebe3;
+}
