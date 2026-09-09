@@ -294,12 +294,12 @@ export function MemoriesSettings({ onPrivacyPrompt, credentials }: MemoriesSetti
               </p>
               <p className="text-fg-muted text-sm">{t('user_memory.protected_read_note')}</p>
               <div className="flex justify-end gap-2 pt-1">
-                <Button variant="ghost" size="xs" onClick={() => setShowProtectedRisk(false)}>
+                <Button variant="ghost" size="sm" onClick={() => setShowProtectedRisk(false)}>
                   {t('action.forget_cancel')}
                 </Button>
                 <Button
                   variant="primary"
-                  size="xs"
+                  size="sm"
                   onClick={() => {
                     void setIncludeProtected(true)
                     setShowProtectedRisk(false)
@@ -1116,13 +1116,13 @@ function MemoryItemRow({
             <div className="flex items-center gap-2">
               <Button
                 variant="primary"
-                size="xs"
+                size="sm"
                 loading={saving}
                 onClick={() => void handleSaveEdit()}
               >
                 {t('action.save')}
               </Button>
-              <Button variant="ghost" size="xs" onClick={() => setEditing(false)} disabled={saving}>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
                 {t('action.forget_cancel')}
               </Button>
             </div>
@@ -1155,7 +1155,7 @@ function MemoryItemRow({
             <Tooltip content={t('user_memory.edit')} placement="top">
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 icon={<Pencil className="size-3.5" />}
                 onClick={startEdit}
                 aria-label={t('user_memory.edit')}
@@ -1167,7 +1167,7 @@ function MemoryItemRow({
             >
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 icon={<Brain className={enabled ? 'text-accent size-3.5' : 'size-3.5'} />}
                 onClick={() => void onToggle(id, !enabled)}
                 aria-label={enabled ? t('user_memory.disable') : t('user_memory.enable')}
@@ -1176,7 +1176,7 @@ function MemoryItemRow({
             <Tooltip content={t('user_memory.delete')} placement="top">
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 icon={<Trash2 className="size-3.5" />}
                 onClick={() => setConfirmOpen(true)}
                 aria-label={t('user_memory.delete')}

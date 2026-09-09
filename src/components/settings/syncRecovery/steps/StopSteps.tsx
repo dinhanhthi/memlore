@@ -123,7 +123,7 @@ export function StopSteps({ render, onStatusChanged }: StopStepsProps) {
               <Button
                 key={choice}
                 variant="secondary"
-                size="xs"
+                size="sm"
                 className="h-auto w-full items-start justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
                 onClick={() => choose(choice)}
                 data-testid={`gdrive-recovery-stop-${choice}`}

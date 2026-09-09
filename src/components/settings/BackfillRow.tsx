@@ -287,10 +287,10 @@ export function BackfillRow({
                   `start_backfill` gates only on the one-time privacy
                   receipt — never on `hostedConsentAt` — so nothing
                   server-side re-checks the cost of this click. */}
-              <Button variant="primary" size="xs" onClick={() => setShowRebuildConfirm(true)}>
+              <Button variant="primary" size="sm" onClick={() => setShowRebuildConfirm(true)}>
                 {t('backfill.reindex_start')}
               </Button>
-              <Button variant="ghost" size="xs" onClick={() => onDismissReindexPrompt?.()}>
+              <Button variant="ghost" size="sm" onClick={() => onDismissReindexPrompt?.()}>
                 {t('backfill.reindex_dismiss')}
               </Button>
             </div>
@@ -322,7 +322,7 @@ export function BackfillRow({
 
         {status === 'needs_consent' && (
           <div className="mt-2.5">
-            <Button variant="secondary" size="xs" onClick={openConsentModal}>
+            <Button variant="secondary" size="sm" onClick={openConsentModal}>
               {t('backfill.review_consent')}
             </Button>
           </div>
@@ -339,7 +339,7 @@ export function BackfillRow({
           {running && (
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               icon={<Pause className="size-3.5" strokeWidth={2} />}
               onClick={() => {
                 void pause()
@@ -350,7 +350,7 @@ export function BackfillRow({
           )}
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             loading={pending === 'start'}
             icon={<Play className="size-3.5" strokeWidth={2} />}
             onClick={() => {
@@ -363,7 +363,7 @@ export function BackfillRow({
               keep an explicit confirm since it re-embeds everything. */}
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             icon={<RotateCcw className="size-3.5" strokeWidth={2} />}
             onClick={() => setShowRebuildConfirm(true)}
           >
@@ -402,12 +402,12 @@ export function BackfillRow({
             </p>
             <p className="text-fg-muted text-2xs">{t('background.protected_read_note')}</p>
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" size="xs" onClick={() => setShowProtectedRisk(false)}>
+              <Button variant="ghost" size="sm" onClick={() => setShowProtectedRisk(false)}>
                 {t('action.forget_cancel')}
               </Button>
               <Button
                 variant="primary"
-                size="xs"
+                size="sm"
                 onClick={() => {
                   void setIncludeProtected(true)
                   setShowProtectedRisk(false)

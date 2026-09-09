@@ -75,7 +75,7 @@ export function FeaturePromptEditor({
         </span>
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           aria-controls={editorId}
           aria-expanded={expanded}
           disabled={disabled}
@@ -105,7 +105,7 @@ export function FeaturePromptEditor({
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               disabled={disabled || saving || !dirty}
               onClick={() => void handleSave()}
             >
@@ -113,7 +113,7 @@ export function FeaturePromptEditor({
             </Button>
             <Button
               variant="ghost"
-              size="xs"
+              size="sm"
               disabled={disabled || saving || !isCustom}
               onClick={() => void handleReset()}
             >

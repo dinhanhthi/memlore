@@ -197,7 +197,7 @@ export function TemplatesSettings() {
                             <div className="flex shrink-0 gap-1">
                               <Button
                                 variant="ghost"
-                                size="xs"
+                                size="sm"
                                 aria-label={t('templates_section.edit_aria', { name: tpl.name })}
                                 onClick={() => {
                                   setEditingTemplate(tpl)
@@ -208,7 +208,7 @@ export function TemplatesSettings() {
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="xs"
+                                size="sm"
                                 aria-label={t('templates_section.delete_aria', { name: tpl.name })}
                                 onClick={() => setDeleteTarget(tpl)}
                               >
@@ -223,7 +223,7 @@ export function TemplatesSettings() {
                     <div className="mt-3">
                       <Button
                         variant="ghost"
-                        size="xs"
+                        size="sm"
                         onClick={() => {
                           setEditingTemplate(null)
                           setShowForm(true)

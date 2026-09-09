@@ -171,7 +171,7 @@ export function MediaCacheSettings() {
             >
               <Button
                 variant="secondary"
-                size="xs"
+                size="sm"
                 disabled={busy || !stats || stats.usedBytes === 0}
                 onClick={handleClear}
                 data-testid="clear-cache-button"

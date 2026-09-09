@@ -104,7 +104,7 @@ export function DeviceList({ devices, error, onRename, onRefresh }: Props) {
         >
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             onClick={() => void handleRefresh()}
             // Pass `undefined` (not `false`) when idle so Button's
             // `disabled={disabled ?? loading}` still disables while refreshing.
@@ -162,7 +162,7 @@ export function DeviceList({ devices, error, onRename, onRefresh }: Props) {
             </p>
             <Button
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => useUiStore.getState().setDeviceRemovalOutcome(null)}
               aria-label={t('security.devices.remove_outcome_dismiss')}
             >
@@ -204,7 +204,7 @@ export function DeviceList({ devices, error, onRename, onRefresh }: Props) {
                   <Tooltip content={t('security.devices.rename')} placement="bottom">
                     <Button
                       variant="ghost"
-                      size="xs"
+                      size="sm"
                       onClick={() => openRename(device)}
                       disabled={actionsDisabled}
                       aria-label={t('security.devices.rename')}
@@ -216,7 +216,7 @@ export function DeviceList({ devices, error, onRename, onRefresh }: Props) {
                     <Tooltip content={t('security.devices.remove_or_revoke')} placement="bottom">
                       <Button
                         variant="ghost"
-                        size="xs"
+                        size="sm"
                         onClick={() =>
                           useSecureWizardStore.getState().openForDevice({
                             deviceId: device.device_id,

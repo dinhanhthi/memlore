@@ -157,7 +157,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
                   <Button
                     key={device.device_id}
                     variant="secondary"
-                    size="xs"
+                    size="sm"
                     className="h-auto w-full justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
                     aria-label={t('settings:security.secure_wizard.device.select', {
                       device: device.name,
@@ -177,7 +177,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
                 </p>
                 <Button
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   className="self-start"
                   onClick={goToRoutineRotation}
                 >
@@ -198,7 +198,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
           <div className="grid gap-2">
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               className="h-auto justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
               onClick={() => choose('phrase_leaked')}
             >
@@ -206,7 +206,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
             </Button>
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               className="h-auto justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
               onClick={() => choose('phrase_safe')}
             >
@@ -214,7 +214,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
             </Button>
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               className="h-auto items-start justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
               onClick={() => choose('just_remove')}
             >
@@ -239,7 +239,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
           <div className="grid gap-3">
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               className="h-auto items-start justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
               onClick={() => choose('revoke_only')}
             >
@@ -254,7 +254,7 @@ export function DeviceBranchSteps({ render }: SecureWizardStepProps) {
             </Button>
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               className="h-auto items-start justify-start rounded-xl px-4 py-3 text-left whitespace-normal"
               onClick={() => choose('cutoff_google')}
             >

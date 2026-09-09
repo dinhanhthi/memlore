@@ -92,7 +92,7 @@ export function CloudProviderPicker({
                   <p className="text-fg-muted min-w-0 truncate text-xs">{localPath}</p>
                 ) : null}
                 <Button
-                  size="xs"
+                  size="sm"
                   disabled={disabled}
                   onClick={onPickFolder}
                   className="w-full whitespace-nowrap"

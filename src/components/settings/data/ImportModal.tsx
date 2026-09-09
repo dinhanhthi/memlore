@@ -453,7 +453,7 @@ export function ImportModal() {
           />
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             icon={<Folder className="size-4" strokeWidth={1.75} />}
             onClick={() => void handleBrowse()}
             data-testid="import-browse"
@@ -543,12 +543,12 @@ export function ImportModal() {
             className="border-danger-border"
           />
           <div className="mt-3 flex gap-2">
-            <Button variant="secondary" size="xs" onClick={handleReset}>
+            <Button variant="secondary" size="sm" onClick={handleReset}>
               {t('confirm.cancel')}
             </Button>
             <Button
               variant="destructive"
-              size="xs"
+              size="sm"
               onClick={runImport}
               disabled={confirmText !== 'DELETE'}
               data-testid="replace-confirm-button"
@@ -725,7 +725,7 @@ export function ImportModal() {
               />
               <Button
                 variant="secondary"
-                size="xs"
+                size="sm"
                 onClick={() => void handleBrowseReport()}
                 aria-label={t('modal.browse')}
               >
@@ -746,12 +746,12 @@ export function ImportModal() {
             )}
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" size="xs" onClick={() => setReportOpen(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setReportOpen(false)}>
               {t('apple.save_report_cancel')}
             </Button>
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               data-testid="apple-save-report-confirm"
               onClick={() => void handleSaveReport()}
               disabled={!reportPath.trim() || reportInsideSource}
@@ -767,7 +767,7 @@ export function ImportModal() {
         <div className="border-danger-border bg-danger-bg rounded-xl border p-4">
           <p className="text-danger-fg text-sm font-medium">{t('modal.error')}</p>
           {error && <p className="text-danger-fg mt-1 font-mono text-xs">{error}</p>}
-          <Button variant="secondary" size="xs" className="mt-3" onClick={handleReset}>
+          <Button variant="secondary" size="sm" className="mt-3" onClick={handleReset}>
             {t('modal.cancel_button')}
           </Button>
         </div>

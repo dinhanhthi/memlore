@@ -102,7 +102,7 @@ function NotificationPermissionBanner() {
       tone="warning"
       title={t('permission_title')}
       action={
-        <Button variant="secondary" size="xs" onClick={() => void handleGrant()}>
+        <Button variant="secondary" size="sm" onClick={() => void handleGrant()}>
           {t('permission_grant')}
         </Button>
       }
@@ -273,10 +273,10 @@ function ReminderForm({ initial, onSave, onCancel }: ReminderFormProps) {
       {validationError && <p className="text-destructive text-xs">{validationError}</p>}
 
       <div className="flex gap-2 pt-1">
-        <Button type="submit" variant="primary" size="xs" disabled={saving}>
+        <Button type="submit" variant="primary" size="sm" disabled={saving}>
           {t('save')}
         </Button>
-        <Button type="button" variant="ghost" size="xs" onClick={onCancel} disabled={saving}>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
           {t('cancel')}
         </Button>
       </div>
@@ -464,7 +464,7 @@ export function RemindersPanel() {
               ) : (
                 <Button
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   icon={<Plus className="size-3.5" strokeWidth={1.75} />}
                   onClick={() => {
                     setShowAddForm(true)

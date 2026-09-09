@@ -169,10 +169,10 @@ function AIPrivacyNoticeBody({
 
       {mode === 'accept' && !hideActions && (
         <div className="border-border-default flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-          <Button variant="ghost" size="xs" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose}>
             {t('action.forget_cancel', { defaultValue: 'Cancel' })}
           </Button>
-          <Button variant="primary" size="xs" onClick={onAccept}>
+          <Button variant="primary" size="sm" onClick={onAccept}>
             {t('action.accept_privacy', { defaultValue: 'I understand and agree' })}
           </Button>
         </div>

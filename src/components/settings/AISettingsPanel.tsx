@@ -681,7 +681,7 @@ function AiSetupAttentionBanner({
       tone="warning"
       title={title}
       action={
-        <Button variant="secondary" size="xs" onClick={onAction}>
+        <Button variant="secondary" size="sm" onClick={onAction}>
           {actionLabel}
         </Button>
       }

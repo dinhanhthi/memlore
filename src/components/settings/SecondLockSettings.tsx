@@ -213,12 +213,12 @@ export function SecondLockSettings() {
               />
               {setError && <p className="text-danger-text text-xs">{setError}</p>}
               <div className="mt-2 flex gap-2">
-                <Button type="submit" size="xs" loading={isSetBusy}>
+                <Button type="submit" size="sm" loading={isSetBusy}>
                   {t('security.second_lock.enable_button')}
                 </Button>
                 <Button
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   disabled={isSetBusy}
                   onClick={() => {
                     resetSetForm()
@@ -259,7 +259,7 @@ export function SecondLockSettings() {
                 {!showChangeForm && (
                   <Button
                     variant="secondary"
-                    size="xs"
+                    size="sm"
                     onClick={() => {
                       resetChangeForm()
                       setChangeSuccess(false)
@@ -302,12 +302,12 @@ export function SecondLockSettings() {
                   />
                   {changeError && <p className="text-danger-text text-xs">{changeError}</p>}
                   <div className="mt-2 flex gap-2">
-                    <Button type="submit" size="xs" loading={isChangeBusy}>
+                    <Button type="submit" size="sm" loading={isChangeBusy}>
                       {t('security.second_lock.update_button')}
                     </Button>
                     <Button
                       variant="secondary"
-                      size="xs"
+                      size="sm"
                       disabled={isChangeBusy}
                       onClick={() => {
                         resetChangeForm()
@@ -379,7 +379,7 @@ export function SecondLockSettings() {
             {disableError && <p className="text-danger-fg mt-2 text-sm">{disableError}</p>}
             <Button
               variant="destructive"
-              size="xs"
+              size="sm"
               className="mt-3"
               onClick={() => {
                 setDisableError(null)

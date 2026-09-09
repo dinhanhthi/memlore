@@ -31,10 +31,10 @@ function DownloadRow({ row, onRemove }: { row: DownloadedAsset; onRemove: () => 
       }
     >
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="xs" onClick={row.openSetting}>
+        <Button variant="ghost" size="sm" onClick={row.openSetting}>
           {t('data_section.downloads.open_in_settings')}
         </Button>
-        <Button variant="destructive" size="xs" onClick={onRemove}>
+        <Button variant="destructive" size="sm" onClick={onRemove}>
           {t('data_section.downloads.remove')}
         </Button>
       </div>

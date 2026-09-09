@@ -549,7 +549,7 @@ export function GoogleDriveSettings() {
           action={
             <Button
               variant="primary"
-              size="xs"
+              size="sm"
               loading={isBusy}
               disabled={isBusy}
               onClick={handleReconnect}
@@ -571,7 +571,7 @@ export function GoogleDriveSettings() {
           action={
             <Button
               variant="primary"
-              size="xs"
+              size="sm"
               onClick={() => setSettingsCategory('security')}
               data-testid="cross-mode-goto-security"
             >
@@ -591,7 +591,7 @@ export function GoogleDriveSettings() {
           action={
             <Button
               variant="primary"
-              size="xs"
+              size="sm"
               onClick={() => setSettingsCategory('security')}
               data-testid="cross-mode-goto-security"
             >
@@ -609,7 +609,7 @@ export function GoogleDriveSettings() {
           tone="success"
           className="mb-4"
           action={
-            <Button variant="ghost" size="xs" onClick={() => setRecoverySuccess(null)}>
+            <Button variant="ghost" size="sm" onClick={() => setRecoverySuccess(null)}>
               {t('gdrive.help.delete_and_disconnect.dismiss_success')}
             </Button>
           }
@@ -628,7 +628,7 @@ export function GoogleDriveSettings() {
           action={
             <Button
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => {
                 void dismissScopeUpgrade()
               }}
@@ -681,7 +681,7 @@ export function GoogleDriveSettings() {
             {showRecoveryResume && (
               <Button
                 variant="secondary"
-                size="xs"
+                size="sm"
                 loading={recoveryActionBusy}
                 disabled={recoveryActionBusy}
                 onClick={() => {
@@ -697,7 +697,7 @@ export function GoogleDriveSettings() {
             {recovery.canCancelSafely && (
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 disabled={recoveryActionBusy}
                 onClick={() => {
                   void handleCancelRecovery()
@@ -806,7 +806,7 @@ export function GoogleDriveSettings() {
                   aria-label={t('gdrive.storage_quota_notice.dismiss')}
                   icon={<X className="size-4" />}
                   onClick={dismissCriticalQuotaNotice}
-                  size="xs"
+                  size="sm"
                   variant="ghost"
                 />
               }
@@ -815,7 +815,7 @@ export function GoogleDriveSettings() {
               <Button
                 className="mt-2"
                 onClick={() => setSettingsCategory('media')}
-                size="xs"
+                size="sm"
                 variant="secondary"
               >
                 {t('gdrive.storage_quota_notice.media_settings')}
@@ -863,7 +863,7 @@ export function GoogleDriveSettings() {
       {/* Disconnected: Connect only. Connected: Sync now / Disconnect / Help. */}
       <div className="my-3 flex flex-wrap gap-2">
         {!isConnected && (
-          <Button size="xs" disabled={connectDisabled} onClick={handleConnectClick}>
+          <Button size="sm" disabled={connectDisabled} onClick={handleConnectClick}>
             {isBusy
               ? t('gdrive.connecting')
               : isInitialLoading
@@ -875,7 +875,7 @@ export function GoogleDriveSettings() {
         {!isConnected && selected === 'gdrive' && isAwaitingCallback && (
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             onClick={handleCancelConnect}
             data-testid="gdrive-cancel-connect"
           >
@@ -917,7 +917,7 @@ export function GoogleDriveSettings() {
         <div className="mb-2">
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             disabled={actionsDisabled}
             onClick={() => useSyncRecoveryWizardStore.getState().openWizard()}
             data-testid="gdrive-open-sync-help"

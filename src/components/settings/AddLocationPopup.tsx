@@ -84,7 +84,7 @@ export function AddLocationPopup({ onSave, onClose }: AddLocationPopupProps) {
       <div className="flex gap-2">
         <Button
           variant="primary"
-          size="xs"
+          size="sm"
           onClick={() => void handleSave()}
           disabled={isSaving}
           className="flex-1 justify-center"
@@ -94,7 +94,7 @@ export function AddLocationPopup({ onSave, onClose }: AddLocationPopupProps) {
         </Button>
         <Button
           variant="secondary"
-          size="xs"
+          size="sm"
           onClick={onClose}
           disabled={isSaving}
           className="flex-1 justify-center"

@@ -81,7 +81,7 @@ export function GeocodeCheckButton({
   const checkButton = (
     <Button
       variant="secondary"
-      size="xs"
+      size="sm"
       type="button"
       loading={isChecking}
       disabled={disabled}

@@ -334,12 +334,12 @@ export function ProvidersTab({ onError, onPrivacyPrompt }: ProvidersTabProps) {
                   connected
                   actions={
                     <>
-                      <Button variant="secondary" size="xs" onClick={() => setModalKey(preset.id)}>
+                      <Button variant="secondary" size="sm" onClick={() => setModalKey(preset.id)}>
                         {t('providers_tab.config', { defaultValue: 'Config' })}
                       </Button>
                       <Button
                         variant="destructive"
-                        size="xs"
+                        size="sm"
                         onClick={() => handleDisconnect(preset.id)}
                       >
                         {t('providers_tab.disconnect', { defaultValue: 'Disconnect' })}
@@ -364,7 +364,7 @@ export function ProvidersTab({ onError, onPrivacyPrompt }: ProvidersTabProps) {
                   }
                   actions={
                     <>
-                      <Button variant="secondary" size="xs" onClick={() => setModalKey(card.id)}>
+                      <Button variant="secondary" size="sm" onClick={() => setModalKey(card.id)}>
                         {t('providers_tab.config', { defaultValue: 'Config' })}
                       </Button>
                       {/* No Disconnect: an on-device card is only ever here
@@ -419,7 +419,7 @@ export function ProvidersTab({ onError, onPrivacyPrompt }: ProvidersTabProps) {
                       actions={
                         <Button
                           variant="secondary"
-                          size="xs"
+                          size="sm"
                           onClick={() => handleConnect(preset.id)}
                         >
                           {t('providers_tab.connect', { defaultValue: 'Connect' })}
@@ -436,7 +436,7 @@ export function ProvidersTab({ onError, onPrivacyPrompt }: ProvidersTabProps) {
                       actions={
                         <Button
                           variant="secondary"
-                          size="xs"
+                          size="sm"
                           onClick={() => handleConnect(card.id)}
                         >
                           {t('providers_tab.connect', { defaultValue: 'Connect' })}

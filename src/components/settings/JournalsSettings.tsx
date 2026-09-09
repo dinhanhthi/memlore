@@ -258,7 +258,7 @@ export function JournalsSettings() {
           <div className="mt-3">
             <Button
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => {
                 setEditingJournal(null)
                 setShowForm(true)

@@ -219,7 +219,7 @@ export function InvisibleLockSettings() {
                 <Button
                   type="submit"
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   loading={isOpenBusy}
                   disabled={openPassword.length === 0}
                 >
@@ -247,7 +247,7 @@ export function InvisibleLockSettings() {
           >
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               disabled={!isSessionUnlocked}
               onClick={() => {
                 resetChangeForm()
@@ -272,7 +272,7 @@ export function InvisibleLockSettings() {
           >
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               onClick={() => {
                 setRemoveMessage(null)
                 setRemoveConfirmOpen(true)

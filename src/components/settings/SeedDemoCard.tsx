@@ -128,7 +128,7 @@ export function SeedDemoCard() {
       </div>
       <Button
         variant="primary"
-        size="xs"
+        size="sm"
         loading={loading || statusLoading}
         disabled={disabled}
         onClick={handleSeed}

@@ -193,7 +193,7 @@ export function EncryptionSettings() {
             {!showChangeForm && (
               <Button
                 variant="secondary"
-                size="xs"
+                size="sm"
                 onClick={() => {
                   resetFormFields()
                   setChangeSuccess(false)
@@ -210,12 +210,12 @@ export function EncryptionSettings() {
               <ChangePasswordFields onChange={setChangeCredentials} disabled={isChangeBusy} />
               {changeError && <p className="text-danger-text text-xs">{changeError}</p>}
               <div className="mt-2 flex gap-2">
-                <Button type="submit" size="xs" disabled={!canSubmitChange}>
+                <Button type="submit" size="sm" disabled={!canSubmitChange}>
                   {isChangeBusy ? t('security.password.updating') : t('security.password.update')}
                 </Button>
                 <Button
                   variant="secondary"
-                  size="xs"
+                  size="sm"
                   disabled={isChangeBusy}
                   onClick={() => {
                     setShowChangeForm(false)
@@ -279,7 +279,7 @@ export function EncryptionSettings() {
           </p>
           <Button
             variant="primary"
-            size="xs"
+            size="sm"
             className="mt-4"
             onClick={() => useSecureWizardStore.getState().openWizard()}
             disabled={rotationBusy}

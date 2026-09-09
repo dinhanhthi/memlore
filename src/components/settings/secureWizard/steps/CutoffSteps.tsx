@@ -176,14 +176,14 @@ function CutoffReconnectStep({ render }: SecureWizardStepProps) {
               {t(connectErrorKey, i18nProvider)}
             </p>
             {connectErrorKey === GENERIC_CONNECT_ERROR_KEY && (
-              <Button variant="secondary" size="xs" onClick={openSyncSettings}>
+              <Button variant="secondary" size="sm" onClick={openSyncSettings}>
                 {t('settings:security.secure_wizard.cutoff.step3_open_sync_settings')}
               </Button>
             )}
           </div>
         )}
         {!connecting && (
-          <Button variant="ghost" size="xs" onClick={handleSkip} className="self-start">
+          <Button variant="ghost" size="sm" onClick={handleSkip} className="self-start">
             {t('settings:security.secure_wizard.cutoff.skip')}
           </Button>
         )}
@@ -296,7 +296,7 @@ export function CutoffSteps({ render }: SecureWizardStepProps) {
 
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               onClick={() => void handleDisconnect()}
               loading={disconnectStatus === 'running'}
               disabled={disconnectStatus === 'done' || disconnectStatus === 'running'}
@@ -321,7 +321,7 @@ export function CutoffSteps({ render }: SecureWizardStepProps) {
 
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               onClick={() => void handleOpenGoogle()}
               className="self-start"
             >

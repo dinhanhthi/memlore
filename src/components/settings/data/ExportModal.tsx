@@ -283,7 +283,7 @@ export function ExportModal() {
         <div className="border-danger-border bg-danger-bg rounded-xl border p-4">
           <p className="text-danger-fg text-sm font-medium">{t('modal.error')}</p>
           {error && <p className="text-danger-fg mt-1 font-mono text-xs">{error}</p>}
-          <Button variant="secondary" size="xs" className="mt-3" onClick={handleReset}>
+          <Button variant="secondary" size="sm" className="mt-3" onClick={handleReset}>
             {t('modal.cancel_button')}
           </Button>
         </div>

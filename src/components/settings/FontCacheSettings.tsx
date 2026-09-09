@@ -94,7 +94,7 @@ export function FontCacheSettings() {
         <div>
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             onClick={handleClear}
             // Stay enabled when EITHER the cache has files OR the slot is
             // still configured: an externally-wiped cache (rm, OS cleanup)
