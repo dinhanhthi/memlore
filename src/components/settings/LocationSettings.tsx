@@ -1,6 +1,6 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useFloating, offset, flip, shift, autoUpdate, FloatingPortal } from '@floating-ui/react'
-import { Download, Eye, EyeOff, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { Download, Eye, EyeOff, ExternalLink, Plus, Star, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { useTranslation } from 'react-i18next'
@@ -27,7 +27,6 @@ import { Tooltip } from '../common/Tooltip'
 import { SettingsRow } from './SettingsRow'
 import { SettingsGroup } from './SettingsSurfaceCard'
 import { Toggle } from './Toggle'
-import { DefaultLocationForm } from './DefaultLocationForm'
 import { AddLocationPopup } from './AddLocationPopup'
 import { GeocodeCheckButton } from './GeocodeCheckButton'
 import { SettingsTabList } from './SettingsTabList'
@@ -308,7 +307,6 @@ function MapDisplaySection() {
 
 const LOCATION_TABS: { id: LocationTab; labelKey: string; defaultLabel: string }[] = [
   { id: 'geocoding', labelKey: 'location.tabs.geocoding', defaultLabel: 'Location & geocoding' },
-  { id: 'default', labelKey: 'location.tabs.default', defaultLabel: 'Default location' },
   { id: 'saved', labelKey: 'location.tabs.saved', defaultLabel: 'Saved locations' },
 ]
 
@@ -319,10 +317,10 @@ function locationPanelId(id: LocationTab) {
   return `location-panel-${id}`
 }
 
-/// `LocationSettings` — three horizontal tabs (mirrors AI panel layout):
+/// `LocationSettings` — two horizontal tabs (mirrors AI panel layout):
 /// 1. Location & geocoding — provider segmented control + optional API key
-/// 2. Default location — toggle + form (auto-fill on entry creation)
-/// 3. Saved locations — list / add / delete location_aliases
+/// 2. Saved locations — auto-add toggle + list / add / star-as-default / delete
+///    of location_aliases (the starred alias is the default location)
 export function LocationSettings() {
   const { t } = useTranslation('settings')
 
@@ -593,17 +591,17 @@ export function LocationSettings() {
                 </div>
               )}
 
-              {tab.id === 'default' && (
+              {tab.id === 'saved' && (
                 <div className="max-w-180 space-y-5">
                   <SettingsGroup
                     title={t('location.defaultLocation.title')}
                     tip={t('location.defaultLocation.description')}
-                    divided={false}
                   >
                     <SettingsRow
                       className="px-4"
                       divider={false}
                       title={t('location.defaultLocation.toggle')}
+                      hint={defaultLoc.label || t('location.defaultLocation.noAddress')}
                     >
                       <Toggle
                         checked={defaultLoc.enabled}
@@ -612,24 +610,7 @@ export function LocationSettings() {
                         disabled={defaultLoc.isLoading}
                       />
                     </SettingsRow>
-                    {defaultLoc.enabled && (
-                      <div className="border-border-default border-t px-4 pt-3 pb-4">
-                        <DefaultLocationForm
-                          initialLabel={defaultLoc.label}
-                          initialAddress={defaultLoc.address}
-                          initialLat={defaultLoc.lat}
-                          initialLng={defaultLoc.lng}
-                          onSave={defaultLoc.setLocation}
-                          onClear={defaultLoc.clearLocation}
-                        />
-                      </div>
-                    )}
                   </SettingsGroup>
-                </div>
-              )}
-
-              {tab.id === 'saved' && (
-                <div className="max-w-180 space-y-5">
                   <SettingsGroup
                     title={t('location.savedLocationsSection.title')}
                     tip={t('location.savedLocationsSection.hint')}
@@ -662,41 +643,84 @@ export function LocationSettings() {
                         {t('location.savedLocationsSection.noSavedLocations')}
                       </p>
                     ) : (
-                      aliases.map((alias) => (
-                        <div
-                          key={alias.id}
-                          className="hover:bg-surface-row-hover flex items-center justify-between px-4 py-3 transition-colors duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) motion-reduce:transition-none"
-                        >
-                          <div className="flex min-w-0 flex-col">
-                            <span className="text-fg truncate text-sm leading-tight font-medium">
-                              {alias.label}
-                            </span>
-                            {alias.address && (
-                              <span className="text-fg-muted truncate text-xs leading-tight">
-                                {alias.address}
-                              </span>
-                            )}
-                          </div>
-                          <Tooltip
-                            content={t('location.savedLocationsSection.deleteAlias')}
-                            placement="left"
+                      aliases.map((alias) => {
+                        const isDefault =
+                          defaultLoc.lat === alias.latitude && defaultLoc.lng === alias.longitude
+                        return (
+                          <div
+                            key={alias.id}
+                            className="hover:bg-surface-row-hover flex items-center justify-between px-4 py-3 transition-colors duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) motion-reduce:transition-none"
                           >
-                            <button
-                              type="button"
-                              onClick={() => void deleteAlias(alias.id)}
-                              aria-label={t('location.savedLocationsSection.deleteAlias')}
-                              className={cn(
-                                'text-fg-subtle ml-3 shrink-0',
-                                'hover:text-danger',
-                                'outline-none',
-                                'transition-colors duration-150',
+                            <div className="flex min-w-0 flex-col">
+                              <span className="text-fg truncate text-sm leading-tight font-medium">
+                                {alias.label}
+                              </span>
+                              {alias.address && (
+                                <span className="text-fg-muted truncate text-xs leading-tight">
+                                  {alias.address}
+                                </span>
                               )}
-                            >
-                              <Trash2 className="size-4" strokeWidth={1.75} />
-                            </button>
-                          </Tooltip>
-                        </div>
-                      ))
+                            </div>
+                            <div className="ml-3 flex shrink-0 items-center gap-2">
+                              <Tooltip
+                                content={
+                                  isDefault
+                                    ? t('location.defaultLocation.title')
+                                    : t('location.defaultLocation.useAsDefault')
+                                }
+                                placement="left"
+                              >
+                                <button
+                                  type="button"
+                                  disabled={defaultLoc.isLoading || isDefault}
+                                  onClick={() => {
+                                    void defaultLoc.setLocation(
+                                      alias.label,
+                                      alias.address,
+                                      alias.latitude,
+                                      alias.longitude,
+                                    )
+                                    if (!defaultLoc.enabled) void defaultLoc.setEnabled(true)
+                                  }}
+                                  aria-label={t('location.defaultLocation.useAsDefault')}
+                                  aria-pressed={isDefault}
+                                  className={cn(
+                                    'outline-none',
+                                    'transition-colors duration-150',
+                                    isDefault
+                                      ? 'text-accent'
+                                      : 'text-fg-subtle hover:text-fg disabled:opacity-50',
+                                  )}
+                                >
+                                  <Star
+                                    className="size-4"
+                                    strokeWidth={1.75}
+                                    fill={isDefault ? 'currentColor' : 'none'}
+                                  />
+                                </button>
+                              </Tooltip>
+                              <Tooltip
+                                content={t('location.savedLocationsSection.deleteAlias')}
+                                placement="left"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteAlias(alias.id)}
+                                  aria-label={t('location.savedLocationsSection.deleteAlias')}
+                                  className={cn(
+                                    'text-fg-subtle',
+                                    'hover:text-danger',
+                                    'outline-none',
+                                    'transition-colors duration-150',
+                                  )}
+                                >
+                                  <Trash2 className="size-4" strokeWidth={1.75} />
+                                </button>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        )
+                      })
                     )}
                   </SettingsGroup>
                 </div>

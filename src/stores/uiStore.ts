@@ -102,7 +102,7 @@ export type SettingsCategory =
 // (e.g. when the user switches to another app tab whose `activeView`
 // isn't 'settings').
 export type SecurityTab = 'device_password' | 'second_lock' | 'invisible_lock' | 'recovery_devices'
-export type LocationTab = 'geocoding' | 'default' | 'saved'
+export type LocationTab = 'geocoding' | 'saved'
 /** `'chat'` is the merged "Models" tab — it absorbed the former `'embed'` tab,
  *  which rehydrate migrates rather than discards. */
 export type AITab = 'general' | 'providers' | 'chat' | 'features' | 'memories' | 'persona'

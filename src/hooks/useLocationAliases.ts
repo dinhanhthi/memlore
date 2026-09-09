@@ -8,9 +8,9 @@ import {
 import type { LocationAlias } from '../types/location'
 
 // Module-level cache shared across all hook instances (replaces a former
-// Zustand store). Do NOT swap for useState: LocationSettings and
-// DefaultLocationForm mount simultaneously and mutations in one must
-// reflect in the other.
+// Zustand store). Do NOT swap for useState: several consumers (LocationSettings,
+// LocationPicker, AddLocationPopup) mount simultaneously and mutations in one
+// must reflect in the others.
 let aliasesCache: LocationAlias[] = []
 const listeners = new Set<() => void>()
 const getAliases = () => aliasesCache

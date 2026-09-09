@@ -561,21 +561,6 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     },
   },
   {
-    id: 'settings.location_default',
-    group: 'settings',
-    labelKey: 'settings.location_default',
-    icon: MapPin,
-    keywords: ['settings', 'location', 'default'],
-    run: () => {
-      useTabStore.getState().updateActiveTab({
-        activeView: 'settings',
-        selectedEntryId: null,
-        settingsCategory: 'location',
-        locationTab: 'default',
-      })
-    },
-  },
-  {
     id: 'settings.location_saved',
     group: 'settings',
     labelKey: 'settings.location_saved',

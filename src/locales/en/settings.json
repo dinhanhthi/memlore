@@ -477,7 +477,6 @@
   "location": {
     "tabs": {
       "geocoding": "Location & geocoding",
-      "default": "Default location",
       "saved": "Saved locations"
     },
     "mapDisplay": {
@@ -601,20 +600,8 @@
       "title": "Default location",
       "description": "Automatically add a default location when creating new entries.",
       "toggle": "Auto-add default location",
-      "labelPlaceholder": "Home, Office…",
-      "addressPlaceholder": "Search address…",
-      "save": "Save location",
-      "clear": "Clear",
-      "saved": "Location saved",
-      "mapPreviewAria": "Map preview of selected location",
-      "mapPreviewEmpty": "Pick an address to preview it on the map.",
-      "mapPreviewLive": "Map preview updated for {{label}}",
       "noAddress": "No address set",
-      "savedLocations": "Saved locations",
-      "noSavedLocations": "No saved locations yet",
-      "deleteAlias": "Delete location",
-      "useAsDefault": "Use as default",
-      "suggestions_unavailable": "Address suggestions unavailable. You can still type an address manually."
+      "useAsDefault": "Use as default"
     },
     "savedLocationsSection": {
       "title": "Saved locations",

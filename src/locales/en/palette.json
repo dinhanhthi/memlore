@@ -52,7 +52,6 @@
     "security_recovery_devices": "Settings → Security → Security actions",
     "security_invisible_lock": "Settings → Security → Invisible lock",
     "location_geocoding": "Settings → Location → Geocoding",
-    "location_default": "Settings → Location → Default location",
     "location_saved": "Settings → Location → Saved locations",
     "ai_models": "Settings → AI → Models",
     "ai_features": "Settings → AI → Features",

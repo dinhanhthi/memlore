@@ -402,7 +402,7 @@ export const useTabStore = create<TabState>()(
           'invisible_lock',
           'recovery_devices',
         ]
-        const validLocation: LocationTab[] = ['geocoding', 'default', 'saved']
+        const validLocation: LocationTab[] = ['geocoding', 'saved']
         const validAi: AITab[] = ['general', 'providers', 'chat', 'features', 'memories', 'persona']
         const validTemplates: TemplatesTab[] = ['custom', 'builtin']
         const validEditor: EditorTab[] = ['font', 'general', 'layout']

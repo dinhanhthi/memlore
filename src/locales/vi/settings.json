@@ -477,7 +477,6 @@
   "location": {
     "tabs": {
       "geocoding": "Vị trí & gợi ý địa chỉ",
-      "default": "Vị trí mặc định",
       "saved": "Vị trí đã lưu"
     },
     "mapDisplay": {
@@ -601,20 +600,8 @@
       "title": "Vị trí mặc định",
       "description": "Tự động thêm vị trí mặc định khi tạo mục mới.",
       "toggle": "Tự động thêm vị trí mặc định",
-      "labelPlaceholder": "Nhà, Văn phòng…",
-      "addressPlaceholder": "Tìm kiếm địa chỉ…",
-      "save": "Lưu vị trí",
-      "clear": "Xóa",
-      "saved": "Đã lưu vị trí",
-      "mapPreviewAria": "Xem trước bản đồ vị trí đã chọn",
-      "mapPreviewEmpty": "Chọn địa chỉ để xem trước trên bản đồ.",
-      "mapPreviewLive": "Đã cập nhật xem trước bản đồ cho {{label}}",
       "noAddress": "Chưa có địa chỉ",
-      "savedLocations": "Vị trí đã lưu",
-      "noSavedLocations": "Chưa có vị trí nào được lưu",
-      "deleteAlias": "Xóa vị trí",
-      "useAsDefault": "Dùng làm mặc định",
-      "suggestions_unavailable": "Không dùng được gợi ý địa chỉ. Bạn vẫn có thể tự nhập địa chỉ."
+      "useAsDefault": "Dùng làm mặc định"
     },
     "savedLocationsSection": {
       "title": "Vị trí đã lưu",

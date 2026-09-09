@@ -48,7 +48,6 @@ const EXPECTED_SUBTAB_IDS = [
   'settings.sync_devices',
   'settings.sync_schedule',
   'settings.location_geocoding',
-  'settings.location_default',
   'settings.location_saved',
   'settings.ai_models',
   'settings.ai_features',
@@ -134,7 +133,7 @@ describe('getCommands', () => {
     expect(ids).toContain('settings.data_downloads')
     // Verify total sub-tab count
     const subtabCommands = commands.filter((c) => EXPECTED_SUBTAB_IDS.includes(c.id))
-    expect(subtabCommands).toHaveLength(26)
+    expect(subtabCommands).toHaveLength(25)
   })
 
   it('every settings command has group=settings', () => {
