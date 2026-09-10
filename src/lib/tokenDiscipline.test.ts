@@ -48,6 +48,13 @@ describe('token discipline — banned dead classes', () => {
     expect(hits(/(?<![\w-])text-muted(?![\w-])/)).toEqual([])
   })
 
+  // 4 / 6 / 8 / 10 / 12 / 16px are --radius-xs..2xl on the Signature scale.
+  // Hardcoding them pins every skin to Signature's radius — Clay's scale runs
+  // 0.5–1.5rem, so `rounded-[10px]` silently opts a control out of it.
+  it('does not hardcode a radius that has an exact token', () => {
+    expect(hits(/rounded-\[(?:4|6|8|10|12|16)px\]/)).toEqual([])
+  })
+
   it('does not use bg-surface-lo (no such token)', () => {
     expect(hits(/\bbg-surface-lo\b/)).toEqual([])
   })
@@ -63,11 +70,14 @@ describe('token discipline — banned dead classes', () => {
 })
 
 describe('token discipline — light-mode chrome', () => {
-  it('does not paint skeletons with white-alpha (invisible on paper)', () => {
+  it('does not paint chrome with white-alpha (invisible on paper, skin-blind)', () => {
     // Photo overlays on decoded media keep white-alpha — those sit on pixels,
-    // not on paper. Chrome skeletons must not.
+    // not on paper. Chrome must not: a `dark:bg-white/8` fork is mode-aware but
+    // skin-blind, so Clay dark got a cool wash over its warm chip.
     expect(
-      hits(/\bbg-white\/(?:10|15|20)\b/).filter((f) => !f.startsWith('components/media/')),
+      hits(/\bbg-white\/\d+\b|\bborder-white\/\d+\b/).filter(
+        (f) => !f.startsWith('components/media/'),
+      ),
     ).toEqual([])
   })
 

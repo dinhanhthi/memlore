@@ -83,6 +83,9 @@ const CAPSULE_RADIUS = 'rounded-(--button-radius)'
 const OUTLINE_SECONDARY_CLASS = cn(
   'inline-flex cursor-pointer items-center gap-1.5',
   CAPSULE_RADIUS,
+  // Label stays `text-fg`: `--color-fg-muted` on `--color-surface-control-hover`
+  // measures 2.87:1 on Signature dark/soft. Any variant painted on a
+  // `surface-control*` fill must use `text-fg`, never a muted ink.
   'border border-border-default bg-surface-control font-medium text-fg shadow-(--shadow-control)',
   'hover:bg-surface-control-hover',
   'motion-safe:active:scale-[0.98] active:brightness-95',

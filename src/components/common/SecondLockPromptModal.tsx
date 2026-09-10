@@ -111,7 +111,7 @@ export function SecondLockPromptModal({
             }}
             disabled={isBusy}
             aria-label={passwordPlaceholder}
-            className="border-border-default bg-surface-hi text-fg placeholder:text-fg-muted focus:border-accent focus:ring-focus-ring h-10 w-full rounded-[12px] border px-3 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="border-border-default bg-surface-hi text-fg placeholder:text-fg-muted focus:border-accent focus:ring-focus-ring h-10 w-full rounded-xl border px-3 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
             placeholder={passwordPlaceholder}
           />
           {error && <p className="text-danger-text mt-2 text-sm leading-[1.45]">{error}</p>}

@@ -322,7 +322,7 @@ function WarmupFailedModal({ code, onClose, t }: WarmupFailedModalProps) {
           <p className="text-fg-muted text-xs">
             {t('ai.on_device_llm.warmup.error_code_label', { defaultValue: 'Error' })}:{' '}
             <Tooltip content={code} placement="top" multiline>
-              <code className="text-fg-secondary bg-surface-subtle rounded-[6px] px-1.5 py-0.5 font-mono">
+              <code className="text-fg-secondary bg-surface-subtle rounded-sm px-1.5 py-0.5 font-mono">
                 {truncate(code, 24)}
               </code>
             </Tooltip>

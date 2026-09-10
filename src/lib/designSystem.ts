@@ -23,7 +23,7 @@ function isDesignSystem(v: unknown): v is DesignSystem {
   return typeof v === 'string' && (DESIGN_SYSTEMS as readonly string[]).includes(v)
 }
 
-/** Anything not in `DESIGN_SYSTEMS` falls back to the default (signature). */
+/** Anything not in `DESIGN_SYSTEMS` falls back to the default (clay). */
 export function coerceDesignSystem(v: unknown): DesignSystem {
   return isDesignSystem(v) ? v : DEFAULT_DESIGN_SYSTEM
 }

@@ -46,9 +46,9 @@ const TagTableRow = memo(function TagTableRow({
         'border-border-default cursor-pointer border-b last:border-b-0',
         // Neutral near-white hover (white tint in dark mode) instead of an
         // accent wash; black tint in light mode keeps the hover visible there.
-        !selected && 'dark:hover:bg-elevated hover:bg-white/60',
+        !selected && 'dark:hover:bg-elevated hover:bg-surface-row-hover',
         count === 0 ? 'opacity-50' : '',
-        selected && 'bg-elevated dark:bg-white/8',
+        selected && 'bg-elevated dark:bg-surface-hi',
       )}
     >
       {/* Accent left stripe marks the selected row — mirrors the selected

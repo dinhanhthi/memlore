@@ -322,7 +322,7 @@ export function CalendarPanel() {
                         type="button"
                         onClick={() => handlePickMonth(m)}
                         className={cn(
-                          'min-w-16 rounded-[10px] px-3 py-2 text-sm font-medium capitalize transition-colors duration-(--motion-duration-fast)',
+                          'min-w-16 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors duration-(--motion-duration-fast)',
                           isSelected
                             ? 'gradient-primary text-fg-inverse font-medium'
                             : 'text-fg hover:bg-surface-hi',
@@ -375,7 +375,7 @@ export function CalendarPanel() {
                         type="button"
                         onClick={() => handlePickYear(y)}
                         className={cn(
-                          'min-w-16 rounded-[10px] px-3 py-2 text-sm font-medium tabular-nums transition-colors duration-(--motion-duration-fast)',
+                          'min-w-16 rounded-lg px-3 py-2 text-sm font-medium tabular-nums transition-colors duration-(--motion-duration-fast)',
                           isSelected
                             ? 'gradient-primary text-fg-inverse font-medium'
                             : isToday

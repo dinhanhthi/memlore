@@ -258,7 +258,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type="button"
       className={cn(
         // SuperX icon button: 10px radius, muted idle, surface-hi hover.
-        'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-[10px] border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
+        'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-lg border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
         'disabled:hover:text-fg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
         className,
       )}

@@ -585,7 +585,7 @@ export function applyAccent(preset: AccentPreset, customHex: string | null): voi
 
 export function applySurfaceStyle(style: SurfaceStyle): void {
   // Deep/Soft/Lumen are Signature-only dark surfaces. XOR: at most one of
-  // surface-soft / surface-lumen. Strip both under Clean so a
+  // surface-soft / surface-lumen. Strip both under Clean and Clay so a
   // Signature-persisted preference cannot leak.
   const isSignature = readActiveDesignSystem() === 'signature'
   const root = document.documentElement.classList

@@ -91,7 +91,7 @@ export function InvisibleVaultMarkModal({ open, onClose, onSubmit }: InvisibleVa
           <div className="flex items-start gap-4">
             <div
               aria-hidden="true"
-              className="text-accent bg-accent-soft grid h-11 w-11 shrink-0 place-items-center rounded-[12px]"
+              className="text-accent bg-accent-soft grid h-11 w-11 shrink-0 place-items-center rounded-xl"
             >
               <EyeOff className="size-6" strokeWidth={1.75} />
             </div>

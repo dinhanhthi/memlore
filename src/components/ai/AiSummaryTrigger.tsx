@@ -173,7 +173,7 @@ function Banner() {
       // accent turns `bg-accent-soft` into `accent / 0.14` — a wash too
       // faint to lift off the panel. A white overlay lifts by the same
       // amount on every ladder and keeps accent out of the entry list.
-      <article className="mx-2 my-3 rounded-lg border border-white/15 bg-white/8 px-3 py-3 text-sm">
+      <article className="border-border-default bg-surface-hi mx-2 my-3 rounded-lg border px-3 py-3 text-sm">
         <header className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <AiIcon aria-hidden />
