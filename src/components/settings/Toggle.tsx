@@ -13,10 +13,8 @@
 ///               switch uses `aria-labelledby` and omits `aria-label`.
 ///   disabled  — when true, the switch is inert
 ///
-/// Sizing: the track is 30×16px (knob 12×12px). Same proportions as
-/// the previous 38×22 design — just scaled down so the toggle reads
-/// as a control, not a hero element. Affects every consumer in
-/// Settings + the Search overlay.
+/// Sizing: see the `size` prop below — `SIZE_CLASSES` is the source of
+/// truth. Affects every consumer in Settings + the Search overlay.
 ///
 /// Keyboard: native <button> handles Space AND Enter via onClick — no manual
 /// onKeyDown handler is needed. Adding one would double-fire onChange on Enter.

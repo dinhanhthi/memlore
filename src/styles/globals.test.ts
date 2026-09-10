@@ -390,9 +390,35 @@ function parseColorMix(value: string): Srgb {
   return oklabToSrgb(L, ax, bx, alpha)
 }
 
+/**
+ * `oklch(from <color> <L> c h)` — the relative form Clay uses for its button
+ * slabs (`--cta-face`, `--danger-face`, and their lips). Only lightness is
+ * pinned; `c` and `h` are inherited, and since OKLCH's chroma/hue are just
+ * OKLab's `a`/`b` in polar form, inheriting both means `a` and `b` pass
+ * through untouched. So this is a pure lightness swap on the base colour.
+ *
+ * Caveat: `oklabToSrgb` clamps per channel, while browsers gamut-map by
+ * reducing chroma. The two agree closely at the lightness these tokens pin
+ * (spot-checked against the live app: --danger-face reads 5.91:1 there and
+ * 5.914:1 here on Clay dark; --cta-face 5.39 vs 5.44), but a token
+ * that lands far outside sRGB would read slightly more saturated in this
+ * harness than on screen.
+ */
+function parseRelativeOklch(value: string): Srgb {
+  const match = value.trim().match(/^oklch\(\s*from\s+(.+?)\s+([0-9.]+)(%?)\s+c\s+h\s*\)$/i)
+  if (!match) throw new Error(`unsupported relative oklch() color: ${value}`)
+  const base = parseCssColor(match[1])
+  const Lraw = Number(match[2])
+  const L = match[3] === '%' ? Lraw / 100 : Lraw
+  if (!Number.isFinite(L)) throw new Error(`invalid relative oklch() color: ${value}`)
+  const lab = srgbToOklab(base)
+  return oklabToSrgb(L, lab.a, lab.b, base.a)
+}
+
 function parseCssColor(value: string): Srgb {
   const v = value.trim()
   if (v.startsWith('#')) return parseHexColor(v)
+  if (/^oklch\(\s*from\s/i.test(v)) return parseRelativeOklch(v)
   if (/^oklch\(/i.test(v)) return parseOklch(v)
   if (/^color-mix\(/i.test(v)) return parseColorMix(v)
   throw new Error(`unsupported color value: ${value}`)
@@ -1767,10 +1793,8 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
   })
 
   // Clean paints destructive buttons as a solid --color-danger-fill with
-  // --color-fg-inverse text (shadcn `bg-destructive text-white`). Clay is not
-  // asserted here: it builds its slab from --danger-face, a relative
-  // `oklch(from …)` colour this token map cannot resolve. Measured live
-  // instead — white on --danger-face is 5.91:1 dark / 5.93:1 light.
+  // --color-fg-inverse text (shadcn `bg-destructive text-white`). Clay builds
+  // its slab from --danger-face / --cta-face instead; both are asserted below.
   it.each(['clean-light', 'clean-dark'] as const)(
     '%s: --color-fg-inverse on --color-danger-fill ≥ 4.5:1',
     (id) => {
@@ -1779,6 +1803,22 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
       ).toBeGreaterThanOrEqual(WCAG_AA_MIN)
     },
   )
+
+  // The Clay button slabs. These are what actually paint: the destructive
+  // rule stamps --cta-ink on --danger-face, primary on --cta-face. Both faces
+  // pin OKLCH L to 0.52 precisely so the white label clears AA, so these are
+  // the assertions that make that claim real rather than a comment.
+  it.each(['clay-light', 'clay-dark'] as const)('%s: --cta-ink on --danger-face >= 4.5:1', (id) => {
+    expect(contrastOf(tokensBySurface[id], '--cta-ink', '--danger-face')).toBeGreaterThanOrEqual(
+      WCAG_AA_MIN,
+    )
+  })
+
+  it.each(['clay-light', 'clay-dark'] as const)('%s: --cta-ink on --cta-face >= 4.5:1', (id) => {
+    expect(contrastOf(tokensBySurface[id], '--cta-ink', '--cta-face')).toBeGreaterThanOrEqual(
+      WCAG_AA_MIN,
+    )
+  })
 
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {
     expect(cleanLightTokenBodies).toMatch(/--radius-2xl:\s*0\.75rem/)
