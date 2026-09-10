@@ -70,11 +70,11 @@ export function DashboardView() {
           transparent so the tray wash shows through. */}
       <div
         className={cn(
-          'relative z-30 -mb-px flex shrink-0 items-center justify-between gap-3 px-4 pt-4',
-          isClay ? 'bg-transparent' : 'bg-elevated',
+          'relative z-30 -mb-px flex shrink-0 items-center justify-between gap-3 bg-transparent px-4',
+          !isClay && 'pt-4',
         )}
       >
-        <h2 className="font-title text-xl font-semibold">{t('title')}</h2>
+        <h2 className="font-title text-2xl font-extrabold">{t('title')}</h2>
         <Button
           variant="ghost"
           size="sm"
