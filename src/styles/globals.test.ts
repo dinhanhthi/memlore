@@ -1864,7 +1864,9 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
   it('leaves no Clay rule stamping --color-fg-inverse on an accent slab', () => {
     const clayFgInverse = [
       ...cssCode.matchAll(
-        /:root(?:\.dark)?\.ds-clay [^{]*\{[^}]*[^-]color:\s*var\(--color-fg-inverse\)/g,
+        // lookbehind so `background-color:` (a fill, e.g. the switch knob) is
+        // not mistaken for a text stamp, without needing a leading character
+        /:root(?:\.dark)?\.ds-clay [^{]*\{[^}]*(?<![-\w])color:\s*var\(--color-fg-inverse\)/g,
       ),
     ]
     expect(clayFgInverse.map((m) => m[0].split('{')[0].trim())).toEqual([])
