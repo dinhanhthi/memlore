@@ -121,7 +121,6 @@
   --color-fg: #1a1917;
   --color-fg-secondary: #6a6760;
   --color-fg-muted: #6a6760;
-  --color-fg-faint: #9a968c; /* decorative mono labels / timestamps */
   --color-fg-inverse: #ffffff; /* text on solid accent */
 
   /* Chat user bubble. Light: SuperX stone darker than --color-app so the
@@ -401,7 +400,6 @@
   --color-fg: #eee;
   --color-fg-secondary: #c7c3bf;
   --color-fg-muted: #a8a29e;
-  --color-fg-faint: #6b6b6b;
   --color-fg-inverse: #ffffff; /* accent-fg — white on solid accent fills */
 
   /* Graphite chip + light text. Shared by Deep and Soft. */
@@ -577,7 +575,6 @@
   --color-fg: oklch(96% 0.006 262);
   --color-fg-secondary: oklch(72% 0.014 263);
   --color-fg-muted: oklch(72% 0.014 263);
-  --color-fg-faint: oklch(62% 0.014 263);
 
   /* Borders — rule 30% / rule-2 42%, plus a quieter subtle step.
      Hairline 1px feel; structure is the rule, not a thick stroke. */
@@ -735,7 +732,6 @@
   --color-fg: oklch(0.145 0 0);
   --color-fg-secondary: oklch(0.45 0 0);
   --color-fg-muted: oklch(0.45 0 0);
-  --color-fg-faint: oklch(0.556 0 0);
   --color-fg-inverse: oklch(1 0 0);
 
   /* Borders — shadcn border/input 0.922, plus a quieter and a louder step. */
@@ -812,7 +808,6 @@
   --color-fg: oklch(0.985 0 0);
   --color-fg-secondary: oklch(0.708 0 0);
   --color-fg-muted: oklch(0.708 0 0);
-  --color-fg-faint: oklch(0.6 0 0);
   --color-fg-inverse: oklch(1 0 0);
 
   /* shadcn dark borders are white-alpha so they read on both 0.145 and
@@ -907,7 +902,6 @@
   --color-fg: #2a241c;
   --color-fg-secondary: #453e34;
   --color-fg-muted: #5c554b;
-  --color-fg-faint: #8a8177;
   /* Warm off-white: pure white read harsh on the clay slabs. */
   --color-fg-inverse: #fbf7f0;
 
@@ -1008,7 +1002,6 @@
   --color-fg: #f0ebe3;
   --color-fg-secondary: #d1c9bd;
   --color-fg-muted: #b3aa9e;
-  --color-fg-faint: #7d766d;
   --color-fg-inverse: #f0ebe3;
 
   /* kit `--line` rgb(240 235 227 / 0.1). */

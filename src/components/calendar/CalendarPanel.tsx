@@ -402,7 +402,7 @@ export function CalendarPanel() {
             {/* Weekday headers */}
             <div className="mb-1 grid grid-cols-7 text-center">
               {WEEKDAY_KEYS.map((k) => (
-                <div key={k} className="text-fg-faint py-1 font-mono text-xs">
+                <div key={k} className="text-fg-muted py-1 font-mono text-xs">
                   {t(`calendar_panel.weekday.${k}`)}
                 </div>
               ))}
@@ -516,7 +516,7 @@ export function CalendarPanel() {
                   )}
                 >
                   <div className="relative z-10 flex min-w-0 items-baseline gap-2">
-                    <span className="text-fg-faint text-2xs truncate font-mono font-medium tracking-[0.8px] uppercase">
+                    <span className="text-fg-muted text-2xs truncate font-mono font-medium tracking-[0.8px] uppercase">
                       {new Date(selectedCalendarDate + 'T12:00:00').toLocaleDateString(locale, {
                         weekday: 'short',
                         month: 'short',

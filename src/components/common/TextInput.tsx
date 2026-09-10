@@ -49,7 +49,7 @@ export type TextInputProps = InputProps | TextareaProps
  *  show/hide toggle.
  */
 export const FIELD_BASE =
-  'w-full rounded-xl border border-border-default bg-elevated px-4 py-3 text-sm text-fg placeholder:text-fg-faint outline-none shadow-(--shadow-control) transition-[border-color,box-shadow,background-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) disabled:opacity-50 disabled:cursor-not-allowed hover:border-border-default'
+  'w-full rounded-xl border border-border-default bg-elevated px-4 py-3 text-sm text-fg placeholder:text-fg-muted outline-none shadow-(--shadow-control) transition-[border-color,box-shadow,background-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) disabled:opacity-50 disabled:cursor-not-allowed hover:border-border-default'
 
 const BASE = FIELD_BASE
 

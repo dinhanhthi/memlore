@@ -609,7 +609,6 @@ describe('Semantic OKLCH tokens — registered in @theme', () => {
     '--color-fg',
     '--color-fg-secondary',
     '--color-fg-muted',
-    '--color-fg-faint',
     '--color-fg-inverse',
     '--color-surface-hi',
     '--color-border-subtle',
@@ -659,7 +658,6 @@ describe('SuperX dark charcoal ladder', () => {
     // App chrome fg; editor body max is pure white (see ProseMirror override).
     expect(darkBlock).toMatch(/--color-fg:\s*#eee/)
     expect(darkBlock).toMatch(/--color-fg-muted:\s*#a8a29e/)
-    expect(darkBlock).toMatch(/--color-fg-faint:\s*#6b6b6b/)
     expect(darkBlock).toMatch(/--color-border-subtle:\s*#2a2a2a/)
     expect(darkBlock).toMatch(/--color-border-default:\s*#363636/)
     expect(darkBlock).toMatch(/--color-border-strong:\s*#4a4a4a/)
@@ -682,7 +680,6 @@ describe('Dark mode redefines all semantic tokens', () => {
     '--color-fg',
     '--color-fg-secondary',
     '--color-fg-muted',
-    '--color-fg-faint',
     '--color-fg-inverse',
     '--color-surface-hi',
     '--color-border-subtle',
@@ -1674,8 +1671,10 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
 /**
  * Scripted WCAG AA 4.5:1 check across the eight shipping surfaces.
  *
- * Exemptions (do not assert): `--color-fg-faint` (decorative timestamps /
- * mono labels). Primary CTA fill is `--color-accent-fill` on every surface.
+ * No text-role exemptions: `--color-fg-faint` used to be excused here as
+ * "decorative", but every consumer was readable type and it cleared 4.5:1 on
+ * none of the eight surfaces — the token is deleted, not exempted.
+ * Primary CTA fill is `--color-accent-fill` on every surface.
  *
  * `--color-accent-fill` is a chroma-preserving oklch in both modes (the
  * lightest L that still clears 4.5:1 with `--color-fg-inverse`), except

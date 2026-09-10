@@ -113,7 +113,7 @@ export function OnThisDayCard() {
                   openEntry(entry, true)
                 }}
               >
-                <span className="text-fg-faint text-2xs shrink-0 font-mono">{year}</span>
+                <span className="text-fg-muted text-2xs shrink-0 font-mono">{year}</span>
                 <span className="text-fg min-w-0 truncate text-sm">
                   {isCoveredLocked
                     ? t('entry_card.locked_entry', { ns: 'editor' })

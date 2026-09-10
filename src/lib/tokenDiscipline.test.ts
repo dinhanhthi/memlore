@@ -51,6 +51,15 @@ describe('token discipline — banned dead classes', () => {
   it('does not use bg-surface-lo (no such token)', () => {
     expect(hits(/\bbg-surface-lo\b/)).toEqual([])
   })
+
+  // `--color-fg-faint` measured 2.55–4.34:1 on every fill of all eight
+  // surfaces, and its consumers were readable type (word counts, timestamps,
+  // tag counts, weekday headers, every field placeholder). There is no room
+  // for a fourth readable tier — Signature light's `fg-muted` itself bottoms
+  // out at 4.88 — so the token is gone and its callers use `fg-muted`.
+  it('does not use text-fg-faint (the token failed AA on all 8 surfaces)', () => {
+    expect(hits(/\bfg-faint\b/)).toEqual([])
+  })
 })
 
 describe('token discipline — light-mode chrome', () => {

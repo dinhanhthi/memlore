@@ -96,7 +96,7 @@ export function Toggle({
             ? 'gradient-primary border border-transparent'
             : disabled
               ? 'bg-surface-subtle border-border-default border'
-              : 'bg-surface-hi border-fg-faint/50 border',
+              : 'bg-surface-hi border-border-strong border',
         ].join(' ')}
       >
         {/* Knob — square pill, position from `s.knobOff` / `s.knobOn`. */}

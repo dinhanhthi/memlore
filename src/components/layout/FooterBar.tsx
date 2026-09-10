@@ -264,8 +264,8 @@ export function FooterBar() {
       <div data-testid="footer-metadata" className="flex min-w-0 items-center gap-2 text-sm">
         {hasSelection && (
           <>
-            <span className="text-fg-faint font-mono">{t('footer.words', { count: words })}</span>
-            <span className="text-fg-faint font-mono">{t('footer.chars', { count: chars })}</span>
+            <span className="text-fg-muted font-mono">{t('footer.words', { count: words })}</span>
+            <span className="text-fg-muted font-mono">{t('footer.chars', { count: chars })}</span>
             <span
               data-testid="footer-save-state"
               className={cn('inline-flex items-center gap-1 font-mono', {

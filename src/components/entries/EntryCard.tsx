@@ -451,7 +451,7 @@ function EntryCardImpl({
         {/* Top row: time · journal · lock state · actions · mood */}
         <div className="relative z-10 mb-2.5 flex items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="text-fg-faint text-2xs shrink-0 font-mono tracking-[0.2px]">
+            <span className="text-fg-muted text-2xs shrink-0 font-mono tracking-[0.2px]">
               {timeLabel}
             </span>
             {journal && (

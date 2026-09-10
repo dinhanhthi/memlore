@@ -279,14 +279,14 @@ export function TagsView() {
                       className="text-fg-muted px-3 py-2 text-left text-xs tracking-wider whitespace-nowrap uppercase"
                     >
                       {t('tags_view.col_tag')}{' '}
-                      <span className="text-fg-faint ml-1 font-normal">{tagCount}</span>
+                      <span className="text-fg-muted ml-1 font-normal">{tagCount}</span>
                     </th>
                     <th
                       scope="col"
                       className="text-fg-muted px-3 py-2 text-right text-xs tracking-wider whitespace-nowrap uppercase"
                     >
                       {t('tags_view.col_entries')}{' '}
-                      <span className="text-fg-faint ml-1 font-normal">{totalEntries}</span>
+                      <span className="text-fg-muted ml-1 font-normal">{totalEntries}</span>
                     </th>
                     <th scope="col" className="py-2 pr-3">
                       <div className="flex justify-end">
