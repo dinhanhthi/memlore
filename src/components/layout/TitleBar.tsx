@@ -656,7 +656,9 @@ function WindowTabPresentation({
 
       {/* Title — hidden when pinned (icon-only). */}
       {!pinned && (
-        <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{title}</span>
+        <span className="xj-tab-title min-w-0 flex-1 truncate text-left text-sm font-medium">
+          {title}
+        </span>
       )}
 
       {/* Close × (fades in on hover/active). Skipped on pinned tabs (must

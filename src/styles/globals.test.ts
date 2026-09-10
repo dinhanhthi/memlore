@@ -1323,6 +1323,12 @@ describe('Clean design system — :root.ds-clean / :root.dark.ds-clean', () => {
     expect(selector).toContain("class~='rounded-xl'")
     expect(selector).toContain('.media-tap-placeholder')
   })
+
+  it('steps titlebar tab titles down one type size on Signature and Clean (text-xs, not text-sm)', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-signature\s+\.xj-tab-title\s*,\s*:root\.ds-clean\s+\.xj-tab-title\s*\{[^}]*font-size:\s*var\(--text-xs\)/,
+    )
+  })
 })
 
 describe('Signature Lumen surface — .dark.surface-lumen', () => {

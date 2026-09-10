@@ -1838,6 +1838,12 @@
   display: none;
 }
 
+/* Titlebar tab label: one step below text-sm. Clay keeps text-sm. */
+:root.ds-signature .xj-tab-title,
+:root.ds-clean .xj-tab-title {
+  font-size: var(--text-xs);
+}
+
 /* =========================================================
    Design system: Clean — structural overrides
    ---------------------------------------------------------
