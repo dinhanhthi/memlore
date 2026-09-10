@@ -32,6 +32,7 @@ export const RadioOptionPill = forwardRef<HTMLButtonElement, RadioOptionPillProp
           className,
         )}
         {...rest}
+        data-variant={selected ? 'primary' : 'secondary'}
       >
         {label}
       </button>

@@ -147,7 +147,7 @@ export function MediaGalleryFullView() {
               onChange={(v) => setMediaPageSize(Number(v))}
               options={PAGE_SIZE_SELECT_OPTIONS}
               aria-label={tNav('media_gallery.per_page_aria')}
-              className="w-auto shrink-0 px-2.5 py-1.5 text-xs"
+              className="h-7 w-auto shrink-0 px-2.5 py-1 text-xs [&_svg]:size-3"
             />
           </div>
           <Tooltip content={t('settings.media', { defaultValue: 'Settings → Media' })}>

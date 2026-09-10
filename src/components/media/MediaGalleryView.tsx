@@ -115,7 +115,7 @@ export function MediaGalleryView() {
               onChange={(v) => setCols(Number(v) as ColsOption)}
               options={COLS_SELECT_OPTIONS}
               aria-label={t('media_gallery.per_row_aria')}
-              className="text-2xs w-auto shrink-0 gap-1 rounded-lg px-2 py-1 [&_svg]:size-3"
+              className="text-2xs h-7 w-auto shrink-0 gap-1 rounded-lg px-2 py-1 [&_svg]:size-3"
             />
           </div>
           <div className="flex items-center gap-1.5">
@@ -127,7 +127,7 @@ export function MediaGalleryView() {
               onChange={(v) => setMediaPageSize(Number(v))}
               options={PAGE_SIZE_SELECT_OPTIONS}
               aria-label={t('media_gallery.per_page_aria')}
-              className="text-2xs w-auto shrink-0 gap-1 rounded-lg px-2 py-1 [&_svg]:size-3"
+              className="text-2xs h-7 w-auto shrink-0 gap-1 rounded-lg px-2 py-1 [&_svg]:size-3"
             />
           </div>
         </div>
