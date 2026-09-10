@@ -1121,6 +1121,11 @@
      Clay stays ~6% above Signature/Clean. Chained multiplier so
      Tailwind-inlined `--text-*` calcs pick it up. */
   --ds-type-scale: 1.06;
+  /* Clay's ladder is FOUR steps, not the shared five: `xs` is pinned to the
+     same 0.875rem as `sm`. Deliberate (Baloo 2's small x-height reads thin at
+     13px), and asserted in globals.test.ts. Consequence: on Clay a label and
+     its hint separate by colour alone, so shared components must not lean on
+     `text-xs` vs `text-sm` to carry hierarchy. See docs/DESIGN.md. */
   --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
   --text-xs: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
   --text-sm: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
