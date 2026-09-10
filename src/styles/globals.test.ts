@@ -1866,6 +1866,22 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
     expect(rule![1]).toMatch(/box-shadow:[^;]*var\(--color-focus-ring\)/)
   })
 
+  // Clay light collapses panel-3 / selected-tab / elevated / surface-hi /
+  // nav-active / surface-subtle onto one fill, so a tooltip painted
+  // `bg-elevated` floats over a card of the identical colour, separated only
+  // by a 1.21:1 hairline. Lift it to the canvas, the one other value Clay owns.
+  it('lifts the Clay tooltip off the card plane', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-tooltip\s*\{[^}]*background(?:-color)?:\s*var\(--color-app\)/,
+    )
+  })
+
+  // Frosted glass is Signature's vocabulary; Clay's is matte warm paper.
+  // Clean already strips the blur — Clay never did.
+  it('strips the backdrop blur from Clay scrims', () => {
+    expect(cssCode).toMatch(/:root\.ds-clay \.xj-scrim\s*\{[^}]*backdrop-filter:\s*none/)
+  })
+
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {
     expect(cleanLightTokenBodies).toMatch(/--radius-2xl:\s*0\.75rem/)
   })

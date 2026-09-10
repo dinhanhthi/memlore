@@ -1778,6 +1778,21 @@
   background: none;
 }
 
+/* Clay light paints panel-3 / selected-tab / elevated / surface-hi all
+   #f7f1e6, so a `bg-elevated` tooltip over a card is the same colour with a
+   1.21:1 hairline between them. The canvas is the one other value Clay owns. */
+:root.ds-clay .xj-tooltip {
+  background-color: var(--color-app);
+  border-color: var(--color-border-strong);
+}
+
+/* Frosted glass is Signature's vocabulary; Clay's is matte warm paper. Same
+   one-liner Clean uses. */
+:root.ds-clay .xj-scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 :root.ds-clay .xj-content-gradient {
   background: var(--color-app);
 }
