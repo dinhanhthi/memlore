@@ -1849,6 +1849,19 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
     expect(clayFgInverse.map((m) => m[0].split('{')[0].trim())).toEqual([])
   })
 
+  // WCAG 2.4.7: text fields suppress the global offset ring (it reads as a
+  // second box around the field), so they must paint their own indicator.
+  // Clay already did via its own inset ring; Signature and Clean painted
+  // nothing at all and left the blinking caret as the only focus signal.
+  it('text fields paint a focus ring instead of only suppressing the outline', () => {
+    const rule = cssCode.match(
+      /input:not\([^)]*\):focus-visible,\s*textarea:focus-visible\s*\{([^}]*)\}/,
+    )
+    expect(rule, 'shared text-field focus rule not found').not.toBeNull()
+    expect(rule![1]).toMatch(/outline:\s*none/)
+    expect(rule![1]).toMatch(/box-shadow:[^;]*var\(--color-focus-ring\)/)
+  })
+
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {
     expect(cleanLightTokenBodies).toMatch(/--radius-2xl:\s*0\.75rem/)
   })

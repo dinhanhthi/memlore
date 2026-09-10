@@ -2721,11 +2721,15 @@ body {
   outline-offset: 2px;
 }
 
-/* Text fields — caret is the focus indicator. The offset ring reads as a
-   second box around the field (including mouse focus: :focus-visible
-   matches text inputs even without a keyboard). Beats the unlayered
-   :focus-visible ring (0,2,0 vs 0,1,0). Checkbox / radio / range / file
-   and native <select> keep the global ring. */
+/* Text fields — the OFFSET ring is suppressed (it reads as a second box
+   around the field, including on mouse focus: :focus-visible matches text
+   inputs even without a keyboard) and replaced with a flush ring hugging the
+   field edge. The caret alone is not an indicator a sighted keyboard user can
+   scan a dense settings form with. --color-focus-ring clears 3:1 on all eight
+   surfaces. Clay's own inset ring (:root.ds-clay, more specific) still wins
+   there, so its wells stay borderless. Beats the unlayered :focus-visible
+   ring (0,2,0 vs 0,1,0). Checkbox / radio / range / file and native <select>
+   keep the global offset ring. */
 input:not(
     [type='checkbox'],
     [type='radio'],
@@ -2739,6 +2743,7 @@ input:not(
   ):focus-visible,
 textarea:focus-visible {
   outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 /* Writing canvas — caret is the focus indicator. Beats the unlayered
