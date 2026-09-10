@@ -578,7 +578,7 @@ function EntryCardImpl({
               {entry.preview_text && (
                 <p
                   className={cn(
-                    'text-fg-secondary text- line-clamp-2 leading-[1.45]',
+                    'text-fg-secondary line-clamp-2 text-sm leading-[1.45]',
                     showTitleRow && 'mt-2.5',
                   )}
                 >

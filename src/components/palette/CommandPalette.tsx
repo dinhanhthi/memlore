@@ -126,7 +126,14 @@ export function CommandPalette() {
                           cmd.run()
                           setOpen(false)
                         }}
-                        className="text-fg data-[selected=true]:bg-accent/10 data-[selected=true]:text-fg [&_svg]:text-fg-muted [&_canvas]:text-fg-muted [&[data-selected=true]_svg]:text-accent [&[data-selected=true]_canvas]:text-accent flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm [&_svg]:size-4"
+                        // The icon slot is the first child: a lucide `svg` for
+                        // most commands, the orb's wrapper `span` for the AI
+                        // ones. Both take the rest colour. Only the `svg` takes
+                        // the selected accent — the orb reads its ink off the
+                        // wrapper and re-reads it only on `<html>` mutations,
+                        // so a `data-selected` flip on this row does not reach
+                        // it. See the known gap in `ThinkingOrb.tsx`.
+                        className="text-fg data-[selected=true]:bg-accent/10 data-[selected=true]:text-fg [&>*:first-child]:text-fg-muted [&[data-selected=true]>*:first-child]:text-accent flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm [&>svg]:size-4"
                       >
                         <cmd.icon />
                         <span className="flex-1 truncate">{label}</span>

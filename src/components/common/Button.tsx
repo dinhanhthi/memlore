@@ -1,11 +1,9 @@
-import React, { forwardRef, isValidElement, useEffect, useRef } from 'react'
+import React, { forwardRef, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { OrbState } from 'thinking-orbs'
 import { cn } from '../../lib/cn'
 import { announce } from '../../stores/announcerStore'
-import { useUiStore } from '../../stores/uiStore'
-import { AiIcon } from './AiIcon'
-import { InlineOrb, ThinkingOrb } from './ThinkingOrb'
+import { InlineOrb } from './ThinkingOrb'
 
 type ButtonVariant =
   | 'primary'
@@ -192,35 +190,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     wasLoading.current = loading
   }, [loading, announceOnSettle, loadingError, startText])
 
-  // Loading replaces the leading icon with a thinking-orb (inline 20px)
-  // preset; default `searching`). The orb auto-freezes under reduced motion.
-  // The orb ignores CSS `color`/`text-*` — it resolves its own ink via the
-  // app theme (the `.dark` class on <html>). Primary fills carry a white
-  // label in every design system, so the orb is pinned to `theme="dark"`
-  // (light ink) regardless of mode. Surface-tuned contrast filters live in
-  // `ThinkingOrb`; on `theme="dark"` the `searching` state needs alpha
-  // amplification rather than a brightness lift — see `searchingBoost`.
-  // Clay dark labels are accent ink (dark) on a light fill, so the orb stays
-  // on auto there.
-  const designSystem = useUiStore((s) => s.designSystem)
-  const theme = useUiStore((s) => s.theme)
-  const primaryOrbTheme =
-    variant === 'primary' && !(designSystem === 'clay' && theme === 'dark')
-      ? ('dark' as const)
-      : undefined
-  const idleIcon =
-    primaryOrbTheme != null &&
-    isValidElement(icon) &&
-    (icon.type === AiIcon || icon.type === InlineOrb || icon.type === ThinkingOrb)
-      ? React.cloneElement(icon as React.ReactElement<{ theme?: string }>, {
-          theme: primaryOrbTheme,
-        })
-      : icon
-  const leadingIcon = loading ? (
-    <InlineOrb state={loadingOrbState} theme={primaryOrbTheme} aria-hidden />
-  ) : (
-    idleIcon
-  )
+  // Loading replaces the leading icon with a thinking-orb (inline 20px
+  // preset; default `searching`). The orb auto-freezes under reduced motion
+  // and inks itself from the wrapper's computed colour, so it follows the
+  // button label instead of needing a per-variant theme pin here.
+  const leadingIcon = loading ? <InlineOrb state={loadingOrbState} aria-hidden /> : icon
   const iconOnly = leadingIcon != null && children == null
   return (
     <button
