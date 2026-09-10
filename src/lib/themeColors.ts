@@ -407,7 +407,11 @@ function buildClayTokens(p: ClayPalette, rgb: string, isDark: boolean): AccentTo
     accentSoft: p.ghost,
     editorSelection: `color-mix(in srgb, ${p.acc} 35%, transparent)`,
     accentText: p.text,
-    focusRing: p.acc,
+    /* Light: the pastel slab fill measures 2.07–2.71 on the cream papers, and
+     * Clay's hairline is only 1.21:1 — so the ring would be the only boundary
+     * a keyboard user gets, and an invisible one. `text` is already the
+     * AA-on-paper value (5.04–8.21). Dark's `acc` is 5.27–7.99 and stays. */
+    focusRing: isDark ? p.acc : p.text,
     accentRgb: rgb,
     gradPrimary: `linear-gradient(135deg, ${p.deep}, ${p.acc})`,
     solidPrimary: p.acc,
