@@ -1324,6 +1324,50 @@ describe('Clean design system — :root.ds-clean / :root.dark.ds-clean', () => {
     expect(selector).toContain('.media-tap-placeholder')
   })
 
+  it('sweeps fields on Signature unconditionally, never blanket-matching <button>', () => {
+    const sweep = cssCode.match(
+      /:root\.ds-signature\s*\n?\s*:is\(\s*input:not\(\[type='checkbox'\][\s\S]*?\{[^}]*border-radius:\s*var\(--button-radius\)/,
+    )
+    expect(sweep).not.toBeNull()
+    const rule = sweep![0]
+    expect(rule).toContain("class~='rounded-sm'")
+    expect(rule).toContain("class~='rounded-xl'")
+    // `rounded-2xl` cards/panels opt out of both sweeps by not being matched.
+    expect(rule).not.toContain('rounded-2xl')
+    // Card- and row-shaped raw buttons would stretch into ovals, so the
+    // selector must not name the element (`--button-radius` in the body does).
+    expect(rule.slice(0, rule.indexOf('{'))).not.toMatch(/\bbutton\b/)
+    // `.xj-pill` must sit in the *subject* list — the first `:is()` — or it
+    // opts nothing in. Mutation-checked: `toContain` alone passes when it is
+    // moved into the radius arm.
+    expect(rule).toMatch(/:is\(\s*input:not\([\s\S]*?,\s*\.xj-pill\s*\)/)
+    // ~30px `px-2` number fields would crowd WebKit's flush-right spinner.
+    // Must be an exclusion — a positive match would invert the whole rule.
+    expect(rule).toMatch(/:not\(\s*\[type='number'\]\s*\)/)
+  })
+
+  it.each([
+    ['../components/common/Select.tsx', 'xj-pill rounded-xl'],
+    ['../components/calendar/CalendarPanel.tsx', 'xj-cal-day xj-pill'],
+  ])('keeps the .xj-pill marker on %s', (file, marker) => {
+    // The sweep needs the marker AND a `rounded-*` class on the same element;
+    // dropping either silently loses the Signature pill with the CSS intact.
+    expect(readFileSync(resolve(__dirname, file), 'utf8')).toContain(marker)
+  })
+
+  it('keeps the Appearance layout cards out of both radius sweeps via rounded-(--radius-xl)', () => {
+    const cards = readFileSync(
+      resolve(__dirname, '../components/settings/AppearanceSettings.tsx'),
+      'utf8',
+    )
+    // The alias resolves to the same value as `rounded-xl` but is not matched
+    // by either sweep's `[class~='rounded-xl']`, which is the whole mechanism.
+    // Anchored on the neighbouring utilities: the bare alias string also
+    // appears in the comment above the className, so `toContain` on its own
+    // stays green even when the className itself regresses to `rounded-xl`.
+    expect(cards).toContain('gap-2 rounded-(--radius-xl) p-3')
+  })
+
   it('steps titlebar tab titles down one type size on Signature and Clean (text-xs, not text-sm)', () => {
     expect(cssCode).toMatch(
       /:root\.ds-signature\s+\.xj-tab-title\s*,\s*:root\.ds-clean\s+\.xj-tab-title\s*\{[^}]*font-size:\s*var\(--text-xs\)/,

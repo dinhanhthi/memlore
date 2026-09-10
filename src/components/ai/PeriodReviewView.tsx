@@ -151,7 +151,7 @@ export function PeriodReviewView() {
           ariaLabel={t('period_review.kind_aria', { defaultValue: 'Review period kind' })}
         />
 
-        <div className="border-border-default flex shrink-0 items-center gap-1 rounded-lg border">
+        <div className="border-border-default flex shrink-0 items-center gap-1 rounded-(--button-radius) border">
           <Button
             variant="ghost"
             size="sm"

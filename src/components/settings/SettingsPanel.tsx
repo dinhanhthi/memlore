@@ -399,7 +399,7 @@ export function SettingsPanel() {
                         ? 'text-fg-muted hover:text-fg rounded-md bg-transparent font-normal hover:bg-(--nav-hover-bg)'
                         : isClay
                           ? 'text-fg-muted hover:bg-surface-hi hover:text-fg rounded-lg bg-transparent'
-                          : 'text-fg-muted hover:bg-elevated hover:text-fg dark:hover:bg-surface-hi rounded-xl bg-transparent',
+                          : 'text-fg-muted hover:bg-elevated hover:text-fg dark:hover:bg-surface-hi rounded-full bg-transparent',
                   )}
                 >
                   {isActive && !isClay && (

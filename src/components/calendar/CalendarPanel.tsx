@@ -445,8 +445,9 @@ export function CalendarPanel() {
                     onClick={() => handleDayClick(day)}
                     aria-pressed={isSelected}
                     className={cn(
-                      // SuperX day cell: 12px radius, border-strong hairline
-                      'xj-cal-day flex aspect-square flex-col items-center justify-between rounded-xl border pt-1.5 pb-1 text-sm',
+                      // SuperX day cell: 12px radius (a circle on Signature via
+                      // `xj-pill`), border-strong hairline
+                      'xj-cal-day xj-pill flex aspect-square flex-col items-center justify-between rounded-xl border pt-1.5 pb-1 text-sm',
                       'transition-[background-color,border-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
                       hasEntries ? 'text-fg font-medium' : 'text-fg-muted font-normal',
                       // selected > today > plain

@@ -25,6 +25,7 @@ import { Modal } from '../../common/Modal'
 import { SegmentedControl } from '../../common/SegmentedControl'
 import { Select } from '../../common/Select'
 import { TextInput } from '../../common/TextInput'
+import { Tooltip } from '../../common/Tooltip'
 
 // --- Types --------------------------------------------------------------------
 
@@ -451,15 +452,24 @@ export function ImportModal() {
             aria-label={t('modal.source_label')}
             disabled={appleBusy || phase === 'running' || resultOpen}
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Folder className="size-4" strokeWidth={1.75} />}
-            onClick={() => void handleBrowse()}
-            data-testid="import-browse"
-            aria-label={t('modal.browse')}
+          {/* `disabled` also gates the tooltip: WebKit swallows mouse events on
+              a disabled control, so `mouseleave` can go missing and leave the
+              bubble stuck open (same reason as BubbleToolbar's pointer guard). */}
+          <Tooltip
+            content={t('modal.browse')}
+            className="shrink-0"
             disabled={appleBusy || phase === 'running' || resultOpen}
-          />
+          >
+            <Button
+              variant="outline-secondary"
+              size="lg"
+              icon={<Folder className="size-4" strokeWidth={1.75} />}
+              onClick={() => void handleBrowse()}
+              data-testid="import-browse"
+              aria-label={t('modal.browse')}
+              disabled={appleBusy || phase === 'running' || resultOpen}
+            />
+          </Tooltip>
         </div>
         {(format === 'dayone_zip' || format === 'journey_zip' || isApple) && (
           <p className="text-warning mt-1 text-xs">

@@ -19,6 +19,7 @@ import {
 import { Button } from '../../common/Button'
 import { Callout } from '../../common/Callout'
 import { Select } from '../../common/Select'
+import { Tooltip } from '../../common/Tooltip'
 import { TextInput } from '../../common/TextInput'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -218,21 +219,16 @@ export function ExportModal() {
             placeholder={t('modal.no_destination')}
             aria-label={t('modal.destination_label')}
           />
-          <button
-            type="button"
-            onClick={handleBrowse}
-            data-testid="export-browse"
-            aria-label={t('modal.browse')}
-            title={t('modal.browse')}
-            className={[
-              'flex shrink-0 items-center justify-center rounded-xl border p-3',
-              'border-border-default bg-elevated text-fg-secondary hover:bg-surface-subtle',
-              'outline-none',
-              'transition-[background-color,border-color] duration-(--motion-base)',
-            ].join(' ')}
-          >
-            <Folder className="size-4" strokeWidth={1.75} />
-          </button>
+          <Tooltip content={t('modal.browse')} className="shrink-0">
+            <Button
+              variant="outline-secondary"
+              size="lg"
+              icon={<Folder className="size-4" strokeWidth={1.75} />}
+              onClick={handleBrowse}
+              data-testid="export-browse"
+              aria-label={t('modal.browse')}
+            />
+          </Tooltip>
         </div>
       </div>
 

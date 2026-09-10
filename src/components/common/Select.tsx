@@ -234,7 +234,7 @@ export function Select({
         {...getReferenceProps()}
         className={cn(
           'flex w-full items-center justify-between gap-2',
-          'border-border-default bg-elevated rounded-xl border px-4 shadow-(--shadow-control)',
+          'border-border-default bg-elevated xj-pill rounded-xl border px-4 shadow-(--shadow-control)',
           selectTriggerHeightClass(Boolean(showTriggerDescription && selected?.description)),
           'text-fg text-sm',
           'transition-[border-color,box-shadow,background-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) outline-none',

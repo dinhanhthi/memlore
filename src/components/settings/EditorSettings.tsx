@@ -198,7 +198,7 @@ function FontControlRow({
   onReset,
 }: FontControlRowProps) {
   const btnClass = cn(
-    'inline-flex size-7 cursor-pointer items-center justify-center rounded-md flex-nowrap',
+    'inline-flex size-7 cursor-pointer items-center justify-center rounded-(--button-radius) flex-nowrap',
     'border border-border-default bg-elevated text-fg-muted',
     'hover:bg-accent-soft hover:text-fg',
     'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-elevated disabled:hover:text-fg-muted',
@@ -578,7 +578,7 @@ export function EditorSettings() {
                                 }
                                 setFontFamily(opt.id)
                               }}
-                              className="h-8 w-full rounded-xl px-4 py-3"
+                              className="h-8 w-full px-4 py-3"
                               label={<span className="text-sm font-semibold">{label}</span>}
                             />
                           )

@@ -1280,6 +1280,36 @@
   border-radius: var(--button-radius);
 }
 
+/* Signature runs only the *field* half of the sweep above, and runs it
+   unconditionally against its own `--button-radius` (the 9999px pill in
+   `:root`), so every text field, `PasswordInput`, `ComboBox` and bare modal
+   input is a capsule with no per-component edit. Buttons are deliberately
+   left out: `<Button>` already pills through `--button-radius`, and a blanket
+   `button[class~='rounded-*']` sweep would also catch card- and row-shaped
+   raw buttons (emotion cards, search results, menu rows) and stretch them
+   into ovals. The buttons that *do* take the pill say so at the call site.
+
+   `.xj-pill` opts one specific element in without the blanket match — the
+   `Select` trigger (a field) and the calendar day cell (a content cell that
+   becomes a circle). Both keep their literal `rounded-xl` so Clean and Clay
+   stay untouched: Clay's `--radius-xl` is 0.25rem wider than its
+   `--button-radius`, and a Select must match the `TextInput` beside it.
+
+   `type='number'` is excluded: the fields are ~30px tall with `px-2`, so the
+   capsule's end arcs would crowd WebKit's flush-right spinner. No
+   `.media-tap-placeholder` exclusion is needed here because this selector
+   never matches `button` at all — do NOT add the element to it, that is the
+   whole reason the emotion cards and menu rows survive. */
+:root.ds-signature
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+        [type='file']
+      ):not([type='number']),
+    .xj-pill
+  ):is([class~='rounded-sm'], [class~='rounded-md'], [class~='rounded-lg'], [class~='rounded-xl']) {
+  border-radius: var(--button-radius);
+}
+
 :root.ds-clean {
   /* Elevation — shadcn's tailwind shadow scale, near-flat. */
   --elev-1: 0 1px 2px 0 oklch(0 0 0 / 0.05);
