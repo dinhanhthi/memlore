@@ -177,14 +177,17 @@ const SURFACE_ROLES = [
   '--color-elevated',
   '--color-surface-hi',
   '--color-chrome',
-] as const
-/** Clay-only: text sits on these, but Signature/Clean/Lumen muted pairs fail AA. */
-const CLAY_EXTRA_SURFACE_ROLES = [
-  '--nav-active-bg',
-  '--nav-rail-active-bg',
+  // Settings rows hover the row container and carry `text-fg-muted` sub-copy
+  // inside it (RemindersPanel, DeviceList, JournalsSettings, LocationSettings,
+  // TemplatesSettings, ProvidersTab), so the hover fill is a text surface on
+  // every skin — not a Clay-only one.
   '--color-surface-row-hover',
-  '--color-surface-control',
+  '--nav-active-bg',
 ] as const
+/** Clay-only text surfaces. `--color-surface-control` stays here: its only
+ *  consumer is Button secondary, which labels with `text-fg` (see the Signature
+ *  audit, finding 9) — Soft's #3f3f3f track would fail with muted ink. */
+const CLAY_EXTRA_SURFACE_ROLES = ['--nav-rail-active-bg', '--color-surface-control'] as const
 const STATUS_TEXT_ROLES = [
   '--color-danger-text',
   '--color-success-text',
@@ -192,7 +195,9 @@ const STATUS_TEXT_ROLES = [
   '--color-info-text',
   '--color-empty-text',
 ] as const
-const STATUS_SURFACES = ['--color-app', '--color-elevated'] as const
+// Status copy also lands on raised fills and on hovered settings rows, not
+// just the flat page and card.
+const STATUS_SURFACES = ['--color-app', '--color-elevated', '--color-surface-row-hover'] as const
 
 const SHIPPING_SURFACES: { id: SurfaceId; label: string }[] = [
   { id: 'signature-light', label: 'Signature light (@theme)' },

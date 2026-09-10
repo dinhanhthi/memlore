@@ -108,7 +108,9 @@
   --entry-card-idle-bg: var(--color-selected-tab);
   --entry-card-hover-bg: color-mix(in oklab, var(--color-selected-tab) 45%, #ffffff);
   /* Row hover inside a surface-hi card — one step darker than paper hover */
-  --color-surface-row-hover: #e5e2d9;
+  /* Lightened from #e5e2d9: settings rows carry `text-fg-muted` sub-copy and
+     that pair measured 4.36:1 on the old fill. */
+  --color-surface-row-hover: #eeece6;
   /* Secondary button chip resting / hover — always distinct from card + row */
   --color-surface-control: oklch(0.94 0 0 / 1);
   --color-surface-control-hover: oklch(0.9 0 0 / 1);
@@ -183,7 +185,9 @@
      the dark-mode lightening rule below. Does NOT clear AA on the control
      rungs (#d0ccc0 → 4.03:1); no call site sits there today. */
   --color-danger-text: #b91c1c;
-  --color-success-text: oklch(51.5% 0.16 150);
+  /* One step darker than --color-success (51.5%) so status copy clears AA on
+     the hovered settings row and the selected titlebar tab too. */
+  --color-success-text: oklch(50% 0.16 150);
   /* Warm yellow (hue 85.31, near --color-warning's 75.44); darkened to L52%
      for AA on light paper — the dark block keeps the bright L82% hue-92 variant. */
   --color-warning-text: oklch(0.52 0.15 85.31);
