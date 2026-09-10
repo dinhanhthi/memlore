@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./.cache/tsconfig.website.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "types": ["vite/client", "vitest/globals", "node"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@tauri-apps/api/core": ["./demo/mocks/core.ts"],
+      "@tauri-apps/api/event": ["../web/mocks/event.ts"],
+      "@tauri-apps/api/window": ["../web/mocks/window.ts"],
+      "@tauri-apps/api/path": ["../web/mocks/path.ts"],
+      "@tauri-apps/plugin-opener": ["./demo/mocks/plugin-opener.ts"],
+      "@tauri-apps/plugin-dialog": ["../web/mocks/plugin-dialog.ts"],
+      "@tauri-apps/plugin-notification": ["../web/mocks/plugin-notification.ts"]
+    }
+  },
+  "include": ["../src", "../web/mocks", "../web/scenarios", "."],
+  "exclude": [
+    "../src/**/*.test.ts",
+    "../src/**/*.test.tsx",
+    "../src/test/**",
+    "../web/**/*.test.ts",
+    "../web/**/*.test.tsx",
+    "playwright.config.ts",
+    "tests/landing.spec.ts",
+    "test-results",
+    "playwright-report",
+    "dist"
+  ]
+}

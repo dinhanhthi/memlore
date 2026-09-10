@@ -1,4 +1,7 @@
 dist/
+website/.cache/
+website/test-results/
+website/playwright-report/
 node_modules/
 src-tauri/target/
 src-tauri/gen/
