@@ -924,10 +924,39 @@ describe('Tailwind v4 utilities', () => {
     )
   })
 
-  it('Clay CTA label: light keeps text-fg-inverse, dark paints the accent ink', () => {
+  it('Clay CTA label: the primary button is white ink, other accent fills keep the accent ink', () => {
     expect(css).not.toMatch(/:root\.ds-clay\s+\.gradient-primary\s*\{[^}]*color:/)
+    // The dark accent-ink rule still covers the segmented thumb, but the CTA
+    // button opts out — it darkens its own face so white clears AA.
     expect(css).toMatch(
-      /:root\.dark\.ds-clay\s+\.gradient-primary,[^{]*\{[^}]*color:\s*var\(--color-accent-ink\)/,
+      /:root\.dark\.ds-clay\s+\.gradient-primary:not\(button\[data-variant='primary'\]\),[^{]*\{[^}]*color:\s*var\(--color-accent-ink\)/,
+    )
+    expect(css).toMatch(
+      /:root\.ds-clay\s+button\[data-variant='primary'\]\s*\{[^}]*color:\s*var\(--cta-ink\)/,
+    )
+    expect(clayTokenBodies).toMatch(/--cta-ink:\s*#ffffff/)
+  })
+
+  it('Clay slabs carry no negative-offset inner shade (it left a light hairline)', () => {
+    expect(clayTokenBodies).not.toMatch(/inset 0 -\d+px/)
+    expect(css).not.toMatch(
+      /:root\.ds-clay\s+button\[data-variant='primary'\]\s*\{[^}]*box-shadow:[^;]*inset/,
+    )
+  })
+
+  it('Clay danger slab is the CTA construction in danger colours, white ink', () => {
+    expect(clayTokenBodies).toMatch(/--danger-face:\s*oklch\(from var\(--color-danger-fill\) 0\.52/)
+    expect(clayTokenBodies).toMatch(/--danger-lip:\s*oklch\(from var\(--color-danger-fill\) 0\.34/)
+    expect(css).toMatch(
+      /:root\.ds-clay\s+button\[data-variant='destructive'\]\s*\{[^}]*background:\s*var\(--danger-face\)[^}]*color:\s*var\(--cta-ink\)[^}]*0 var\(--rise\) 0 0 var\(--danger-lip\)/,
+    )
+  })
+
+  it('Clay CTA face and lip are distinct accent-derived slabs', () => {
+    expect(clayTokenBodies).toMatch(/--cta-face:\s*oklch\(from var\(--color-accent-fill\) 0\.52/)
+    expect(clayTokenBodies).toMatch(/--cta-lip:\s*oklch\(from var\(--color-accent-fill\) 0\.34/)
+    expect(css).toMatch(
+      /:root\.ds-clay\s+button\[data-variant='primary'\]\s*\{[^}]*background:\s*var\(--cta-face\)[^}]*0 var\(--rise\) 0 0 var\(--cta-lip\)/,
     )
   })
 
@@ -1351,6 +1380,7 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
       '--shadow-panel',
       '--shadow-card',
       '--shadow-control',
+      '--slab-deep',
       '--shadow-toggle-on',
       '--grad-surface',
       '--nav-active-bg',
@@ -1467,10 +1497,13 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
   })
 
   it('Clay secondary uses the same 4px under-bar as primary', () => {
-    expect(clayLightTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--neu-deep\)/)
-    expect(clayDarkTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--neu-deep\)/)
+    expect(clayLightTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--slab-deep\)/)
+    expect(clayDarkTokenBodies).toMatch(/0 var\(--rise\) 0 0 var\(--slab-deep\)/)
     expect(clayLightTokenBodies).toMatch(/--color-button-slab:\s*#f7f1e6/)
-    expect(clayDarkTokenBodies).toMatch(/--color-button-slab:\s*#3a3530/)
+    expect(clayDarkTokenBodies).toMatch(/--color-button-slab:\s*#4d463e/)
+    // The lip must sit above the dark canvas, not below it: near-black read as
+    // a cast shadow and made secondary look shorter than primary.
+    expect(clayDarkTokenBodies).toMatch(/--slab-deep:\s*#37312a/)
     expect(cssCode).toMatch(
       /:root\.ds-clay\s+button\[data-variant='secondary'\],\s*:root\.ds-clay\s+button\[data-variant='outline-secondary'\],\s*:root\.ds-clay\s+button\[data-variant='secondary-outline'\]\s*\{[^}]*background-color:\s*var\(--color-button-slab\)[^}]*box-shadow:\s*var\(--shadow-control\)/,
     )
@@ -1481,19 +1514,13 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
 
   it('Clay destructive is a danger clay slab (kit §6), not an outline', () => {
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='destructive'\]\s*\{[^}]*background:\s*var\(--grad-danger-fill\)/,
-    )
-    expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='destructive'\]\s*\{[^}]*box-shadow:\s*var\(--shadow-danger\)/,
-    )
-    expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='destructive'\]\s*\{[^}]*color:\s*var\(--danger-ink\)/,
+      /:root\.ds-clay\s+button\[data-variant='destructive'\]\s*\{[^}]*background:\s*var\(--danger-face\)/,
     )
     expect(cssCode).toMatch(
       /:root\.ds-clay\s+button\[data-variant='destructive'\]:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/,
     )
     expect(cssCode).toMatch(
-      /:root\.ds-clay\s+button\[data-variant='destructive'\]:active:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--shadow-danger-pressed\)/,
+      /:root\.ds-clay\s+button\[data-variant='destructive'\]:active:not\(:disabled\)\s*\{[^}]*0 0 0 0 var\(--danger-lip\)/,
     )
   })
 

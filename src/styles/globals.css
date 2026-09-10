@@ -964,6 +964,10 @@
   /* Clay recipe tokens (kit §3/§5) — read only by :root.ds-clay rules. */
   --neu: #efe6d8;
   --neu-deep: #cfc3b0;
+  /* Neutral slab lip (secondary buttons). Same face→lip step as the accent
+     CTA so secondary reads as tall as primary, not as a flat face over a
+     shadow. Light mode already had it: `--neu-deep` is the same value. */
+  --slab-deep: #cfc3b0;
   --neu-hi: rgb(255 255 255 / 0.7);
   --neu-press: rgb(90 70 40 / 0.16);
   --amb: rgb(70 50 20 / 0.16);
@@ -994,8 +998,10 @@
   --color-surface-row-hover: #252220;
   --color-surface-control: #2c2926;
   --color-surface-control-hover: #36322d;
-  /* Lifted chip on `--neu` cards so the near-black under-bar is visible. */
-  --color-button-slab: #3a3530;
+  /* Secondary slab face. Lifted to a mid-gray so its `--slab-deep` lip stays
+     above canvas/panel and the 4px under-bar reads as button body — the old
+     #3a3530 + near-black lip made secondary look shorter than primary. */
+  --color-button-slab: #4d463e;
   --color-surface-subtle: #2a2622;
   --nav-active-bg: #2a2622;
   --nav-hover-bg: #201d1a;
@@ -1056,9 +1062,13 @@
   --content-grad-to: #201d1a;
 
   --neu: #2c2926;
-  /* Near-black lip so the 4px under-bar reads on canvas `#171513`
-     (kit `#161412` vanished into the page and left secondary looking flat). */
+  /* Near-black ground — wells and tracks only (--shadow-well/-track). */
   --neu-deep: #0a0806;
+  /* Neutral slab lip: one clear step under `--color-button-slab` and above
+     canvas `#171513` / elevated `#201d1a`, so the extrusion is visible the
+     way the accent CTA's `--color-accent-deep` lip is. Near-black read as a
+     cast shadow instead, which is what shrank secondary next to primary. */
+  --slab-deep: #37312a;
   --neu-hi: rgb(255 250 242 / 0.1);
   --neu-press: rgb(0 0 0 / 0.45);
   --amb: rgb(0 0 0 / 0.45);
@@ -1071,12 +1081,12 @@
   --elev-4: 0 1px 0 var(--neu-hi), 0 20px 44px var(--amb);
   --shadow-cta:
     0 var(--rise) 0 0 var(--color-accent-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.38), inset 0 -2px 5px rgb(0 0 0 / 0.12);
+    inset 0 1px 0 rgb(255 255 255 / 0.38);
   --shadow-cta-pressed:
     0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
   --shadow-danger:
     0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.5), inset 0 -2px 6px rgb(0 0 0 / 0.18);
+    inset 0 1px 0 rgb(255 255 255 / 0.5);
   --shadow-danger-pressed:
     0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
   /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
@@ -1085,8 +1095,8 @@
   --shadow-panel: var(--elev-2);
   --shadow-card: var(--elev-2);
   --shadow-control:
-    0 var(--rise) 0 0 var(--neu-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 var(--neu-hi), inset 0 -2px 5px rgb(0 0 0 / 0.06);
+    0 var(--rise) 0 0 var(--slab-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 var(--neu-hi);
   --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
   /* Kit sheen (white 35%) shared by every accent slab; the sunken track
      under the switch-off thumb and the segmented thumb; the knob rim. */
@@ -1146,15 +1156,26 @@
   /* Primary slab (kit §6): 4px extrusion + ambient + inner light/ground.
      Press collapses the extrusion; the button translates by --rise. */
   --rise: 4px;
+  /* CTA button slab. Derived from the live accent, so it follows every preset
+     and both modes. Face is pinned to L 52% so the white label clears AA on any
+     accent (measured 5.2–5.9:1 across presets); the lip is the same hue well below the face, which is what
+     separates the two — the kit's inset sheen is dropped because it drew a
+     light hairline along the bottom edge of the face. */
+  --cta-face: oklch(from var(--color-accent-fill) 0.52 c h);
+  --cta-lip: oklch(from var(--color-accent-fill) 0.34 c h);
+  --cta-ink: #ffffff;
+  /* Danger slab: same construction, --color-accent-fill → --color-danger-fill. */
+  --danger-face: oklch(from var(--color-danger-fill) 0.52 c h);
+  --danger-lip: oklch(from var(--color-danger-fill) 0.34 c h);
   --shadow-cta:
     0 var(--rise) 0 0 var(--color-accent-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.38), inset 0 -2px 5px rgb(0 0 0 / 0.12);
+    inset 0 1px 0 rgb(255 255 255 / 0.38);
   --shadow-cta-pressed:
     0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
   /* Danger slab — same recipe as --shadow-cta, accent-deep → --danger-deep. */
   --shadow-danger:
     0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.5), inset 0 -2px 6px rgb(0 0 0 / 0.18);
+    inset 0 1px 0 rgb(255 255 255 / 0.5);
   --shadow-danger-pressed:
     0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
   /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
@@ -1166,8 +1187,8 @@
   /* Neutral slab — secondary buttons, pills. Wells (inputs, switch-off,
      segmented track) invert this via :root.ds-clay rules below. */
   --shadow-control:
-    0 var(--rise) 0 0 var(--neu-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 var(--neu-hi), inset 0 -2px 5px rgb(0 0 0 / 0.06);
+    0 var(--rise) 0 0 var(--slab-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
+    inset 0 1px 0 var(--neu-hi);
   --shadow-well: inset 0 2px 5px var(--neu-press), inset 0 0 0 1.5px var(--color-border-default);
   /* Kit sheen (white 35%) shared by every accent slab; the sunken track
      under the switch-off thumb and the segmented thumb; the knob rim. */
@@ -1422,10 +1443,12 @@
   background: var(--grad-accent-fill);
 }
 
-:root.dark.ds-clay .gradient-primary,
+:root.dark.ds-clay .gradient-primary:not(button[data-variant='primary']),
 :root.dark.ds-clay .xj-seg [role='radio'][aria-checked='true'] {
   /* Dark: the lifted accent fills carry the kit's near-black accent ink
-     instead of white (product choice; white measured 2.3–2.9:1). */
+     instead of white (product choice; white measured 2.3–2.9:1). The CTA
+     button opts out — it darkens its own face to --cta-face so the white
+     --cta-ink label clears AA. */
   color: var(--color-accent-ink);
 }
 
@@ -1461,7 +1484,15 @@
 }
 
 :root.ds-clay button[data-variant='primary'] {
-  box-shadow: var(--shadow-cta);
+  /* Flat accent face + a plain colour lip: no inset sheen, so nothing draws a
+     light rim between the face and the under-bar. Wins over the
+     `.gradient-primary` fill rule above on source order (same specificity)
+     and over Button.tsx's `text-fg-inverse` utility on specificity. */
+  background: var(--cta-face);
+  color: var(--cta-ink);
+  box-shadow:
+    0 var(--rise) 0 0 var(--cta-lip),
+    0 calc(var(--rise) + 8px) 18px var(--amb);
 }
 
 :root.ds-clay button[data-variant='primary']:hover:not(:disabled) {
@@ -1473,7 +1504,9 @@
   transform: translateY(var(--rise));
   scale: none;
   filter: brightness(0.97);
-  box-shadow: var(--shadow-cta-pressed);
+  box-shadow:
+    0 0 0 0 var(--cta-lip),
+    0 2px 8px var(--amb);
 }
 
 /* Selected calendar day (Calendar grid, MiniDatePicker): the same extruded
@@ -1525,7 +1558,7 @@
   transform: translateY(var(--rise));
   scale: none;
   box-shadow:
-    0 0 0 0 var(--neu-deep),
+    0 0 0 0 var(--slab-deep),
     0 2px 8px var(--amb),
     inset 0 3px 7px var(--neu-press);
 }
@@ -1578,33 +1611,38 @@
   transform: translateY(var(--rise));
   scale: none;
   box-shadow:
-    0 0 0 0 var(--neu-deep),
+    0 0 0 0 var(--slab-deep),
     0 2px 8px var(--amb),
     inset 0 3px 7px var(--neu-press);
 }
 
 :root.ds-clay button[data-variant='destructive'] {
-  /* Kit §6 danger: same slab as primary, --acc → --color-danger-fill.
-     Dark ink (not inverse) so the top sheen stays visible and AA holds
-     on the kit coral — same stamp as Clay dark primary. */
-  background: var(--grad-danger-fill);
-  color: var(--danger-ink);
+  /* Kit §6 danger: same slab as primary, --cta-face → --danger-face. Flat
+     face, no inset sheen, and the face is pinned low enough that the white
+     --cta-ink label clears AA on the kit coral (dark ink was the old way of
+     buying that contrast on the lighter fill). */
+  background: var(--danger-face);
+  color: var(--cta-ink);
   border-color: transparent;
-  box-shadow: var(--shadow-danger);
+  box-shadow:
+    0 var(--rise) 0 0 var(--danger-lip),
+    0 calc(var(--rise) + 8px) 18px var(--amb);
 }
 
 :root.ds-clay button[data-variant='destructive']:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.05);
   /* Beat Button.tsx `hover:bg-danger/10` so the slab fill does not wash out. */
-  background-color: var(--color-danger-fill);
+  background-color: var(--danger-face);
 }
 
 :root.ds-clay button[data-variant='destructive']:active:not(:disabled) {
   transform: translateY(var(--rise));
   scale: none;
   filter: brightness(0.97);
-  box-shadow: var(--shadow-danger-pressed);
+  box-shadow:
+    0 0 0 0 var(--danger-lip),
+    0 2px 8px var(--amb);
 }
 
 /* ---- Switch (kit §7): off = neutral well, on = accent slab. ---- */
