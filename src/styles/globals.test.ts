@@ -177,14 +177,17 @@ const SURFACE_ROLES = [
   '--color-elevated',
   '--color-surface-hi',
   '--color-chrome',
-] as const
-/** Clay-only: text sits on these, but Signature/Clean/Lumen muted pairs fail AA. */
-const CLAY_EXTRA_SURFACE_ROLES = [
-  '--nav-active-bg',
-  '--nav-rail-active-bg',
+  // Settings rows hover the row container and carry `text-fg-muted` sub-copy
+  // inside it (RemindersPanel, DeviceList, JournalsSettings, LocationSettings,
+  // TemplatesSettings, ProvidersTab), so the hover fill is a text surface on
+  // every skin — not a Clay-only one.
   '--color-surface-row-hover',
-  '--color-surface-control',
+  '--nav-active-bg',
 ] as const
+/** Clay-only text surfaces. `--color-surface-control` stays here: its only
+ *  consumer is Button secondary, which labels with `text-fg` (see the Signature
+ *  audit, finding 9) — Soft's #3f3f3f track would fail with muted ink. */
+const CLAY_EXTRA_SURFACE_ROLES = ['--nav-rail-active-bg', '--color-surface-control'] as const
 const STATUS_TEXT_ROLES = [
   '--color-danger-text',
   '--color-success-text',
@@ -192,7 +195,9 @@ const STATUS_TEXT_ROLES = [
   '--color-info-text',
   '--color-empty-text',
 ] as const
-const STATUS_SURFACES = ['--color-app', '--color-elevated'] as const
+// Status copy also lands on raised fills and on hovered settings rows, not
+// just the flat page and card.
+const STATUS_SURFACES = ['--color-app', '--color-elevated', '--color-surface-row-hover'] as const
 
 const SHIPPING_SURFACES: { id: SurfaceId; label: string }[] = [
   { id: 'signature-light', label: 'Signature light (@theme)' },
@@ -609,7 +614,6 @@ describe('Semantic OKLCH tokens — registered in @theme', () => {
     '--color-fg',
     '--color-fg-secondary',
     '--color-fg-muted',
-    '--color-fg-faint',
     '--color-fg-inverse',
     '--color-surface-hi',
     '--color-border-subtle',
@@ -659,7 +663,6 @@ describe('SuperX dark charcoal ladder', () => {
     // App chrome fg; editor body max is pure white (see ProseMirror override).
     expect(darkBlock).toMatch(/--color-fg:\s*#eee/)
     expect(darkBlock).toMatch(/--color-fg-muted:\s*#a8a29e/)
-    expect(darkBlock).toMatch(/--color-fg-faint:\s*#6b6b6b/)
     expect(darkBlock).toMatch(/--color-border-subtle:\s*#2a2a2a/)
     expect(darkBlock).toMatch(/--color-border-default:\s*#363636/)
     expect(darkBlock).toMatch(/--color-border-strong:\s*#4a4a4a/)
@@ -682,7 +685,6 @@ describe('Dark mode redefines all semantic tokens', () => {
     '--color-fg',
     '--color-fg-secondary',
     '--color-fg-muted',
-    '--color-fg-faint',
     '--color-fg-inverse',
     '--color-surface-hi',
     '--color-border-subtle',
@@ -965,10 +967,10 @@ describe('Tailwind v4 utilities', () => {
 
   it('Clay CTA label: the primary button is white ink, other accent fills keep the accent ink', () => {
     expect(css).not.toMatch(/:root\.ds-clay\s+\.gradient-primary\s*\{[^}]*color:/)
-    // The dark accent-ink rule still covers the segmented thumb, but the CTA
-    // button opts out — it darkens its own face so white clears AA.
+    // Every accent slab that carries a label now uses the CTA face + ink; the
+    // dark accent-ink rule is left only for the generic .gradient-primary fill.
     expect(css).toMatch(
-      /:root\.dark\.ds-clay\s+\.gradient-primary:not\(button\[data-variant='primary'\]\),[^{]*\{[^}]*color:\s*var\(--color-accent-ink\)/,
+      /:root\.dark\.ds-clay\s+\.gradient-primary:not\(button\[data-variant='primary'\]\)\s*\{[^}]*color:\s*var\(--color-accent-ink\)/,
     )
     expect(css).toMatch(
       /:root\.ds-clay\s+button\[data-variant='primary'\]\s*\{[^}]*color:\s*var\(--cta-ink\)/,
@@ -1065,6 +1067,20 @@ describe('Body rule', () => {
 })
 
 describe('Fonts — self-hosted, no network (offline regression guard)', () => {
+  // The app ships `vi`. Every face that can render user content (entry titles
+  // via --font-title, UI via --font-sans, code via --font-mono) must carry the
+  // Vietnamese subset, or a Vietnamese string falls back to a system face
+  // mid-word. Asserted against the installed packages, not the stylesheet.
+  it.each([
+    ['@fontsource-variable/fraunces/index.css', 'Fraunces — --font-title, entry titles'],
+    ['@fontsource-variable/geist/index.css', 'Geist — --font-sans on Signature/Clean'],
+    ['@fontsource-variable/baloo-2/index.css', 'Baloo 2 — --font-sans on Clay'],
+    ['@fontsource-variable/geist-mono/index.css', 'Geist Mono — --font-mono'],
+  ])('%s ships a vietnamese @font-face (%s)', (spec) => {
+    const file = readFileSync(require.resolve(spec), 'utf8')
+    expect(file).toMatch(/unicode-range:[^;]*U\+1EA0-1EF9/)
+  })
+
   it('does NOT reference Google Fonts (or any external font URL) — fonts are bundled offline', () => {
     // The whole point: no runtime CDN request for typography. Fonts are
     // self-hosted via @fontsource packages imported in src/main.tsx.
@@ -1674,8 +1690,10 @@ describe('Clay design system — :root.ds-clay / :root.dark.ds-clay', () => {
 /**
  * Scripted WCAG AA 4.5:1 check across the eight shipping surfaces.
  *
- * Exemptions (do not assert): `--color-fg-faint` (decorative timestamps /
- * mono labels). Primary CTA fill is `--color-accent-fill` on every surface.
+ * No text-role exemptions: `--color-fg-faint` used to be excused here as
+ * "decorative", but every consumer was readable type and it cleared 4.5:1 on
+ * none of the eight surfaces — the token is deleted, not exempted.
+ * Primary CTA fill is `--color-accent-fill` on every surface.
  *
  * `--color-accent-fill` is a chroma-preserving oklch in both modes (the
  * lightest L that still clears 4.5:1 with `--color-fg-inverse`), except
@@ -1818,6 +1836,64 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
     expect(contrastOf(tokensBySurface[id], '--cta-ink', '--cta-face')).toBeGreaterThanOrEqual(
       WCAG_AA_MIN,
     )
+  })
+
+  // Every OTHER Clay accent slab that carries a label must use the same
+  // face+ink pair as the CTA button. The selected calendar day and the
+  // segmented-control active radio used to stamp --color-fg-inverse on the
+  // raw --grad-accent-fill, which measured 2.47–4.29:1 in light across the
+  // six presets — the button fix did not reach them.
+  it('paints the Clay selected calendar day with the CTA face + ink', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-cal-day\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--cta-face\)[^}]*color:\s*var\(--cta-ink\)/,
+    )
+  })
+
+  it('paints the Clay segmented thumb with the CTA face + ink', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-seg-thumb\s*\{[^}]*background:\s*var\(--cta-face\)/,
+    )
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-seg \[role='radio'\]\[aria-checked='true'\]\s*\{[^}]*color:\s*var\(--cta-ink\)/,
+    )
+  })
+
+  it('leaves no Clay rule stamping --color-fg-inverse on an accent slab', () => {
+    const clayFgInverse = [
+      ...cssCode.matchAll(
+        /:root(?:\.dark)?\.ds-clay [^{]*\{[^}]*[^-]color:\s*var\(--color-fg-inverse\)/g,
+      ),
+    ]
+    expect(clayFgInverse.map((m) => m[0].split('{')[0].trim())).toEqual([])
+  })
+
+  // WCAG 2.4.7: text fields suppress the global offset ring (it reads as a
+  // second box around the field), so they must paint their own indicator.
+  // Clay already did via its own inset ring; Signature and Clean painted
+  // nothing at all and left the blinking caret as the only focus signal.
+  it('text fields paint a focus ring instead of only suppressing the outline', () => {
+    const rule = cssCode.match(
+      /input:not\([^)]*\):focus-visible,\s*textarea:focus-visible\s*\{([^}]*)\}/,
+    )
+    expect(rule, 'shared text-field focus rule not found').not.toBeNull()
+    expect(rule![1]).toMatch(/outline:\s*none/)
+    expect(rule![1]).toMatch(/box-shadow:[^;]*var\(--color-focus-ring\)/)
+  })
+
+  // Clay light collapses panel-3 / selected-tab / elevated / surface-hi /
+  // nav-active / surface-subtle onto one fill, so a tooltip painted
+  // `bg-elevated` floats over a card of the identical colour, separated only
+  // by a 1.21:1 hairline. Lift it to the canvas, the one other value Clay owns.
+  it('lifts the Clay tooltip off the card plane', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-tooltip\s*\{[^}]*background(?:-color)?:\s*var\(--color-app\)/,
+    )
+  })
+
+  // Frosted glass is Signature's vocabulary; Clay's is matte warm paper.
+  // Clean already strips the blur — Clay never did.
+  it('strips the backdrop blur from Clay scrims', () => {
+    expect(cssCode).toMatch(/:root\.ds-clay \.xj-scrim\s*\{[^}]*backdrop-filter:\s*none/)
   })
 
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {

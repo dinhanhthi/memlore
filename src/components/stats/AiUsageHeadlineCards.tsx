@@ -16,7 +16,7 @@ interface CardProps {
 function HeadlineCard({ label, value }: CardProps) {
   return (
     <div className="bg-elevated border-border-default flex min-w-0 flex-col gap-1 rounded-2xl border p-4">
-      <span className="text-fg-faint shrink-0 text-xs tracking-wide uppercase">{label}</span>
+      <span className="text-fg-muted shrink-0 text-xs tracking-wide uppercase">{label}</span>
       <span className="text-fg truncate text-2xl font-medium tabular-nums">{value}</span>
     </div>
   )

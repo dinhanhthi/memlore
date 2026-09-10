@@ -233,7 +233,7 @@ export function OnThisDayView() {
                           "before:from-accent/25 before:pointer-events-none before:absolute before:inset-0 before:bg-linear-to-r before:to-transparent before:content-['']",
                         )}
                       >
-                        <h3 className="text-fg-faint text-2xs relative z-10 font-mono font-medium tracking-[0.8px] uppercase">
+                        <h3 className="text-fg-muted text-2xs relative z-10 font-mono font-medium tracking-[0.8px] uppercase">
                           {year}
                         </h3>
                       </div>

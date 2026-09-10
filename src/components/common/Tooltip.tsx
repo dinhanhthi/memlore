@@ -71,7 +71,7 @@ export function Tooltip({
           style={floatingStyles}
           {...getFloatingProps()}
           className={cn(
-            'xj-tooltip border-border-default bg-elevated text-fg pointer-events-none z-(--z-tooltip) rounded-md border px-2 py-1 text-sm font-medium shadow-md',
+            'xj-tooltip border-border-default bg-elevated text-fg pointer-events-none z-(--z-tooltip) rounded-md border px-2 py-1 text-sm font-medium shadow-(--elev-3)',
             multiline ? 'max-w-56 text-xs leading-snug font-normal' : 'whitespace-nowrap',
             (!open || disabled) && 'hidden',
           )}

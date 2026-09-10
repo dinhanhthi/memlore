@@ -46,9 +46,9 @@ const TagTableRow = memo(function TagTableRow({
         'border-border-default cursor-pointer border-b last:border-b-0',
         // Neutral near-white hover (white tint in dark mode) instead of an
         // accent wash; black tint in light mode keeps the hover visible there.
-        !selected && 'dark:hover:bg-elevated hover:bg-white/60',
+        !selected && 'dark:hover:bg-elevated hover:bg-surface-row-hover',
         count === 0 ? 'opacity-50' : '',
-        selected && 'bg-elevated dark:bg-white/8',
+        selected && 'bg-elevated dark:bg-surface-hi',
       )}
     >
       {/* Accent left stripe marks the selected row — mirrors the selected
@@ -279,14 +279,14 @@ export function TagsView() {
                       className="text-fg-muted px-3 py-2 text-left text-xs tracking-wider whitespace-nowrap uppercase"
                     >
                       {t('tags_view.col_tag')}{' '}
-                      <span className="text-fg-faint ml-1 font-normal">{tagCount}</span>
+                      <span className="text-fg-muted ml-1 font-normal">{tagCount}</span>
                     </th>
                     <th
                       scope="col"
                       className="text-fg-muted px-3 py-2 text-right text-xs tracking-wider whitespace-nowrap uppercase"
                     >
                       {t('tags_view.col_entries')}{' '}
-                      <span className="text-fg-faint ml-1 font-normal">{totalEntries}</span>
+                      <span className="text-fg-muted ml-1 font-normal">{totalEntries}</span>
                     </th>
                     <th scope="col" className="py-2 pr-3">
                       <div className="flex justify-end">

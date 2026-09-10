@@ -173,7 +173,7 @@ function SearchOverlayContent({
         {/* Search input row — bigger leading icon, tighter input height */}
         <div className="flex items-center gap-2 px-5 pt-4 pb-3">
           <span
-            className="text-fg-faint flex size-6 shrink-0 items-center justify-center"
+            className="text-fg-muted flex size-6 shrink-0 items-center justify-center"
             aria-hidden="true"
           >
             {isLoading && (trimmed || filtersActive) ? (
@@ -329,7 +329,7 @@ function SearchOverlayContent({
                             <span className="font-display text-fg truncate text-sm font-bold">
                               {r.title ?? 'Untitled'}
                             </span>
-                            <span className="text-fg-faint shrink-0 font-mono text-xs">
+                            <span className="text-fg-muted shrink-0 font-mono text-xs">
                               {formatEntryDate(r.entry_date)}
                             </span>
                           </div>
@@ -372,7 +372,7 @@ function SearchOverlayContent({
                                     {t('search.relevance_label', { percent: rel.percent })}
                                   </span>
                                 </Tooltip>
-                                <span className="text-fg-faint font-mono">
+                                <span className="text-fg-muted font-mono">
                                   {formatEntryDate(h.entry_date)}
                                 </span>
                               </div>

@@ -41,12 +41,15 @@ type TextareaProps = BaseProps & {
 export type TextInputProps = InputProps | TextareaProps
 
 /** Shared field chrome — must stay in sync with `PasswordInput` / `Select`
- *  (bg, text, border, focus ring). SuperX surface recipe:
- *  elevated fill, border-default, ~11px radius, focus = accent border + soft ring.
- *  Password keeps extra `pr-11` for the show/hide toggle.
+ *  (bg, text, border, radius). SuperX surface recipe: elevated fill,
+ *  border-default, rounded-xl. The focus ring is NOT set here: `globals.css`
+ *  paints a flush `--color-focus-ring` ring on every text field (and Clay
+ *  overrides it with its own inset ring), so `outline-none` below only
+ *  suppresses the browser default. Password keeps extra `pr-11` for the
+ *  show/hide toggle.
  */
 export const FIELD_BASE =
-  'w-full rounded-xl border border-border-default bg-elevated px-4 py-3 text-sm text-fg placeholder:text-fg-faint outline-none shadow-(--shadow-control) transition-[border-color,box-shadow,background-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) disabled:opacity-50 disabled:cursor-not-allowed hover:border-border-default'
+  'w-full rounded-xl border border-border-default bg-elevated px-4 py-3 text-sm text-fg placeholder:text-fg-muted outline-none shadow-(--shadow-control) transition-[border-color,box-shadow,background-color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo) disabled:opacity-50 disabled:cursor-not-allowed hover:border-border-default'
 
 const BASE = FIELD_BASE
 

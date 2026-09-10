@@ -8,7 +8,6 @@ import { EMOTIONS, EMOTION_BY_KEY } from './emotions'
 import type { EmotionKey } from '../../types/entry'
 import { useEmotionSuggestion } from '../../hooks/useEmotionSuggestion'
 import { useAiEmotionEnabled } from '../../hooks/useAiEmotionEnabled'
-import { useTheme } from '../../hooks/useTheme'
 
 /// Minimum content_text word count before the AI suggestion chip is
 /// fetched. Mirrors the chunk-a6 plan's "> 30 words" gate — short
@@ -50,8 +49,6 @@ export function EmotionPicker({
 }: EmotionPickerProps) {
   const { t } = useTranslation('editor')
   const { t: tAi } = useTranslation('ai')
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
   const [selected, setSelected] = useState<EmotionKey | null>(currentEmotion)
   const [dismissed, setDismissed] = useState(false)
 
@@ -122,7 +119,7 @@ export function EmotionPicker({
         <div role="radiogroup" aria-label={t('emotion.title')} className="grid grid-cols-3 gap-3">
           {EMOTIONS.map((meta) => {
             const isSelected = selected === meta.key
-            const hex = isDark ? meta.hueDark : meta.hue
+            const swatch = meta.cssVar
             return (
               <button
                 key={meta.key}
@@ -135,7 +132,14 @@ export function EmotionPicker({
                   'flex flex-col items-center justify-center gap-2 rounded-xl border px-3 py-5 transition-colors motion-reduce:transition-none',
                   isSelected ? '' : 'border-border-default hover:border-accent/50',
                 )}
-                style={isSelected ? { backgroundColor: `${hex}14`, borderColor: hex } : undefined}
+                style={
+                  isSelected
+                    ? {
+                        backgroundColor: `color-mix(in oklab, ${swatch} 8%, transparent)`,
+                        borderColor: swatch,
+                      }
+                    : undefined
+                }
               >
                 <span aria-hidden className="text-4xl leading-none">
                   {meta.emoji}

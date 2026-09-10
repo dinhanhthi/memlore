@@ -120,7 +120,7 @@ export function AttachmentStrip({
           onClick={handleExpand}
           aria-label={toggleAria}
           aria-expanded={false}
-          className="flex h-8 w-full cursor-pointer items-center gap-2 border-none bg-transparent px-4 text-left transition-colors hover:bg-black/4 motion-reduce:transition-none dark:hover:bg-white/4"
+          className="hover:bg-surface-row-hover flex h-8 w-full cursor-pointer items-center gap-2 border-none bg-transparent px-4 text-left transition-colors motion-reduce:transition-none"
         >
           <span className="text-fg-secondary min-w-0 flex-1 truncate text-xs">{summaryText}</span>
           <ChevronUp
@@ -176,7 +176,7 @@ export function AttachmentStrip({
                         aria-label={ariaLabel}
                         onClick={action}
                         disabled={!handler}
-                        className="bg-panel-2 text-fg-secondary border-border-default flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border p-1 transition-colors hover:bg-black/4 disabled:cursor-default motion-reduce:transition-none dark:hover:bg-white/4"
+                        className="bg-panel-2 text-fg-secondary border-border-default hover:bg-surface-row-hover flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border p-1 transition-colors disabled:cursor-default motion-reduce:transition-none"
                       >
                         <FileIcon className="size-5 shrink-0" aria-hidden />
                         <span className="text-2xs block w-full truncate text-center leading-tight font-medium">

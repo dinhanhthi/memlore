@@ -682,6 +682,33 @@ describe('applyAccent — Clay computed contrast', () => {
     }
   })
 
+  // WCAG 1.4.11 non-text: the keyboard ring must clear 3:1 on the paper it is
+  // drawn against. Clay light's hairline is only 1.21:1, so the ring is the
+  // ONLY boundary a keyboard user gets — the pastel slab fill (`acc`) measured
+  // 2.07–2.71 on four of six presets.
+  it('keeps the clay focus ring ≥ 3:1 on canvas and canvas-soft in light for every preset', () => {
+    applyDesignSystem('clay')
+    for (const preset of ALL_PRESETS) {
+      paint(preset)
+      const ring = toHex(readVar('--color-focus-ring'))
+      for (const paper of CLAY_LIGHT_PAPERS) {
+        expect(getContrastRatio(ring, paper), `${preset} on ${paper}`).toBeGreaterThanOrEqual(3)
+      }
+    }
+  })
+
+  it('keeps the clay focus ring ≥ 3:1 on canvas and canvas-soft in dark for every preset', () => {
+    applyDesignSystem('clay')
+    document.documentElement.classList.add('dark')
+    for (const preset of ALL_PRESETS) {
+      paint(preset)
+      const ring = toHex(readVar('--color-focus-ring'))
+      for (const paper of CLAY_DARK_PAPERS) {
+        expect(getContrastRatio(ring, paper), `${preset} on ${paper}`).toBeGreaterThanOrEqual(3)
+      }
+    }
+  })
+
   it('keeps the dark accent ink ≥ 4.5:1 on --color-accent-fill for every preset', () => {
     applyDesignSystem('clay')
     document.documentElement.classList.add('dark')

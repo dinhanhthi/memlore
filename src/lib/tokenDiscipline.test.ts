@@ -48,17 +48,36 @@ describe('token discipline — banned dead classes', () => {
     expect(hits(/(?<![\w-])text-muted(?![\w-])/)).toEqual([])
   })
 
+  // 4 / 6 / 8 / 10 / 12 / 16px are --radius-xs..2xl on the Signature scale.
+  // Hardcoding them pins every skin to Signature's radius — Clay's scale runs
+  // 0.5–1.5rem, so `rounded-[10px]` silently opts a control out of it.
+  it('does not hardcode a radius that has an exact token', () => {
+    expect(hits(/rounded-\[(?:4|6|8|10|12|16)px\]/)).toEqual([])
+  })
+
   it('does not use bg-surface-lo (no such token)', () => {
     expect(hits(/\bbg-surface-lo\b/)).toEqual([])
+  })
+
+  // `--color-fg-faint` measured 2.55–4.34:1 on every fill of all eight
+  // surfaces, and its consumers were readable type (word counts, timestamps,
+  // tag counts, weekday headers, every field placeholder). There is no room
+  // for a fourth readable tier — Signature light's `fg-muted` itself bottoms
+  // out at 4.88 — so the token is gone and its callers use `fg-muted`.
+  it('does not use text-fg-faint (the token failed AA on all 8 surfaces)', () => {
+    expect(hits(/\bfg-faint\b/)).toEqual([])
   })
 })
 
 describe('token discipline — light-mode chrome', () => {
-  it('does not paint skeletons with white-alpha (invisible on paper)', () => {
+  it('does not paint chrome with white-alpha (invisible on paper, skin-blind)', () => {
     // Photo overlays on decoded media keep white-alpha — those sit on pixels,
-    // not on paper. Chrome skeletons must not.
+    // not on paper. Chrome must not: a `dark:bg-white/8` fork is mode-aware but
+    // skin-blind, so Clay dark got a cool wash over its warm chip.
     expect(
-      hits(/\bbg-white\/(?:10|15|20)\b/).filter((f) => !f.startsWith('components/media/')),
+      hits(/\bbg-white\/\d+\b|\bborder-white\/\d+\b/).filter(
+        (f) => !f.startsWith('components/media/'),
+      ),
     ).toEqual([])
   })
 
@@ -72,6 +91,20 @@ describe('token discipline — light-mode chrome', () => {
 
   it('does not paint chart chrome with Tailwind Slate hex', () => {
     expect(hits(/#1e293b|#f1f5f9|#64748b|#94a3b8|#334155|#e2e8f0/i)).toEqual([])
+  })
+
+  // Emotion swatches were literal Tailwind rose/amber/emerald with a
+  // light/dark axis but NO skin axis, so three fully saturated mid-tones
+  // landed unchanged on Clay's desaturated warm clay and Clean's achromatic
+  // neutrals. They go through tokens now, like every other colour.
+  it('does not hardcode Tailwind emotion hexes in components', () => {
+    const inComponents = hits(/#F43F5E|#FB7185|#F59E0B|#FBBF24|#10B981|#34D399/i).filter(
+      // `styles/` is where the tokens are DEFINED. JournalAllIcon paints a
+      // literal rainbow (all six hues at once) for the "all journals" mark —
+      // a rainbow has no semantic token; see the comment in that file.
+      (f) => !f.startsWith('styles/') && f !== 'components/journals/JournalAllIcon.tsx',
+    )
+    expect(inComponents).toEqual([])
   })
 })
 
@@ -90,6 +123,24 @@ describe('token discipline — Hallmark P2 patterns', () => {
 
   it('does not keep the dead .xj-rainbow wordmark gradient', () => {
     expect(hits(/xj-rainbow/)).toEqual([])
+  })
+
+  // Clip-text gradient headings are the most-repeated AI tell in the product:
+  // `text-rainbow-soft` painted every dashboard card title on all 8 surfaces,
+  // and neither Clean (which strips every other gradient) nor Clay overrode it.
+  it('does not paint headings with a clip-text gradient', () => {
+    expect(hits(/text-rainbow-soft|--gradient-rainbow-soft/)).toEqual([])
+  })
+
+  // `.t-shimmer::before` is the one sanctioned clip-text use: an animated
+  // highlight band over loading text, reduced-motion guarded. Any OTHER
+  // clip-text rule is a gradient headline.
+  it('uses background-clip: text only for the loading shimmer', () => {
+    const css = readFileSync(resolve(SRC, 'styles/globals.css'), 'utf8')
+    const clipRules = [...css.matchAll(/([^{}]+)\{[^{}]*background-clip:\s*text/g)].map((m) =>
+      m[1].trim().split('\n').pop()!.trim(),
+    )
+    expect(clipRules).toEqual(['.t-shimmer::before'])
   })
 
   it('does not fall back tag colour to leftover violet #a78bfa', () => {

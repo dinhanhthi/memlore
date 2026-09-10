@@ -470,7 +470,7 @@ function TabScrollArrow({ direction, disabled, onClick, className }: TabScrollAr
         disabled={disabled}
         onClick={onClick}
         className={cn(
-          'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-6 shrink-0 cursor-pointer place-items-center rounded-[10px] border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) disabled:cursor-default disabled:opacity-50',
+          'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-6 shrink-0 cursor-pointer place-items-center rounded-lg border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) disabled:cursor-default disabled:opacity-50',
           className,
         )}
       >
@@ -734,7 +734,7 @@ function TitleBarAction({ ariaLabel, onClick, icon, tooltip }: ActionProps) {
       aria-label={ariaLabel}
       onClick={onClick}
       // SuperX icon button: 10px radius, transparent idle, surface-hi hover.
-      className="text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 cursor-pointer place-items-center rounded-[10px] border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)"
+      className="text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 cursor-pointer place-items-center rounded-lg border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)"
     >
       {icon}
     </button>

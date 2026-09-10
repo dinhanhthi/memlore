@@ -173,7 +173,7 @@ export function JournalPicker({
             <span className="text-fg flex-1 overflow-hidden text-sm font-semibold tracking-[-.1px] text-ellipsis whitespace-nowrap">
               {triggerLabel}
             </span>
-            <span className="text-fg-faint shrink-0">
+            <span className="text-fg-muted shrink-0">
               <ChevronDown className="size-4" strokeWidth={1.75} />
             </span>
           </button>

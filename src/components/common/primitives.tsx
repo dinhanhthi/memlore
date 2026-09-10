@@ -126,10 +126,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       className="border-border-default bg-elevated focus-within:border-accent relative flex items-center rounded-xl border px-3 transition-[border-color,box-shadow] duration-(--motion-duration-fast) focus-within:shadow-[0_0_0_2px_color-mix(in_oklab,var(--color-accent)_30%,transparent)]"
       style={{ height: s.h }}
     >
-      {icon && <span className="text-fg-faint mr-2 flex">{icon}</span>}
+      {icon && <span className="text-fg-muted mr-2 flex">{icon}</span>}
       <input
         ref={ref}
-        className="xj-input-bare text-fg placeholder:text-fg-faint h-full flex-1 border-none bg-transparent outline-none"
+        className="xj-input-bare text-fg placeholder:text-fg-muted h-full flex-1 border-none bg-transparent outline-none"
         style={{ fontSize: s.fs }}
         {...rest}
       />
@@ -157,7 +157,7 @@ export const Star = forwardRef<HTMLButtonElement, StarProps>(function Star(
       width={size}
       height={size}
       viewBox="0 0 20 20"
-      className={cn('text-fg-faint block shrink-0', className)}
+      className={cn('text-fg-muted block shrink-0', className)}
       aria-hidden="true"
     >
       <path
@@ -258,7 +258,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type="button"
       className={cn(
         // SuperX icon button: 10px radius, muted idle, surface-hi hover.
-        'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-[10px] border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
+        'text-fg-muted hover:bg-surface-hi hover:text-fg grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-lg border-none bg-transparent transition-[background-color,color] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
         'disabled:hover:text-fg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
         className,
       )}
@@ -301,7 +301,7 @@ export const TagPill = forwardRef<HTMLButtonElement, TagPillProps>(function TagP
     tag.color !== null ? (
       <span className="h-1 w-1 shrink-0 rounded-full" style={{ background: tag.color }} />
     ) : (
-      <span className="bg-fg-faint h-1 w-1 shrink-0 rounded-full" />
+      <span className="bg-fg-muted h-1 w-1 shrink-0 rounded-full" />
     )
 
   const containerClass =

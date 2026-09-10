@@ -22,7 +22,6 @@ import { useEntryDates } from '../../hooks/useEntryDates'
 import { useEntryEmotionByDate } from '../../hooks/useEntryEmotionByDate'
 import { EMPTY_TAGS, useEntryTags } from '../../hooks/useEntryTags'
 import { EMOTION_BY_KEY } from '../common/emotions'
-import { useTheme } from '../../hooks/useTheme'
 import { cn } from '../../lib/cn'
 import { useUiStore } from '../../stores/uiStore'
 import { toISODate } from '../../lib/dates'
@@ -126,8 +125,6 @@ export function CalendarPanel() {
   // answers "did the user write?" and `emotionByDate` answers "how did
   // they feel?".
   const { data: emotionByDate } = useEntryEmotionByDate(currentYear)
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const firstDayOfWeek = getFirstDayOfWeek(currentYear, currentMonth)
@@ -325,7 +322,7 @@ export function CalendarPanel() {
                         type="button"
                         onClick={() => handlePickMonth(m)}
                         className={cn(
-                          'min-w-16 rounded-[10px] px-3 py-2 text-sm font-medium capitalize transition-colors duration-(--motion-duration-fast)',
+                          'min-w-16 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors duration-(--motion-duration-fast)',
                           isSelected
                             ? 'gradient-primary text-fg-inverse font-medium'
                             : 'text-fg hover:bg-surface-hi',
@@ -378,7 +375,7 @@ export function CalendarPanel() {
                         type="button"
                         onClick={() => handlePickYear(y)}
                         className={cn(
-                          'min-w-16 rounded-[10px] px-3 py-2 text-sm font-medium tabular-nums transition-colors duration-(--motion-duration-fast)',
+                          'min-w-16 rounded-lg px-3 py-2 text-sm font-medium tabular-nums transition-colors duration-(--motion-duration-fast)',
                           isSelected
                             ? 'gradient-primary text-fg-inverse font-medium'
                             : isToday
@@ -402,7 +399,7 @@ export function CalendarPanel() {
             {/* Weekday headers */}
             <div className="mb-1 grid grid-cols-7 text-center">
               {WEEKDAY_KEYS.map((k) => (
-                <div key={k} className="text-fg-faint py-1 font-mono text-xs">
+                <div key={k} className="text-fg-muted py-1 font-mono text-xs">
                   {t(`calendar_panel.weekday.${k}`)}
                 </div>
               ))}
@@ -473,7 +470,7 @@ export function CalendarPanel() {
                             <span
                               key={key}
                               className="h-1 w-1 rounded-full"
-                              style={{ backgroundColor: isDark ? meta.hueDark : meta.hue }}
+                              style={{ backgroundColor: meta.cssVar }}
                             />
                           )
                         })}
@@ -516,7 +513,7 @@ export function CalendarPanel() {
                   )}
                 >
                   <div className="relative z-10 flex min-w-0 items-baseline gap-2">
-                    <span className="text-fg-faint text-2xs truncate font-mono font-medium tracking-[0.8px] uppercase">
+                    <span className="text-fg-muted text-2xs truncate font-mono font-medium tracking-[0.8px] uppercase">
                       {new Date(selectedCalendarDate + 'T12:00:00').toLocaleDateString(locale, {
                         weekday: 'short',
                         month: 'short',
