@@ -446,10 +446,7 @@ describe('useAppleJournalImport', () => {
     expect(result.current.reportSaveStatus.kind).toBe('error')
 
     await act(async () => {
-      await result.current.saveReport(
-        '/tmp/memlore-apple-journal-import-report.txt',
-        'report body',
-      )
+      await result.current.saveReport('/tmp/memlore-apple-journal-import-report.txt', 'report body')
     })
     expect(tauri.writeAppleJournalImportReport).toHaveBeenCalledWith(
       '/tmp/memlore-apple-journal-import-report.txt',
@@ -539,10 +536,7 @@ describe('useAppleJournalImport', () => {
     })
 
     await act(async () => {
-      await result.current.saveReport(
-        '/tmp/memlore-apple-journal-import-report.txt',
-        'report body',
-      )
+      await result.current.saveReport('/tmp/memlore-apple-journal-import-report.txt', 'report body')
     })
 
     expect(tauri.writeAppleJournalImportReport).toHaveBeenCalled()

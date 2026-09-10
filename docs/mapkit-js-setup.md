@@ -10,7 +10,6 @@ Official Apple help: [Create a Maps identifier and private key](https://develope
 
 ## What you will create
 
-
 | Item                  | Example                            | Where it lives                                             |
 | --------------------- | ---------------------------------- | ---------------------------------------------------------- |
 | Maps ID (description) | `Memlore`                          | Apple Developer portal only                                |
@@ -19,7 +18,6 @@ Official Apple help: [Create a Maps identifier and private key](https://develope
 | Key ID (`kid`)        | 10-character id from the Keys page | Used when signing the JWT                                  |
 | Team ID (`iss`)       | 10-character id on Membership      | Used when signing the JWT                                  |
 | JWT                   | long `eyJ…` string                 | Repo-root `.env` as `MEMLORE_MAPKIT_TOKEN` (gitignored)    |
-
 
 An existing MapKit JS key stays tied to the Maps ID it was created with. A **new** Maps ID needs a **new** key. Each Maps ID can have at most two keys.
 
@@ -48,9 +46,11 @@ The identifier is permanent. If you pick `maps.com.you.xjournal` by mistake, reg
 5. Click **Configure** next to Maps and select the Maps ID from step 1 (`maps.app.memlore`).
 6. **Continue** → **Register**.
 7. **Download** the `.p8` file. Apple shows it **once**. Store it outside the repo, for example:
-  ```text
-   ~/Secrets/memlore/AuthKey_XXXXXXXXXX.p8
-  ```
+
+```text
+ ~/Secrets/memlore/AuthKey_XXXXXXXXXX.p8
+```
+
 8. Copy the **Key ID** shown on that page (10 characters). You will need it as `MAPKIT_KEY_ID`.
 
 Do not put the `.p8` under `/Users/thi/git/memlore` or any other git checkout.
@@ -109,19 +109,24 @@ node scripts/generate-mapkit-token.mjs \
 `src-tauri/build.rs` reads `.env` at the **repo root** and forwards `MEMLORE_MAPKIT_TOKEN` into the compile. Cargo does not load `.env` by itself. A real shell export of the same name wins over the file.
 
 1. If you do not already have a root `.env`, copy the example:
-  ```bash
-   cp .env.example .env
-  ```
-2. Add or replace this line (quotes optional; no spaces around `=`):
-  ```bash
-   MEMLORE_MAPKIT_TOKEN=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9....
-  ```
-3. Quit any running `pnpm tauri dev`, then start it again:
-  ```bash
-   pnpm tauri dev
-  ```
 
-   Changing `.env` triggers a Rust rebuild. The web preview (`pnpm web:dev`) does **not** bake this token — Apple Maps in the browser harness stays mocked.
+```bash
+ cp .env.example .env
+```
+
+2. Add or replace this line (quotes optional; no spaces around `=`):
+
+```bash
+ MEMLORE_MAPKIT_TOKEN=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9....
+```
+
+3. Quit any running `pnpm tauri dev`, then start it again:
+
+```bash
+ pnpm tauri dev
+```
+
+Changing `.env` triggers a Rust rebuild. The web preview (`pnpm web:dev`) does **not** bake this token — Apple Maps in the browser harness stays mocked.
 
 ### Production / signed builds
 
