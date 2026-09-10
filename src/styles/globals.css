@@ -2778,7 +2778,10 @@ body {
    surfaces. Clay's own inset ring (:root.ds-clay, more specific) still wins
    there, so its wells stay borderless. Beats the unlayered :focus-visible
    ring (0,2,0 vs 0,1,0). Checkbox / radio / range / file and native <select>
-   keep the global offset ring. */
+   keep the global offset ring. `.xj-input-bare` is excluded: those inputs are
+   chrome-less and their WRAPPER draws the border and the focus treatment
+   (primitives.tsx `Input`), so ringing the input too stacks a second ring
+   inside the first. */
 input:not(
     [type='checkbox'],
     [type='radio'],
@@ -2789,8 +2792,8 @@ input:not(
     [type='reset'],
     [type='color'],
     [type='image']
-  ):focus-visible,
-textarea:focus-visible {
+  ):not(.xj-input-bare):focus-visible,
+textarea:not(.xj-input-bare):focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-focus-ring);
 }

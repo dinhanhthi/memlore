@@ -1181,8 +1181,11 @@ describe('Accessibility', () => {
   })
 
   it('does not wrap text fields in the global focus ring', () => {
+    // Text fields suppress the OFFSET ring and draw a flush one instead (see
+    // "text fields paint a focus ring…"). `textarea` carries a
+    // `:not(.xj-input-bare)` guard so bare inputs keep their wrapper's ring.
     expect(css).toMatch(
-      /input:not\([\s\S]*?\)\:focus-visible[\s\S]*?textarea:focus-visible\s*\{[^}]*outline:\s*none/,
+      /input:not\([\s\S]*?\)\:focus-visible[\s\S]*?textarea[^{]*:focus-visible\s*\{[^}]*outline:\s*none/,
     )
     expect(css).not.toMatch(/select:focus-visible\s*\{[^}]*outline:\s*none/)
   })
@@ -1873,11 +1876,24 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
   // nothing at all and left the blinking caret as the only focus signal.
   it('text fields paint a focus ring instead of only suppressing the outline', () => {
     const rule = cssCode.match(
-      /input:not\([^)]*\):focus-visible,\s*textarea:focus-visible\s*\{([^}]*)\}/,
+      /input:not\([^)]*\)[^{]*:focus-visible,\s*textarea[^{]*:focus-visible\s*\{([^}]*)\}/,
     )
     expect(rule, 'shared text-field focus rule not found').not.toBeNull()
     expect(rule![1]).toMatch(/outline:\s*none/)
     expect(rule![1]).toMatch(/box-shadow:[^;]*var\(--color-focus-ring\)/)
+  })
+
+  // `.xj-input-bare` marks a chrome-less input whose WRAPPER owns the border
+  // and the focus treatment (primitives.tsx `Input` draws `focus-within:border-accent`
+  // plus its own ring). Ringing the inner input too stacks a second concentric
+  // ring inside the first — the exact "second box around the field" the rule's
+  // own comment warns about. Clay already excludes it; the shared rule must too.
+  it('leaves bare inputs to their wrapper (no double ring)', () => {
+    const rule = cssCode.match(
+      /input:not\([^)]*\)[^{]*:focus-visible,\s*textarea[^{]*:focus-visible\s*\{[^}]*\}/,
+    )
+    expect(rule).not.toBeNull()
+    expect(rule![0]).toMatch(/:not\(\.xj-input-bare\)/)
   })
 
   // Clay light collapses panel-3 / selected-tab / elevated / surface-hi /
