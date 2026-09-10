@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 import { statsMoodHistogram } from '../../lib/tauri'
 import type { MoodHistogramRow } from '../../lib/tauri'
 import { useStats } from '../../hooks/useStats'
-import { useTheme } from '../../hooks/useTheme'
 import { EMOTIONS, EMOTION_BY_KEY } from '../common/emotions'
 import type { EmotionKey } from '../../types/entry'
 import type { Period } from './PeriodSelector'
@@ -25,8 +24,6 @@ interface EmotionHistogramProps {
 export function EmotionHistogram({ period }: EmotionHistogramProps) {
   const { t } = useTranslation('stats')
   const { t: tEditor } = useTranslation('editor')
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
   const rangeDays = periodRangeDays(period)
 
   const cacheKey = moodHistogramKey(period)
@@ -69,7 +66,7 @@ export function EmotionHistogram({ period }: EmotionHistogramProps) {
         const count = countByKey.get(meta.key) ?? 0
         const pct = total > 0 ? Math.round((count / total) * 100) : 0
         const widthPct = (count / maxCount) * 100
-        const fill = isDark ? meta.hueDark : meta.hue
+        const fill = meta.cssVar
         return (
           <div key={meta.key} className="flex items-center gap-3">
             <div className="flex w-24 items-center gap-2 text-sm">

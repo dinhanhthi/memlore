@@ -22,7 +22,6 @@ import { useEntryDates } from '../../hooks/useEntryDates'
 import { useEntryEmotionByDate } from '../../hooks/useEntryEmotionByDate'
 import { EMPTY_TAGS, useEntryTags } from '../../hooks/useEntryTags'
 import { EMOTION_BY_KEY } from '../common/emotions'
-import { useTheme } from '../../hooks/useTheme'
 import { cn } from '../../lib/cn'
 import { useUiStore } from '../../stores/uiStore'
 import { toISODate } from '../../lib/dates'
@@ -126,8 +125,6 @@ export function CalendarPanel() {
   // answers "did the user write?" and `emotionByDate` answers "how did
   // they feel?".
   const { data: emotionByDate } = useEntryEmotionByDate(currentYear)
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const firstDayOfWeek = getFirstDayOfWeek(currentYear, currentMonth)
@@ -473,7 +470,7 @@ export function CalendarPanel() {
                             <span
                               key={key}
                               className="h-1 w-1 rounded-full"
-                              style={{ backgroundColor: isDark ? meta.hueDark : meta.hue }}
+                              style={{ backgroundColor: meta.cssVar }}
                             />
                           )
                         })}

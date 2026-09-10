@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bar,
@@ -11,9 +10,15 @@ import {
   YAxis,
 } from 'recharts'
 import type { EmotionTrendChartRow } from '../../hooks/useEmotionTrend'
-import { useTheme } from '../../hooks/useTheme'
 import { CHART_NEUTRAL } from '../../lib/themeColors'
 import { EMOTIONS } from '../common/emotions'
+
+/** Static: each entry is a `var(--color-emotion-*)` token, so the skin and
+ *  mode are resolved by the cascade at paint time, not recomputed here. */
+const EMOTION_COLORS = Object.fromEntries(EMOTIONS.map((m) => [m.key, m.cssVar])) as Record<
+  'bad' | 'neutral' | 'good',
+  string
+>
 
 interface EmotionTrendChartProps {
   rows: EmotionTrendChartRow[]
@@ -22,18 +27,7 @@ interface EmotionTrendChartProps {
 
 export function EmotionTrendChart({ rows, height = 240 }: EmotionTrendChartProps) {
   const { t: tEditor } = useTranslation('editor')
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
   const colors = CHART_NEUTRAL
-
-  const emotionColors = useMemo(
-    () =>
-      Object.fromEntries(EMOTIONS.map((m) => [m.key, isDark ? m.hueDark : m.hue])) as Record<
-        'bad' | 'neutral' | 'good',
-        string
-      >,
-    [isDark],
-  )
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -64,9 +58,9 @@ export function EmotionTrendChart({ rows, height = 240 }: EmotionTrendChartProps
           formatter={(value) => tEditor(`emotion.${value}`)}
           wrapperStyle={{ fontSize: 12 }}
         />
-        <Bar dataKey="bad" stackId="emo" fill={emotionColors.bad} name="bad" />
-        <Bar dataKey="neutral" stackId="emo" fill={emotionColors.neutral} name="neutral" />
-        <Bar dataKey="good" stackId="emo" fill={emotionColors.good} name="good" />
+        <Bar dataKey="bad" stackId="emo" fill={EMOTION_COLORS.bad} name="bad" />
+        <Bar dataKey="neutral" stackId="emo" fill={EMOTION_COLORS.neutral} name="neutral" />
+        <Bar dataKey="good" stackId="emo" fill={EMOTION_COLORS.good} name="good" />
       </BarChart>
     </ResponsiveContainer>
   )

@@ -5,12 +5,12 @@ export type { EmotionKey }
 export interface EmotionMeta {
   key: EmotionKey
   emoji: string
-  /** Light-mode swatch. Used for dot indicators, heatmap cells, and
-   * subtle background tints inside the picker card. */
-  hue: string
-  /** Dark-mode variant — same hue family, brighter for contrast on
-   * dark surfaces. WCAG AA non-text decorative use is fine in both. */
-  hueDark: string
+  /** `var(--color-emotion-<key>)` — the swatch used for dot indicators,
+   * heatmap cells, chart fills and picker tints. A token, not a hex, so each
+   * skin retunes it: Signature/Clean keep the saturated set, Clay drops to
+   * its own ~0.11 chroma. Resolves in SVG `fill` as well as CSS. Both modes
+   * come from the cascade, so consumers no longer branch on `isDark`. */
+  cssVar: string
   /** Points at the i18n key under `editor.emotion.<key>` in
    * `src/locales/<lang>/editor.json`. */
   i18nKey: string
@@ -22,22 +22,19 @@ export const EMOTIONS: readonly EmotionMeta[] = [
   {
     key: 'bad',
     emoji: '😞',
-    hue: '#F43F5E',
-    hueDark: '#FB7185',
+    cssVar: 'var(--color-emotion-bad)',
     i18nKey: 'emotion.bad',
   },
   {
     key: 'neutral',
     emoji: '😐',
-    hue: '#F59E0B',
-    hueDark: '#FBBF24',
+    cssVar: 'var(--color-emotion-neutral)',
     i18nKey: 'emotion.neutral',
   },
   {
     key: 'good',
     emoji: '😊',
-    hue: '#10B981',
-    hueDark: '#34D399',
+    cssVar: 'var(--color-emotion-good)',
     i18nKey: 'emotion.good',
   },
 ]

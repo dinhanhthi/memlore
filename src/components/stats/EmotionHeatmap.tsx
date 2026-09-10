@@ -147,7 +147,7 @@ export function EmotionHeatmap({ year = new Date().getFullYear() }: EmotionHeatm
         {/* Day cells — fill = emotion hue (or empty bg). */}
         {cells.map(({ date, emotion, weekCol, dayRow }) => {
           const meta = emotion ? EMOTION_BY_KEY[emotion] : null
-          const fill = meta ? (isDark ? meta.hueDark : meta.hue) : emptyColor
+          const fill = meta ? meta.cssVar : emptyColor
           const x = SVG_PADDING_LEFT + weekCol * CELL_STEP
           const y = MONTH_LABEL_HEIGHT + dayRow * CELL_STEP
           const label = meta ? `${date} — ${tEditor(meta.i18nKey)}` : date
@@ -175,7 +175,7 @@ export function EmotionHeatmap({ year = new Date().getFullYear() }: EmotionHeatm
             <span
               aria-hidden
               className="inline-block size-2.5 rounded-sm"
-              style={{ backgroundColor: isDark ? meta.hueDark : meta.hue }}
+              style={{ backgroundColor: meta.cssVar }}
             />
             <span>{tEditor(meta.i18nKey)}</span>
           </span>

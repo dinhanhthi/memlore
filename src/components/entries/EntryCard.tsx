@@ -528,11 +528,10 @@ function EntryCardImpl({
                 <span
                   role="img"
                   aria-label={t('entry_card.mood_aria', { mood: entry.emotion })}
-                  className="ml-1 size-2.5 rounded-full bg-(--entry-emotion-color) dark:bg-(--entry-emotion-color-dark)"
+                  className="ml-1 size-2.5 rounded-full bg-(--entry-emotion-color)"
                   style={
                     {
-                      '--entry-emotion-color': EMOTION_BY_KEY[entry.emotion].hue,
-                      '--entry-emotion-color-dark': EMOTION_BY_KEY[entry.emotion].hueDark,
+                      '--entry-emotion-color': EMOTION_BY_KEY[entry.emotion].cssVar,
                     } as React.CSSProperties
                   }
                 />

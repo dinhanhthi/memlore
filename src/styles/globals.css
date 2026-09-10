@@ -206,6 +206,10 @@
   --color-danger-fg: oklch(0.45 0.18 25);
 
   /* Editor inline highlight — fixed warm yellow, independent of accent. */
+  --color-emotion-bad: #f43f5e;
+  --color-emotion-neutral: #f59e0b;
+  --color-emotion-good: #10b981;
+
   --color-editor-highlight: oklch(90% 0.16 95);
 }
 
@@ -459,6 +463,10 @@
   --color-danger-bg: oklch(0.91 0.05 20);
   --color-danger-border: oklch(0.84 0.07 20);
   --color-danger-fg: oklch(0.4 0.17 25);
+  --color-emotion-bad: #fb7185;
+  --color-emotion-neutral: #fbbf24;
+  --color-emotion-good: #34d399;
+
   --color-editor-highlight: oklch(58% 0.14 95 / 0.55);
 
   /* Mirror applyAccent('sky') / buildTokens(230) dark-mode output. */
@@ -772,6 +780,14 @@
   --color-danger-border: oklch(0.88 0.06 22);
   --color-danger-fg: oklch(0.45 0.18 25);
 
+  /* Emotion scale — deliberately the same values as Signature. It reads as
+     content data (the user's own mood), not skin paint, and shadcn ships
+     saturated status colours on neutral ground too. Restated here, not
+     inherited, so the Clean token-parity check stays meaningful. */
+  --color-emotion-bad: #f43f5e;
+  --color-emotion-neutral: #f59e0b;
+  --color-emotion-good: #10b981;
+
   --color-editor-highlight: oklch(0.94 0.12 95);
   --content-grad-from: oklch(1 0 0);
   --content-grad-to: oklch(1 0 0);
@@ -847,6 +863,11 @@
   --color-danger-fg: oklch(0.4 0.17 25);
 
   --color-editor-highlight: oklch(0.48 0.1 95);
+  /* Same deliberate mirror as the Clean light block above. */
+  --color-emotion-bad: #fb7185;
+  --color-emotion-neutral: #fbbf24;
+  --color-emotion-good: #34d399;
+
   --content-grad-from: oklch(0.145 0 0);
   --content-grad-to: oklch(0.145 0 0);
 }
@@ -949,6 +970,13 @@
   --color-accent-deep: #3486a8;
   --color-accent-wash: #d9eef5;
 
+  /* Emotion swatches at the kit's chroma (~0.11), darkened until the dot
+     clears 3:1 on canvas AND canvas-soft — Tailwind's saturated mid-tones
+     were the one un-Clay note in the palette, and washed out on cream. */
+  --color-emotion-bad: #bd676d;
+  --color-emotion-neutral: #ac762e;
+  --color-emotion-good: #2d9068;
+
   --color-editor-highlight: oklch(0.93 0.06 50);
   --content-grad-from: #f7f1e6;
   --content-grad-to: #f7f1e6;
@@ -1044,6 +1072,10 @@
   --color-accent-deep: #3d86a3;
   --color-accent-ink: #0a1e26;
   --color-accent-wash: #1c323a;
+
+  --color-emotion-bad: #e08790;
+  --color-emotion-neutral: #ebc472;
+  --color-emotion-good: #6ccba1;
 
   --color-editor-highlight: oklch(0.42 0.06 50);
   --content-grad-from: #201d1a;

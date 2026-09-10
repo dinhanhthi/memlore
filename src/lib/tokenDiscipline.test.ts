@@ -82,6 +82,20 @@ describe('token discipline — light-mode chrome', () => {
   it('does not paint chart chrome with Tailwind Slate hex', () => {
     expect(hits(/#1e293b|#f1f5f9|#64748b|#94a3b8|#334155|#e2e8f0/i)).toEqual([])
   })
+
+  // Emotion swatches were literal Tailwind rose/amber/emerald with a
+  // light/dark axis but NO skin axis, so three fully saturated mid-tones
+  // landed unchanged on Clay's desaturated warm clay and Clean's achromatic
+  // neutrals. They go through tokens now, like every other colour.
+  it('does not hardcode Tailwind emotion hexes in components', () => {
+    const inComponents = hits(/#F43F5E|#FB7185|#F59E0B|#FBBF24|#10B981|#34D399/i).filter(
+      // `styles/` is where the tokens are DEFINED. JournalAllIcon paints a
+      // literal rainbow (all six hues at once) for the "all journals" mark —
+      // a rainbow has no semantic token; see the comment in that file.
+      (f) => !f.startsWith('styles/') && f !== 'components/journals/JournalAllIcon.tsx',
+    )
+    expect(inComponents).toEqual([])
+  })
 })
 
 describe('token discipline — CTA ink', () => {
