@@ -32,10 +32,10 @@ interface ToggleProps {
   ariaLabelledBy?: string
   disabled?: boolean
   /**
-   * Visual scale.
-   * - `'sm'` (default): 30×16 track, 12×12 knob, label `text-sm`.
+   * Visual scale (px figures on the shared 16px root).
+   * - `'sm'` (default): 36×22 track, 16×16 knob, label `text-sm`.
    *   Matches Settings rows.
-   * - `'xs'`: 24×14 track, 10×10 knob, label `text-xs`. For dense
+   * - `'xs'`: 28×18 track, 14×14 knob, label `text-xs`. For dense
    *   contexts like the Search overlay where the toggle sits next
    *   to a compact input, not in a tall settings row.
    */
@@ -54,10 +54,10 @@ const SIZE_CLASSES: Record<
     label: 'text-sm',
   },
   xs: {
-    // Bumped one notch from h-3.5/w-6 (14×24) to h-5/w-7
+    // Bumped one notch from h-3.5/w-6 (14×24) to h-4.5/w-7
     // (18×28) so the toggle reads as a tappable control next to a
     // text-xs label without feeling like a stray dot.
-    track: 'h-4.5 w-7 ',
+    track: 'h-4.5 w-7',
     knob: 'h-3.5 w-3.5',
     knobOff: 'left-[2px]',
     knobOn: 'left-3',

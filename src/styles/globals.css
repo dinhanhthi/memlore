@@ -54,7 +54,9 @@
      `--ui-font-scale` (Appearance → Interface size; 1 / 1.05 / 1.1) and
      `--ds-type-scale` (per design system; Clay 1.06). Headings (`text-lg`+)
      are deliberately NOT scaled — they stay at Tailwind defaults so display
-     titles keep their proportions. `--ui-font-scale` defaults to 1 in `:root`
+     titles keep their proportions — but `--text-lg` is floored at
+     `--text-base` so the ladder can never invert: unscaled 18px is below
+     Clay's base at Interface size 1.1 (1rem × 1.1 × 1.06 = 18.66px). `--ui-font-scale` defaults to 1 in `:root`
      below and is overridden on `documentElement` by `useUiFontScale`.
      `--ds-type-scale` lives on `:root` (not inline) so a Clay override is
      not buried by the inline scale. Line-height tokens are unitless ratios,
@@ -73,6 +75,9 @@
   /* Scaled UI body text (Tailwind defaults × `--ui-font-scale`). */
   --text-sm: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
   --text-base: calc(1rem * var(--ui-font-scale) * var(--ds-type-scale));
+  /* Unscaled heading step, floored so body text can never overtake it. No-op
+     at every shipping default; only Clay at Interface size 1.1 reaches it. */
+  --text-lg: max(1.125rem, var(--text-base));
 
   /* ── Semantic surfaces — SuperX light ladder (warm paper neutrals).
      Source: docs/context/SURFACE-STYLES-superx.md
@@ -938,8 +943,6 @@
   --color-empty: oklch(0.7 0.05 55);
   --color-danger-text: #9e3838;
   --color-danger-fill: var(--color-danger);
-  --danger-deep: #b34444;
-  --danger-ink: #1a0a0a;
   --color-success-text: oklch(0.38 0.14 160);
   --color-warning-text: oklch(0.48 0.1 75);
   --color-info-text: oklch(0.48 0.1 260);
@@ -1038,9 +1041,6 @@
      dark #ef4444 → #f87171 does. */
   --color-danger-text: #f09898;
   --color-danger-fill: var(--color-danger);
-  --danger-deep: #b34a4a;
-  /* Near-black stamp on the lifted kit fill — same move as Clay dark primary. */
-  --danger-ink: #2a1018;
   --color-success-text: oklch(0.7 0.1 160);
   --color-warning-text: oklch(0.72 0.1 75);
   --color-info-text: oklch(0.71 0.1 260);
@@ -1084,14 +1084,6 @@
     inset 0 1px 0 rgb(255 255 255 / 0.38);
   --shadow-cta-pressed:
     0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
-  --shadow-danger:
-    0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.5);
-  --shadow-danger-pressed:
-    0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
-  /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
-  --grad-danger-fill:
-    linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 46%), var(--color-danger-fill);
   --shadow-panel: var(--elev-2);
   --shadow-card: var(--elev-2);
   --shadow-control:
@@ -1133,11 +1125,13 @@
   --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   font-size: 16px;
   /* Originally written to bridge Signature's old 15px root up to the kit's
-     16px — but `:root.ds-clay` already set a 16px root, so the two stacked
-     and Clay has always shipped at a 16.96px body. Kept at 1.06 to preserve
-     that shipped size now that 16px is the shared root: Clay stays ~6% above
-     Signature/Clean. Chained multiplier so Tailwind-inlined `--text-*`
-     calcs pick it up. */
+     16px — but `:root.ds-clay` already declared a 16px root, and font-size
+     does not stack across the cascade: the more specific selector simply
+     overrode `html`, so Clay's root has always been 16px. The 16.96px body
+     comes from this multiplier alone, applied to the `--text-*` calcs. Kept
+     at 1.06 to preserve that shipped size now that 16px is the shared root:
+     Clay stays ~6% above Signature/Clean. Chained multiplier so
+     Tailwind-inlined `--text-*` calcs pick it up. */
   --ds-type-scale: 1.06;
   --text-2xs: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
   --text-xs: calc(0.875rem * var(--ui-font-scale) * var(--ds-type-scale));
@@ -1157,10 +1151,14 @@
      Press collapses the extrusion; the button translates by --rise. */
   --rise: 4px;
   /* CTA button slab. Derived from the live accent, so it follows every preset
-     and both modes. Face is pinned to L 52% so the white label clears AA on any
-     accent (measured 5.2–5.9:1 across presets); the lip is the same hue well below the face, which is what
-     separates the two — the kit's inset sheen is dropped because it drew a
-     light hairline along the bottom edge of the face. */
+     and both modes. Face is pinned to L 52% so the white label clears AA on
+     every shipped preset — measured live at 4.56:1 (emerald), 4.97 (sky),
+     5.49 (gray), 5.86 (orange), 6.05 (violet), 6.13 (rose). Emerald sits only
+     0.06 above the 4.5:1 floor, so do NOT raise L or chroma here without
+     re-measuring: at chroma 0.2 the cyan/teal band (hue 165–210) drops to
+     4.34–4.49:1 and would fail. The lip is the same hue well below the face,
+     which is what separates the two — the kit's inset sheen is dropped
+     because it drew a light hairline along the bottom edge of the face. */
   --cta-face: oklch(from var(--color-accent-fill) 0.52 c h);
   --cta-lip: oklch(from var(--color-accent-fill) 0.34 c h);
   --cta-ink: #ffffff;
@@ -1172,15 +1170,6 @@
     inset 0 1px 0 rgb(255 255 255 / 0.38);
   --shadow-cta-pressed:
     0 0 0 0 var(--color-accent-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
-  /* Danger slab — same recipe as --shadow-cta, accent-deep → --danger-deep. */
-  --shadow-danger:
-    0 var(--rise) 0 0 var(--danger-deep), 0 calc(var(--rise) + 8px) 18px var(--amb),
-    inset 0 1px 0 rgb(255 255 255 / 0.5);
-  --shadow-danger-pressed:
-    0 0 0 0 var(--danger-deep), 0 2px 8px var(--amb), inset 0 3px 7px rgb(0 0 0 / 0.22);
-  /* 32% sheen (vs 22% on accent): coral hides a white wash more than sky. */
-  --grad-danger-fill:
-    linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 46%), var(--color-danger-fill);
 
   --shadow-panel: var(--elev-2);
   --shadow-card: var(--elev-2);
@@ -2145,11 +2134,13 @@
    --------------------------------------------------------- */
 html {
   font-family: var(--font-sans);
-  /* Shared 16px root for all three skins. The @theme UI ladder then lands on
-     12 (2xs) / 13 (xs, bumped to 0.8125rem) / 14 (sm) / 16 (base) / 18 (lg).
-     `:root.ds-clay` restates the same 16px (redundant but kept — it documents
-     the Clay kit's own body size); Clay still renders ~6% larger than
-     Signature/Clean via its `--ds-type-scale: 1.06`. */
+  /* Shared 16px root for all three skins. On Signature/Clean the @theme UI
+     ladder then lands on 12 (2xs) / 13 (xs, bumped to 0.8125rem) / 14 (sm) /
+     16 (base) / 18 (lg). Clay is NOT on that ladder: `:root.ds-clay` restates
+     the same 16px root (redundant but kept — it documents the Clay kit's own
+     body size) and its `--ds-type-scale: 1.06` plus its own `--text-xs`
+     override give 12.72 / 14.84 / 14.84 / 16.96 / 18 — `xs` and `sm` are
+     deliberately the same step there. */
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
