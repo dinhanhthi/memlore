@@ -965,10 +965,10 @@ describe('Tailwind v4 utilities', () => {
 
   it('Clay CTA label: the primary button is white ink, other accent fills keep the accent ink', () => {
     expect(css).not.toMatch(/:root\.ds-clay\s+\.gradient-primary\s*\{[^}]*color:/)
-    // The dark accent-ink rule still covers the segmented thumb, but the CTA
-    // button opts out — it darkens its own face so white clears AA.
+    // Every accent slab that carries a label now uses the CTA face + ink; the
+    // dark accent-ink rule is left only for the generic .gradient-primary fill.
     expect(css).toMatch(
-      /:root\.dark\.ds-clay\s+\.gradient-primary:not\(button\[data-variant='primary'\]\),[^{]*\{[^}]*color:\s*var\(--color-accent-ink\)/,
+      /:root\.dark\.ds-clay\s+\.gradient-primary:not\(button\[data-variant='primary'\]\)\s*\{[^}]*color:\s*var\(--color-accent-ink\)/,
     )
     expect(css).toMatch(
       /:root\.ds-clay\s+button\[data-variant='primary'\]\s*\{[^}]*color:\s*var\(--cta-ink\)/,
@@ -1818,6 +1818,35 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
     expect(contrastOf(tokensBySurface[id], '--cta-ink', '--cta-face')).toBeGreaterThanOrEqual(
       WCAG_AA_MIN,
     )
+  })
+
+  // Every OTHER Clay accent slab that carries a label must use the same
+  // face+ink pair as the CTA button. The selected calendar day and the
+  // segmented-control active radio used to stamp --color-fg-inverse on the
+  // raw --grad-accent-fill, which measured 2.47–4.29:1 in light across the
+  // six presets — the button fix did not reach them.
+  it('paints the Clay selected calendar day with the CTA face + ink', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-cal-day\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--cta-face\)[^}]*color:\s*var\(--cta-ink\)/,
+    )
+  })
+
+  it('paints the Clay segmented thumb with the CTA face + ink', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-seg-thumb\s*\{[^}]*background:\s*var\(--cta-face\)/,
+    )
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-seg \[role='radio'\]\[aria-checked='true'\]\s*\{[^}]*color:\s*var\(--cta-ink\)/,
+    )
+  })
+
+  it('leaves no Clay rule stamping --color-fg-inverse on an accent slab', () => {
+    const clayFgInverse = [
+      ...cssCode.matchAll(
+        /:root(?:\.dark)?\.ds-clay [^{]*\{[^}]*[^-]color:\s*var\(--color-fg-inverse\)/g,
+      ),
+    ]
+    expect(clayFgInverse.map((m) => m[0].split('{')[0].trim())).toEqual([])
   })
 
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {

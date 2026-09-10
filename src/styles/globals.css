@@ -1423,8 +1423,7 @@
   background: var(--grad-accent-fill);
 }
 
-:root.dark.ds-clay .gradient-primary:not(button[data-variant='primary']),
-:root.dark.ds-clay .xj-seg [role='radio'][aria-checked='true'] {
+:root.dark.ds-clay .gradient-primary:not(button[data-variant='primary']) {
   /* Dark: the lifted accent fills carry the kit's near-black accent ink
      instead of white (product choice; white measured 2.3–2.9:1). The CTA
      button opts out — it darkens its own face to --cta-face so the white
@@ -1493,14 +1492,14 @@
    accent slab as the primary CTA. Driven by aria-pressed so the other skins
    keep their Tailwind selected state untouched. */
 :root.ds-clay .xj-cal-day[aria-pressed='true'] {
-  background: var(--grad-accent-fill);
-  color: var(--color-fg-inverse);
+  /* Same slab as the primary CTA: the face is pinned to L 52% so the white
+     --cta-ink label clears AA on every preset in both modes. */
+  background: var(--cta-face);
+  color: var(--cta-ink);
   border-color: transparent;
-  box-shadow: var(--shadow-cta);
-}
-
-:root.dark.ds-clay .xj-cal-day[aria-pressed='true'] {
-  color: var(--color-accent-ink);
+  box-shadow:
+    0 var(--rise) 0 0 var(--cta-lip),
+    0 calc(var(--rise) + 8px) 18px var(--amb);
 }
 
 :root.ds-clay .xj-cal-day[aria-pressed='true']:active {
@@ -1653,15 +1652,15 @@
 }
 
 :root.ds-clay .xj-seg-thumb {
-  background: var(--grad-accent-fill);
+  /* CTA face so the active radio's --cta-ink label clears AA (the raw accent
+     fill measured 2.47-4.29:1 in light). */
+  background: var(--cta-face);
   border-color: transparent;
-  box-shadow:
-    0 3px 0 0 var(--color-accent-deep),
-    inset 0 1px 0 var(--sheen);
+  box-shadow: 0 3px 0 0 var(--cta-lip);
 }
 
 :root.ds-clay .xj-seg [role='radio'][aria-checked='true'] {
-  color: var(--color-fg-inverse);
+  color: var(--cta-ink);
 }
 
 /* ---- Inputs (kit §9): wells, not slabs. `.xj-input-bare` opts a chrome-less
