@@ -18,9 +18,7 @@ export function DashboardCard({ title, action, className, children }: DashboardC
     >
       <div className="dashboard-card-fill bg-elevated border-border-default card-wave-edge flex h-full min-h-0 flex-col gap-4 overflow-hidden border p-4">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-          <h3 className="font-title text-rainbow-soft text-lg font-semibold whitespace-nowrap">
-            {title}
-          </h3>
+          <h3 className="font-title text-fg text-lg font-semibold whitespace-nowrap">{title}</h3>
           {action && <div className="shrink-0 whitespace-nowrap">{action}</div>}
         </div>
         <div className="min-h-0 flex-1">{children}</div>

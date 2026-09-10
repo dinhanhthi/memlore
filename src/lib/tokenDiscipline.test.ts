@@ -92,6 +92,24 @@ describe('token discipline — Hallmark P2 patterns', () => {
     expect(hits(/xj-rainbow/)).toEqual([])
   })
 
+  // Clip-text gradient headings are the most-repeated AI tell in the product:
+  // `text-rainbow-soft` painted every dashboard card title on all 8 surfaces,
+  // and neither Clean (which strips every other gradient) nor Clay overrode it.
+  it('does not paint headings with a clip-text gradient', () => {
+    expect(hits(/text-rainbow-soft|--gradient-rainbow-soft/)).toEqual([])
+  })
+
+  // `.t-shimmer::before` is the one sanctioned clip-text use: an animated
+  // highlight band over loading text, reduced-motion guarded. Any OTHER
+  // clip-text rule is a gradient headline.
+  it('uses background-clip: text only for the loading shimmer', () => {
+    const css = readFileSync(resolve(SRC, 'styles/globals.css'), 'utf8')
+    const clipRules = [...css.matchAll(/([^{}]+)\{[^{}]*background-clip:\s*text/g)].map((m) =>
+      m[1].trim().split('\n').pop()!.trim(),
+    )
+    expect(clipRules).toEqual(['.t-shimmer::before'])
+  })
+
   it('does not fall back tag colour to leftover violet #a78bfa', () => {
     expect(hits(/:\s*'#a78bfa'/)).toEqual([])
   })

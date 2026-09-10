@@ -299,15 +299,6 @@
     color-mix(in oklab, var(--color-accent) 60%, transparent) 95%
   );
 
-  /* Dashboard card titles — two stops: current accent-text (AA on
-     paper) plus an analogous companion (+60°, same L/C so contrast
-     holds). Follows applyAccent because both stops read --color-accent-text. */
-  --gradient-rainbow-soft: linear-gradient(
-    90deg,
-    var(--color-accent-text),
-    oklch(from var(--color-accent-text) l c calc(h + 60))
-  );
-
   /* Soft Sky CTA glow (primary button halo) — mirrors buildTokens(230) light. */
   --shadow-primary-glow:
     0 6px 20px -6px oklch(60% 0.27 230 / 0.4), 0 2px 6px oklch(65% 0.24 290 / 0.2);
@@ -1905,22 +1896,6 @@
 }
 
 /* Dashboard card titles: clip a two-stop accent gradient to the glyphs. */
-@utility text-rainbow-soft {
-  background-image: var(--gradient-rainbow-soft);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-}
-
-@media (forced-colors: active) {
-  .text-rainbow-soft {
-    background: none;
-    color: CanvasText;
-    -webkit-text-fill-color: CanvasText;
-  }
-}
-
 /* Badge background — warm hairline shimmer along the long edges. Pairs with
    rounded pills/chips; draws attention without a solid fill. */
 @utility badge-border {
