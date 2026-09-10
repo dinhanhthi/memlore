@@ -1067,6 +1067,20 @@ describe('Body rule', () => {
 })
 
 describe('Fonts — self-hosted, no network (offline regression guard)', () => {
+  // The app ships `vi`. Every face that can render user content (entry titles
+  // via --font-title, UI via --font-sans, code via --font-mono) must carry the
+  // Vietnamese subset, or a Vietnamese string falls back to a system face
+  // mid-word. Asserted against the installed packages, not the stylesheet.
+  it.each([
+    ['@fontsource-variable/fraunces/index.css', 'Fraunces — --font-title, entry titles'],
+    ['@fontsource-variable/geist/index.css', 'Geist — --font-sans on Signature/Clean'],
+    ['@fontsource-variable/baloo-2/index.css', 'Baloo 2 — --font-sans on Clay'],
+    ['@fontsource-variable/geist-mono/index.css', 'Geist Mono — --font-mono'],
+  ])('%s ships a vietnamese @font-face (%s)', (spec) => {
+    const file = readFileSync(require.resolve(spec), 'utf8')
+    expect(file).toMatch(/unicode-range:[^;]*U\+1EA0-1EF9/)
+  })
+
   it('does NOT reference Google Fonts (or any external font URL) — fonts are bundled offline', () => {
     // The whole point: no runtime CDN request for typography. Fonts are
     // self-hosted via @fontsource packages imported in src/main.tsx.
