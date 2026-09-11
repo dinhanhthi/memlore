@@ -86,6 +86,10 @@
   --button-selected-fg: var(--button-primary-fg);
   --button-selected-border: transparent;
   --download-glow-hot: color-mix(in oklch, var(--color-accent) 40%, white);
+  --badge-idle-bg: color-mix(in oklch, var(--color-ink) 32%, var(--color-raised));
+  --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 42%, var(--color-raised));
+  --badge-idle-fg: oklch(99% 0.004 80);
+  --badge-idle-border: color-mix(in oklch, var(--color-ink) 52%, transparent);
   --rule-width: 1px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);

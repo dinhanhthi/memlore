@@ -228,6 +228,25 @@ test('download CTAs use a bright face and a traveling border glow', async ({ pag
   expect(bg, 'download face should be the bright accent').toBe(accent)
 })
 
+async function relativeLuminance(locator: Locator, property: 'color' | 'backgroundColor') {
+  return locator.evaluate((el, propertyName) => {
+    const value = getComputedStyle(el)[propertyName]
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return 0
+    ctx.fillStyle = value
+    ctx.fillRect(0, 0, 1, 1)
+    const [r = 0, g = 0, b = 0] = ctx.getImageData(0, 0, 1, 1).data
+    const toLin = (channel: number) => {
+      const srgb = channel / 255
+      return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4
+    }
+    return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b)
+  }, property)
+}
+
 test('demo option badges stay bright and unclipped at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
@@ -235,11 +254,17 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   const tour = page.getByRole('group', { name: 'Explore the demo' })
   const selected = tour.getByRole('button', { pressed: true })
   const idle = tour.getByRole('button', { pressed: false }).first()
-  const ink = await page.locator('h1').evaluate((el) => getComputedStyle(el).color)
-  const muted = await page.locator('.hero-description').evaluate((el) => getComputedStyle(el).color)
-  const idleColor = await idle.evaluate((el) => getComputedStyle(el).color)
-  expect(idleColor, 'idle badge text should use ink, not muted').toBe(ink)
-  expect(idleColor, 'idle badge text should not be muted').not.toBe(muted)
+  const muted = page.locator('.hero-description')
+  const paper = page.locator('body')
+  const idleText = await relativeLuminance(idle, 'color')
+  const selectedText = await relativeLuminance(selected, 'color')
+  const idleFill = await relativeLuminance(idle, 'backgroundColor')
+  const mutedText = await relativeLuminance(muted, 'color')
+  const paperFill = await relativeLuminance(paper, 'backgroundColor')
+  expect(idleText, 'idle badge text should be near-white').toBeGreaterThan(0.9)
+  expect(idleText, 'idle badge text should beat muted copy').toBeGreaterThan(mutedText)
+  expect(selectedText, 'selected badge text should be near-white').toBeGreaterThan(0.9)
+  expect(idleFill, 'idle badge fill should lift off the page').toBeGreaterThan(paperFill * 2)
   expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   const rowBox = await page.locator('.option-badges').boundingBox()

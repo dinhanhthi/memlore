@@ -720,14 +720,14 @@ footer {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: var(--rule-width) solid color-mix(in oklch, var(--color-ink) 28%, transparent);
-  background: color-mix(in oklch, var(--color-ink) 12%, var(--color-raised));
-  color: var(--color-ink);
+  border: var(--rule-width) solid var(--badge-idle-border);
+  background: var(--badge-idle-bg);
+  color: var(--badge-idle-fg);
   padding: 4px 14px;
   min-height: 1.75rem;
   border-radius: var(--button-radius);
   font-size: 14px;
-  font-weight: 550;
+  font-weight: 600;
   white-space: nowrap;
   box-shadow: none;
   transition:
@@ -739,12 +739,12 @@ footer {
 .option-row button[aria-checked='true'] {
   background: var(--button-selected-bg);
   border-color: var(--button-selected-border);
-  color: var(--button-selected-fg);
+  color: var(--badge-idle-fg);
   box-shadow: none;
 }
 @media (hover: hover) and (pointer: fine) {
   .option-row button:hover:not(:disabled) {
-    background: color-mix(in oklch, var(--color-ink) 18%, var(--color-raised));
+    background: var(--badge-idle-bg-hover);
   }
 }
 .theme-dot {
