@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowDown,
   ArrowRight,
+  ArrowUp,
   ArrowUpRight,
   BookOpen,
   CalendarClock,
@@ -293,15 +294,33 @@ function EditorFigure() {
 function ChatFigure() {
   return (
     <figure className="illust illust-chat" aria-hidden="true">
-      <div className="chat-row chat-you">How did today actually feel?</div>
-      <div className="chat-row chat-ai">
-        You kept coming back to the walk after dinner. Want to start there?
-      </div>
-      <div className="chat-row chat-you">Yes. The light on the river.</div>
-      <div className="chat-row chat-ai chat-stream">
-        <span />
-        <span />
-        <span />
+      <div className="chat-window">
+        <div className="chat-chrome">
+          <strong>
+            <MessageCircle className="size-4" />
+            {chat.figure.title}
+          </strong>
+          <span className="chat-save">
+            <Sparkles className="size-3.5" />
+            {chat.figure.save}
+          </span>
+        </div>
+        <div className="chat-thread">
+          {chat.figure.messages.map((message) => (
+            <div
+              key={message.text}
+              className={message.from === 'you' ? 'chat-row chat-you' : 'chat-row chat-ai'}
+            >
+              {message.text}
+            </div>
+          ))}
+        </div>
+        <div className="chat-composer">
+          <span>{chat.figure.placeholder}</span>
+          <span className="chat-send">
+            <ArrowUp className="size-3.5" />
+          </span>
+        </div>
       </div>
     </figure>
   )
@@ -652,11 +671,6 @@ export default function LandingPage() {
           <div>
             <h2>{encrypt.title}</h2>
             <p>{encrypt.body}</p>
-            <ul>
-              {encrypt.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
           <EncryptFigure />
         </section>
@@ -717,22 +731,12 @@ export default function LandingPage() {
           <div>
             <h2>{chat.title}</h2>
             <p>{chat.body}</p>
-            <ul>
-              {chat.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
         </section>
         <section className="split" id="persona">
           <div>
             <h2>{persona.title}</h2>
             <p>{persona.body}</p>
-            <ul>
-              {persona.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
           <PersonaFigure />
         </section>
@@ -740,11 +744,6 @@ export default function LandingPage() {
           <div>
             <h2>{search.title}</h2>
             <p>{search.body}</p>
-            <ul>
-              {search.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
           <SearchFigure />
         </section>
@@ -753,22 +752,12 @@ export default function LandingPage() {
           <div>
             <h2>{locations.title}</h2>
             <p>{locations.body}</p>
-            <ul>
-              {locations.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
         </section>
         <section className="split" id="import-export">
           <div>
             <h2>{transfer.title}</h2>
             <p>{transfer.body}</p>
-            <ul>
-              {transfer.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
           </div>
           <TransferFigure />
         </section>
@@ -778,13 +767,8 @@ export default function LandingPage() {
             <span>{openSource.symbol}</span>
           </div>
           <div>
-            <h2>
-              {openSource.titleLead}
-              <br />
-              {openSource.titleAccent}
-            </h2>
+            <h2>{openSource.title}</h2>
             <p>{openSource.body}</p>
-            <p>{openSource.beta}</p>
             <a className="text-link" href={githubUrl} target="_blank" rel="noreferrer">
               {openSource.github} <ArrowUpRight className="size-4.5" />
             </a>

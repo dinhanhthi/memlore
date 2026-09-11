@@ -63,12 +63,7 @@ export const demo = {
 
 export const encrypt = {
   title: 'Even we cannot read it.',
-  body: 'Locked with your password, on your Mac. Memlore has no servers and no backdoor.',
-  points: [
-    'A password is required. Always.',
-    'Files on disk stay sealed without it.',
-    'Lost password cannot be recovered — not even by us.',
-  ],
+  body: 'Locked with your password, on your Mac. Memlore has no servers and no backdoor. A password is required — always. Files on disk stay sealed without it. A lost password cannot be recovered — not even by us.',
   figure: {
     words: 'Your words',
     password: 'Your password',
@@ -203,33 +198,31 @@ export const ai = {
 }
 
 export const chat = {
-  title: 'Talk the day through. Keep the page.',
-  body: 'Daily Chat is a companion for the hours you would rather speak than type. Replies stream in. The conversation itself is ephemeral. Saving it is a separate, deliberate step — and it becomes an entry in your own words.',
-  points: [
-    'Off until an AI provider is configured and the privacy notice is accepted.',
-    'Stop at any time. Clear wipes the thread. Locking the app wipes it too.',
-    'Save as entry drafts a first-person page you can edit before it lands in the journal.',
-  ],
+  title: 'Daily Chat',
+  body: 'Talk about the day, then save it as a journal entry you can edit. Off until you set up an AI provider. Locking the app clears the thread.',
+  figure: {
+    title: 'Daily Chat',
+    save: 'Save as entry',
+    placeholder: 'Tell me about your day…',
+    messages: [
+      { from: 'you' as const, text: 'Long day. Walked to the river after dinner.' },
+      {
+        from: 'ai' as const,
+        text: 'That walk keeps coming up. What stayed with you tonight?',
+      },
+      { from: 'you' as const, text: 'I left the headphones at home. It was quiet.' },
+    ],
+  },
 }
 
 export const search = {
-  title: 'Find the feeling, not the filename.',
-  body: 'Look for a word you wrote, or a feeling you only half-remember. Search stays on your Mac.',
-  points: [
-    'Invisible entries never show up. Locked ones stay out unless you let them in.',
-    'Search by meaning is extra, and stays off until you turn it on.',
-    'Tags, calendar, On This Day, and maps sit beside it — still offline.',
-  ],
+  title: 'Search your journal',
+  body: 'Find a word you wrote, or something you only half-remember. Search stays on your Mac, next to tags, calendar, and maps.',
 }
 
 export const persona = {
-  title: 'A second you, in your rhythm.',
-  body: 'Optional. It can chat with you, keep a few memories, and write the next line the way you would.',
-  points: [
-    'Memories are short notes from your journal. You can read and edit them.',
-    'Your persona is a second self — how you sound, what you care about.',
-    'When it writes for you, it follows that rhythm, not a generic one.',
-  ],
+  title: 'Your persona',
+  body: 'Optional. It keeps a few notes from your journal and writes the next line in your rhythm, not a generic one.',
   figure: {
     memories: ['the walk after dinner', 'Tuesday kitchen', 'light on the river'],
     reply: 'You always come back to the walk.',
@@ -239,23 +232,13 @@ export const persona = {
 }
 
 export const locations = {
-  title: 'The days, on a map.',
-  body: 'Entries and photos can sit where they happened. Open a pin, and you are back on that page.',
-  points: [
-    'Pins show a picture when the memory has one.',
-    'Tap a place to open the entry.',
-    'The map lives with the journal, on this Mac.',
-  ],
+  title: 'Entries on a map',
+  body: 'Entries and photos sit where they happened. Open a pin to go back to that page. The map stays on this Mac.',
 }
 
 export const transfer = {
-  title: 'Come with your days. Leave with your files.',
-  body: 'Bring a journal from Day One, Journey, Apple Journal, Markdown, or plain text. Export a backup, Markdown, or plain text — all on this Mac.',
-  points: [
-    'Import Day One JSON, Journey ZIP, an Apple Journal folder, Markdown, or plain text.',
-    'Export a Memlore backup, Markdown files, or plain text.',
-    'Nothing is sent to us. The files stay with you.',
-  ],
+  title: 'Import and export',
+  body: 'Bring a journal from Day One, Journey, Apple Journal, Markdown, or plain text. Export a backup or files — all on this Mac, nothing sent to us.',
   figure: {
     inbound: ['Day One', 'Journey', 'Apple Journal', 'Markdown', 'Plain text'],
     hub: 'Memlore',
@@ -265,11 +248,9 @@ export const transfer = {
 
 export const openSource = {
   symbol: 'Made in the open.',
-  titleLead: 'Your story is yours.',
-  titleAccent: 'So is the choice.',
-  body: 'Memlore is open source. You can see how it works, suggest an improvement, or help shape what comes next.',
-  beta: 'All current features are free during beta. That is not a promise they stay free after beta. Optional third-party AI providers may charge their own fees.',
-  github: 'Meet the project on GitHub',
+  title: 'Open source',
+  body: 'You can see how it works, suggest an improvement, or help shape what comes next. All current features are free during beta — that is not a promise they stay free after. Optional third-party AI providers may charge their own fees.',
+  github: 'View on GitHub',
 }
 
 export type ComparisonProductName = 'Memlore' | 'Day One' | 'Journey' | 'Apple Journal'
