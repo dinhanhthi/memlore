@@ -42,7 +42,7 @@ export const demo = {
   title: 'Get a feel for it.',
   subtitle: 'A real little journal. A made-up life. Yours to explore.',
   cue: 'Click around. It works like the real app.',
-  themeAria: 'Design system for the demo',
+  themeAria: 'Choose appearance',
   themes: {
     clay: 'Clay',
     clean: 'Clean',

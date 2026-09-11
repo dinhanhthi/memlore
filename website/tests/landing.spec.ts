@@ -119,7 +119,7 @@ for (const viewport of VIEWPORTS) {
   })
 }
 
-const THEME_PICKER = 'Design system for the demo'
+const THEME_PICKER = 'Choose appearance'
 
 type LandingChrome = {
   paper: string
@@ -346,7 +346,9 @@ test('demo skins sit at the mockup top-left with Open separately', async ({ page
   const mockup = page.locator('.demo-window')
   const chrome = page.locator('.demo-chrome')
   const picker = chrome.getByRole('radiogroup', { name: THEME_PICKER })
+  const label = chrome.locator('.demo-chrome-label')
   const open = chrome.getByRole('link', { name: /open separately/i })
+  await expect(label).toHaveText(/choose appearance/i)
   await expect(picker.getByRole('radio', { name: 'Clay' })).toBeVisible()
   await expect(picker.getByRole('radio', { name: 'Clean' })).toBeVisible()
   await expect(picker.getByRole('radio', { name: 'Signature' })).toBeVisible()
@@ -354,12 +356,15 @@ test('demo skins sit at the mockup top-left with Open separately', async ({ page
 
   const mockupBox = await mockup.boundingBox()
   const chromeBox = await chrome.boundingBox()
+  const labelBox = await label.boundingBox()
   const clayBox = await picker.getByRole('radio', { name: 'Clay' }).boundingBox()
   const openBox = await open.boundingBox()
   expect(mockupBox, 'mockup should have a box').toBeTruthy()
   expect(chromeBox, 'demo chrome should have a box').toBeTruthy()
+  expect(labelBox, 'Choose appearance should have a box').toBeTruthy()
   expect(clayBox, 'Clay badge should have a box').toBeTruthy()
   expect(openBox, 'Open separately should have a box').toBeTruthy()
+  expect(labelBox!.x, 'Choose appearance should sit left of the skins').toBeLessThan(clayBox!.x)
   expect(chromeBox!.y, 'chrome should sit on the mockup').toBeGreaterThanOrEqual(mockupBox!.y - 1)
   expect(chromeBox!.x, 'chrome should sit on the left of the mockup').toBeGreaterThanOrEqual(
     mockupBox!.x - 1,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUpRight,
   BookOpen,
   CalendarClock,
@@ -455,7 +456,15 @@ function Demo() {
         </div>
         <div className="demo-window">
           <div className="demo-chrome">
-            <div className="option-row" role="radiogroup" aria-label={demo.themeAria}>
+            <p className="demo-chrome-label" id="demo-appearance-label">
+              {demo.themeAria}
+              <ArrowRight className="size-3" aria-hidden="true" />
+            </p>
+            <div
+              className="option-row"
+              role="radiogroup"
+              aria-labelledby="demo-appearance-label"
+            >
               {(
                 [
                   ['clay', demo.themes.clay],

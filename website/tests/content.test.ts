@@ -179,7 +179,7 @@ it('does not keep the landing tour or reset chrome', () => {
 })
 
 it('scopes the design-system picker to the demo, not the landing chrome', () => {
-  expect(demo.themeAria.toLowerCase()).toMatch(/demo/)
+  expect(demo.themeAria.toLowerCase()).toMatch(/choose appearance/)
   expect(demo.themeAria.toLowerCase()).not.toMatch(/website/)
 })
 
