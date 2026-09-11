@@ -42,8 +42,6 @@ export const demo = {
   title: 'Get a feel for it.',
   subtitle: 'A real little journal. A made-up life. Yours to explore.',
   cue: 'Click around. It works like the real app.',
-  optionsTitle: 'Scenes and skins',
-  tourAria: 'Explore the demo',
   themeAria: 'Design system for the demo',
   themes: {
     clay: 'Clay',
@@ -59,15 +57,8 @@ export const demo = {
   errorText: 'Try loading it again, or open the demo in its own tab.',
   tryAgain: 'Try again',
   openDemo: 'Open demo',
-  reset: 'Reset demo',
   openSeparately: 'Open separately',
   disclaimer: 'Sample data. Writing, locks, sync, and AI are simulated.',
-  tour: [
-    { view: 'write' as const, label: 'Write a little' },
-    { view: 'explore' as const, label: 'Look back' },
-    { view: 'chat' as const, label: 'Ask your journal' },
-    { view: 'locks' as const, label: 'Keep it private' },
-  ],
 }
 
 export const encrypt = {

@@ -172,6 +172,12 @@ it('tells visitors the demo window is clickable like the real app', () => {
   expect(demo.cue.toLowerCase()).toMatch(/real app/)
 })
 
+it('does not keep the landing tour or reset chrome', () => {
+  expect(demo).not.toHaveProperty('tour')
+  expect(demo).not.toHaveProperty('reset')
+  expect(demo.openSeparately.toLowerCase()).toMatch(/open separately/)
+})
+
 it('scopes the design-system picker to the demo, not the landing chrome', () => {
   expect(demo.themeAria.toLowerCase()).toMatch(/demo/)
   expect(demo.themeAria.toLowerCase()).not.toMatch(/website/)

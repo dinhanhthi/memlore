@@ -26,10 +26,7 @@ import {
   MessageSquareQuote,
   Mic,
   Monitor,
-  PenLine,
-  RotateCcw,
   ScanSearch,
-  Search,
   Shield,
   Smartphone,
   Sparkles,
@@ -57,16 +54,10 @@ import {
   type ComparisonMark,
 } from './content'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
-import type { DemoView, DesignSystem } from './demoBridge'
+import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
 
-const tourIcons = {
-  write: PenLine,
-  explore: Search,
-  chat: MessageCircle,
-  locks: LockKeyhole,
-} as const
 const aiIcons = {
   titles: Heading,
   summaries: Highlighter,
@@ -415,7 +406,6 @@ function Demo() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const [theme, setTheme] = useState<DesignSystem>(DEFAULT_DESIGN_SYSTEM)
-  const [view, setView] = useState<DemoView>('write')
   const themeRef = useRef(theme)
   useEffect(() => {
     themeRef.current = theme
@@ -464,6 +454,33 @@ function Demo() {
           <span />
         </div>
         <div className="demo-window">
+          <div className="demo-chrome">
+            <div className="option-row" role="radiogroup" aria-label={demo.themeAria}>
+              {(
+                [
+                  ['clay', demo.themes.clay],
+                  ['clean', demo.themes.clean],
+                  ['signature', demo.themes.signature],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === id}
+                  disabled={status !== 'ready'}
+                  onClick={() => changeTheme(id)}
+                >
+                  <span className={`theme-dot theme-dot-${id}`} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+            <a className="demo-chrome-open" href="./demo.html" target="_blank" rel="noreferrer">
+              <Maximize2 className="size-3" />
+              {demo.openSeparately}
+            </a>
+          </div>
           <p className="demo-mobile-hint">
             {demo.mobileHintBefore}{' '}
             <a href="./demo.html" target="_blank" rel="noreferrer">
@@ -507,70 +524,7 @@ function Demo() {
           </div>
         </div>
       </div>
-      <div className="demo-options">
-        <p className="options-label">{demo.optionsTitle}</p>
-        <div className="option-badges">
-          <div className="option-row" role="group" aria-label={demo.tourAria}>
-            {demo.tour.map(({ view: key, label }) => {
-              const Icon = tourIcons[key]
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={view === key}
-                  disabled={status !== 'ready'}
-                  onClick={() => {
-                    setView(key)
-                    sendDemoCommand(frame.current, { command: 'navigate', view: key })
-                  }}
-                >
-                  <Icon className="size-3.5" />
-                  <span>{label}</span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="option-row" role="radiogroup" aria-label={demo.themeAria}>
-            {(
-              [
-                ['clay', demo.themes.clay],
-                ['clean', demo.themes.clean],
-                ['signature', demo.themes.signature],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={theme === id}
-                disabled={status !== 'ready'}
-                onClick={() => changeTheme(id)}
-              >
-                <span className={`theme-dot theme-dot-${id}`} />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="option-meta">
-          <p className="demo-disclaimer">{demo.disclaimer}</p>
-          <div>
-            <button
-              type="button"
-              disabled={status !== 'ready'}
-              onClick={() => {
-                sendDemoCommand(frame.current, { command: 'reset' })
-                setView('write')
-              }}
-            >
-              <RotateCcw className="size-3.5" /> {demo.reset}
-            </button>
-            <a href="./demo.html" target="_blank" rel="noreferrer">
-              <Maximize2 className="size-3.5" /> {demo.openSeparately}
-            </a>
-          </div>
-        </div>
-      </div>
+      <p className="demo-disclaimer">{demo.disclaimer}</p>
     </section>
   )
 }

@@ -36,7 +36,7 @@ function demoFrame(page: Page) {
 }
 
 async function waitForDemoReady(page: Page) {
-  await expect(page.getByRole('button', { name: 'Reset demo' })).toBeEnabled({
+  await expect(page.getByRole('radio', { name: 'Clay' })).toBeEnabled({
     timeout: 60_000,
   })
 }
@@ -259,9 +259,9 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await waitForDemoReady(page)
-  const tour = page.getByRole('group', { name: 'Explore the demo' })
-  const selected = tour.getByRole('button', { pressed: true })
-  const idle = tour.getByRole('button', { pressed: false }).first()
+  const picker = page.getByRole('radiogroup', { name: THEME_PICKER })
+  const selected = picker.getByRole('radio', { checked: true })
+  const idle = picker.getByRole('radio', { checked: false }).first()
   const muted = page.locator('.hero-description')
   const paper = page.locator('body')
   const idleText = await relativeLuminance(idle, 'color')
@@ -275,7 +275,7 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   expect(idleFill, 'idle badge fill should lift off the page').toBeGreaterThan(paperFill * 2)
   expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
-  const rowBox = await page.locator('.option-badges').boundingBox()
+  const rowBox = await page.locator('.demo-chrome').boundingBox()
   const idleBox = await idle.boundingBox()
   const selectedBox = await selected.boundingBox()
   expect(rowBox, 'option badges should have a box').toBeTruthy()
@@ -333,51 +333,50 @@ test('demo Settings restyles the iframe only', async ({ page }) => {
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
-test('guided demo actions navigate the iframe and reset restores write', async ({ page }) => {
+test('demo skins sit at the mockup top-left with Open separately', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await waitForDemoReady(page)
-  const frame = demoFrame(page)
+  await expect(page.getByRole('button', { name: 'Write a little' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Look back' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Ask your journal' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Keep it private' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Reset demo' })).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Write a little' }).click()
-  await expect(page.getByRole('button', { name: 'Write a little' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  await expect(frame.getByText('A fresh start').first()).toBeVisible({ timeout: 20_000 })
+  const mockup = page.locator('.demo-window')
+  const chrome = page.locator('.demo-chrome')
+  const picker = chrome.getByRole('radiogroup', { name: THEME_PICKER })
+  const open = chrome.getByRole('link', { name: /open separately/i })
+  await expect(picker.getByRole('radio', { name: 'Clay' })).toBeVisible()
+  await expect(picker.getByRole('radio', { name: 'Clean' })).toBeVisible()
+  await expect(picker.getByRole('radio', { name: 'Signature' })).toBeVisible()
+  await expect(open).toHaveAttribute('href', './demo.html')
 
-  await page.getByRole('button', { name: 'Look back' }).click()
-  await expect(page.getByRole('button', { name: 'Look back' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
+  const mockupBox = await mockup.boundingBox()
+  const chromeBox = await chrome.boundingBox()
+  const clayBox = await picker.getByRole('radio', { name: 'Clay' }).boundingBox()
+  const openBox = await open.boundingBox()
+  expect(mockupBox, 'mockup should have a box').toBeTruthy()
+  expect(chromeBox, 'demo chrome should have a box').toBeTruthy()
+  expect(clayBox, 'Clay badge should have a box').toBeTruthy()
+  expect(openBox, 'Open separately should have a box').toBeTruthy()
+  expect(chromeBox!.y, 'chrome should sit on the mockup').toBeGreaterThanOrEqual(mockupBox!.y - 1)
+  expect(chromeBox!.x, 'chrome should sit on the left of the mockup').toBeGreaterThanOrEqual(
+    mockupBox!.x - 1,
   )
-  await expect(frame.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 20_000 })
-
-  await page.getByRole('button', { name: 'Ask your journal' }).click()
-  await expect(page.getByRole('button', { name: 'Ask your journal' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
+  expect(chromeBox!.y - mockupBox!.y, 'chrome should be at the top').toBeLessThan(16)
+  expect(chromeBox!.x - mockupBox!.x, 'chrome should be at the left').toBeLessThan(16)
+  expect(openBox!.x, 'Open separately should sit beside the skins').toBeGreaterThan(
+    clayBox!.x + clayBox!.width,
   )
-  await expect(
-    frame.getByRole('heading', { name: 'Daily Chat' }).or(frame.getByText('Conversations')),
-  ).toBeVisible({ timeout: 20_000 })
-
-  await page.getByRole('button', { name: 'Keep it private' }).click()
-  await expect(page.getByRole('button', { name: 'Keep it private' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
+  expect(Math.abs(openBox!.y - clayBox!.y), 'Open separately should share the skins row').toBeLessThan(
+    12,
   )
-  await expect(frame.getByText('Second lock', { exact: false }).first()).toBeVisible({
-    timeout: 20_000,
-  })
-
-  await page.getByRole('button', { name: 'Reset demo' }).click()
-  await waitForDemoReady(page)
-  await expect(page.getByRole('button', { name: 'Write a little' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  await expect(frame.getByText('A fresh start').first()).toBeVisible({ timeout: 20_000 })
+  expect(clayBox!.height, 'skin badges should be smaller').toBeLessThanOrEqual(28)
+  const fontSize = await picker
+    .getByRole('radio', { name: 'Clay' })
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  expect(fontSize, 'skin badge type should be smaller').toBeLessThanOrEqual(12)
 })
 
 test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
@@ -407,14 +406,16 @@ test('lock UI exists and chat composer is reachable after guided navigation', as
   await waitForDemoReady(page)
   const frame = demoFrame(page)
 
-  await page.getByRole('button', { name: 'Keep it private' }).click()
+  await frame.getByRole('button', { name: 'Settings' }).first().click()
+  await frame.getByRole('tab', { name: 'Security', exact: true }).click()
+  await frame.getByRole('tab', { name: 'Second lock' }).click()
   await expect(
     frame.getByRole('button', { name: /change password|unlock|disable second lock/i }).first(),
   ).toBeVisible({
     timeout: 20_000,
   })
 
-  await page.getByRole('button', { name: 'Ask your journal' }).click()
+  await frame.getByRole('button', { name: 'Chat', exact: true }).click()
   const newChat = frame.getByRole('button', { name: /^New( chat)?$/i }).first()
   await expect(newChat).toBeEnabled({ timeout: 20_000 })
   const composer = frame.getByPlaceholder('Tell me about your day…')
