@@ -1,7 +1,7 @@
 export const githubUrl = 'https://github.com/dinhanhthi/memlore'
 
 export const meta = {
-  title: 'Memlore — Make room for your story',
+  title: 'Memlore — A little life. A lasting story.',
   description:
     'A private place for your memories. Explore Memlore, an open-source journal for writing, reflecting, and finding your way back to what matters.',
 }
@@ -30,14 +30,14 @@ export const hero = {
   titleLead: 'A little life.',
   titleAccent: 'A lasting story.',
   descriptionLead: 'Memlore is a private journal for your Mac.',
-  description:
-    'For the days you want to remember, and the thoughts you need to put somewhere.',
+  description: 'For the days you want to remember, and the thoughts you need to put somewhere.',
   download: 'Download beta',
   downloadAria: 'Download the macOS beta from GitHub',
   tryDemo: 'Try the demo',
   followGithub: 'Follow the journey',
   availability: 'macOS beta on GitHub. More platforms coming.',
   mascotAlt: 'Memlore’s dog mascot. The head follows your cursor.',
+  mascotAltStill: 'Memlore’s dog mascot.',
   portraitLead: 'A place to land.',
   portraitAccent: 'Even on the ordinary days.',
 }
@@ -263,7 +263,6 @@ export type ComparisonMark = 'yes' | 'no' | 'partial'
 
 export type ComparisonProduct = {
   name: ComparisonProductName
-  badge?: string
   note: string
   sourceUrl?: string
 }
@@ -287,7 +286,6 @@ export const comparison = {
   products: [
     {
       name: 'Memlore',
-      badge: 'Open source',
       note: 'Still in beta, and macOS-only today. Other platforms are coming, without a date attached.',
     },
     {

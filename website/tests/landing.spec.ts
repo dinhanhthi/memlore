@@ -68,8 +68,8 @@ async function expectNoRootOverflow(page: Page) {
   ).toBeLessThanOrEqual(overflow.bodyClient)
 }
 
-async function headerDownloadLabelVisible(page: Page) {
-  return page.locator('.header-actions .download-label').evaluate((el) => {
+async function githubLabelVisible(page: Page) {
+  return page.locator('.header-github .github-label').evaluate((el) => {
     const box = el.getBoundingClientRect()
     return box.width > 4 && box.height > 4
   })
@@ -79,20 +79,20 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(page.locator('.hero .download'), 'hero download')
   await expectSingleLine(page.locator('.hero .button'), 'hero demo')
   await expectSingleLine(page.locator('.footer-main .download'), 'footer download')
+  await expectSingleLine(page.locator('.header-github'), 'header GitHub')
   if (compact) {
     const toggle = page.getByRole('button', { name: 'Open menu' })
     await expectSingleLine(toggle, 'nav toggle')
-    await expectSingleLine(page.locator('.header-actions .download'), 'header download')
-    expect(await headerDownloadLabelVisible(page), 'header download should be icon-only').toBe(
-      false,
-    )
+    await expect(page.locator('.header-actions .download')).toBeHidden()
+    expect(await githubLabelVisible(page), 'compact GitHub should be the mark only').toBe(false)
+    await expect(page.locator('.hero-head img')).toHaveAttribute('src', /straight\.png/)
     await toggle.click()
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
     await expectSingleLine(nav.getByRole('link', { name: 'Demo' }), 'nav Demo')
     await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
     await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
     await expectSingleLine(nav.locator('summary'), 'nav Doc')
-    await expectSingleLine(nav.getByRole('link', { name: 'GitHub' }), 'nav GitHub')
+    await expect(nav.getByRole('link', { name: 'GitHub' })).toHaveCount(0)
     return
   }
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
@@ -100,18 +100,15 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
   await expectSingleLine(nav.locator('summary'), 'nav Doc')
-  await expectSingleLine(page.locator('.header-github'), 'header GitHub')
   await expectSingleLine(page.locator('.header-actions .download'), 'header download')
-  expect(await headerDownloadLabelVisible(page), 'desktop download should show its label').toBe(
-    true,
-  )
+  expect(await githubLabelVisible(page), 'desktop GitHub should show its label').toBe(true)
   await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
 }
 
 test('landing and demo.html load from production assets', async ({ page }) => {
   const landing = attachErrorCollectors(page)
   await page.goto('/')
-  await expect(page).toHaveTitle('Memlore — Make room for your story')
+  await expect(page).toHaveTitle('Memlore — A little life. A lasting story.')
   await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
   const landingScripts = await page
     .locator('script[src]')
@@ -146,6 +143,41 @@ for (const viewport of VIEWPORTS) {
       await expect(page.getByText('This preview needs a wider window.')).toBeVisible()
       await expect(page.locator('.comparison-cards article')).toHaveCount(4)
       await expect(page.locator('.comparison-scroll')).toBeHidden()
+      const demoBottom = await page
+        .locator('.demo-section')
+        .evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom))
+      const featuresTop = await page
+        .locator('#features')
+        .evaluate((el) => parseFloat(getComputedStyle(el).paddingTop))
+      expect(demoBottom, 'demo should not add a large gap before the next section').toBe(0)
+      expect(featuresTop, 'encrypt section should sit closer to the preview').toBeLessThanOrEqual(
+        32,
+      )
+      const chatPadding = await page.locator('.illust-chat').evaluate((el) => {
+        const style = getComputedStyle(el)
+        return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft]
+      })
+      expect(chatPadding, 'Daily Chat mockup should not pick up .illust padding').toEqual([
+        '0px',
+        '0px',
+        '0px',
+        '0px',
+      ])
+      const lockOrder = await page.evaluate(() => {
+        const section = document.querySelector('#locks')
+        if (!(section instanceof HTMLElement)) return null
+        const topOf = (node: Element | null) => node?.getBoundingClientRect().top ?? -1
+        return {
+          title: topOf(section.querySelector('h2')),
+          intro: topOf(section.querySelector('.locks-copy > p')),
+          figure: topOf(section.querySelector('.illust-locks')),
+          list: topOf(section.querySelector('.lock-list')),
+        }
+      })
+      expect(lockOrder, 'locks section should exist').toBeTruthy()
+      expect(lockOrder!.title).toBeLessThan(lockOrder!.intro)
+      expect(lockOrder!.intro).toBeLessThan(lockOrder!.figure)
+      expect(lockOrder!.figure).toBeLessThan(lockOrder!.list)
     } else {
       await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
       await expect(page.locator('.demo-placeholder')).toHaveCount(0)
@@ -154,6 +186,20 @@ for (const viewport of VIEWPORTS) {
       path: testInfo.outputPath(`landing-${viewport.name}.png`),
       fullPage: true,
     })
+    await expect(page.locator('.compare-card-memlore > h3')).not.toContainText(/open source/i)
+    if (!compact) {
+      await expect(
+        page.locator('.comparison-scroll thead').getByRole('columnheader', { name: 'Memlore' }),
+      ).not.toContainText(/open source/i)
+      const titleSize = await page
+        .locator('.comparison-scroll thead th')
+        .nth(1)
+        .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+      expect(
+        titleSize,
+        'comparison app titles should read larger than table body',
+      ).toBeGreaterThanOrEqual(18)
+    }
     await expectChromeSingleLine(page, compact)
     await expectNoRootOverflow(page)
     expect(errors.pageErrors, errors.pageErrors.join('\n')).toEqual([])
@@ -537,6 +583,7 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(doc.locator('a[href*="404"]')).toHaveCount(0)
 
   await expect(page.locator('.header-github')).toHaveAttribute('href', GITHUB)
+  await expect(page.locator('.header-github .github-mark')).toHaveCount(1)
   const download = page.locator('.hero .download')
   await expect(download).toHaveAttribute('href', GITHUB)
   await expect(download).toHaveAttribute('aria-label', /macOS beta from GitHub/i)

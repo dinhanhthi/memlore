@@ -92,6 +92,10 @@ it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
   expect(comparison.rows.length).toBeGreaterThan(5)
 })
 
+it('does not put an Open source badge on the Memlore comparison column', () => {
+  expect('badge' in product('Memlore')).toBe(false)
+})
+
 it('describes Apple Journal as more than an iPhone app', () => {
   const apple = product('Apple Journal').note
   expect(apple).toMatch(/iPad/i)
@@ -120,6 +124,11 @@ it('does not claim competitors lack encryption or AI', () => {
 it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {
   expect(nav.docDisclosure).toMatch(/coming soon/i)
   expect(nav.docDisclosure).not.toMatch(/https?:\/\//i)
+})
+
+it('uses a still mascot description when the head does not follow the pointer', () => {
+  expect(hero.mascotAltStill.toLowerCase()).toMatch(/mascot/)
+  expect(hero.mascotAltStill.toLowerCase()).not.toMatch(/cursor/)
 })
 
 it('describes the compact demo as a placeholder until mobile apps exist', () => {
