@@ -622,7 +622,8 @@ footer {
   color: var(--color-accent);
 }
 @media (hover: hover) and (pointer: fine) {
-  .demo-window {
+  .demo-window,
+  .demo-disclaimer {
     transform: rotateY(-6deg) rotateX(2.5deg) translateY(0);
   }
   .demo-stage:hover .demo-window {
@@ -631,6 +632,9 @@ footer {
       0 1px 0 color-mix(in oklch, var(--color-ink) 16%, transparent),
       0 32px 56px var(--color-shadow),
       0 72px 110px var(--color-shadow);
+  }
+  .demo-stage:hover .demo-disclaimer {
+    transform: rotateY(0deg) rotateX(0deg) translateY(-8px);
   }
 }
 .demo-viewport {
@@ -725,9 +729,11 @@ footer {
   border-radius: 5px 5px 3px 3px;
 }
 .demo-disclaimer {
-  margin-top: 12px;
+  margin: 10px 0 0;
   font-size: 14px;
   color: var(--color-muted);
+  transform-origin: 50% 50%;
+  transition: transform var(--dur-long) var(--ease-out);
 }
 .split {
   display: grid;
@@ -1617,7 +1623,8 @@ footer {
   .demo-stack {
     display: none;
   }
-  .demo-window {
+  .demo-window,
+  .demo-disclaimer {
     transform: none;
   }
   .demo-viewport,

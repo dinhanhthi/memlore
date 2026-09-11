@@ -523,8 +523,8 @@ function Demo() {
             )}
           </div>
         </div>
+        <p className="demo-disclaimer">{demo.disclaimer}</p>
       </div>
-      <p className="demo-disclaimer">{demo.disclaimer}</p>
     </section>
   )
 }

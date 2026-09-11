@@ -379,6 +379,38 @@ test('demo skins sit at the mockup top-left with Open separately', async ({ page
   expect(fontSize, 'skin badge type should be smaller').toBeLessThanOrEqual(12)
 })
 
+test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const mockup = page.locator('.demo-window')
+  const disclaimer = page.locator('.demo-disclaimer')
+  await expect(disclaimer).toBeVisible()
+  const layout = await page.evaluate(() => {
+    const stage = document.querySelector('.demo-stage')
+    const windowEl = document.querySelector('.demo-window')
+    const text = document.querySelector('.demo-disclaimer')
+    if (!(stage instanceof HTMLElement) || !(windowEl instanceof HTMLElement) || !(text instanceof HTMLElement)) {
+      return null
+    }
+    return {
+      windowLeft: windowEl.offsetLeft,
+      textLeft: text.offsetLeft,
+      windowBottom: windowEl.offsetTop + windowEl.offsetHeight,
+      textTop: text.offsetTop,
+      parent: text.parentElement === stage,
+    }
+  })
+  expect(layout, 'demo stage, window, and disclaimer should exist').toBeTruthy()
+  expect(layout!.parent, 'disclaimer should stay a child of the existing stage').toBe(true)
+  expect(layout!.textLeft, 'disclaimer should share the mockup left edge').toBe(layout!.windowLeft)
+  expect(layout!.textTop, 'disclaimer should sit under the mockup').toBeGreaterThanOrEqual(
+    layout!.windowBottom,
+  )
+  const mockupTransform = await mockup.evaluate((el) => getComputedStyle(el).transform)
+  const textTransform = await disclaimer.evaluate((el) => getComputedStyle(el).transform)
+  expect(textTransform, 'disclaimer should stay parallel to the mockup').toBe(mockupTransform)
+})
+
 test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.demo-disclaimer')).toContainText(/sample data/i)
