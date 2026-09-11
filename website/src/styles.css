@@ -290,14 +290,17 @@ footer {
 .download {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
-  background: var(--color-accent);
-  color: var(--color-accent-ink);
-  box-shadow: 0 10px 28px color-mix(in oklch, var(--color-accent) 32%, transparent);
+  overflow: visible;
+  background: var(--download-face);
+  color: var(--download-face-ink);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 22%, transparent),
+    0 0 22px var(--download-halo),
+    0 10px 28px var(--color-shadow);
 }
 .download-glow {
   position: absolute;
-  inset: 0;
+  inset: -2px;
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
@@ -306,84 +309,45 @@ footer {
 .download-glow::after {
   content: '';
   position: absolute;
-  inset: 1.5px;
+  inset: 2px;
   border-radius: inherit;
-  background: var(--color-accent);
+  background: var(--download-face);
   z-index: 1;
 }
 .download-glow-h,
 .download-glow-v {
   position: absolute;
+  top: 0;
+  left: 0;
   pointer-events: none;
   z-index: 0;
   border-radius: 50%;
-  filter: blur(8px);
+  filter: blur(12px);
   background: radial-gradient(
     ellipse at center,
     var(--download-glow-hot) 0%,
-    var(--color-accent) 30%,
-    var(--color-accent-deep) 55%,
-    transparent 80%
+    var(--download-glow-mid) 28%,
+    var(--download-glow-deep) 55%,
+    transparent 78%
   );
+  offset-path: inset(0 round 9999px);
+  offset-anchor: center;
+  offset-rotate: 0deg;
 }
 .download-glow-h {
-  width: 60px;
-  height: 35px;
-  animation: download-glow-a 3.5s var(--ease-in-out) infinite;
+  width: 78px;
+  height: 44px;
+  animation: download-glow-orbit 3.2s linear infinite;
 }
 .download-glow-v {
-  width: 35px;
-  height: 60px;
-  animation: download-glow-b 3.5s var(--ease-in-out) infinite;
+  width: 44px;
+  height: 78px;
+  animation: download-glow-orbit 3.2s linear infinite reverse;
+  animation-delay: -1.6s;
 }
-@keyframes download-glow-a {
-  0% {
-    left: -40px;
-    top: -25px;
-    opacity: 0;
-  }
-  3% {
-    opacity: 1;
-  }
-  45% {
-    left: calc(100% - 25px);
-    top: -25px;
-    opacity: 1;
-  }
-  95% {
-    left: calc(100% - 25px);
-    top: calc(100% + 15px);
-    opacity: 1;
-  }
-  100% {
-    left: calc(100% - 25px);
-    top: calc(100% + 30px);
-    opacity: 0;
-  }
-}
-@keyframes download-glow-b {
-  0% {
-    left: -25px;
-    top: -40px;
-    opacity: 0;
-  }
-  3% {
-    opacity: 1;
-  }
-  45% {
-    left: -25px;
-    top: calc(100% - 25px);
-    opacity: 1;
-  }
-  95% {
-    left: calc(100% + 15px);
-    top: calc(100% - 25px);
-    opacity: 1;
-  }
-  100% {
-    left: calc(100% + 30px);
-    top: calc(100% - 25px);
-    opacity: 0;
+@keyframes download-glow-orbit {
+  to {
+    offset-distance: 100%;
   }
 }
 .download > svg,
@@ -413,7 +377,10 @@ footer {
 }
 @media (hover: hover) and (pointer: fine) {
   .download:hover {
-    filter: brightness(1.08);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 40%, transparent),
+      0 0 28px var(--download-halo),
+      0 12px 32px var(--color-shadow);
   }
   .button:hover {
     transform: translateY(-1px);

@@ -205,7 +205,9 @@ test('CTA buttons stay fully rounded while the picker restyles only the demo', a
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
-test('download CTAs use a bright face and a traveling border glow', async ({ page }) => {
+test('download CTAs have a dark face, light label, and traveling border glow', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   const hero = page.locator('.hero .download')
@@ -214,10 +216,15 @@ test('download CTAs use a bright face and a traveling border glow', async ({ pag
   await expect(hero.locator('.download-glow-v')).toHaveCount(1)
   await expect(page.locator('.header-actions .download .download-glow')).toHaveCount(1)
   await expect(page.locator('.footer-main .download .download-glow')).toHaveCount(1)
-  const animation = await hero.locator('.download-glow-h').evaluate((el) => getComputedStyle(el).animationName)
-  expect(animation).toMatch(/download-glow-a/)
-  const bg = await hero.evaluate((el) => getComputedStyle(el).backgroundColor)
-  const accent = await page.evaluate(() => {
+  const animation = await hero
+    .locator('.download-glow-h')
+    .evaluate((el) => getComputedStyle(el).animationName)
+  expect(animation).toMatch(/download-glow-orbit/)
+  const face = await relativeLuminance(hero, 'backgroundColor')
+  const label = await relativeLuminance(hero, 'color')
+  expect(face, 'download face should stay dark so the glow reads').toBeLessThan(0.12)
+  expect(label, 'download label should be near-white').toBeGreaterThan(0.9)
+  const accentFace = await page.evaluate(() => {
     const probe = document.createElement('span')
     probe.style.backgroundColor = 'var(--color-accent)'
     document.body.append(probe)
@@ -225,7 +232,8 @@ test('download CTAs use a bright face and a traveling border glow', async ({ pag
     probe.remove()
     return color
   })
-  expect(bg, 'download face should be the bright accent').toBe(accent)
+  const bg = await hero.evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(bg, 'download face must not match the honey accent fill').not.toBe(accentFace)
 })
 
 async function relativeLuminance(locator: Locator, property: 'color' | 'backgroundColor') {
