@@ -89,3 +89,5 @@ run-ds-validate.sh
 node_modules
 
 website/.hallmark/
+
+.hallmark/

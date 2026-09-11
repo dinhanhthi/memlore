@@ -89,7 +89,7 @@ it('remaps persist before store hydration so host localStorage cannot overwrite 
     expect(useTabStore.persist.hasHydrated()).toBe(true)
     expect(useOnboardingStore.persist.hasHydrated()).toBe(true)
     expect(ui.getState().addedProviders).toContain('ollama')
-    expect(ui.getState().designSystem).toBe('signature')
+    expect(ui.getState().designSystem).toBe('clay')
     expect(ui.getState().theme).toBe('dark')
     expect(useOnboardingStore.getState().pending).toBe(false)
     expect(useTabStore.getState().activeTabId).not.toBe('poison-tab')

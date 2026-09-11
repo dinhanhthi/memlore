@@ -1,4 +1,5 @@
 export type DesignSystem = 'signature' | 'clean' | 'clay'
+export const DEFAULT_DESIGN_SYSTEM: DesignSystem = 'clay'
 export type DemoView = 'write' | 'explore' | 'chat' | 'locks'
 export type DemoCommand =
   | { command: 'theme'; designSystem: DesignSystem }
@@ -8,7 +9,7 @@ export type DemoMessage =
   | { type: 'memlore-demo-ready'; version: 1 }
   | { type: 'memlore-demo-theme'; version: 1; designSystem: DesignSystem }
 
-const DESIGN_SYSTEMS = new Set<DesignSystem>(['signature', 'clean', 'clay'])
+const DESIGN_SYSTEMS = new Set<DesignSystem>(['clay', 'clean', 'signature'])
 const DEMO_VIEWS = new Set<DemoView>(['write', 'explore', 'chat', 'locks'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {

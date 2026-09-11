@@ -71,9 +71,9 @@ credential for the mock, not a real journal password.
   Playwright walkthrough is not part of the smoke suite.
 - Sync, export, import, and some system settings show an explicit
   “simulated” notice instead of silently doing nothing.
-- There is no production download. GitHub is
-  https://github.com/dinhanhthi/memlore. Doc is a coming-soon disclosure,
-  not a 404 link.
+- There is no production binary or store listing. The **Download beta**
+  control opens https://github.com/dinhanhthi/memlore. Doc is a coming-soon
+  disclosure, not a 404 link.
 - macOS is the current platform. Windows, Linux, iOS, and Android are
   coming soon without a date.
 

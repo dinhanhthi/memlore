@@ -1,14 +1,29 @@
 import { expect, it } from 'vitest'
 import * as content from '../src/content'
-import { comparison, demo, features, githubUrl, meta, nav, platforms } from '../src/content'
+import {
+  ai,
+  comparison,
+  demo,
+  editor,
+  encrypt,
+  githubUrl,
+  hero,
+  locations,
+  locks,
+  meta,
+  nav,
+  persona,
+  platforms,
+  search,
+  transfer,
+} from '../src/content'
 import websiteIndex from '../index.html?raw'
 
 const PRICE =
   /\$\s*\d|€\s*\d|£\s*\d|\d[\d,]*(?:\.\d+)?\s*(?:usd|eur|gbp|dollars?)|\b(?:usd|eur|gbp)\s*\d|\b\d+(?:\.\d+)?\s*\/\s*(?:mo|month|yr|year)\b/i
 const SHIP_DATE =
   /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b|\b20\d{2}\b|\bq[1-4]\s*20\d{2}\b|\b(?:next|this)\s+(?:spring|summer|fall|autumn|winter|year|month)\b|\b(?:by|in|during)\s+(?:q[1-4]|january|february|march|april|june|july|august|september|october|november|december)\b/i
-const DOWNLOAD_OR_RELEASE =
-  /\bdownload(?:s|ing)?\b|\breleases?\b|\breleased\b|\bget the app\b|\bapp store\b|\bplay store\b|\bmicrosoft store\b/i
+const STORE_RELEASE = /\bapp store\b|\bplay store\b|\bmicrosoft store\b|\bproduction release\b/i
 const LACKS_ENCRYPTION_OR_AI =
   /\b(?:no|without|lack(?:s|ing)?|doesn't have|does not have)\s+(?:end-to-end\s+)?(?:encryption|ai)\b|\b(?:encryption|ai)\s+(?:not available|unavailable)\b/i
 
@@ -59,37 +74,47 @@ it('does not promise ship dates for Windows, Linux, iOS, or Android', () => {
   expect(allCopy()).not.toMatch(SHIP_DATE)
 })
 
-it('does not claim a download or production release', () => {
-  expect(allCopy()).not.toMatch(DOWNLOAD_OR_RELEASE)
+it('points the macOS beta download at GitHub, not a store', () => {
+  expect(hero.download).toMatch(/download/i)
+  expect(hero.download).toMatch(/beta/i)
+  expect(nav.downloadAria).toMatch(/github/i)
+  expect(allCopy()).not.toMatch(STORE_RELEASE)
 })
 
-it('compares Memlore, Day One, Journey, and Apple Journal with a strength and a tradeoff each', () => {
-  for (const name of ['Memlore', 'Day One', 'Journey', 'Apple Journal']) {
+it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
+  for (const name of ['Memlore', 'Day One', 'Journey', 'Apple Journal'] as const) {
     const entry = product(name)
-    expect(entry.strength.trim().length).toBeGreaterThan(20)
-    expect(entry.tradeoff.trim().length).toBeGreaterThan(20)
+    expect(entry.note.trim().length).toBeGreaterThan(20)
+    for (const row of comparison.rows) {
+      expect(row.marks[name]).toMatch(/^(yes|no|partial)$/)
+    }
   }
+  expect(comparison.rows.length).toBeGreaterThan(5)
 })
 
 it('describes Apple Journal as more than an iPhone app', () => {
-  const apple = `${product('Apple Journal').strength} ${product('Apple Journal').tradeoff}`
+  const apple = product('Apple Journal').note
   expect(apple).toMatch(/iPad/i)
   expect(apple).toMatch(/Mac/i)
   expect(apple).not.toMatch(/iPhone[- ]only/i)
 })
 
-it('states Memlore’s tradeoff as beta and macOS today', () => {
-  const tradeoff = product('Memlore').tradeoff
-  expect(tradeoff).toMatch(/beta/i)
-  expect(tradeoff).toMatch(/macOS/i)
+it('states Memlore’s note as beta and macOS today', () => {
+  const note = product('Memlore').note
+  expect(note).toMatch(/beta/i)
+  expect(note).toMatch(/macOS/i)
 })
 
 it('does not claim competitors lack encryption or AI', () => {
   const competitorCopy = comparison.products
     .filter((item) => item.name !== 'Memlore')
-    .flatMap((item) => [item.strength, item.tradeoff])
+    .map((item) => item.note)
     .join('\n')
   expect(competitorCopy).not.toMatch(LACKS_ENCRYPTION_OR_AI)
+  expect(comparison.rows.find((row) => /optional ai/i.test(row.label))?.marks['Day One']).toBe(
+    'yes',
+  )
+  expect(comparison.rows.find((row) => /optional ai/i.test(row.label))?.marks.Journey).toBe('yes')
 })
 
 it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {
@@ -97,8 +122,29 @@ it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {
   expect(nav.docDisclosure).not.toMatch(/https?:\/\//i)
 })
 
+it('explains encryption for a non-technical reader', () => {
+  const copy = collectStrings(encrypt).join('\n').toLowerCase()
+  expect(copy).toMatch(/cannot read|never see/)
+  expect(copy).toMatch(/password/)
+  expect(copy).toMatch(/no server/)
+  expect(copy).not.toMatch(/argon2|aes-256|sqlcipher|ciphertext|zeroize/)
+})
+
 it('covers the required feature themes from real product capabilities', () => {
-  const copy = collectStrings(features).join('\n').toLowerCase()
+  const copy = [
+    ...collectStrings(hero),
+    ...collectStrings(encrypt),
+    ...collectStrings(locks),
+    ...collectStrings(ai),
+    ...collectStrings(editor),
+    ...collectStrings(search),
+    ...collectStrings(persona),
+    ...collectStrings(locations),
+    ...collectStrings(transfer),
+    ...collectStrings(comparison),
+  ]
+    .join('\n')
+    .toLowerCase()
   expect(copy).toMatch(/writ|words|editor/)
   expect(copy).toMatch(/photo|media/)
   expect(copy).toMatch(/search/)
@@ -109,11 +155,21 @@ it('covers the required feature themes from real product capabilities', () => {
   expect(copy).toMatch(/\bai\b/)
   expect(copy).toMatch(/local/)
   expect(copy).toMatch(/second lock|invisible/)
-  expect(copy).toMatch(/own cloud|your own cloud/)
+  expect(copy).toMatch(/own cloud|your own cloud|cloud folder/)
   expect(copy).toMatch(/sync/)
+  expect(copy).toMatch(/persona/)
+  expect(copy).toMatch(/rhythm/)
+  expect(copy).toMatch(/map/)
   expect(copy).toMatch(/import/)
   expect(copy).toMatch(/export/)
-  expect(copy).toMatch(/appearance|design/)
+  expect(copy).toMatch(/day one/)
+  expect(copy).toMatch(/journey/)
+  expect(copy).toMatch(/apple journal/)
+})
+
+it('tells visitors the demo window is clickable like the real app', () => {
+  expect(demo.cue.toLowerCase()).toMatch(/click/)
+  expect(demo.cue.toLowerCase()).toMatch(/real app/)
 })
 
 it('keeps demo limitations visible for sample data and simulated AI, locks, and sync', () => {
@@ -140,6 +196,11 @@ it('cites only the recorded official comparison URLs', () => {
 it('keeps the HTML title and description in sync with the copy source', () => {
   expect(websiteIndex).toContain(`<title>${meta.title}</title>`)
   expect(websiteIndex).toContain(`content="${meta.description}"`)
+})
+
+it('ships a favicon from the existing logo assets', () => {
+  expect(websiteIndex).toContain('rel="icon"')
+  expect(websiteIndex).toContain('./logo-without-container/256.png')
 })
 
 it('names the current macOS beta without promising other platforms a date', () => {

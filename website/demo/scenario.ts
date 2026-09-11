@@ -18,7 +18,7 @@ function applyDemoSeed() {
   markLaunchViewApplied()
   useUiStore.setState({
     theme: 'dark',
-    designSystem: 'signature',
+    designSystem: 'clay',
     uiLanguage: 'en',
     // Ollama is keyless; without this the generation slot looks disconnected
     // and Daily Chat New/Send stay disabled in the guided demo.

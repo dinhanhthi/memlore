@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import {
+  DEFAULT_DESIGN_SYSTEM,
   isDemoCommand,
   isDemoMessage,
   isDemoView,
@@ -10,6 +11,10 @@ import {
   sendDemoCommand,
 } from '../src/demoBridge'
 import type { DemoCommand } from '../src/demoBridge'
+
+it('defaults the landing and demo to Clay', () => {
+  expect(DEFAULT_DESIGN_SYSTEM).toBe('clay')
+})
 
 it('isDesignSystem accepts only the three landing enums', () => {
   expect(isDesignSystem('signature')).toBe(true)

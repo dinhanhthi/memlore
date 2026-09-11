@@ -10,3 +10,4 @@ src-tauri/swift/**/.build/
 src-tauri/swift/**/.swiftpm/
 pnpm-lock.yaml
 *.gen.ts
+website/src/naturalEarthLand.ts

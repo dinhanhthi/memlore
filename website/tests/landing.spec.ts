@@ -73,8 +73,9 @@ async function expectChromeSingleLine(page: Page) {
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
   await expectSingleLine(nav.locator('summary'), 'nav Doc')
   await expectSingleLine(page.locator('.github-link'), 'header GitHub')
-  await expectSingleLine(page.locator('.hero .button.primary'), 'hero CTA')
-  await expectSingleLine(page.locator('.footer-main .button.primary'), 'footer CTA')
+  await expectSingleLine(page.locator('.hero .download'), 'hero download')
+  await expectSingleLine(page.locator('.hero .button'), 'hero demo')
+  await expectSingleLine(page.locator('.footer-main .download'), 'footer download')
 }
 
 test('landing and demo.html load from production assets', async ({ page }) => {
@@ -118,6 +119,17 @@ for (const viewport of VIEWPORTS) {
   })
 }
 
+test('editor media pane shows file-type icons instead of body copy', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const pane = page.locator('.ed-media')
+  await expect(pane).toBeVisible()
+  await expect(pane.locator('small')).toHaveText('Media')
+  await expect(pane.locator('p')).toHaveCount(0)
+  await expect(pane.locator('.ed-files svg')).toHaveCount(3)
+  await expect(pane).not.toContainText('Photos, video, and voice memos')
+})
+
 test('demo Settings design system syncs landing data-design-system', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
@@ -150,18 +162,22 @@ test('theme selector syncs landing data-design-system and demo ds-* class', asyn
   await waitForDemoReady(page)
   const html = page.locator('html')
   const frameHtml = demoFrame(page).locator('html')
-  const picker = page.getByLabel('Design system for website and demo')
+  const picker = page.getByRole('radiogroup', { name: 'Design system for website and demo' })
 
-  for (const system of ['signature', 'clean', 'clay'] as const) {
-    await picker.selectOption(system)
-    await expect(html).toHaveAttribute('data-design-system', system)
+  for (const system of [
+    { id: 'clay', name: 'Clay' },
+    { id: 'clean', name: 'Clean' },
+    { id: 'signature', name: 'Signature' },
+  ] as const) {
+    await picker.getByRole('radio', { name: system.name }).click()
+    await expect(html).toHaveAttribute('data-design-system', system.id)
     await expect
       .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
       .toBe('dark')
     await expect
       .poll(() => page.evaluate(() => document.documentElement.style.colorScheme))
       .toBe('dark')
-    await expect(frameHtml).toHaveClass(new RegExp(`\\bds-${system}\\b`))
+    await expect(frameHtml).toHaveClass(new RegExp(`\\bds-${system.id}\\b`))
   }
 })
 
@@ -212,7 +228,7 @@ test('guided demo actions navigate the iframe and reset restores write', async (
   await expect(frame.getByText('A fresh start').first()).toBeVisible({ timeout: 20_000 })
 })
 
-test('demo disclaimer, doc disclosure, GitHub href, and no download button', async ({ page }) => {
+test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.demo-disclaimer')).toContainText(/sample data/i)
   await expect(page.locator('.demo-disclaimer')).toContainText(/simulated/i)
@@ -226,10 +242,11 @@ test('demo disclaimer, doc disclosure, GitHub href, and no download button', asy
   await expect(doc.locator('a[href*="404"]')).toHaveCount(0)
 
   await expect(page.locator('.github-link')).toHaveAttribute('href', GITHUB)
-  await expect(
-    page.getByRole('link', { name: /download|get the app|app store|release/i }),
-  ).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /download|get the app|release/i })).toHaveCount(0)
+  const download = page.locator('.hero .download')
+  await expect(download).toHaveAttribute('href', GITHUB)
+  await expect(download).toHaveAttribute('aria-label', /macOS beta from GitHub/i)
+  await expect(page.getByRole('link', { name: /app store|play store/i })).toHaveCount(0)
+  await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky')
 })
 
 test('lock UI exists and chat composer is reachable after guided navigation', async ({ page }) => {

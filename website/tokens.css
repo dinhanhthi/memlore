@@ -1,57 +1,95 @@
-/* Hallmark · genre: atmospheric · macrostructure: Workbench · tone: intimate atmospheric · anchor hue: honey
- * theme: custom Espresso (paper oklch(18% 0.025 30) · accent oklch(76% 0.093 73) honey · Fraunces + Geist)
- * theme_axes: dark / italic-serif / warm · nav: N1b · footer: Ft5 · enrichment: live iframe demo
- * pre-emit critique: P4 H4 E5 S5 R4 V4 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4
+ * genre: atmospheric · macrostructure: Split Studio · tone: intimate atmospheric
+ * theme: studied-DNA (source: https://superx.so) + Memlore Espresso
+ * paper oklch(12% 0.02 30) · accent oklch(76% 0.093 73) honey
+ * display: Fraunces (font-title) · body: Geist 400 · wordmark: Fraunces
+ * theme_axes: dark / geometric-sans / warm
+ * nav: N5 sticky-pill · footer: Ft1 · enrichment: E4 live iframe 3D window
+ * studied: yes · DNA-source: url · source-url: https://superx.so
+ * observed: dark product-theater, stacked mockups, per-feature split, sticky nav
+ * rhythm: unknown (URL mode)
+ * H8/E4 knobs: frame=floating-no-chrome, tilt=6deg, stack-of-3, shadow=layered
+ * F-split knobs: alternate=ltr/rtl · proof=css-art
+ */
 :root {
   color-scheme: dark;
-  --color-paper: oklch(18% 0.025 30);
-  --color-panel: oklch(25% 0.026 35);
-  --color-raised: oklch(29% 0.025 35);
-  --color-rule: oklch(37% 0.023 35);
-  --color-ink: oklch(95.5% 0.017 75);
-  --color-muted: oklch(74% 0.029 65);
+  --color-paper: oklch(12% 0.02 30);
+  --color-panel: oklch(18% 0.022 32);
+  --color-raised: oklch(22% 0.024 34);
+  --color-rule: oklch(32% 0.02 35);
+  --color-ink: oklch(96% 0.014 75);
+  --color-muted: oklch(76% 0.028 65);
   --color-accent: oklch(76% 0.093 73);
   --color-accent-deep: oklch(66% 0.095 66);
+  --color-accent-ink: oklch(18% 0.03 50);
   --color-focus: oklch(85% 0.105 80);
-  --color-shadow: oklch(10% 0.02 30 / 0.5);
-  --color-clear: oklch(18% 0.025 30 / 0);
+  --color-shadow: oklch(6% 0.02 30 / 0.62);
+  --color-clear: oklch(12% 0.02 30 / 0);
   --color-success: oklch(77% 0.09 145);
-  --font-display: 'Fraunces Variable', serif;
+  --color-error: oklch(68% 0.16 25);
+  --color-bloom: oklch(56% 0.09 70 / 0.28);
+  --color-ai-titles: oklch(74% 0.12 73);
+  --color-ai-summaries: oklch(72% 0.11 145);
+  --color-ai-deeper: oklch(72% 0.1 250);
+  --color-ai-chat: oklch(74% 0.12 330);
+  --color-ai-ask: oklch(72% 0.1 210);
+  --color-ai-search: oklch(74% 0.11 50);
+  --color-ai-emotion: oklch(72% 0.12 18);
+  --color-ai-time: oklch(70% 0.1 290);
+  --color-ai-image: oklch(74% 0.11 100);
+  --color-ai-device: oklch(70% 0.08 180);
+  --font-display: 'Geist Variable', sans-serif;
+  --font-title: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --font-body: 'Geist Variable', sans-serif;
+  --font-wordmark: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --text-xs: 0.75rem;
   --text-small: 0.875rem;
-  --text-base: 1rem;
-  --text-lead: 1.125rem;
-  --text-heading: clamp(2rem, 3.7vw, 3.25rem);
-  --text-display: clamp(2.65rem, 6.4vw, 5.5rem);
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
-  --space-section: 112px;
+  --text-base: 1.125rem;
+  --text-lead: 1.25rem;
+  --text-heading: clamp(2rem, 3.4vw, 3rem);
+  --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+  --text-display-s: clamp(2rem, 4vw + 0.6rem, 3.4rem);
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-section: 7rem;
   --radius-control: 8px;
-  --radius-panel: 16px;
+  --radius-panel: 18px;
+  --radius-pill: 999px;
   --rule-width: 1px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-short: 150ms;
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
 }
 :root[data-design-system='clean'] {
   color-scheme: dark;
   --font-display: 'Geist Variable', sans-serif;
   --radius-control: 4px;
-  --radius-panel: 6px;
-  --color-paper: oklch(19% 0.015 35);
-  --color-panel: oklch(24% 0.015 35);
-  --color-raised: oklch(28% 0.015 35);
+  --radius-panel: 8px;
+  --color-paper: oklch(13% 0.012 35);
+  --color-panel: oklch(18% 0.012 35);
+  --color-raised: oklch(22% 0.012 35);
 }
 :root[data-design-system='clay'] {
   color-scheme: dark;
   --radius-control: 18px;
   --radius-panel: 28px;
-  --color-paper: oklch(22% 0.027 35);
-  --color-panel: oklch(29% 0.029 40);
-  --color-raised: oklch(33% 0.03 40);
+  --color-paper: oklch(16% 0.024 35);
+  --color-panel: oklch(22% 0.028 40);
+  --color-raised: oklch(27% 0.03 40);
 }

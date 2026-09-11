@@ -12,7 +12,7 @@ Checked 2026-09-10. Recheck before publishing or updating product claims. These 
 ## Copy boundaries
 
 - Do not claim competitors lack encryption or AI. Encryption is not unique to Memlore.
-- Do not imply Memlore has production releases or non-macOS native apps today. GitHub releases API returned an empty list on 2026-09-10; use development/demo CTA until a release is verified.
+- Do not imply Memlore has production releases or non-macOS native apps today. GitHub releases API returned an empty list on 2026-09-10. The landing **Download beta** control opens the GitHub repository, not a binary or store listing.
 - The user supplied the promise that features are free during beta. This does not promise future pricing or include third-party AI/cloud charges.
 - The website demo is a simulation with sample data and scripted AI. Native password/Touch ID, real encryption, cloud sync, model downloads, and filesystem operations are not performed by the demo.
 - Main app capabilities are described from current repository code/README. The website does not claim an independent security audit.
