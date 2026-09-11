@@ -737,16 +737,24 @@ export default function LandingPage() {
       <main id="main">
         <section className="hero">
           <div className="hero-copy">
-            <p className="release-note">
-              <span />
-              {hero.note}
+            <p className="hero-badges">
+              <span className="hero-badge">
+                <Code2 className="size-3.5" />
+                {hero.badgeOpenSource}
+              </span>
+              <span className="hero-badge" data-tone="free">
+                <Heart className="size-3.5" />
+                {hero.badgeFree}
+              </span>
             </p>
             <h1>
               {hero.titleLead}
               <br />
               <span>{hero.titleAccent}</span>
             </h1>
-            <p className="hero-description">{hero.description}</p>
+            <p className="hero-description">
+              <strong>{hero.descriptionLead}</strong> {hero.description}
+            </p>
             <div className="button-row">
               <DownloadLink
                 className="download download-hero"

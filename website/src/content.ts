@@ -25,11 +25,13 @@ export const nav = {
 }
 
 export const hero = {
-  note: 'An open-source journal, growing with you.',
+  badgeOpenSource: 'Open source',
+  badgeFree: 'Free',
   titleLead: 'A little life.',
   titleAccent: 'A lasting story.',
+  descriptionLead: 'Memlore is a private journal for your Mac.',
   description:
-    'For the days you want to remember, and the thoughts you need to put somewhere. A private home for your memories.',
+    'For the days you want to remember, and the thoughts you need to put somewhere.',
   download: 'Download beta',
   downloadAria: 'Download the macOS beta from GitHub',
   tryDemo: 'Try the demo',
