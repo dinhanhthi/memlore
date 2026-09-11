@@ -18,8 +18,8 @@ import {
 import { LIGHT_MODE_ENABLED } from './themeConfig'
 
 describe('designSystem constants', () => {
-  it('lists signature then clean then clay', () => {
-    expect(DESIGN_SYSTEMS).toEqual(['signature', 'clean', 'clay'])
+  it('lists clay then clean then signature', () => {
+    expect(DESIGN_SYSTEMS).toEqual(['clay', 'clean', 'signature'])
   })
 
   it('defaults to clay', () => {

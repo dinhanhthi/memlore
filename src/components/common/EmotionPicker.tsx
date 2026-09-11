@@ -146,7 +146,7 @@ export function EmotionPicker({
                 </span>
                 <span
                   className="text-sm font-medium"
-                  style={{ color: isSelected ? hex : undefined }}
+                  style={{ color: isSelected ? swatch : undefined }}
                 >
                   {t(meta.i18nKey)}
                 </span>

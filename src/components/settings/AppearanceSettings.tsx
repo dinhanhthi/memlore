@@ -471,7 +471,7 @@ export function AppearanceSettings() {
                                 // Clean's `[class~='rounded-xl']` corner-radius sweep,
                                 // so these preset cards keep a fixed radius at every
                                 // Corner radius setting. Do not "tidy" it to rounded-xl.
-                                'focus-visible:ring-accent flex flex-col items-center gap-2 rounded-(--radius-xl) p-3 transition-[box-shadow,border-color] duration-150 outline-none focus-visible:ring-2',
+                                'flex flex-col items-center gap-2 rounded-(--radius-xl) p-3 transition-[box-shadow,border-color] duration-150 outline-none',
                                 selected
                                   ? 'gradient-border-primary border border-transparent [--border-gradient-width:2px]'
                                   : 'border-border-default hover:bg-surface-hi border',

@@ -1165,29 +1165,12 @@ describe('Accessibility', () => {
     expect(css).toMatch(/\.reduce-motion\s*\*\s*\{/)
   })
 
-  it('draws an instant :focus-visible ring from --color-focus-ring', () => {
-    // Anchored to the BARE `:focus-visible` rule (start of line) — a compound
-    // selector like `input:focus-visible` must not satisfy this assertion.
-    expect(css).toMatch(
-      /(?:^|\n):focus-visible\s*\{[^}]*outline:\s*2px\s+solid\s+var\(--color-focus-ring\)/,
-    )
-    expect(css).toMatch(/(?:^|\n):focus-visible\s*\{[^}]*outline-offset:\s*2px/)
-    // Must not globally kill the ring (WebKit default suppression lives elsewhere).
-    expect(css).not.toMatch(/(?:^|\n):focus-visible\s*\{[^}]*outline:\s*none/)
-  })
-
-  it('does not wrap the ProseMirror canvas in the global focus ring', () => {
-    expect(css).toMatch(/\.ProseMirror:focus-visible\s*\{[^}]*outline:\s*none/)
-  })
-
-  it('does not wrap text fields in the global focus ring', () => {
-    // Text fields suppress the OFFSET ring and draw a flush one instead (see
-    // "text fields paint a focus ring…"). `textarea` carries a
-    // `:not(.xj-input-bare)` guard so bare inputs keep their wrapper's ring.
-    expect(css).toMatch(
-      /input:not\([\s\S]*?\)\:focus-visible[\s\S]*?textarea[^{]*:focus-visible\s*\{[^}]*outline:\s*none/,
-    )
-    expect(css).not.toMatch(/select:focus-visible\s*\{[^}]*outline:\s*none/)
+  // Focus rings are deliberately removed app-wide (desktop feel — the WebView
+  // Tab ring reads as browser chrome). This guard protects the REMOVAL: a
+  // reviewer re-adding a ring "for a11y" breaks this test on purpose.
+  it('paints no focus ring anywhere', () => {
+    expect(css).toMatch(/(?:^|\n):focus-visible\s*\{[^}]*outline:\s*none/)
+    expect(css).not.toMatch(/(?:outline|box-shadow):[^;]*var\(--color-focus-ring\)/)
   })
 })
 
@@ -1920,32 +1903,6 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
       ),
     ]
     expect(clayFgInverse.map((m) => m[0].split('{')[0].trim())).toEqual([])
-  })
-
-  // WCAG 2.4.7: text fields suppress the global offset ring (it reads as a
-  // second box around the field), so they must paint their own indicator.
-  // Clay already did via its own inset ring; Signature and Clean painted
-  // nothing at all and left the blinking caret as the only focus signal.
-  it('text fields paint a focus ring instead of only suppressing the outline', () => {
-    const rule = cssCode.match(
-      /input:not\([^)]*\)[^{]*:focus-visible,\s*textarea[^{]*:focus-visible\s*\{([^}]*)\}/,
-    )
-    expect(rule, 'shared text-field focus rule not found').not.toBeNull()
-    expect(rule![1]).toMatch(/outline:\s*none/)
-    expect(rule![1]).toMatch(/box-shadow:[^;]*var\(--color-focus-ring\)/)
-  })
-
-  // `.xj-input-bare` marks a chrome-less input whose WRAPPER owns the border
-  // and the focus treatment (primitives.tsx `Input` draws `focus-within:border-accent`
-  // plus its own ring). Ringing the inner input too stacks a second concentric
-  // ring inside the first — the exact "second box around the field" the rule's
-  // own comment warns about. Clay already excludes it; the shared rule must too.
-  it('leaves bare inputs to their wrapper (no double ring)', () => {
-    const rule = cssCode.match(
-      /input:not\([^)]*\)[^{]*:focus-visible,\s*textarea[^{]*:focus-visible\s*\{[^}]*\}/,
-    )
-    expect(rule).not.toBeNull()
-    expect(rule![0]).toMatch(/:not\(\.xj-input-bare\)/)
   })
 
   // Clay light collapses panel-3 / selected-tab / elevated / surface-hi /

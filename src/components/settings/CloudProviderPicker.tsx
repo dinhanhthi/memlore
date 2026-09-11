@@ -72,7 +72,6 @@ export function CloudProviderPicker({
               onClick={() => onChange(kind)}
               className={cn(
                 'flex h-auto min-h-0 w-full flex-1 flex-col items-start justify-start gap-2 rounded-xl bg-transparent p-4 text-left whitespace-normal',
-                'focus-visible:ring-accent outline-none focus-visible:ring-2 focus-visible:ring-inset',
                 cardDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
               )}
             >

@@ -155,7 +155,7 @@ export function ForceRePairScreen({ onCompleted }: Props) {
               className={cn(
                 'border-border-default bg-app text-fg placeholder:text-fg-muted/50',
                 'w-full resize-none rounded-xl border px-4 py-3 text-sm',
-                'focus:border-accent/60 focus:ring-accent/30 focus:ring-2 focus:outline-none',
+                'focus:border-accent/60 focus:outline-none',
                 'transition-colors duration-(--motion-duration-base)',
                 'disabled:opacity-50',
               )}

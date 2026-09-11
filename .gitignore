@@ -86,3 +86,8 @@ run-ds-validate.sh
 !/docs/.gitkeep
 !/docs/mapkit-js-setup.md
 !/docs/gdrive-oauth-setup.md
+node_modules
+
+website/.hallmark/
+
+.hallmark/

@@ -1,4 +1,7 @@
 dist/
+website/.cache/
+website/test-results/
+website/playwright-report/
 node_modules/
 src-tauri/target/
 src-tauri/gen/
@@ -7,3 +10,4 @@ src-tauri/swift/**/.build/
 src-tauri/swift/**/.swiftpm/
 pnpm-lock.yaml
 *.gen.ts
+website/src/naturalEarthLand.ts

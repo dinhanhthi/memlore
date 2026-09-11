@@ -9,7 +9,7 @@ import { LIGHT_MODE_ENABLED } from './themeConfig'
  */
 export type DesignSystem = 'signature' | 'clean' | 'clay'
 
-export const DESIGN_SYSTEMS: readonly DesignSystem[] = ['signature', 'clean', 'clay']
+export const DESIGN_SYSTEMS: readonly DesignSystem[] = ['clay', 'clean', 'signature']
 
 export const DEFAULT_DESIGN_SYSTEM: DesignSystem = 'clay'
 

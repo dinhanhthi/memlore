@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/logo-with-container/logo-iOS-Default-256x256@2x.png" width="80" alt="Memlore logo" />
   <h1>Memlore</h1>
-  <p>Your personal lore, your life, remembered.<br />A cross-platform, privacy-first, local-first journal — with rich, optional AI.</p>
+  <p>A little life. A lasting story.<br />A cross-platform, privacy-first, local-first journal — with rich, optional AI.</p>
 </div>
 
 > [!WARNING]
