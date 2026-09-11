@@ -119,6 +119,27 @@ for (const viewport of VIEWPORTS) {
   })
 }
 
+test('CTA buttons stay fully rounded in every design system', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  await waitForDemoReady(page)
+  const download = page.locator('.hero .download')
+  const secondary = page.locator('.hero .button')
+  const picker = page.getByRole('radiogroup', { name: 'Design system for website and demo' })
+  for (const name of ['Clay', 'Clean', 'Signature'] as const) {
+    await picker.getByRole('radio', { name }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-design-system', name.toLowerCase())
+    const downloadPx = await download.evaluate((el) =>
+      parseFloat(getComputedStyle(el).borderRadius),
+    )
+    const secondaryPx = await secondary.evaluate((el) =>
+      parseFloat(getComputedStyle(el).borderRadius),
+    )
+    expect(downloadPx, `${name} primary radius`).toBe(9999)
+    expect(secondaryPx, `${name} secondary radius`).toBe(9999)
+  }
+})
+
 test('editor media pane shows file-type icons instead of body copy', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')

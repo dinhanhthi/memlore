@@ -111,10 +111,9 @@ function DownloadLink({
       target="_blank"
       rel="noreferrer"
       aria-label={ariaLabel}
+      data-variant="primary"
     >
-      <span className="download-mark" aria-hidden="true">
-        <Download className="size-4" />
-      </span>
+      <Download className="size-4" />
       <span>{label}</span>
     </a>
   )
@@ -488,6 +487,7 @@ function Demo() {
                     <button
                       type="button"
                       className="button"
+                      data-variant="secondary"
                       onClick={() => {
                         setStatus('loading')
                         setAttempt((value) => value + 1)
@@ -630,7 +630,7 @@ export default function LandingPage() {
                 label={hero.download}
                 ariaLabel={hero.downloadAria}
               />
-              <a className="button" href="#demo">
+              <a className="button" href="#demo" data-variant="secondary">
                 {hero.tryDemo} <ArrowDown className="size-4" />
               </a>
             </div>
@@ -908,7 +908,7 @@ export default function LandingPage() {
               label={footer.download}
               ariaLabel={footer.downloadAria}
             />
-            <a className="button" href="#demo">
+            <a className="button" href="#demo" data-variant="secondary">
               {footer.tryDemo}
             </a>
           </div>

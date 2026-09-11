@@ -63,6 +63,24 @@
   --radius-control: 8px;
   --radius-panel: 18px;
   --radius-pill: 999px;
+  --button-radius: 9999px;
+  --button-height-md: 2.25rem;
+  --button-height-lg: 2.75rem;
+  --button-font-weight: 600;
+  --button-letter-spacing: -0.1px;
+  --button-motion: var(--dur-micro);
+  --button-rise: 0px;
+  --button-primary-bg: var(--color-accent);
+  --button-primary-fg: var(--color-accent-ink);
+  --button-primary-lip: var(--color-accent-deep);
+  --button-primary-shadow: none;
+  --button-secondary-bg: color-mix(in oklch, var(--color-ink) 12%, var(--color-raised));
+  --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 18%, var(--color-raised));
+  --button-secondary-fg: var(--color-ink);
+  --button-secondary-shadow: none;
+  --button-selected-bg: color-mix(in oklch, var(--color-accent) 18%, var(--color-raised));
+  --button-selected-fg: var(--color-accent);
+  --button-selected-border: color-mix(in oklch, var(--color-accent) 40%, transparent);
   --rule-width: 1px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
@@ -81,6 +99,8 @@
   --font-display: 'Geist Variable', sans-serif;
   --radius-control: 4px;
   --radius-panel: 8px;
+  --button-font-weight: 500;
+  --button-letter-spacing: 0;
   --color-paper: oklch(13% 0.012 35);
   --color-panel: oklch(18% 0.012 35);
   --color-raised: oklch(22% 0.012 35);
@@ -89,6 +109,24 @@
   color-scheme: dark;
   --radius-control: 18px;
   --radius-panel: 28px;
+  --button-font-weight: 600;
+  --button-letter-spacing: 0.01em;
+  --button-motion: 280ms cubic-bezier(0.2, 0, 0, 1);
+  --button-rise: 4px;
+  --button-primary-bg: oklch(from var(--color-accent) 0.52 c h);
+  --button-primary-fg: oklch(100% 0 0);
+  --button-primary-lip: oklch(from var(--color-accent) 0.34 c h);
+  --button-primary-shadow:
+    0 var(--button-rise) 0 0 var(--button-primary-lip),
+    0 calc(var(--button-rise) + 8px) 18px var(--color-shadow);
+  --button-secondary-bg: var(--color-raised);
+  --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 8%, var(--color-raised));
+  --button-secondary-shadow:
+    0 var(--button-rise) 0 0 color-mix(in oklch, var(--color-ink) 16%, var(--color-panel)),
+    0 calc(var(--button-rise) + 8px) 18px var(--color-shadow);
+  --button-selected-bg: var(--button-primary-bg);
+  --button-selected-fg: var(--button-primary-fg);
+  --button-selected-border: transparent;
   --color-paper: oklch(16% 0.024 35);
   --color-panel: oklch(22% 0.028 40);
   --color-raised: oklch(27% 0.03 40);

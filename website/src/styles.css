@@ -264,44 +264,81 @@ footer {
 .doc-menu p a {
   text-decoration: underline;
 }
-.download {
+.download,
+.button {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 6px 16px 6px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-ink);
-  color: var(--color-paper);
-  font-size: var(--text-small);
-  font-weight: 600;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--button-height-lg);
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: var(--button-radius);
+  font-size: 1rem;
+  font-weight: var(--button-font-weight);
+  letter-spacing: var(--button-letter-spacing);
+  line-height: 1;
   white-space: nowrap;
-  box-shadow: 0 12px 28px var(--color-shadow);
+  text-decoration: none;
+  cursor: pointer;
   transition:
-    transform var(--dur-short) var(--ease-out),
-    background-color var(--dur-short) var(--ease-out);
+    transform var(--button-motion),
+    box-shadow var(--button-motion),
+    background-color var(--button-motion),
+    filter var(--button-motion);
 }
-.download-mark {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-accent-ink);
+.download {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  box-shadow: var(--button-primary-shadow);
 }
-.download-hero {
-  min-height: 52px;
-  padding-right: 18px;
+.button {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
+  box-shadow: var(--button-secondary-shadow);
+  font-weight: 500;
+}
+.header-actions .download {
+  min-height: var(--button-height-md);
+  padding: 0 1rem;
+  font-size: var(--text-small);
+}
+.demo-status .button {
+  min-height: var(--button-height-md);
+  font-size: var(--text-small);
+}
+.download:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
   .download:hover {
-    transform: translateY(-1.5px);
-    background: color-mix(in oklch, var(--color-ink) 88%, var(--color-accent));
+    filter: brightness(1.07);
+  }
+  .button:hover {
+    background: var(--button-secondary-bg-hover);
   }
 }
-.download:active {
-  transform: translateY(1px);
+.download:active,
+.button:active {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+}
+:root[data-design-system='clay'] .download:hover,
+:root[data-design-system='clay'] .button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+:root[data-design-system='clay'] .download:active,
+:root[data-design-system='clay'] .button:active {
+  transform: translateY(var(--button-rise));
+  filter: brightness(0.97);
+}
+:root[data-design-system='clay'] .download:active {
+  box-shadow:
+    0 0 0 0 var(--button-primary-lip),
+    0 2px 8px var(--color-shadow);
 }
 .hero {
   padding: 72px 0 96px;
@@ -343,33 +380,6 @@ footer {
   align-items: center;
   gap: 16px;
   margin-top: 28px;
-}
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 12px 18px;
-  border: var(--rule-width) solid var(--color-rule);
-  border-radius: var(--radius-pill);
-  background: var(--color-raised);
-  color: var(--color-ink);
-  white-space: nowrap;
-  font-size: var(--text-small);
-  font-weight: 550;
-  transition:
-    transform var(--dur-micro) var(--ease-out),
-    background-color var(--dur-short) var(--ease-out);
-}
-@media (hover: hover) and (pointer: fine) {
-  .button:hover {
-    background: var(--color-panel);
-    transform: translateY(-1.5px);
-  }
-}
-.button:active {
-  transform: translateY(1px);
 }
 .button:disabled,
 .button[data-state='loading'] {
@@ -459,15 +469,15 @@ footer {
   font-style: italic;
   font-size: 1.2rem;
   font-weight: 550;
-  line-height: 1.25;
+  line-height: 2.25;
   text-align: left;
   text-wrap: balance;
   pointer-events: none;
 }
 .demo-cue-arrow {
   position: absolute;
-  left: 4px;
-  top: 1.05em;
+  left: 50%;
+  top: 2.05em;
   width: 64px;
   height: auto;
   overflow: visible;
@@ -601,7 +611,6 @@ footer {
   gap: 10px;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
 }
 .option-row {
   display: flex;
@@ -619,23 +628,29 @@ footer {
   gap: 6px;
   border: var(--rule-width) solid var(--color-rule);
   background: var(--color-panel);
-  color: var(--color-ink);
-  padding: 4px 10px;
-  min-height: 32px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
+  color: var(--color-muted);
+  padding: 4px 14px;
+  min-height: 1.75rem;
+  border-radius: var(--button-radius);
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
+  box-shadow: var(--button-secondary-shadow);
   transition:
-    background-color var(--dur-short) var(--ease-out),
-    color var(--dur-short) var(--ease-out),
-    border-color var(--dur-short) var(--ease-out);
+    background-color var(--button-motion),
+    color var(--button-motion),
+    border-color var(--button-motion),
+    box-shadow var(--button-motion);
 }
 .option-row button[aria-pressed='true'],
 .option-row button[aria-checked='true'] {
-  background: var(--color-raised);
-  border-color: var(--color-accent);
-  color: var(--color-ink);
+  background: var(--button-selected-bg);
+  border-color: var(--button-selected-border);
+  color: var(--button-selected-fg);
+}
+:root[data-design-system='clay'] .option-row button[aria-pressed='true'],
+:root[data-design-system='clay'] .option-row button[aria-checked='true'] {
+  box-shadow: 0 3px 0 0 var(--button-primary-lip);
 }
 @media (hover: hover) and (pointer: fine) {
   .option-row button:hover:not(:disabled) {
@@ -1683,7 +1698,7 @@ footer {
     font-size: 11px;
     padding: 4px 8px;
   }
-  .download-hero span:last-child,
+  .hero .download span:last-child,
   .header-actions .download span:last-child {
     max-width: 7.5rem;
   }
@@ -1701,8 +1716,13 @@ footer {
   .download:hover,
   .button:hover,
   .download:active,
-  .button:active {
+  .button:active,
+  :root[data-design-system='clay'] .download:hover,
+  :root[data-design-system='clay'] .button:hover,
+  :root[data-design-system='clay'] .download:active,
+  :root[data-design-system='clay'] .button:active {
     transform: none;
+    filter: none;
   }
   .demo-window {
     transform: none;
