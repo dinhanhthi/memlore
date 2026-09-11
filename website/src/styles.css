@@ -313,8 +313,10 @@ footer {
   outline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .download:hover {
-    filter: brightness(1.07);
+  .download:hover,
+  .button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
   }
   .button:hover {
     background: var(--button-secondary-bg-hover);
@@ -322,20 +324,10 @@ footer {
 }
 .download:active,
 .button:active {
-  transform: scale(0.98);
-  filter: brightness(0.95);
-}
-:root[data-design-system='clay'] .download:hover,
-:root[data-design-system='clay'] .button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.05);
-}
-:root[data-design-system='clay'] .download:active,
-:root[data-design-system='clay'] .button:active {
   transform: translateY(var(--button-rise));
   filter: brightness(0.97);
 }
-:root[data-design-system='clay'] .download:active {
+.download:active {
   box-shadow:
     0 0 0 0 var(--button-primary-lip),
     0 2px 8px var(--color-shadow);
@@ -606,55 +598,56 @@ footer {
 }
 .option-badges {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   max-width: 100%;
   min-width: 0;
+  overflow: visible;
+  padding-block: 2px;
 }
 .option-row {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 0;
+  min-width: 0;
 }
-.option-badges .option-row + .option-row {
-  padding-inline-start: 10px;
-  border-inline-start: var(--rule-width) solid var(--color-rule);
+@media (min-width: 68rem) {
+  .option-badges .option-row + .option-row {
+    padding-inline-start: 10px;
+    border-inline-start: var(--rule-width) solid var(--color-rule);
+  }
 }
 .option-row button {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: var(--rule-width) solid var(--color-rule);
-  background: var(--color-panel);
-  color: var(--color-muted);
+  border: var(--rule-width) solid color-mix(in oklch, var(--color-ink) 28%, transparent);
+  background: color-mix(in oklch, var(--color-ink) 12%, var(--color-raised));
+  color: var(--color-ink);
   padding: 4px 14px;
   min-height: 1.75rem;
   border-radius: var(--button-radius);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 550;
   white-space: nowrap;
-  box-shadow: var(--button-secondary-shadow);
+  box-shadow: none;
   transition:
     background-color var(--button-motion),
     color var(--button-motion),
-    border-color var(--button-motion),
-    box-shadow var(--button-motion);
+    border-color var(--button-motion);
 }
 .option-row button[aria-pressed='true'],
 .option-row button[aria-checked='true'] {
   background: var(--button-selected-bg);
   border-color: var(--button-selected-border);
   color: var(--button-selected-fg);
-}
-:root[data-design-system='clay'] .option-row button[aria-pressed='true'],
-:root[data-design-system='clay'] .option-row button[aria-checked='true'] {
-  box-shadow: 0 3px 0 0 var(--button-primary-lip);
+  box-shadow: none;
 }
 @media (hover: hover) and (pointer: fine) {
   .option-row button:hover:not(:disabled) {
-    background: var(--color-raised);
+    background: color-mix(in oklch, var(--color-ink) 18%, var(--color-raised));
   }
 }
 .theme-dot {
@@ -1507,13 +1500,7 @@ footer {
 .skip-link:focus {
   transform: translateY(0);
 }
-:root[data-design-system='clay'] .demo-window,
-:root[data-design-system='clay'] .open-section,
-:root[data-design-system='clay'] .illust:not(.illust-locks) {
-  box-shadow:
-    inset 0 2px 0 var(--color-rule),
-    0 16px 32px var(--color-shadow);
-}
+
 @media (min-width: 90rem) {
   .hero {
     padding-top: 96px;
@@ -1716,11 +1703,7 @@ footer {
   .download:hover,
   .button:hover,
   .download:active,
-  .button:active,
-  :root[data-design-system='clay'] .download:hover,
-  :root[data-design-system='clay'] .button:hover,
-  :root[data-design-system='clay'] .download:active,
-  :root[data-design-system='clay'] .button:active {
+  .button:active {
     transform: none;
     filter: none;
   }

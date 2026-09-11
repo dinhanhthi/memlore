@@ -119,16 +119,80 @@ for (const viewport of VIEWPORTS) {
   })
 }
 
-test('CTA buttons stay fully rounded in every design system', async ({ page }) => {
+const THEME_PICKER = 'Design system for the demo'
+
+type LandingChrome = {
+  paper: string
+  panel: string
+  raised: string
+  radiusPanel: string
+  radiusControl: string
+  buttonRise: string
+  buttonPrimaryShadow: string
+  headingFont: string
+  bodyFont: string
+  balooLoaded: boolean
+  frauncesLoaded: boolean
+  designSystem: string
+}
+
+async function readLandingChrome(page: Page): Promise<LandingChrome> {
+  return page.evaluate(async () => {
+    await document.fonts.ready
+    const root = getComputedStyle(document.documentElement)
+    const heading = document.querySelector('h1')
+    return {
+      paper: root.getPropertyValue('--color-paper').trim(),
+      panel: root.getPropertyValue('--color-panel').trim(),
+      raised: root.getPropertyValue('--color-raised').trim(),
+      radiusPanel: root.getPropertyValue('--radius-panel').trim(),
+      radiusControl: root.getPropertyValue('--radius-control').trim(),
+      buttonRise: root.getPropertyValue('--button-rise').trim(),
+      buttonPrimaryShadow: root.getPropertyValue('--button-primary-shadow').trim(),
+      headingFont: heading ? getComputedStyle(heading).fontFamily : '',
+      bodyFont: getComputedStyle(document.body).fontFamily,
+      balooLoaded: document.fonts.check('16px "Baloo 2 Variable"'),
+      frauncesLoaded: document.fonts.check('16px "Fraunces Variable"'),
+      designSystem: document.documentElement.getAttribute('data-design-system') ?? '',
+    }
+  })
+}
+
+function cssOklch(value: string) {
+  return value.replace(/(\s)0\./g, '$1.')
+}
+
+function expectHybridLandingChrome(chrome: LandingChrome) {
+  expect(cssOklch(chrome.paper), 'Clean paper').toBe('oklch(13% .012 35)')
+  expect(cssOklch(chrome.panel), 'Clean panel').toBe('oklch(18% .012 35)')
+  expect(cssOklch(chrome.raised), 'Clean raised').toBe('oklch(22% .012 35)')
+  expect(chrome.radiusPanel, 'Clay panel radius').toBe('28px')
+  expect(chrome.radiusControl, 'Clay control radius').toBe('18px')
+  expect(chrome.buttonRise, 'Clay button rise').toBe('4px')
+  expect(chrome.buttonPrimaryShadow, 'Clay button shadow').not.toBe('none')
+  expect(chrome.headingFont, 'Clay heading font').toMatch(/Fraunces/i)
+  expect(chrome.bodyFont, 'Clay body font').toMatch(/Baloo 2/i)
+  expect(chrome.balooLoaded, 'Baloo 2 face must be loaded').toBe(true)
+  expect(chrome.frauncesLoaded, 'Fraunces face must be loaded').toBe(true)
+  expect(chrome.designSystem, 'landing html must not switch skins').toBe('')
+}
+
+test('CTA buttons stay fully rounded while the picker restyles only the demo', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await waitForDemoReady(page)
   const download = page.locator('.hero .download')
   const secondary = page.locator('.hero .button')
-  const picker = page.getByRole('radiogroup', { name: 'Design system for website and demo' })
+  const picker = page.getByRole('radiogroup', { name: THEME_PICKER })
+  const frameHtml = demoFrame(page).locator('html')
+  const before = await readLandingChrome(page)
+  expectHybridLandingChrome(before)
   for (const name of ['Clay', 'Clean', 'Signature'] as const) {
     await picker.getByRole('radio', { name }).click()
-    await expect(page.locator('html')).toHaveAttribute('data-design-system', name.toLowerCase())
+    await expect(frameHtml).toHaveClass(new RegExp(`\\bds-${name.toLowerCase()}\\b`))
+    expectHybridLandingChrome(await readLandingChrome(page))
     const downloadPx = await download.evaluate((el) =>
       parseFloat(getComputedStyle(el).borderRadius),
     )
@@ -138,6 +202,36 @@ test('CTA buttons stay fully rounded in every design system', async ({ page }) =
     expect(downloadPx, `${name} primary radius`).toBe(9999)
     expect(secondaryPx, `${name} secondary radius`).toBe(9999)
   }
+  expect(await readLandingChrome(page)).toEqual(before)
+})
+
+test('demo option badges stay bright and unclipped at the bottom', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  await waitForDemoReady(page)
+  const tour = page.getByRole('group', { name: 'Explore the demo' })
+  const selected = tour.getByRole('button', { pressed: true })
+  const idle = tour.getByRole('button', { pressed: false }).first()
+  const ink = await page.locator('h1').evaluate((el) => getComputedStyle(el).color)
+  const muted = await page.locator('.hero-description').evaluate((el) => getComputedStyle(el).color)
+  const idleColor = await idle.evaluate((el) => getComputedStyle(el).color)
+  expect(idleColor, 'idle badge text should use ink, not muted').toBe(ink)
+  expect(idleColor, 'idle badge text should not be muted').not.toBe(muted)
+  expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
+  expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
+  const rowBox = await page.locator('.option-badges').boundingBox()
+  const idleBox = await idle.boundingBox()
+  const selectedBox = await selected.boundingBox()
+  expect(rowBox, 'option badges should have a box').toBeTruthy()
+  expect(idleBox, 'idle badge should have a box').toBeTruthy()
+  expect(selectedBox, 'selected badge should have a box').toBeTruthy()
+  expect(idleBox!.y + idleBox!.height, 'idle badge clipped at the bottom').toBeLessThanOrEqual(
+    rowBox!.y + rowBox!.height + 1,
+  )
+  expect(
+    selectedBox!.y + selectedBox!.height,
+    'selected badge clipped at the bottom',
+  ).toBeLessThanOrEqual(rowBox!.y + rowBox!.height + 1)
 })
 
 test('editor media pane shows file-type icons instead of body copy', async ({ page }) => {
@@ -151,12 +245,15 @@ test('editor media pane shows file-type icons instead of body copy', async ({ pa
   await expect(pane).not.toContainText('Photos, video, and voice memos')
 })
 
-test('demo Settings design system syncs landing data-design-system', async ({ page }) => {
+test('demo Settings restyles the iframe only', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await waitForDemoReady(page)
-  const html = page.locator('html')
   const frame = demoFrame(page)
+  const frameHtml = frame.locator('html')
+  const picker = page.getByRole('radiogroup', { name: THEME_PICKER })
+  const before = await readLandingChrome(page)
+  expectHybridLandingChrome(before)
 
   await frame.getByRole('button', { name: 'Settings' }).first().click()
   await frame.getByRole('tab', { name: 'Appearance' }).click()
@@ -167,39 +264,17 @@ test('demo Settings design system syncs landing data-design-system', async ({ pa
   ] as const
   for (const system of systems) {
     await frame.getByRole('radio', { name: system.name }).click()
-    await expect(html).toHaveAttribute('data-design-system', system.id)
-    await expect
-      .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
-      .toBe('dark')
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.style.colorScheme))
-      .toBe('dark')
-  }
-})
-
-test('theme selector syncs landing data-design-system and demo ds-* class', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 })
-  await page.goto('/')
-  await waitForDemoReady(page)
-  const html = page.locator('html')
-  const frameHtml = demoFrame(page).locator('html')
-  const picker = page.getByRole('radiogroup', { name: 'Design system for website and demo' })
-
-  for (const system of [
-    { id: 'clay', name: 'Clay' },
-    { id: 'clean', name: 'Clean' },
-    { id: 'signature', name: 'Signature' },
-  ] as const) {
-    await picker.getByRole('radio', { name: system.name }).click()
-    await expect(html).toHaveAttribute('data-design-system', system.id)
-    await expect
-      .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
-      .toBe('dark')
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.style.colorScheme))
-      .toBe('dark')
     await expect(frameHtml).toHaveClass(new RegExp(`\\bds-${system.id}\\b`))
+    await expect(picker.getByRole('radio', { name: new RegExp(system.id, 'i') })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    expectHybridLandingChrome(await readLandingChrome(page))
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
+      .toBe('dark')
   }
+  expect(await readLandingChrome(page)).toEqual(before)
 })
 
 test('guided demo actions navigate the iframe and reset restores write', async ({ page }) => {

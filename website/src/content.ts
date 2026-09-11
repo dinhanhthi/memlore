@@ -44,7 +44,7 @@ export const demo = {
   cue: 'Click around. It works like the real app.',
   optionsTitle: 'Scenes and skins',
   tourAria: 'Explore the demo',
-  themeAria: 'Design system for website and demo',
+  themeAria: 'Design system for the demo',
   themes: {
     clay: 'Clay',
     clean: 'Clean',

@@ -414,8 +414,6 @@ function Demo() {
   const [view, setView] = useState<DemoView>('write')
   const themeRef = useRef(theme)
   useEffect(() => {
-    document.documentElement.dataset.designSystem = theme
-    document.documentElement.style.colorScheme = 'dark'
     themeRef.current = theme
   }, [theme])
   useEffect(() => {

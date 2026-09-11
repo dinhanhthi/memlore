@@ -12,7 +12,7 @@ import {
 } from '../src/demoBridge'
 import type { DemoCommand } from '../src/demoBridge'
 
-it('defaults the landing and demo to Clay', () => {
+it('defaults the demo to Clay', () => {
   expect(DEFAULT_DESIGN_SYSTEM).toBe('clay')
 })
 

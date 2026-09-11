@@ -172,6 +172,15 @@ it('tells visitors the demo window is clickable like the real app', () => {
   expect(demo.cue.toLowerCase()).toMatch(/real app/)
 })
 
+it('scopes the design-system picker to the demo, not the landing chrome', () => {
+  expect(demo.themeAria.toLowerCase()).toMatch(/demo/)
+  expect(demo.themeAria.toLowerCase()).not.toMatch(/website/)
+})
+
+it('does not stamp a live design-system attribute on the landing html', () => {
+  expect(websiteIndex).not.toMatch(/data-design-system/)
+})
+
 it('keeps demo limitations visible for sample data and simulated AI, locks, and sync', () => {
   const disclaimer = demo.disclaimer.toLowerCase()
   expect(disclaimer).toMatch(/sample/)
