@@ -740,9 +740,11 @@ footer {
   border-radius: 5px 5px 3px 3px;
 }
 .demo-disclaimer {
+  position: relative;
+  z-index: calc(var(--z-raised) + 1);
   margin: 10px 0 0;
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-ink);
   transform-origin: 50% 50%;
   transition: transform var(--dur-long) var(--ease-out);
 }

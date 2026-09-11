@@ -414,6 +414,22 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   const mockupTransform = await mockup.evaluate((el) => getComputedStyle(el).transform)
   const textTransform = await disclaimer.evaluate((el) => getComputedStyle(el).transform)
   expect(textTransform, 'disclaimer should stay parallel to the mockup').toBe(mockupTransform)
+  const textLum = await relativeLuminance(disclaimer, 'color')
+  const mutedLum = await relativeLuminance(page.locator('.hero-description'), 'color')
+  expect(textLum, 'disclaimer should read lighter than muted body copy').toBeGreaterThan(mutedLum)
+  const stacking = await page.evaluate(() => {
+    const windowEl = document.querySelector('.demo-window')
+    const text = document.querySelector('.demo-disclaimer')
+    if (!(windowEl instanceof HTMLElement) || !(text instanceof HTMLElement)) return null
+    return {
+      windowZ: Number.parseFloat(getComputedStyle(windowEl).zIndex) || 0,
+      textZ: Number.parseFloat(getComputedStyle(text).zIndex) || 0,
+    }
+  })
+  expect(stacking, 'mockup and disclaimer should exist').toBeTruthy()
+  expect(stacking!.textZ, 'disclaimer must sit above the mockup shadow').toBeGreaterThan(
+    stacking!.windowZ,
+  )
 })
 
 test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
