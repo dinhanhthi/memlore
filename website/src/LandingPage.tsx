@@ -27,6 +27,7 @@ import {
   MessageSquareQuote,
   Mic,
   Monitor,
+  Plus,
   ScanSearch,
   Shield,
   Smartphone,
@@ -154,7 +155,7 @@ function EncryptFigure() {
       <div className="encrypt-scene">
         <article className="encrypt-card">
           <div className="encrypt-card-body">
-            <FileText className="size-8" />
+            <FileText className="size-10" />
           </div>
           <small>{encrypt.figure.words}</small>
         </article>
@@ -169,7 +170,7 @@ function EncryptFigure() {
         <EncryptArrow />
         <article className="encrypt-card">
           <div className="encrypt-card-body">
-            <Shield className="size-8" />
+            <Shield className="size-10" />
           </div>
           <small>{encrypt.figure.sealed}</small>
         </article>
@@ -235,9 +236,41 @@ function MediaFiles() {
   )
 }
 
+function SlashPreview() {
+  return (
+    <div className="ed-slash-menu">
+      <span className="ed-slash-prompt">/</span>
+      <div className="ed-slash-list">
+        {editor.slashItems.map((item) => (
+          <div key={item.label} className="ed-slash-item">
+            <span>{item.label}</span>
+            {item.hint ? <span className="ed-slash-hint">{item.hint}</span> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MarkdownPreview() {
+  return <pre className="ed-md">{editor.markdownSample}</pre>
+}
+
+function PluginsPreview({ sample }: { sample: string }) {
+  return (
+    <div className="ed-plugins-row">
+      <Plus className="size-5" strokeWidth={1.75} />
+      <p>{sample}</p>
+    </div>
+  )
+}
+
 function paneSample(pane: (typeof editor.panes)[number]) {
   if (pane.id === 'math') return <EulerIdentity />
   if (pane.id === 'media') return <MediaFiles />
+  if (pane.id === 'slash') return <SlashPreview />
+  if (pane.id === 'markdown') return <MarkdownPreview />
+  if (pane.id === 'plugins') return <PluginsPreview sample={pane.sample} />
   return <p>{pane.sample}</p>
 }
 
@@ -246,7 +279,10 @@ function EditorFigure() {
     <figure className="illust illust-editor" aria-hidden="true">
       {editor.panes.map((pane) => (
         <div key={pane.id} className={`ed-pane ed-${pane.id}`}>
-          <small>{pane.title}</small>
+          <small>
+            {pane.title}
+            {'tag' in pane ? <span className="ed-tag">{pane.tag}</span> : null}
+          </small>
           {paneSample(pane)}
         </div>
       ))}
@@ -460,11 +496,7 @@ function Demo() {
               {demo.themeAria}
               <ArrowRight className="size-3" aria-hidden="true" />
             </p>
-            <div
-              className="option-row"
-              role="radiogroup"
-              aria-labelledby="demo-appearance-label"
-            >
+            <div className="option-row" role="radiogroup" aria-labelledby="demo-appearance-label">
               {(
                 [
                   ['clay', demo.themes.clay],

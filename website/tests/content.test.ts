@@ -130,6 +130,17 @@ it('explains encryption for a non-technical reader', () => {
   expect(copy).not.toMatch(/argon2|aes-256|sqlcipher|ciphertext|zeroize/)
 })
 
+it('names the editor and lists slash commands, GFM, and later plugins', () => {
+  expect(editor.title.toLowerCase()).toMatch(/editor/)
+  expect(editor.panes.map((pane) => pane.id)).toEqual(
+    expect.arrayContaining(['slash', 'markdown', 'plugins']),
+  )
+  const copy = collectStrings(editor).join('\n').toLowerCase()
+  expect(copy).toMatch(/slash/)
+  expect(copy).toMatch(/github flavored markdown|\bgfm\b/)
+  expect(copy).toMatch(/plugin/)
+})
+
 it('covers the required feature themes from real product capabilities', () => {
   const copy = [
     ...collectStrings(hero),

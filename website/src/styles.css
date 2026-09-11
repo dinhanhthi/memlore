@@ -147,6 +147,10 @@ svg {
   width: 2rem;
   height: 2rem;
 }
+.size-10 {
+  width: 2.5rem;
+  height: 2.5rem;
+}
 .size-16 {
   width: 4rem;
   height: 4rem;
@@ -212,7 +216,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 28px;
-  font-size: var(--text-small);
+  font-size: var(--text-md);
 }
 .site-header nav > a,
 .doc-menu summary {
@@ -404,7 +408,7 @@ footer {
   align-items: end;
 }
 .release-note {
-  font-size: var(--text-small);
+  font-size: var(--text-md);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -912,6 +916,7 @@ footer {
   margin-top: 8px;
   color: var(--color-muted);
   font-size: var(--text-small);
+  max-width: 100% !important;
 }
 @keyframes encrypt-dash {
   to {
@@ -953,19 +958,23 @@ footer {
   color: var(--color-ink);
 }
 .illust-locks article[data-lock='second'] {
+  border-style: double;
+  border-width: 5px;
   background: color-mix(in oklch, var(--color-ink) 10%, transparent);
 }
 .illust-locks article[data-lock='invisible'] {
   border-style: dashed;
+  border-width: 3px;
   background: color-mix(in oklch, var(--color-ink) 5%, transparent);
 }
 .illust-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
 }
 .ed-pane {
   min-width: 0;
+  min-height: 92px;
   padding: 14px;
   border-radius: var(--radius-control);
   background: var(--color-raised);
@@ -979,9 +988,76 @@ footer {
 .ed-pane p {
   font-size: 14px;
   color: var(--color-ink);
+  max-width: none;
 }
 .ed-code p {
   font-family: var(--font-mono);
+}
+.ed-tag {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+.ed-slash-menu {
+  display: grid;
+  gap: 8px;
+}
+.ed-slash-prompt {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--color-ink) 12%, var(--color-raised));
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  color: var(--color-accent);
+}
+.ed-slash-list {
+  display: grid;
+  gap: 4px;
+}
+.ed-slash-item {
+  display: flex;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.ed-slash-hint {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.ed-md {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ed-plugins {
+  grid-column: 1 / -1;
+  min-height: 0;
+  border: 2px dashed color-mix(in oklch, var(--color-ink) 22%, transparent);
+  background: color-mix(in oklch, var(--color-ink) 4%, var(--color-raised));
+}
+.ed-plugins-row {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+}
+.ed-plugins-row svg {
+  margin-top: 2px;
+  color: var(--color-accent);
+}
+.ed-plugins-row p {
+  margin: 0;
 }
 .ed-math-eq {
   margin: 0;

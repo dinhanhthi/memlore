@@ -79,29 +79,35 @@ export const encrypt = {
 
 export const locks = {
   title: 'Three locks. Three different silences.',
-  body: 'Privacy is not a single switch. Memlore stacks an app lock, a second lock for chosen entries, and an invisible vault that is not there until the right password is spoken.',
+  body: 'You can lock entries in 3 different ways.',
   items: [
     {
       id: 'app' as const,
       title: 'App lock',
-      text: 'The journal will not open until the password — or Touch ID — lets it. This lock is not optional.',
+      text: 'The journal only opens with the password or Touch ID. This lock is required and protects it from unauthorized access.',
     },
     {
       id: 'second' as const,
       title: 'Second lock',
-      text: 'Chosen entries sit behind an extra password. Unlocking the app is not enough to read them.',
+      text: 'To keep some entries private, add a second lock. Others with app access will know private entries exist, but cannot open them.',
     },
     {
       id: 'invisible' as const,
       title: 'Invisible vault',
-      text: 'Separate vaults vanish from lists, search, and calendars until you enter the vault password.',
+      text: 'If you need entries to stay completely invisible and private, even from people who can unlock the app, they won’t know these entries exist.',
     },
   ],
 }
 
 export const editor = {
-  title: 'A quiet page that can still hold a lot.',
-  body: 'The editor holds many kinds of input. Convenient to use, and a pleasure to look at.',
+  title: 'The editor. A quiet page that still holds a lot.',
+  body: 'Slash commands and GitHub Flavored Markdown sit beside words, math, code, and media — and more plugins can land later.',
+  slashItems: [
+    { label: 'Heading 1', hint: '#' },
+    { label: 'Image' },
+    { label: 'Today' },
+  ] satisfies { label: string; hint?: string }[],
+  markdownSample: '**Tuesday**\n- [x] coffee\n- [ ] the walk',
   panes: [
     {
       id: 'text' as const,
@@ -118,6 +124,22 @@ export const editor = {
       id: 'media' as const,
       title: 'Media',
       sample: 'Photos, video, and voice memos, kept with the entry.',
+    },
+    {
+      id: 'slash' as const,
+      title: 'Slash command',
+      sample: 'Type / for a heading, image, or today’s date.',
+    },
+    {
+      id: 'markdown' as const,
+      title: 'Markdown',
+      tag: 'GFM',
+      sample: 'GitHub Flavored Markdown. Type it, paste it, keep it.',
+    },
+    {
+      id: 'plugins' as const,
+      title: 'More plugins later',
+      sample: 'The page can grow. More editor plugins can land without changing how you write.',
     },
   ],
 }

@@ -177,9 +177,7 @@ function expectHybridLandingChrome(chrome: LandingChrome) {
   expect(chrome.designSystem, 'landing html must not switch skins').toBe('')
 }
 
-test('CTA buttons stay fully rounded while the picker restyles only the demo', async ({
-  page,
-}) => {
+test('CTA buttons stay fully rounded while the picker restyles only the demo', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   await waitForDemoReady(page)
@@ -205,9 +203,7 @@ test('CTA buttons stay fully rounded while the picker restyles only the demo', a
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
-test('download CTAs have a dark face, light label, and traveling border glow', async ({
-  page,
-}) => {
+test('download CTAs have a dark face, light label, and traveling border glow', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   const hero = page.locator('.hero .download')
@@ -301,6 +297,28 @@ test('editor media pane shows file-type icons instead of body copy', async ({ pa
   await expect(pane).not.toContainText('Photos, video, and voice memos')
 })
 
+test('editor section names the editor and shows slash, markdown, and later plugins', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const section = page.locator('#editor')
+  await expect(section.getByRole('heading', { level: 2 })).toContainText(/editor/i)
+  const slash = page.locator('.ed-slash')
+  await expect(slash).toBeVisible()
+  await expect(slash.locator('.ed-slash-prompt')).toHaveText('/')
+  await expect(slash).toContainText('Heading 1')
+  const markdown = page.locator('.ed-markdown')
+  await expect(markdown).toBeVisible()
+  await expect(markdown.locator('.ed-tag')).toHaveText('GFM')
+  await expect(markdown.locator('.ed-md')).toContainText('**Tuesday**')
+  await expect(markdown.locator('.ed-md')).toContainText('- [x] coffee')
+  const plugins = page.locator('.ed-plugins')
+  await expect(plugins).toBeVisible()
+  await expect(plugins).toContainText(/plugin/i)
+  await expect(plugins).toContainText(/later/i)
+})
+
 test('demo Settings restyles the iframe only', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
@@ -374,9 +392,10 @@ test('demo skins sit at the mockup top-left with Open separately', async ({ page
   expect(openBox!.x, 'Open separately should sit beside the skins').toBeGreaterThan(
     clayBox!.x + clayBox!.width,
   )
-  expect(Math.abs(openBox!.y - clayBox!.y), 'Open separately should share the skins row').toBeLessThan(
-    12,
-  )
+  expect(
+    Math.abs(openBox!.y - clayBox!.y),
+    'Open separately should share the skins row',
+  ).toBeLessThan(12)
   expect(clayBox!.height, 'skin badges should be smaller').toBeLessThanOrEqual(28)
   const fontSize = await picker
     .getByRole('radio', { name: 'Clay' })
@@ -394,7 +413,11 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
     const stage = document.querySelector('.demo-stage')
     const windowEl = document.querySelector('.demo-window')
     const text = document.querySelector('.demo-disclaimer')
-    if (!(stage instanceof HTMLElement) || !(windowEl instanceof HTMLElement) || !(text instanceof HTMLElement)) {
+    if (
+      !(stage instanceof HTMLElement) ||
+      !(windowEl instanceof HTMLElement) ||
+      !(text instanceof HTMLElement)
+    ) {
       return null
     }
     return {

@@ -17,7 +17,7 @@
   --color-panel: oklch(18% 0.012 35);
   --color-raised: oklch(22% 0.012 35);
   --color-rule: oklch(32% 0.02 35);
-  --color-ink: oklch(96% 0.014 75);
+  --color-ink: oklch(1 0 0);
   --color-muted: oklch(76% 0.028 65);
   --color-accent: oklch(76% 0.093 73);
   --color-accent-deep: oklch(66% 0.095 66);
@@ -44,7 +44,8 @@
   --font-wordmark: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
   --text-xs: 0.75rem;
-  --text-small: 0.875rem;
+  --text-small: 0.92rem;
+  --text-md: 1rem;
   --text-base: 1.125rem;
   --text-lead: 1.25rem;
   --text-heading: clamp(2rem, 3.4vw, 3rem);
@@ -108,4 +109,3 @@
   --z-sticky: 200;
   --z-sticky-nav: 300;
 }
-
