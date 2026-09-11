@@ -85,6 +85,7 @@
   --button-selected-bg: var(--button-primary-bg);
   --button-selected-fg: var(--button-primary-fg);
   --button-selected-border: transparent;
+  --download-glow-hot: color-mix(in oklch, var(--color-accent) 40%, white);
   --rule-width: 1px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);

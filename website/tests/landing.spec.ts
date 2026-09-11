@@ -205,6 +205,29 @@ test('CTA buttons stay fully rounded while the picker restyles only the demo', a
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
+test('download CTAs use a bright face and a traveling border glow', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const hero = page.locator('.hero .download')
+  await expect(hero.locator('.download-glow')).toHaveCount(1)
+  await expect(hero.locator('.download-glow-h')).toHaveCount(1)
+  await expect(hero.locator('.download-glow-v')).toHaveCount(1)
+  await expect(page.locator('.header-actions .download .download-glow')).toHaveCount(1)
+  await expect(page.locator('.footer-main .download .download-glow')).toHaveCount(1)
+  const animation = await hero.locator('.download-glow-h').evaluate((el) => getComputedStyle(el).animationName)
+  expect(animation).toMatch(/download-glow-a/)
+  const bg = await hero.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const accent = await page.evaluate(() => {
+    const probe = document.createElement('span')
+    probe.style.backgroundColor = 'var(--color-accent)'
+    document.body.append(probe)
+    const color = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return color
+  })
+  expect(bg, 'download face should be the bright accent').toBe(accent)
+})
+
 test('demo option badges stay bright and unclipped at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')

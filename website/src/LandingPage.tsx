@@ -113,6 +113,10 @@ function DownloadLink({
       aria-label={ariaLabel}
       data-variant="primary"
     >
+      <span className="download-glow" aria-hidden="true">
+        <span className="download-glow-h" />
+        <span className="download-glow-v" />
+      </span>
       <Download className="size-4" />
       <span>{label}</span>
     </a>

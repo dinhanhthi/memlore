@@ -288,9 +288,108 @@ footer {
     filter var(--button-motion);
 }
 .download {
-  background: var(--button-primary-bg);
-  color: var(--button-primary-fg);
-  box-shadow: var(--button-primary-shadow);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow: 0 10px 28px color-mix(in oklch, var(--color-accent) 32%, transparent);
+}
+.download-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.download-glow::after {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  border-radius: inherit;
+  background: var(--color-accent);
+  z-index: 1;
+}
+.download-glow-h,
+.download-glow-v {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(8px);
+  background: radial-gradient(
+    ellipse at center,
+    var(--download-glow-hot) 0%,
+    var(--color-accent) 30%,
+    var(--color-accent-deep) 55%,
+    transparent 80%
+  );
+}
+.download-glow-h {
+  width: 60px;
+  height: 35px;
+  animation: download-glow-a 3.5s var(--ease-in-out) infinite;
+}
+.download-glow-v {
+  width: 35px;
+  height: 60px;
+  animation: download-glow-b 3.5s var(--ease-in-out) infinite;
+}
+@keyframes download-glow-a {
+  0% {
+    left: -40px;
+    top: -25px;
+    opacity: 0;
+  }
+  3% {
+    opacity: 1;
+  }
+  45% {
+    left: calc(100% - 25px);
+    top: -25px;
+    opacity: 1;
+  }
+  95% {
+    left: calc(100% - 25px);
+    top: calc(100% + 15px);
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 25px);
+    top: calc(100% + 30px);
+    opacity: 0;
+  }
+}
+@keyframes download-glow-b {
+  0% {
+    left: -25px;
+    top: -40px;
+    opacity: 0;
+  }
+  3% {
+    opacity: 1;
+  }
+  45% {
+    left: -25px;
+    top: calc(100% - 25px);
+    opacity: 1;
+  }
+  95% {
+    left: calc(100% + 15px);
+    top: calc(100% - 25px);
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% + 30px);
+    top: calc(100% - 25px);
+    opacity: 0;
+  }
+}
+.download > svg,
+.download > span:not(.download-glow) {
+  position: relative;
+  z-index: 2;
 }
 .button {
   background: var(--button-secondary-bg);
@@ -313,24 +412,22 @@ footer {
   outline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .download:hover,
+  .download:hover {
+    filter: brightness(1.08);
+  }
   .button:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
-  }
-  .button:hover {
     background: var(--button-secondary-bg-hover);
   }
 }
-.download:active,
+.download:active {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+}
 .button:active {
   transform: translateY(var(--button-rise));
   filter: brightness(0.97);
-}
-.download:active {
-  box-shadow:
-    0 0 0 0 var(--button-primary-lip),
-    0 2px 8px var(--color-shadow);
 }
 .hero {
   padding: 72px 0 96px;
@@ -1706,6 +1803,11 @@ footer {
   .button:active {
     transform: none;
     filter: none;
+  }
+  .download-glow-h,
+  .download-glow-v {
+    animation: none !important;
+    opacity: 0 !important;
   }
   .demo-window {
     transform: none;
