@@ -196,8 +196,10 @@ interface KbdProps {
 }
 
 export function Kbd({ children }: KbdProps) {
+  // Ligatures off: Geist Mono + WebKit paints `---` as 1ch of ink in a 3ch
+  // box, so the dashes sit outside the chip (slash-menu Divider hint).
   return (
-    <kbd className="border-border-default bg-surface-hi text-fg-muted text-2xs inline-flex min-w-[1.4em] items-center justify-center rounded-md border border-b-2 px-1.5 py-0.5 font-mono font-medium">
+    <kbd className="border-border-default bg-surface-hi text-fg-muted text-2xs inline-flex min-w-[1.4em] items-center justify-center rounded-md border border-b-2 px-1.5 py-0.5 font-mono font-medium whitespace-nowrap [font-variant-ligatures:none]">
       {children}
     </kbd>
   )
