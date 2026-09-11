@@ -1741,16 +1741,6 @@
   box-shadow: var(--shadow-well);
 }
 
-:root.ds-clay
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']):not(
-    [type='file']
-  ):not(.xj-input-bare):focus-visible,
-:root.ds-clay textarea:not(.xj-input-bare):not(.xj-entry-title):focus-visible {
-  box-shadow:
-    inset 0 2px 5px var(--neu-press),
-    inset 0 0 0 2px var(--color-accent);
-}
-
 :root.ds-clay .xj-entry-title {
   background-image: none;
   box-shadow: none;
@@ -2796,42 +2786,12 @@ body {
 /* ---------------------------------------------------------
    Focus & Selection
    --------------------------------------------------------- */
-/* Instant keyboard ring — do not transition outline (keyboard users
-   need the indicator on the first frame). Unlayered, so it beats
-   Tailwind `outline-none` utilities. Suppress the ring only with a
-   more-specific unlayered rule (text fields and `.ProseMirror:focus-visible`
-   below) — a utility class cannot hide it. */
+/* Desktop feel — no focus ring anywhere. The app is a Tauri window, not a
+   web page, and the WebView's Tab ring reads as browser chrome. Unlayered so
+   it also suppresses WebKit's UA `-webkit-focus-ring-color auto`.
+   Deliberate product decision: do not re-add a ring here. */
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-/* Text fields — the OFFSET ring is suppressed (it reads as a second box
-   around the field, including on mouse focus: :focus-visible matches text
-   inputs even without a keyboard) and replaced with a flush ring hugging the
-   field edge. The caret alone is not an indicator a sighted keyboard user can
-   scan a dense settings form with. --color-focus-ring clears 3:1 on all eight
-   surfaces. Clay's own inset ring (:root.ds-clay, more specific) still wins
-   there, so its wells stay borderless. Beats the unlayered :focus-visible
-   ring (0,2,0 vs 0,1,0). Checkbox / radio / range / file and native <select>
-   keep the global offset ring. `.xj-input-bare` is excluded: those inputs are
-   chrome-less and their WRAPPER draws the border and the focus treatment
-   (primitives.tsx `Input`), so ringing the input too stacks a second ring
-   inside the first. */
-input:not(
-    [type='checkbox'],
-    [type='radio'],
-    [type='range'],
-    [type='file'],
-    [type='button'],
-    [type='submit'],
-    [type='reset'],
-    [type='color'],
-    [type='image']
-  ):not(.xj-input-bare):focus-visible,
-textarea:not(.xj-input-bare):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 /* Writing canvas — caret is the focus indicator. Beats the unlayered

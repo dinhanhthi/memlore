@@ -102,7 +102,7 @@ export function InvisibleUnlockPromptModal({
                 if (error) setError(null)
               }}
               disabled={isBusy}
-              className="border-border-default bg-surface-hi text-fg placeholder:text-fg-muted focus:border-accent focus:ring-focus-ring mt-2 h-10 w-full rounded-xl border px-3 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="border-border-default bg-surface-hi text-fg placeholder:text-fg-muted focus:border-accent mt-2 h-10 w-full rounded-xl border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
               placeholder={t('action.unlock_invisible_password_placeholder')}
             />
           </label>

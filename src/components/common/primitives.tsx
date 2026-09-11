@@ -123,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const s = inputSizes[size]
   return (
     <div
-      className="border-border-default bg-elevated focus-within:border-accent relative flex items-center rounded-xl border px-3 transition-[border-color,box-shadow] duration-(--motion-duration-fast) focus-within:shadow-[0_0_0_2px_color-mix(in_oklab,var(--color-accent)_30%,transparent)]"
+      className="border-border-default bg-elevated focus-within:border-accent relative flex items-center rounded-xl border px-3 transition-[border-color] duration-(--motion-duration-fast)"
       style={{ height: s.h }}
     >
       {icon && <span className="text-fg-muted mr-2 flex">{icon}</span>}
