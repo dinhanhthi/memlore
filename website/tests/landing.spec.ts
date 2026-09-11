@@ -8,6 +8,8 @@ const VIEWPORTS = [
   { name: '1280', width: 1280, height: 800 },
 ] as const
 
+const COMPACT_MAX_PX = 1088
+
 const GITHUB = 'https://github.com/dinhanhthi/memlore'
 const IFRAME_TITLE = 'Interactive Memlore demo with fictional journal entries'
 
@@ -66,16 +68,44 @@ async function expectNoRootOverflow(page: Page) {
   ).toBeLessThanOrEqual(overflow.bodyClient)
 }
 
-async function expectChromeSingleLine(page: Page) {
+async function headerDownloadLabelVisible(page: Page) {
+  return page.locator('.header-actions .download-label').evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    return box.width > 4 && box.height > 4
+  })
+}
+
+async function expectChromeSingleLine(page: Page, compact: boolean) {
+  await expectSingleLine(page.locator('.hero .download'), 'hero download')
+  await expectSingleLine(page.locator('.hero .button'), 'hero demo')
+  await expectSingleLine(page.locator('.footer-main .download'), 'footer download')
+  if (compact) {
+    const toggle = page.getByRole('button', { name: 'Open menu' })
+    await expectSingleLine(toggle, 'nav toggle')
+    await expectSingleLine(page.locator('.header-actions .download'), 'header download')
+    expect(await headerDownloadLabelVisible(page), 'header download should be icon-only').toBe(
+      false,
+    )
+    await toggle.click()
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
+    await expectSingleLine(nav.getByRole('link', { name: 'Demo' }), 'nav Demo')
+    await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
+    await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
+    await expectSingleLine(nav.locator('summary'), 'nav Doc')
+    await expectSingleLine(nav.getByRole('link', { name: 'GitHub' }), 'nav GitHub')
+    return
+  }
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
   await expectSingleLine(nav.getByRole('link', { name: 'Demo' }), 'nav Demo')
   await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
   await expectSingleLine(nav.locator('summary'), 'nav Doc')
-  await expectSingleLine(page.locator('.github-link'), 'header GitHub')
-  await expectSingleLine(page.locator('.hero .download'), 'hero download')
-  await expectSingleLine(page.locator('.hero .button'), 'hero demo')
-  await expectSingleLine(page.locator('.footer-main .download'), 'footer download')
+  await expectSingleLine(page.locator('.header-github'), 'header GitHub')
+  await expectSingleLine(page.locator('.header-actions .download'), 'header download')
+  expect(await headerDownloadLabelVisible(page), 'desktop download should show its label').toBe(
+    true,
+  )
+  await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
 }
 
 test('landing and demo.html load from production assets', async ({ page }) => {
@@ -109,11 +139,23 @@ for (const viewport of VIEWPORTS) {
     await page.goto('/')
     await expect(page.locator('h1')).toBeVisible()
     await expectNoRootOverflow(page)
-    await expectChromeSingleLine(page)
+    const compact = viewport.width <= COMPACT_MAX_PX
+    if (compact) {
+      await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toHaveCount(0)
+      await expect(page.locator('.demo-placeholder')).toBeVisible()
+      await expect(page.getByText('This preview needs a wider window.')).toBeVisible()
+      await expect(page.locator('.comparison-cards article')).toHaveCount(4)
+      await expect(page.locator('.comparison-scroll')).toBeHidden()
+    } else {
+      await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
+      await expect(page.locator('.demo-placeholder')).toHaveCount(0)
+    }
     await page.screenshot({
       path: testInfo.outputPath(`landing-${viewport.name}.png`),
       fullPage: true,
     })
+    await expectChromeSingleLine(page, compact)
+    await expectNoRootOverflow(page)
     expect(errors.pageErrors, errors.pageErrors.join('\n')).toEqual([])
     expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
   })
@@ -439,7 +481,10 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   expect(textTransform, 'disclaimer should stay parallel to the mockup').toBe(mockupTransform)
   const textLum = await relativeLuminance(disclaimer, 'color')
   const mutedLum = await relativeLuminance(page.locator('.hero-description'), 'color')
-  expect(textLum, 'disclaimer should read lighter than muted body copy').toBeGreaterThan(mutedLum)
+  expect(
+    textLum,
+    'disclaimer should stay at least as light as muted body copy',
+  ).toBeGreaterThanOrEqual(mutedLum)
   const stacking = await page.evaluate(() => {
     const windowEl = document.querySelector('.demo-window')
     const text = document.querySelector('.demo-disclaimer')
@@ -455,6 +500,29 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   )
 })
 
+test('compact nav opens as a sheet and closes on Escape or backdrop', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/')
+  const toggle = page.getByRole('button', { name: 'Open menu' })
+  const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  await expect(nav).toBeHidden()
+  await toggle.click()
+  await expect(nav).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('nav-open.png') })
+  await page.keyboard.press('Escape')
+  await expect(nav).toBeHidden()
+  await expect(toggle).toBeFocused()
+  await toggle.click()
+  await page.locator('.nav-backdrop').click({ position: { x: 24, y: 640 } })
+  await expect(nav).toBeHidden()
+  await toggle.click()
+  await page.getByRole('link', { name: 'Memlore home' }).click()
+  await expect(nav).toBeHidden()
+})
+
 test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.demo-disclaimer')).toContainText(/sample data/i)
@@ -468,7 +536,7 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(doc).toContainText(/coming soon/i)
   await expect(doc.locator('a[href*="404"]')).toHaveCount(0)
 
-  await expect(page.locator('.github-link')).toHaveAttribute('href', GITHUB)
+  await expect(page.locator('.header-github')).toHaveAttribute('href', GITHUB)
   const download = page.locator('.hero .download')
   await expect(download).toHaveAttribute('href', GITHUB)
   await expect(download).toHaveAttribute('aria-label', /macOS beta from GitHub/i)

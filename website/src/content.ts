@@ -20,6 +20,8 @@ export const nav = {
   download: 'Download',
   downloadAria: 'Download the macOS beta from GitHub',
   mainAria: 'Main navigation',
+  menu: 'Open menu',
+  closeMenu: 'Close menu',
 }
 
 export const hero = {
@@ -48,8 +50,9 @@ export const demo = {
     clean: 'Clean',
     signature: 'Signature',
   },
-  mobileHintBefore: 'Swipe inside the preview to explore the full app, or',
-  mobileHintLink: 'open it separately',
+  placeholderTitle: 'This preview needs a wider window.',
+  placeholderBody:
+    'The live journal is a desktop app, so it cannot run here. When the iOS and Android apps arrive, their view will take this place.',
   iframeTitle: 'Interactive Memlore demo with fictional journal entries',
   loadingTitle: 'Opening your sample journal…',
   loadingText: 'There are a few memories to unpack.',

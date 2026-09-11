@@ -24,6 +24,7 @@ import {
   Lock,
   LockKeyhole,
   Maximize2,
+  Menu,
   MessageCircle,
   MessageSquareQuote,
   Mic,
@@ -89,6 +90,23 @@ const editorMediaFiles = [
   { id: 'audio', Icon: Mic },
 ] as const
 
+const COMPACT_QUERY = '(max-width: 68rem)'
+
+function useWideViewport() {
+  const [wide, setWide] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return !window.matchMedia(COMPACT_QUERY).matches
+  })
+  useEffect(() => {
+    const mq = window.matchMedia(COMPACT_QUERY)
+    const update = () => setWide(!mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return wide
+}
+
 function DownloadLink({
   className,
   label,
@@ -112,8 +130,111 @@ function DownloadLink({
         <span className="download-glow-v" />
       </span>
       <Download className="size-4" />
-      <span>{label}</span>
+      <span className="download-label">{label}</span>
     </a>
+  )
+}
+
+function GitHubLink({ className }: { className: string }) {
+  return (
+    <a className={`github-link ${className}`} href={githubUrl} target="_blank" rel="noreferrer">
+      <GitBranch className="size-4.5" />
+      <span>{nav.github}</span>
+      <ArrowUpRight className="size-3.5" />
+    </a>
+  )
+}
+
+function SiteHeader({ wide }: { wide: boolean }) {
+  const [open, setOpen] = useState(false)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (wide) setOpen(false)
+  }, [wide])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      toggleRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const main = document.getElementById('main')
+    const footer = document.querySelector('footer')
+    main?.setAttribute('inert', '')
+    footer?.setAttribute('inert', '')
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+      main?.removeAttribute('inert')
+      footer?.removeAttribute('inert')
+    }
+  }, [open])
+  const close = () => setOpen(false)
+  return (
+    <>
+      {open ? <div className="nav-backdrop" aria-hidden="true" onClick={close} /> : null}
+      <header className="site-header" data-nav-open={open ? 'true' : undefined}>
+        <a
+          className="wordmark"
+          href="#main"
+          aria-label={nav.homeAria}
+          onClick={() => {
+            if (!open) return
+            setOpen(false)
+            document.getElementById('main')?.removeAttribute('inert')
+            document.querySelector('footer')?.removeAttribute('inert')
+          }}
+        >
+          <HeadFollowLogo alt="" className="wordmark-head" size={36} />
+          {nav.wordmark}
+        </a>
+        <nav
+          id="site-nav"
+          aria-label={nav.mainAria}
+          onClick={(event) => {
+            const target = event.target
+            if (target instanceof Element && target.closest('a')) close()
+          }}
+        >
+          <a href="#demo">{nav.demo}</a>
+          <a href="#features">{nav.features}</a>
+          <a href="#compare">{nav.compare}</a>
+          <details className="doc-menu">
+            <summary>{nav.doc}</summary>
+            <p>
+              {nav.docDisclosure}{' '}
+              <a href={githubUrl} target="_blank" rel="noreferrer">
+                {nav.docReadme}
+              </a>
+              .
+            </p>
+          </details>
+          <GitHubLink className="nav-github" />
+        </nav>
+        <div className="header-actions">
+          <GitHubLink className="header-github" />
+          <DownloadLink className="download" label={nav.download} ariaLabel={nav.downloadAria} />
+          <button
+            ref={toggleRef}
+            type="button"
+            className="nav-toggle"
+            aria-expanded={open}
+            aria-controls="site-nav"
+            aria-label={open ? nav.closeMenu : nav.menu}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? (
+              <X className="size-5" aria-hidden="true" />
+            ) : (
+              <Menu className="size-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      </header>
+    </>
   )
 }
 
@@ -457,7 +578,19 @@ function TransferFigure() {
   )
 }
 
-function Demo() {
+function DemoPlaceholder() {
+  return (
+    <div className="demo-placeholder">
+      <figure className="demo-placeholder-stage">
+        <HeadFollowLogo alt="" className="demo-placeholder-head" size={112} />
+        <p className="demo-placeholder-title">{demo.placeholderTitle}</p>
+        <p>{demo.placeholderBody}</p>
+      </figure>
+    </div>
+  )
+}
+
+function DemoLive() {
   const frame = useRef<HTMLIFrameElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
@@ -490,106 +623,108 @@ function Demo() {
     sendDemoCommand(frame.current, { command: 'theme', designSystem })
   }
   return (
+    <div className="demo-stage">
+      <div className="demo-stack" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+      <div className="demo-window">
+        <div className="demo-chrome">
+          <p className="demo-chrome-label" id="demo-appearance-label">
+            {demo.themeAria}
+            <ArrowRight className="size-3" aria-hidden="true" />
+          </p>
+          <div className="option-row" role="radiogroup" aria-labelledby="demo-appearance-label">
+            {(
+              [
+                ['clay', demo.themes.clay],
+                ['clean', demo.themes.clean],
+                ['signature', demo.themes.signature],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={theme === id}
+                disabled={status !== 'ready'}
+                onClick={() => changeTheme(id)}
+              >
+                <span className={`theme-dot theme-dot-${id}`} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+          <a className="demo-chrome-open" href="./demo.html" target="_blank" rel="noreferrer">
+            <Maximize2 className="size-3" />
+            {demo.openSeparately}
+          </a>
+        </div>
+        <div className="demo-viewport">
+          <iframe
+            ref={frame}
+            key={attempt}
+            src="./demo.html"
+            title={demo.iframeTitle}
+            onError={() => setStatus('error')}
+          />
+          {status !== 'ready' && (
+            <div className="demo-status" role="status">
+              <BookOpen className="size-8" />
+              <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
+              <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+              {status === 'error' && (
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="button"
+                    data-variant="secondary"
+                    onClick={() => {
+                      setStatus('loading')
+                      setAttempt((value) => value + 1)
+                    }}
+                  >
+                    {demo.tryAgain}
+                  </button>
+                  <a className="text-link" href="./demo.html" target="_blank" rel="noreferrer">
+                    {demo.openDemo} <ArrowUpRight className="size-4" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="demo-disclaimer">{demo.disclaimer}</p>
+    </div>
+  )
+}
+
+function Demo({ wide }: { wide: boolean }) {
+  return (
     <section className="demo-section" id="demo" aria-labelledby="demo-title">
       <div className="section-heading demo-heading">
         <div>
           <h2 id="demo-title">{demo.title}</h2>
           <p>{demo.subtitle}</p>
         </div>
-        <p className="demo-cue">
-          {demo.cue}
-          <svg className="demo-cue-arrow" viewBox="0 0 64 80" aria-hidden="true">
-            <path className="demo-cue-shaft" d="M44 6 C 44 38 32 62 12 76" />
-            <path className="demo-cue-head" d="M12 76 L26 75 L18 63 Z" />
-          </svg>
-        </p>
-      </div>
-      <div className="demo-stage">
-        <div className="demo-stack" aria-hidden="true">
-          <span />
-          <span />
-        </div>
-        <div className="demo-window">
-          <div className="demo-chrome">
-            <p className="demo-chrome-label" id="demo-appearance-label">
-              {demo.themeAria}
-              <ArrowRight className="size-3" aria-hidden="true" />
-            </p>
-            <div className="option-row" role="radiogroup" aria-labelledby="demo-appearance-label">
-              {(
-                [
-                  ['clay', demo.themes.clay],
-                  ['clean', demo.themes.clean],
-                  ['signature', demo.themes.signature],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === id}
-                  disabled={status !== 'ready'}
-                  onClick={() => changeTheme(id)}
-                >
-                  <span className={`theme-dot theme-dot-${id}`} />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-            <a className="demo-chrome-open" href="./demo.html" target="_blank" rel="noreferrer">
-              <Maximize2 className="size-3" />
-              {demo.openSeparately}
-            </a>
-          </div>
-          <p className="demo-mobile-hint">
-            {demo.mobileHintBefore}{' '}
-            <a href="./demo.html" target="_blank" rel="noreferrer">
-              {demo.mobileHintLink}
-            </a>
-            .
+        {wide ? (
+          <p className="demo-cue">
+            {demo.cue}
+            <svg className="demo-cue-arrow" viewBox="0 0 64 80" aria-hidden="true">
+              <path className="demo-cue-shaft" d="M44 6 C 44 38 32 62 12 76" />
+              <path className="demo-cue-head" d="M12 76 L26 75 L18 63 Z" />
+            </svg>
           </p>
-          <div className="demo-viewport">
-            <iframe
-              ref={frame}
-              key={attempt}
-              src="./demo.html"
-              title={demo.iframeTitle}
-              onError={() => setStatus('error')}
-            />
-            {status !== 'ready' && (
-              <div className="demo-status" role="status">
-                <BookOpen className="size-8" />
-                <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
-                <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
-                {status === 'error' && (
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="button"
-                      data-variant="secondary"
-                      onClick={() => {
-                        setStatus('loading')
-                        setAttempt((value) => value + 1)
-                      }}
-                    >
-                      {demo.tryAgain}
-                    </button>
-                    <a className="text-link" href="./demo.html" target="_blank" rel="noreferrer">
-                      {demo.openDemo} <ArrowUpRight className="size-4" />
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        <p className="demo-disclaimer">{demo.disclaimer}</p>
+        ) : null}
       </div>
+      {wide ? <DemoLive /> : <DemoPlaceholder />}
     </section>
   )
 }
 
 export default function LandingPage() {
+  const wide = useWideViewport()
   useEffect(() => {
     preloadHeadSprites()
   }, [])
@@ -598,35 +733,7 @@ export default function LandingPage() {
       <a className="skip-link" href="#main">
         {nav.skip}
       </a>
-      <header className="site-header">
-        <a className="wordmark" href="#main" aria-label={nav.homeAria}>
-          <HeadFollowLogo alt="" className="wordmark-head" size={36} />
-          {nav.wordmark}
-        </a>
-        <nav aria-label={nav.mainAria}>
-          <a href="#demo">{nav.demo}</a>
-          <a href="#features">{nav.features}</a>
-          <a href="#compare">{nav.compare}</a>
-          <details className="doc-menu">
-            <summary>{nav.doc}</summary>
-            <p>
-              {nav.docDisclosure}{' '}
-              <a href={githubUrl} target="_blank" rel="noreferrer">
-                {nav.docReadme}
-              </a>
-              .
-            </p>
-          </details>
-        </nav>
-        <div className="header-actions">
-          <a className="github-link" href={githubUrl} target="_blank" rel="noreferrer">
-            <GitBranch className="size-4.5" />
-            <span>{nav.github}</span>
-            <ArrowUpRight className="size-3.5" />
-          </a>
-          <DownloadLink className="download" label={nav.download} ariaLabel={nav.downloadAria} />
-        </div>
-      </header>
+      <SiteHeader wide={wide} />
       <main id="main">
         <section className="hero">
           <div className="hero-copy">
@@ -666,7 +773,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
-        <Demo />
+        <Demo wide={wide} />
         <section className="split" id="features">
           <div>
             <h2>{encrypt.title}</h2>
@@ -833,6 +940,43 @@ export default function LandingPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="comparison-cards">
+            {comparison.products.map((product) => (
+              <article
+                key={product.name}
+                className={product.name === 'Memlore' ? 'compare-card-memlore' : undefined}
+              >
+                <h3>
+                  {product.name === 'Memlore' ? (
+                    <span className="compare-brand">
+                      <img src="./head-rotate/default.png" alt="" width="28" height="28" />
+                      {product.name}
+                    </span>
+                  ) : (
+                    product.name
+                  )}
+                  {product.badge ? <small>{product.badge}</small> : null}
+                </h3>
+                <ul>
+                  {comparison.rows.map((row) => {
+                    const mark = row.marks[product.name]
+                    const label =
+                      mark === 'yes'
+                        ? comparison.yes
+                        : mark === 'no'
+                          ? comparison.no
+                          : comparison.partial
+                    return (
+                      <li key={row.id}>
+                        <span>{row.label}</span>
+                        <MarkIcon mark={mark} label={`${product.name}: ${label}`} />
+                      </li>
+                    )
+                  })}
+                </ul>
+              </article>
+            ))}
           </div>
           <p className="comparison-sources">
             {comparison.sourcesLead}{' '}

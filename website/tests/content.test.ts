@@ -122,6 +122,15 @@ it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {
   expect(nav.docDisclosure).not.toMatch(/https?:\/\//i)
 })
 
+it('describes the compact demo as a placeholder until mobile apps exist', () => {
+  expect(demo.placeholderTitle.toLowerCase()).toMatch(/wider window|larger screen/)
+  expect(demo.placeholderBody.toLowerCase()).toMatch(/desktop/)
+  expect(demo.placeholderBody.toLowerCase()).toMatch(/ios and android/)
+  expect(demo).not.toHaveProperty('mobileHintBefore')
+  expect(nav.menu).toMatch(/menu/i)
+  expect(nav.closeMenu).toMatch(/close/i)
+})
+
 it('explains encryption for a non-technical reader', () => {
   const copy = collectStrings(encrypt).join('\n').toLowerCase()
   expect(copy).toMatch(/cannot read|never see/)
