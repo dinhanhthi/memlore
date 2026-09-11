@@ -158,7 +158,18 @@ function GitHubLink({ className }: { className: string }) {
 function SiteHeader({ wide }: { wide: boolean }) {
   const [open, setOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const docMenuRef = useRef<HTMLDetailsElement>(null)
   if (wide && open) setOpen(false)
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const menu = docMenuRef.current
+      if (!menu?.open) return
+      if (event.target instanceof Node && menu.contains(event.target)) return
+      menu.open = false
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
@@ -210,7 +221,7 @@ function SiteHeader({ wide }: { wide: boolean }) {
           <a href="#demo">{nav.demo}</a>
           <a href="#features">{nav.features}</a>
           <a href="#compare">{nav.compare}</a>
-          <details className="doc-menu">
+          <details ref={docMenuRef} className="doc-menu">
             <summary>{nav.doc}</summary>
             <p>
               {nav.docDisclosure}{' '}

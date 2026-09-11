@@ -591,6 +591,19 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky')
 })
 
+test('doc disclosure stays open on inside click and closes on outside click', async ({ page }) => {
+  await page.goto('/')
+  const doc = page.locator('details.doc-menu')
+  await doc.locator('summary').click()
+  await expect(doc).toHaveAttribute('open', '')
+
+  await doc.locator('p').click()
+  await expect(doc).toHaveAttribute('open', '')
+
+  await page.getByRole('heading', { level: 1 }).click()
+  await expect(doc).not.toHaveAttribute('open')
+})
+
 test('lock UI exists and chat composer is reachable after guided navigation', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
