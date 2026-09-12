@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  autoUpdate,
+  flip,
+  FloatingPortal,
+  offset,
+  shift,
+  useDismiss,
+  useFloating,
+  useFocus,
+  useHover,
+  useInteractions,
+  useRole,
+} from '@floating-ui/react'
+import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
@@ -54,7 +67,9 @@ import {
   platforms,
   search,
   transfer,
+  type ComparisonLevel,
   type ComparisonMark,
+  type ComparisonProductName,
 } from './content'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
@@ -256,18 +271,83 @@ function SiteHeader({ wide }: { wide: boolean }) {
   )
 }
 
-function MarkIcon({ mark, label }: { mark: ComparisonMark; label: string }) {
+function markLabel(mark: ComparisonMark) {
+  if (typeof mark === 'number') return comparison.levels[mark - 1]
+  if (mark === 'yes') return comparison.yes
+  if (mark === 'no') return comparison.no
+  if (mark === 'soon') return comparison.soon
+  return comparison.partial
+}
+
+function LevelDial({ mark, product }: { mark: ComparisonLevel; product: ComparisonProductName }) {
+  const explanation = comparison.levels[mark - 1]
+  const label = `${product}: ${explanation}`
+  const [open, setOpen] = useState(false)
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: 'top',
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(8), flip(), shift({ padding: 8 })],
+  })
+  const hover = useHover(context, { move: false, delay: { open: 80, close: 0 } })
+  const focus = useFocus(context)
+  const dismiss = useDismiss(context)
+  const role = useRole(context, { role: 'tooltip' })
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss, role])
+
+  return (
+    <>
+      <span
+        ref={refs.setReference}
+        className="mark mark-level"
+        data-level={mark}
+        role="img"
+        {...getReferenceProps()}
+        aria-label={label}
+        tabIndex={0}
+      >
+        <span className="level-dial" aria-hidden="true" />
+      </span>
+      {open ? (
+        <FloatingPortal>
+          <span
+            ref={refs.setFloating}
+            className="mark-tip"
+            style={floatingStyles}
+            {...getFloatingProps()}
+          >
+            {explanation}
+          </span>
+        </FloatingPortal>
+      ) : null}
+    </>
+  )
+}
+
+function MarkIcon({ mark, product }: { mark: ComparisonMark; product: ComparisonProductName }) {
+  const label = `${product}: ${markLabel(mark)}`
+  if (typeof mark === 'number') {
+    return <LevelDial mark={mark} product={product} />
+  }
   if (mark === 'yes') {
     return (
       <span className="mark mark-yes" aria-label={label}>
-        <Check className="size-4" aria-hidden="true" />
+        <Check className="size-3" aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'no') {
     return (
       <span className="mark mark-no" aria-label={label}>
-        <X className="size-4" aria-hidden="true" />
+        <X className="size-3" aria-hidden="true" />
+      </span>
+    )
+  }
+  if (mark === 'soon') {
+    return (
+      <span className="mark mark-soon" aria-label={label}>
+        {comparison.soon}
       </span>
     )
   }
@@ -954,24 +1034,18 @@ export default function LandingPage() {
               <tbody>
                 {comparison.rows.map((row) => (
                   <tr key={row.id}>
-                    <th scope="row">{row.label}</th>
-                    {comparison.products.map((product) => {
-                      const mark = row.marks[product.name]
-                      const label =
-                        mark === 'yes'
-                          ? comparison.yes
-                          : mark === 'no'
-                            ? comparison.no
-                            : comparison.partial
-                      return (
-                        <td
-                          key={product.name}
-                          className={product.name === 'Memlore' ? 'memlore-cell' : undefined}
-                        >
-                          <MarkIcon mark={mark} label={`${product.name}: ${label}`} />
-                        </td>
-                      )
-                    })}
+                    <th scope="row">
+                      <strong>{row.label}</strong>
+                      {row.description ? <small>{row.description}</small> : null}
+                    </th>
+                    {comparison.products.map((product) => (
+                      <td
+                        key={product.name}
+                        className={product.name === 'Memlore' ? 'memlore-cell' : undefined}
+                      >
+                        <MarkIcon mark={row.marks[product.name]} product={product.name} />
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -994,21 +1068,15 @@ export default function LandingPage() {
                   )}
                 </h3>
                 <ul>
-                  {comparison.rows.map((row) => {
-                    const mark = row.marks[product.name]
-                    const label =
-                      mark === 'yes'
-                        ? comparison.yes
-                        : mark === 'no'
-                          ? comparison.no
-                          : comparison.partial
-                    return (
-                      <li key={row.id}>
-                        <span>{row.label}</span>
-                        <MarkIcon mark={mark} label={`${product.name}: ${label}`} />
-                      </li>
-                    )
-                  })}
+                  {comparison.rows.map((row) => (
+                    <li key={row.id}>
+                      <span>
+                        <strong>{row.label}</strong>
+                        {row.description ? <small>{row.description}</small> : null}
+                      </span>
+                      <MarkIcon mark={row.marks[product.name]} product={product.name} />
+                    </li>
+                  ))}
                 </ul>
               </article>
             ))}

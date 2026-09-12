@@ -86,7 +86,9 @@ it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
     const entry = product(name)
     expect(entry.note.trim().length).toBeGreaterThan(20)
     for (const row of comparison.rows) {
-      expect(row.marks[name]).toMatch(/^(yes|no|partial)$/)
+      const mark = row.marks[name]
+      if (typeof mark === 'number') expect(mark).toBeGreaterThanOrEqual(1)
+      else expect(mark).toMatch(/^(yes|no|partial|soon)$/)
     }
   }
   expect(comparison.rows.length).toBeGreaterThan(5)
@@ -115,10 +117,19 @@ it('does not claim competitors lack encryption or AI', () => {
     .map((item) => item.note)
     .join('\n')
   expect(competitorCopy).not.toMatch(LACKS_ENCRYPTION_OR_AI)
-  expect(comparison.rows.find((row) => /optional ai/i.test(row.label))?.marks['Day One']).toBe(
-    'yes',
-  )
-  expect(comparison.rows.find((row) => /optional ai/i.test(row.label))?.marks.Journey).toBe('yes')
+  const aiRow = comparison.rows.find((row) => row.id === 'optional-ai')
+  expect(aiRow?.marks['Day One']).toBeGreaterThan(0)
+  expect(aiRow?.marks.Journey).toBeGreaterThan(0)
+})
+
+it('scores Day One and Journey optional AI as levels, Apple Journal as none of that suite', () => {
+  const aiRow = comparison.rows.find((row) => row.id === 'optional-ai')
+  expect(typeof aiRow?.marks.Memlore).toBe('number')
+  expect(typeof aiRow?.marks['Day One']).toBe('number')
+  expect(typeof aiRow?.marks.Journey).toBe('number')
+  expect(aiRow?.marks['Apple Journal']).toBe('no')
+  expect(aiRow?.marks['Day One']).toBeGreaterThan(Number(aiRow?.marks.Journey))
+  expect(aiRow?.marks.Memlore).toBeGreaterThan(Number(aiRow?.marks['Day One']))
 })
 
 it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {

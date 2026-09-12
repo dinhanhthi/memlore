@@ -259,7 +259,8 @@ export const openSource = {
 }
 
 export type ComparisonProductName = 'Memlore' | 'Day One' | 'Journey' | 'Apple Journal'
-export type ComparisonMark = 'yes' | 'no' | 'partial'
+export type ComparisonLevel = 1 | 2 | 3 | 4
+export type ComparisonMark = 'yes' | 'no' | 'partial' | 'soon' | ComparisonLevel
 
 export type ComparisonProduct = {
   name: ComparisonProductName
@@ -270,17 +271,19 @@ export type ComparisonProduct = {
 export type ComparisonRow = {
   id: string
   label: string
+  description?: string
   marks: Record<ComparisonProductName, ComparisonMark>
 }
 
 export const comparison = {
-  title: 'Find your kind of journal.',
-  intro:
-    'Different journals fit different lives. Checks are documented yes. Crosses are documented no. A dash means it varies by plan, or we would have to guess.',
+  title: 'How Memlore compares.',
+  intro: 'Memlore next to three journals people already keep.',
   tableAria: 'Journal comparison table, one column per journal',
   yes: 'Yes',
   no: 'No',
   partial: 'Varies or not documented',
+  soon: 'Soon',
+  levels: ['A few', 'About half', 'Most', 'The full set'],
   sourcesLead: 'Explore the details:',
   sourcesNote: 'Features and plans can change.',
   products: [
@@ -310,32 +313,64 @@ export const comparison = {
     {
       id: 'open-source',
       label: 'Open source',
+      description: 'Anyone can read the code that holds the journal.',
       marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
     },
     {
       id: 'password',
       label: 'Password required before the journal opens',
+      description: 'Not a setting you can switch off. Without it the files stay sealed.',
       marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
+    },
+    {
+      id: 'your-key-only',
+      label: 'Held by your password alone',
+      description:
+        'All four encrypt. Only Memlore asks for no account, keeps no vendor server, and holds no recovery path back into your journal.',
+      marks: {
+        Memlore: 'yes',
+        'Day One': 'partial',
+        Journey: 'partial',
+        'Apple Journal': 'partial',
+      },
     },
     {
       id: 'local-first',
       label: 'Local-first — no vendor journal server',
+      description: 'The journal lives on your machine and works with the network off.',
       marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
     },
     {
       id: 'own-cloud',
-      label: 'Sync to a cloud folder you already own',
-      marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'partial' },
+      label: 'Sync through a cloud folder you already own',
+      description:
+        'Memlore uses your Google Drive or iCloud Drive. Journey offers Google Drive too.',
+      marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'yes', 'Apple Journal': 'partial' },
     },
     {
       id: 'extra-locks',
       label: 'Second lock and invisible vault',
+      description: 'Some entries stay shut, and some leave no trace that they exist.',
       marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
     },
     {
       id: 'optional-ai',
-      label: 'Optional AI on your terms',
-      marks: { Memlore: 'yes', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'partial' },
+      label: 'How much optional AI you get',
+      description:
+        'Titles, summaries, Go Deeper, Daily Chat, Ask Journal, semantic search, emotion, time-machine, images — local, on-device, or your own key.',
+      marks: { Memlore: 4, 'Day One': 2, Journey: 1, 'Apple Journal': 'no' },
+    },
+    {
+      id: 'editor',
+      label: 'An editor that holds more than text',
+      description: 'Markdown, math, code blocks, slash commands, and media inside the page.',
+      marks: { Memlore: 'yes', 'Day One': 'partial', Journey: 'partial', 'Apple Journal': 'no' },
+    },
+    {
+      id: 'appearance',
+      label: 'Make it look like yours',
+      description: 'Three design systems, each in light and dark, plus a swappable writing font.',
+      marks: { Memlore: 'yes', 'Day One': 'partial', Journey: 'partial', 'Apple Journal': 'no' },
     },
     {
       id: 'macos',
@@ -344,13 +379,13 @@ export const comparison = {
     },
     {
       id: 'ios',
-      label: 'iOS app today',
-      marks: { Memlore: 'no', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'yes' },
+      label: 'iOS and Android app',
+      marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'partial' },
     },
     {
       id: 'win-linux',
-      label: 'Windows or Linux app today',
-      marks: { Memlore: 'no', 'Day One': 'partial', Journey: 'yes', 'Apple Journal': 'no' },
+      label: 'Windows or Linux app',
+      marks: { Memlore: 'soon', 'Day One': 'partial', Journey: 'yes', 'Apple Journal': 'no' },
     },
     {
       id: 'beta-free',

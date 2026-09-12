@@ -1579,9 +1579,9 @@ footer {
   overflow-x: auto;
   max-width: 100%;
   min-width: 0;
-  border: var(--rule-width) solid var(--color-rule);
+  border: var(--rule-width) solid var(--color-compare-rule);
   border-radius: var(--radius-panel);
-  background: var(--color-panel);
+  background: var(--color-compare-surface);
 }
 .comparison-cards {
   display: none;
@@ -1592,8 +1592,8 @@ footer {
   min-width: 0;
   padding: 16px 16px 8px;
   border-radius: var(--radius-panel);
-  background: var(--color-panel);
-  border: var(--rule-width) solid var(--color-rule);
+  background: var(--color-compare-surface);
+  border: var(--rule-width) solid var(--color-compare-rule);
 }
 .comparison-cards h3 {
   display: flex;
@@ -1602,7 +1602,7 @@ footer {
   gap: 8px;
   margin: 0 0 4px;
   padding-bottom: 12px;
-  border-bottom: var(--rule-width) solid var(--color-rule);
+  border-bottom: var(--rule-width) solid var(--color-compare-rule);
   font-size: var(--text-lead);
 }
 .comparison-cards ul {
@@ -1617,24 +1617,26 @@ footer {
   gap: 12px;
   min-width: 0;
   min-height: 44px;
-  padding: 8px 0;
-  border-bottom: var(--rule-width) solid var(--color-rule);
+  padding: 12px 0;
+  border-bottom: var(--rule-width) solid var(--color-compare-rule);
   color: var(--color-ink);
-  font-size: var(--text-small);
 }
 .comparison-cards li:last-child {
   border-bottom: 0;
 }
 .comparison-cards li > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .compare-card-memlore {
-  background: color-mix(in oklch, var(--color-accent) 10%, var(--color-panel));
+  background: color-mix(in oklch, var(--color-accent) 22%, var(--color-compare-surface));
 }
 table {
   width: 100%;
-  min-width: 720px;
+  min-width: 800px;
   border-collapse: collapse;
   text-align: center;
   font-size: var(--text-small);
@@ -1643,26 +1645,46 @@ thead th {
   font-size: var(--text-lead);
   font-weight: 550;
   color: var(--color-ink);
-  padding: 18px 16px;
-  background: var(--color-raised);
+  padding: 18px 8px;
+  background: var(--color-compare-head);
 }
 th:first-child,
 td:first-child {
   text-align: left;
-  width: 28%;
-  padding-left: 20px;
+  width: 34%;
+  padding-left: 16px;
+  padding-right: 10px;
 }
 td,
 tbody th {
-  padding: 16px;
+  padding: 16px 8px;
   vertical-align: middle;
-  border-top: var(--rule-width) solid var(--color-rule);
+  border-top: var(--rule-width) solid var(--color-compare-rule);
+}
+tbody tr:nth-child(even) {
+  background: var(--color-compare-stripe);
 }
 tbody th {
-  font-size: var(--text-small);
   font-weight: 500;
   color: var(--color-ink);
   text-align: left;
+}
+.comparison-scroll tbody th strong,
+.comparison-cards li strong {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-ink);
+}
+.comparison-scroll tbody th small,
+.comparison-cards li small {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--text-small);
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--color-muted);
 }
 .compare-brand {
   display: inline-flex;
@@ -1670,27 +1692,91 @@ tbody th {
   gap: 8px;
 }
 .memlore-cell {
-  background: color-mix(in oklch, var(--color-accent) 10%, var(--color-panel));
+  background: color-mix(in oklch, var(--color-accent) 22%, var(--color-compare-surface));
 }
 .mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  white-space: nowrap;
+}
+.mark-yes,
+.mark-no,
+.mark-partial {
+  width: 22px;
+  height: 22px;
 }
 .mark-yes {
-  color: var(--color-success);
-  background: color-mix(in oklch, var(--color-success) 16%, transparent);
+  color: oklch(20% 0.04 145);
+  background: var(--color-success);
 }
 .mark-no {
   color: var(--color-error);
-  background: color-mix(in oklch, var(--color-error) 14%, transparent);
+  background: color-mix(in oklch, var(--color-error) 22%, transparent);
+  border: var(--rule-width) solid color-mix(in oklch, var(--color-error) 45%, transparent);
 }
 .mark-partial {
   color: var(--color-muted);
-  font-size: 18px;
+  background: color-mix(in oklch, var(--color-ink) 10%, transparent);
+  font-size: 14px;
+  line-height: 1;
+}
+.mark-soon {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: var(--color-ink);
+  background: none;
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+.mark-level {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: help;
+}
+.level-dial {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--color-accent) calc(var(--level-fill) * 360deg),
+    color-mix(in oklch, var(--color-ink) 22%, transparent) 0
+  );
+}
+.mark-level[data-level='1'] {
+  --level-fill: 0.25;
+}
+.mark-level[data-level='2'] {
+  --level-fill: 0.5;
+}
+.mark-level[data-level='3'] {
+  --level-fill: 0.75;
+}
+.mark-level[data-level='4'] {
+  --level-fill: 1;
+}
+.mark-tip {
+  z-index: calc(var(--z-sticky-nav) + 20);
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--color-raised);
+  color: var(--color-ink);
+  border: var(--rule-width) solid var(--color-rule);
+  font-family: var(--font-body);
+  font-size: var(--text-small);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .comparison-sources {
   display: flex;
