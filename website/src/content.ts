@@ -18,7 +18,7 @@ export const nav = {
   docReadme: 'GitHub README',
   github: 'GitHub',
   download: 'Download',
-  downloadAria: 'Download the macOS beta from GitHub',
+  downloadAria: 'Download the beta from GitHub',
   mainAria: 'Main navigation',
   menu: 'Open menu',
   closeMenu: 'Close menu',
@@ -29,13 +29,13 @@ export const hero = {
   badgeFree: 'Free',
   titleLead: 'A little life.',
   titleAccent: 'A lasting story.',
-  descriptionLead: 'Memlore is a private journal for your Mac.',
+  descriptionLead: 'Memlore is a private journal.',
   description: 'For the days you want to remember, and the thoughts you need to put somewhere.',
   download: 'Download beta',
-  downloadAria: 'Download the macOS beta from GitHub',
+  downloadAria: 'Download the beta from GitHub',
   tryDemo: 'Try the demo',
   followGithub: 'Follow the journey',
-  availability: 'macOS beta on GitHub. More platforms coming.',
+  availability: 'More platforms coming.',
   mascotAlt: 'Memlore’s dog mascot. The head follows your cursor.',
   mascotAltStill: 'Memlore’s dog mascot.',
   portraitLead: 'A place to land.',
@@ -68,7 +68,7 @@ export const demo = {
 
 export const encrypt = {
   title: 'Even we cannot read it.',
-  body: 'Locked with your password, on your Mac. Memlore has no servers and no backdoor. A password is required — always. Files on disk stay sealed without it. A lost password cannot be recovered — not even by us.',
+  body: 'Locked with your password, on your device. Memlore has no servers and no backdoor. A password is required — always. Files on disk stay sealed without it. A lost password cannot be recovered — not even by us.',
   figure: {
     words: 'Your words',
     password: 'Your password',
@@ -165,6 +165,11 @@ export const ai = {
       text: 'Three follow-up reflection prompts, inserted as cards under the editor.',
     },
     {
+      id: 'continue' as const,
+      title: 'Continue & Rewrite',
+      text: 'Continue the entry from the footer, or rewrite a selection — in your voice.',
+    },
+    {
       id: 'chat' as const,
       title: 'Daily Chat',
       text: 'A conversation about the day that can become a journal entry when you save it.',
@@ -173,6 +178,16 @@ export const ai = {
       id: 'ask' as const,
       title: 'Ask Journal',
       text: 'A question over retrieved excerpts from entries you have already indexed. You can even ask about the memories that Memlore has learned.',
+    },
+    {
+      id: 'memories' as const,
+      title: 'Memories and persona',
+      text: 'Memories distilled from your entries. Opt in, and a second you writes in your voice and style.',
+    },
+    {
+      id: 'reviews' as const,
+      title: 'Reviews and Insights',
+      text: 'Weekly or monthly recaps, plus recurring themes across a stretch of entries.',
     },
     {
       id: 'search' as const,
@@ -222,28 +237,28 @@ export const chat = {
 
 export const search = {
   title: 'Search your journal',
-  body: 'Find a word you wrote, or something you only half-remember. Search stays on your Mac, next to tags, calendar, and maps.',
+  body: 'Find a word you wrote, or something you only half-remember. Search stays on your device, next to tags, calendar, and maps.',
 }
 
 export const persona = {
-  title: 'Your persona',
-  body: 'Optional. It keeps a few notes from your journal and writes the next line in your rhythm, not a generic one.',
+  title: 'Memories and persona',
+  body: 'Memlore distills memories from your entries. Opt in, and it builds a second you that writes in your voice and style.',
   figure: {
+    fromEntries: 'From your entries',
     memories: ['the walk after dinner', 'Tuesday kitchen', 'light on the river'],
-    reply: 'You always come back to the walk.',
-    you: 'That’s my rhythm. Keep going.',
+    reply: 'A second you, in your voice.',
     write: '…the light on the water, the same as last October.',
   },
 }
 
 export const locations = {
   title: 'Entries on a map',
-  body: 'Entries and photos sit where they happened. Open a pin to go back to that page. The map stays on this Mac.',
+  body: 'Entries and photos sit where they happened. Open a pin to go back to that page. The map stays on this device.',
 }
 
 export const transfer = {
   title: 'Import and export',
-  body: 'Bring a journal from Day One, Journey, Apple Journal, Markdown, or plain text. Export a backup or files — all on this Mac, nothing sent to us.',
+  body: 'Bring a journal from Day One, Journey, Apple Journal, Markdown, or plain text. Export a backup or files — all on local machine, nothing sent to us.',
   figure: {
     inbound: ['Day One', 'Journey', 'Apple Journal', 'Markdown', 'Plain text'],
     hub: 'Memlore',
@@ -254,7 +269,7 @@ export const transfer = {
 export const openSource = {
   symbol: 'Made in the open.',
   title: 'Open source',
-  body: 'You can see how it works, suggest an improvement, or help shape what comes next. All current features are free during beta — that is not a promise they stay free after. Optional third-party AI providers may charge their own fees.',
+  body: 'Open so you can see how a journal is secured and how your data is kept. Memlore stays free. Beta is only for extras that keep the project going.',
   github: 'View on GitHub',
 }
 
@@ -357,7 +372,7 @@ export const comparison = {
       id: 'optional-ai',
       label: 'How much optional AI you get',
       description:
-        'Titles, summaries, Go Deeper, Daily Chat, Ask Journal, semantic search, emotion, time-machine, images — local, on-device, or your own key.',
+        'Titles, summaries, Go Deeper, Continue & Rewrite, Daily Chat, Ask Journal, memories, persona, reviews, insights, semantic search, emotion, time-machine, images — local, on-device, or your own key.',
       marks: { Memlore: 4, 'Day One': 2, Journey: 1, 'Apple Journal': 'no' },
     },
     {
@@ -398,7 +413,7 @@ export const comparison = {
 export type PlatformName = 'macOS' | 'Windows & Linux' | 'iOS & Android'
 
 export const platforms = {
-  titleLead: 'A home on your Mac.',
+  titleLead: 'A home on your devices.',
   titleAccent: 'More doors opening soon.',
   intro:
     'We’re starting with macOS and taking the time to make it feel right. Follow along as Memlore grows.',
@@ -414,7 +429,7 @@ export const footer = {
   titleAccent: 'are worth keeping.',
   tryDemo: 'Try the demo',
   download: 'Download beta',
-  downloadAria: 'Download the macOS beta from GitHub',
+  downloadAria: 'Download the beta from GitHub',
   note: 'Made for your life. Made in the open.',
   github: 'GitHub',
 }

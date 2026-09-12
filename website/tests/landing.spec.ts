@@ -186,6 +186,40 @@ for (const viewport of VIEWPORTS) {
       path: testInfo.outputPath(`landing-${viewport.name}.png`),
       fullPage: true,
     })
+    await expect(page.locator('.ai-grid article')).toHaveCount(13)
+    const aiGrid = await page.locator('.ai-grid').evaluate((el) => {
+      const style = getComputedStyle(el)
+      const cell = el.querySelector('article')
+      const device = el.querySelector('article[data-ai="device"]')
+      return {
+        columns: style.gridTemplateColumns.split(' ').length,
+        frameRadius: style.borderRadius,
+        cellRadius: cell ? getComputedStyle(cell).borderRadius : '',
+        deviceColumnEnd: device ? getComputedStyle(device).gridColumnEnd : '',
+      }
+    })
+    const expectedAiColumns = viewport.width > COMPACT_MAX_PX ? 3 : viewport.width > 640 ? 2 : 1
+    expect(
+      aiGrid.columns,
+      `AI lattice should be ${expectedAiColumns}-col at ${viewport.name}`,
+    ).toBe(expectedAiColumns)
+    expect(aiGrid.cellRadius, 'AI cells should share edges, not card radii').toBe('0px')
+    expect(aiGrid.frameRadius, 'AI lattice should round the outer frame').not.toBe('0px')
+    expect(aiGrid.deviceColumnEnd, 'On-device cell should span the row').toBe('-1')
+    const titleBoxes = await page.locator('.ai-grid h3').evaluateAll((nodes) =>
+      nodes.map((el) => ({
+        text: el.textContent,
+        wrap: getComputedStyle(el).whiteSpace,
+        scroll: el.scrollWidth,
+        client: el.clientWidth,
+      })),
+    )
+    for (const title of titleBoxes) {
+      expect(title.wrap, `${title.text} should wrap instead of clipping`).not.toBe('nowrap')
+      expect(title.scroll, `${title.text} clipped inside the lattice`).toBeLessThanOrEqual(
+        title.client + 1,
+      )
+    }
     await expect(page.locator('.compare-card-memlore > h3')).not.toContainText(/open source/i)
     if (!compact) {
       await expect(
@@ -586,7 +620,7 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(page.locator('.header-github .github-mark')).toHaveCount(1)
   const download = page.locator('.hero .download')
   await expect(download).toHaveAttribute('href', GITHUB)
-  await expect(download).toHaveAttribute('aria-label', /macOS beta from GitHub/i)
+  await expect(download).toHaveAttribute('aria-label', /beta from GitHub/i)
   await expect(page.getByRole('link', { name: /app store|play store/i })).toHaveCount(0)
   await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky')
 })

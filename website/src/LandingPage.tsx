@@ -17,6 +17,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
+  BarChart3,
   BookOpen,
   CalendarClock,
   Check,
@@ -41,11 +42,13 @@ import {
   MessageSquareQuote,
   Mic,
   Monitor,
+  PenLine,
   Plus,
   ScanSearch,
   Shield,
   Smartphone,
   Sparkles,
+  UserRound,
   Video,
   X,
 } from 'lucide-react'
@@ -81,8 +84,11 @@ const aiIcons = {
   titles: Heading,
   summaries: Highlighter,
   deeper: Lightbulb,
+  continue: PenLine,
   chat: MessageCircle,
   ask: MessageSquareQuote,
+  memories: UserRound,
+  reviews: BarChart3,
   search: ScanSearch,
   emotion: Heart,
   time: CalendarClock,
@@ -561,15 +567,13 @@ function SearchFigure() {
 function PersonaFigure() {
   return (
     <figure className="illust illust-persona" aria-hidden="true">
+      <p className="persona-caption">{persona.figure.fromEntries}</p>
       <div className="persona-memories">
         {persona.figure.memories.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
-      <div className="persona-chat">
-        <div className="chat-row chat-ai">{persona.figure.reply}</div>
-        <div className="chat-row chat-you">{persona.figure.you}</div>
-      </div>
+      <div className="chat-row chat-ai">{persona.figure.reply}</div>
       <p className="persona-write">{persona.figure.write}</p>
     </figure>
   )
@@ -940,7 +944,7 @@ export default function LandingPage() {
               const Icon = aiIcons[item.id]
               return (
                 <article key={item.id} data-ai={item.id}>
-                  <span className="ai-icon">
+                  <span className="ai-icon" aria-hidden="true">
                     <Icon className="size-5" />
                   </span>
                   <h3>{item.title}</h3>

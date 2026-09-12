@@ -16,7 +16,7 @@ Checked 2026-09-10; optional-AI row rechecked 2026-09-12. Recheck before publish
 - The `your-key-only` row must not say competitors are unencrypted. `partial` there means encrypted but tied to a vendor account or server; Memlore's edge is no account, no vendor server, and no recovery path.
 - Do not claim a competitor's editor is slow or laggy. The editor row compares documented capabilities (Markdown, math, code, slash commands, media), not performance.
 - Do not imply Memlore has production releases or non-macOS native apps today. GitHub releases API returned an empty list on 2026-09-10. The landing **Download beta** control opens the GitHub repository, not a binary or store listing.
-- The user supplied the promise that features are free during beta. This does not promise future pricing or include third-party AI/cloud charges.
+- The journal stays free. Beta is only for extras that help keep the project going. Third-party AI providers may still charge their own fees if you use them.
 - The website demo is a simulation with sample data and scripted AI. Native password/Touch ID, real encryption, cloud sync, model downloads, and filesystem operations are not performed by the demo.
 - Main app capabilities are described from current repository code/README. The website does not claim an independent security audit.
 - Documentation is not published yet. The landing Doc control is a coming-soon disclosure that points at the GitHub README, not a docs URL.

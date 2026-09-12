@@ -2,16 +2,19 @@ import { expect, it } from 'vitest'
 import * as content from '../src/content'
 import {
   ai,
+  chat,
   comparison,
   demo,
   editor,
   encrypt,
+  footer,
   githubUrl,
   hero,
   locations,
   locks,
   meta,
   nav,
+  openSource,
   persona,
   platforms,
   search,
@@ -48,12 +51,13 @@ it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
 })
 
-it('says features are free during beta and that external AI providers may charge', () => {
-  const copy = allCopy().toLowerCase()
-  expect(copy).toMatch(/free during beta/)
-  expect(copy).toMatch(/third-party|external/)
-  expect(copy).toMatch(/may charge|their own fees/)
-  expect(copy).not.toMatch(/free forever|always free|free for life/)
+it('says the journal stays free and is open for security and data', () => {
+  const body = openSource.body.toLowerCase()
+  expect(body).toMatch(/stays free/)
+  expect(body).toMatch(/secur/)
+  expect(body).toMatch(/data/)
+  expect(body).toMatch(/beta/)
+  expect(openSource.body).not.toMatch(/not a promise they stay free/)
 })
 
 it('does not include concrete currency or price strings', () => {
@@ -74,11 +78,28 @@ it('does not promise ship dates for Windows, Linux, iOS, or Android', () => {
   expect(allCopy()).not.toMatch(SHIP_DATE)
 })
 
-it('points the macOS beta download at GitHub, not a store', () => {
+it('points the beta download at GitHub, not a store', () => {
   expect(hero.download).toMatch(/download/i)
   expect(hero.download).toMatch(/beta/i)
   expect(nav.downloadAria).toMatch(/github/i)
   expect(allCopy()).not.toMatch(STORE_RELEASE)
+})
+
+it('does not pin marketing copy to a single platform', () => {
+  const marketing = [
+    hero,
+    encrypt,
+    search,
+    locations,
+    persona,
+    openSource,
+    footer,
+    chat,
+    editor,
+  ]
+    .flatMap(collectStrings)
+    .join('\n')
+  expect(marketing).not.toMatch(/\byour Mac\b|\bthis Mac\b|for your Mac/i)
 })
 
 it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
@@ -198,7 +219,8 @@ it('covers the required feature themes from real product capabilities', () => {
   expect(copy).toMatch(/own cloud|your own cloud|cloud folder/)
   expect(copy).toMatch(/sync/)
   expect(copy).toMatch(/persona/)
-  expect(copy).toMatch(/rhythm/)
+  expect(copy).toMatch(/voice/)
+  expect(copy).toMatch(/opt in/)
   expect(copy).toMatch(/map/)
   expect(copy).toMatch(/import/)
   expect(copy).toMatch(/export/)
