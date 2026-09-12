@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import {
   autoUpdate,
   flip,
@@ -17,9 +17,11 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
+  BarChart3,
   BookOpen,
   CalendarClock,
   Check,
+  Cloud,
   Code2,
   Cpu,
   Download,
@@ -34,18 +36,23 @@ import {
   Laptop,
   Lightbulb,
   Lock,
-  LockKeyhole,
   Maximize2,
   Menu,
   MessageCircle,
   MessageSquareQuote,
   Mic,
   Monitor,
+  MoreHorizontal,
+  PenLine,
+  Play,
   Plus,
+  RefreshCw,
   ScanSearch,
-  Shield,
+  ServerOff,
   Smartphone,
   Sparkles,
+  UserRound,
+  Users,
   Video,
   X,
 } from 'lucide-react'
@@ -55,6 +62,7 @@ import {
   comparison,
   demo,
   editor,
+  emotions,
   encrypt,
   footer,
   githubUrl,
@@ -66,6 +74,7 @@ import {
   persona,
   platforms,
   search,
+  sync,
   transfer,
   type ComparisonLevel,
   type ComparisonMark,
@@ -76,13 +85,17 @@ import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
 import { logoSrc } from './logoDirection'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
+import demoPoster from './demoPoster.webp'
 
 const aiIcons = {
   titles: Heading,
   summaries: Highlighter,
   deeper: Lightbulb,
+  continue: PenLine,
   chat: MessageCircle,
   ask: MessageSquareQuote,
+  memories: UserRound,
+  reviews: BarChart3,
   search: ScanSearch,
   emotion: Heart,
   time: CalendarClock,
@@ -332,33 +345,34 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   }
   if (mark === 'yes') {
     return (
-      <span className="mark mark-yes" aria-label={label}>
+      <span className="mark mark-yes" role="img" aria-label={label}>
         <Check className="size-3" aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'no') {
     return (
-      <span className="mark mark-no" aria-label={label}>
+      <span className="mark mark-no" role="img" aria-label={label}>
         <X className="size-3" aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'soon') {
     return (
-      <span className="mark mark-soon" aria-label={label}>
+      <span className="mark mark-soon" role="img" aria-label={label}>
         {comparison.soon}
       </span>
     )
   }
   return (
-    <span className="mark mark-partial" aria-label={label}>
+    <span className="mark mark-partial" role="img" aria-label={label}>
       —
     </span>
   )
 }
 
-function EncryptArrow() {
+/* The two-way dashed arrow shared by the encrypt and sync figures. */
+function ExchangeArrow() {
   return (
     <svg className="encrypt-arrow" viewBox="0 0 72 40" aria-hidden="true">
       <path className="encrypt-dash" d="M8 11 H54" />
@@ -366,6 +380,24 @@ function EncryptArrow() {
       <path className="encrypt-dash" d="M64 29 H18" />
       <path d="M24 24 L14 29 L24 34" />
     </svg>
+  )
+}
+
+function EncryptArrow({ label, blocked = false }: { label: string; blocked?: boolean }) {
+  return (
+    <div className="encrypt-link">
+      {blocked ? (
+        <svg className="encrypt-arrow encrypt-arrow-blocked" viewBox="0 0 72 40" aria-hidden="true">
+          <path d="M6 20 H28" />
+          <path d="M66 20 H44" />
+          <path d="M32 13 L40 27" />
+          <path d="M40 13 L32 27" />
+        </svg>
+      ) : (
+        <ExchangeArrow />
+      )}
+      <small>{label}</small>
+    </div>
   )
 }
 
@@ -377,26 +409,134 @@ function EncryptFigure() {
           <div className="encrypt-card-body">
             <FileText className="size-10" />
           </div>
-          <small>{encrypt.figure.words}</small>
+          <small>{encrypt.figure.content}</small>
         </article>
-        <EncryptArrow />
-        <article className="encrypt-card encrypt-card-lock">
-          <div className="encrypt-card-body">
-            <span className="encrypt-orbit" />
-            <LockKeyhole className="size-6" />
-          </div>
-          <small>{encrypt.figure.password}</small>
-        </article>
-        <EncryptArrow />
+        <EncryptArrow label={encrypt.figure.password} />
         <article className="encrypt-card">
           <div className="encrypt-card-body">
-            <Shield className="size-10" />
+            <span className="encrypt-orbit" />
+            <Cloud className="size-8" />
           </div>
-          <small>{encrypt.figure.sealed}</small>
+          <small>{encrypt.figure.cloud}</small>
+        </article>
+        <EncryptArrow label={encrypt.figure.blocked} blocked />
+        <article className="encrypt-card encrypt-card-muted">
+          <div className="encrypt-card-body">
+            <Users className="size-10" />
+          </div>
+          <small>{encrypt.figure.others}</small>
         </article>
         <p className="encrypt-unseen">
           <EyeOff className="size-5" />
           {encrypt.figure.unseen}
+        </p>
+      </div>
+    </figure>
+  )
+}
+
+/* Brand marks: Google Drive (official geometry) and iCloud. Fills are brand
+   colours on purpose — the rest of the figure paints through the tokens. */
+function GoogleDriveMark() {
+  return (
+    <svg className="sync-logo" viewBox="0 0 87.3 78" aria-hidden="true">
+      <path
+        d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+        fill="#0066da"
+      />
+      <path
+        d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
+        fill="#00ac47"
+      />
+      <path
+        d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+        fill="#ea4335"
+      />
+      <path
+        d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+        fill="#00832d"
+      />
+      <path
+        d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+        fill="#2684fc"
+      />
+      <path
+        d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+        fill="#ffba00"
+      />
+    </svg>
+  )
+}
+
+function ICloudMark() {
+  return (
+    <svg className="sync-logo sync-logo-cloud" viewBox="0 0 64 40" aria-hidden="true">
+      <g fill="#3693f3">
+        <circle cx="22" cy="19" r="14" />
+        <circle cx="40" cy="15" r="11" />
+        <circle cx="50" cy="26" r="10" />
+        <rect x="14" y="22" width="40" height="14" rx="7" />
+      </g>
+    </svg>
+  )
+}
+
+function MoreCloudsMark() {
+  return (
+    <span className="sync-logo sync-logo-more" aria-hidden="true">
+      <MoreHorizontal className="size-3" />
+    </span>
+  )
+}
+
+const syncLogos: Record<(typeof sync.providers)[number], () => ReactElement> = {
+  gdrive: GoogleDriveMark,
+  icloud: ICloudMark,
+  more: MoreCloudsMark,
+}
+
+function SyncLink({ icon: Icon, label }: { icon: typeof Lock; label: string }) {
+  return (
+    <div className="encrypt-link sync-link">
+      <Icon className="sync-link-icon size-4" />
+      <ExchangeArrow />
+      <small>{label}</small>
+    </div>
+  )
+}
+
+/* Borrows the encrypt figure's scene/card/link classes — restyling
+   `.encrypt-*` in styles.css reshapes this figure too. */
+function SyncFigure() {
+  return (
+    <figure className="illust illust-encrypt" aria-hidden="true">
+      <div className="encrypt-scene">
+        <article className="encrypt-card">
+          <div className="encrypt-card-body">
+            <Laptop className="size-10" />
+          </div>
+          <small>{sync.figure.device}</small>
+        </article>
+        <SyncLink icon={Lock} label={sync.figure.encrypted} />
+        <article className="encrypt-card">
+          <div className="encrypt-card-body sync-providers">
+            {sync.providers.map((provider) => {
+              const Mark = syncLogos[provider]
+              return <Mark key={provider} />
+            })}
+          </div>
+          <small>{sync.figure.cloud}</small>
+        </article>
+        <SyncLink icon={RefreshCw} label={sync.figure.synced} />
+        <article className="encrypt-card">
+          <div className="encrypt-card-body">
+            <Smartphone className="size-10" />
+          </div>
+          <small>{sync.figure.otherDevice}</small>
+        </article>
+        <p className="encrypt-unseen">
+          <ServerOff className="size-5" />
+          {sync.figure.noServer}
         </p>
       </div>
     </figure>
@@ -545,6 +685,32 @@ function ChatFigure() {
   )
 }
 
+function EmotionsFigure() {
+  return (
+    <figure className="illust illust-emotions" aria-hidden="true">
+      <p className="emotion-prompt">{emotions.figure.prompt}</p>
+      <div className="emotion-options">
+        {emotions.figure.options.map((option) => (
+          <span
+            key={option.key}
+            data-emotion={option.key}
+            data-selected={option.key === emotions.figure.selected ? '' : undefined}
+          >
+            <span>{option.emoji}</span>
+            {option.label}
+          </span>
+        ))}
+      </div>
+      <p className="emotion-trend-label">{emotions.figure.trend}</p>
+      <div className="emotion-trend">
+        {emotions.figure.marks.map((mark, index) => (
+          <span key={index} data-emotion={mark} />
+        ))}
+      </div>
+    </figure>
+  )
+}
+
 function SearchFigure() {
   return (
     <figure className="illust illust-search" aria-hidden="true">
@@ -561,15 +727,13 @@ function SearchFigure() {
 function PersonaFigure() {
   return (
     <figure className="illust illust-persona" aria-hidden="true">
+      <p className="persona-caption">{persona.figure.fromEntries}</p>
       <div className="persona-memories">
         {persona.figure.memories.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
-      <div className="persona-chat">
-        <div className="chat-row chat-ai">{persona.figure.reply}</div>
-        <div className="chat-row chat-you">{persona.figure.you}</div>
-      </div>
+      <div className="chat-row chat-ai">{persona.figure.reply}</div>
       <p className="persona-write">{persona.figure.write}</p>
     </figure>
   )
@@ -585,33 +749,37 @@ function MapPhoto({
   x: number
   y: number
   rotate: number
-  variant: 'kitchen' | 'river' | 'trees'
+  variant: 'image' | 'video' | 'audio'
   delay: string
 }) {
   return (
     <g transform={`translate(${x} ${y}) rotate(${rotate})`}>
       <g className="map-pin-bob" style={{ animationDelay: delay }}>
         <rect className="map-photo-frame" x="-26" y="-52" width="52" height="40" rx="5" />
-        {variant === 'kitchen' ? (
-          <>
-            <rect className="map-photo-sky" x="-22" y="-48" width="44" height="18" rx="2" />
-            <rect className="map-photo-ground" x="-22" y="-30" width="44" height="14" rx="2" />
-            <rect className="map-photo-window" x="-8" y="-44" width="16" height="10" rx="1" />
-          </>
-        ) : variant === 'river' ? (
-          <>
-            <rect className="map-photo-sky" x="-22" y="-48" width="44" height="16" rx="2" />
-            <path className="map-photo-water" d="M-22 -32 H22 V-18 H-22 Z" />
-            <path className="map-photo-wave" d="M-18 -26 Q-8 -30 2 -26 T22 -26" />
-          </>
-        ) : (
-          <>
-            <rect className="map-photo-sky" x="-22" y="-48" width="44" height="32" rx="2" />
-            <ellipse className="map-photo-tree" cx="-6" cy="-28" rx="8" ry="10" />
-            <ellipse className="map-photo-tree" cx="10" cy="-26" rx="7" ry="9" />
-            <rect className="map-photo-ground" x="-22" y="-22" width="44" height="6" rx="1" />
-          </>
-        )}
+        {/* Lucide glyphs drawn on their native 24x24 grid, then centred in the frame. */}
+        <g className="map-icon" transform="translate(0 -32) scale(0.92) translate(-12 -12)">
+          {variant === 'image' ? (
+            <>
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+            </>
+          ) : variant === 'video' ? (
+            <>
+              <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+              <rect x="2" y="6" width="14" height="12" rx="2" />
+            </>
+          ) : (
+            <>
+              <path d="M2 10v3" />
+              <path d="M6 6v11" />
+              <path d="M10 3v18" />
+              <path d="M14 8v7" />
+              <path d="M18 5v13" />
+              <path d="M22 10v3" />
+            </>
+          )}
+        </g>
       </g>
       <path className="map-stem" d="M0 -12 L0 10" />
       <circle className="map-dot" cx="0" cy="12" r="3.5" />
@@ -639,9 +807,9 @@ function LocationsFigure() {
         <rect className="map-ocean" width="360" height="180" rx="10" />
         <path className="map-land" d={NATURAL_EARTH_LAND_D} />
         <g className="map-grid">{tiles}</g>
-        <MapPhoto x={58} y={58} rotate={-6} variant="kitchen" delay="0s" />
-        <MapPhoto x={182} y={52} rotate={4} variant="river" delay="0.35s" />
-        <MapPhoto x={286} y={74} rotate={-3} variant="trees" delay="0.7s" />
+        <MapPhoto x={128} y={87} rotate={-6} variant="image" delay="0s" />
+        <MapPhoto x={182} y={52} rotate={4} variant="video" delay="0.35s" />
+        <MapPhoto x={286} y={74} rotate={-3} variant="audio" delay="0.7s" />
       </svg>
     </figure>
   )
@@ -690,6 +858,15 @@ function DemoPlaceholder() {
 
 function DemoLive() {
   const frame = useRef<HTMLIFrameElement>(null)
+  // The demo is the full app (~1.5 MB gzipped, same origin, same main thread). Mount it
+  // only on click so it never counts against the landing page's blocking time.
+  const [started, setStarted] = useState(false)
+  const statusRef = useRef<HTMLDivElement>(null)
+  // The start button unmounts on click; hand focus to the status region so
+  // keyboard and screen-reader users are not dropped on <body>.
+  useEffect(() => {
+    if (started) statusRef.current?.focus()
+  }, [started])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const [theme, setTheme] = useState<DesignSystem>(DEFAULT_DESIGN_SYSTEM)
@@ -698,6 +875,7 @@ function DemoLive() {
     themeRef.current = theme
   }, [theme])
   useEffect(() => {
+    if (!started) return
     const timer = window.setTimeout(
       () => setStatus((current) => (current === 'loading' ? 'error' : current)),
       30000,
@@ -715,13 +893,13 @@ function DemoLive() {
       window.removeEventListener('message', listener)
       window.clearTimeout(timer)
     }
-  }, [attempt])
+  }, [attempt, started])
   const changeTheme = (designSystem: DesignSystem) => {
     setTheme(designSystem)
     sendDemoCommand(frame.current, { command: 'theme', designSystem })
   }
   return (
-    <div className="demo-stage">
+    <div className="demo-stage" data-upright={status === 'ready' ? '' : undefined}>
       <div className="demo-stack" aria-hidden="true">
         <span />
         <span />
@@ -759,18 +937,43 @@ function DemoLive() {
           </a>
         </div>
         <div className="demo-viewport">
-          <iframe
-            ref={frame}
-            key={attempt}
-            src="./demo.html"
-            title={demo.iframeTitle}
-            onError={() => setStatus('error')}
-          />
+          {started && (
+            <iframe
+              ref={frame}
+              key={attempt}
+              src="./demo.html"
+              title={demo.iframeTitle}
+              onError={() => setStatus('error')}
+            />
+          )}
           {status !== 'ready' && (
-            <div className="demo-status" role="status">
-              <BookOpen className="size-8" />
-              <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
-              <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+            <div className="demo-status" role="status" ref={statusRef} tabIndex={-1}>
+              <img
+                className="demo-poster"
+                src={demoPoster}
+                alt={started ? '' : demo.posterAlt}
+                width={1280}
+                height={700}
+                decoding="async"
+              />
+              {!started && (
+                <button
+                  type="button"
+                  className="button"
+                  data-variant="primary"
+                  onClick={() => setStarted(true)}
+                >
+                  <Play className="size-4" /> {demo.start}
+                </button>
+              )}
+              {started && (
+                <>
+                  {status === 'loading' && <span className="demo-progress" aria-hidden="true" />}
+                  <BookOpen className="size-8" />
+                  <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
+                  <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+                </>
+              )}
               {status === 'error' && (
                 <div className="button-row">
                   <button
@@ -898,11 +1101,17 @@ export default function LandingPage() {
           </div>
           <EncryptFigure />
         </section>
+        <section className="split split-flip" id="sync">
+          <SyncFigure />
+          <div>
+            <h2>{sync.title}</h2>
+            <p>{sync.body}</p>
+          </div>
+        </section>
         <section className="split split-flip" id="locks">
           <LocksFigure />
           <div className="locks-copy">
             <h2>{locks.title}</h2>
-            <p>{locks.body}</p>
             <ul className="lock-list">
               {locks.items.map((item) => {
                 const Icon = lockIcons[item.id]
@@ -926,13 +1135,19 @@ export default function LandingPage() {
           </div>
           <EditorFigure />
         </section>
+        <section className="split split-flip" id="emotions">
+          <EmotionsFigure />
+          <div>
+            <h2>{emotions.title}</h2>
+            <p>{emotions.body}</p>
+          </div>
+        </section>
         <section className="ai-section" id="ai">
           <div className="ai-intro">
             <Sparkles className="size-7" />
             <div>
               <h2>{ai.title}</h2>
               <p>{ai.body}</p>
-              <p className="ai-notice">{ai.notice}</p>
             </div>
           </div>
           <div className="ai-grid">
@@ -940,7 +1155,7 @@ export default function LandingPage() {
               const Icon = aiIcons[item.id]
               return (
                 <article key={item.id} data-ai={item.id}>
-                  <span className="ai-icon">
+                  <span className="ai-icon" aria-hidden="true">
                     <Icon className="size-5" />
                   </span>
                   <h3>{item.title}</h3>

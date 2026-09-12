@@ -447,7 +447,6 @@ footer {
   padding: 72px 30px 96px;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
-  gap: 48px;
   align-items: end;
 }
 .hero-badges {
@@ -555,7 +554,6 @@ footer {
 }
 .demo-section {
   padding-top: 12px;
-  padding-bottom: var(--space-2xl);
 }
 .section-heading {
   display: flex;
@@ -586,7 +584,6 @@ footer {
   font-family: var(--font-title);
   font-style: italic;
   font-size: 1.2rem;
-  font-weight: 550;
   line-height: 2.25;
   text-align: left;
   text-wrap: balance;
@@ -619,7 +616,7 @@ footer {
 }
 .demo-stage {
   position: relative;
-  padding: 12px 8px 20px;
+  padding: 20px 8px 20px;
   perspective: 1600px;
   perspective-origin: 50% 42%;
 }
@@ -627,16 +624,17 @@ footer {
   position: absolute;
   left: 10%;
   right: 10%;
-  top: 12px;
+  top: 20px;
   height: 78%;
   border-radius: var(--radius-panel);
   background: var(--color-raised);
   border: var(--rule-width) solid var(--color-rule);
   box-shadow: 0 18px 40px var(--color-shadow);
-  transform: scale(0.96) translateY(-14px);
+  /* Peek 8px / 16px above the window so the stack stays visible when it is upright. */
+  transform: scale(0.96) translateY(-20px);
 }
 .demo-stack span:last-child {
-  transform: scale(0.92) translateY(-28px);
+  transform: scale(0.92) translateY(-40px);
   opacity: 0.7;
 }
 .demo-window {
@@ -700,14 +698,19 @@ footer {
     transform: rotateY(-6deg) rotateX(2.5deg) translateY(0);
   }
   .demo-stage:hover .demo-window {
-    transform: rotateY(0deg) rotateX(0deg) translateY(-8px);
+    transform: rotateY(0deg) rotateX(0deg) translateY(0);
     box-shadow:
       0 1px 0 color-mix(in oklch, var(--color-ink) 16%, transparent),
       0 32px 56px var(--color-shadow),
       0 72px 110px var(--color-shadow);
   }
   .demo-stage:hover .demo-disclaimer {
-    transform: rotateY(0deg) rotateX(0deg) translateY(-8px);
+    transform: rotateY(0deg) rotateX(0deg) translateY(0);
+  }
+  /* Once the app is running the window stays upright for good. */
+  .demo-stage[data-upright] .demo-window,
+  .demo-stage[data-upright] .demo-disclaimer {
+    transform: none;
   }
 }
 .demo-viewport {
@@ -735,6 +738,10 @@ footer {
   padding: 28px;
   text-align: center;
   background: var(--color-paper);
+  isolation: isolate;
+}
+.demo-status:focus {
+  outline: none;
 }
 .demo-status > svg {
   color: var(--color-accent);
@@ -903,7 +910,7 @@ footer {
 }
 .encrypt-scene {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 80px minmax(0, 1fr) 80px minmax(0, 1fr);
   gap: 8px 4px;
   align-items: stretch;
   justify-items: stretch;
@@ -974,11 +981,30 @@ footer {
   transform: translate(-50%, -50%);
   animation: encrypt-spin 10s linear infinite;
 }
+.encrypt-link {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  align-self: center;
+}
+.encrypt-link small {
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  text-align: center;
+  text-wrap: balance;
+}
+.encrypt-card-muted {
+  color: var(--color-muted);
+}
+.encrypt-arrow-blocked {
+  color: var(--color-muted);
+}
 .encrypt-arrow {
   align-self: center;
   justify-self: center;
-  width: 56px;
-  height: 36px;
+  width: 72px;
+  height: 40px;
   color: var(--color-accent);
   overflow: visible;
 }
@@ -1017,6 +1043,35 @@ footer {
     transform: translate(-50%, -50%) rotate(1turn);
   }
 }
+.sync-link-icon {
+  color: var(--color-accent);
+}
+.sync-providers {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  align-items: center;
+  justify-content: center;
+  justify-items: center;
+  gap: 6px;
+}
+.sync-logo {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.sync-logo-cloud {
+  width: 26px;
+}
+.sync-logo-more {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--color-muted);
+  border-radius: 50%;
+  color: var(--color-muted);
+  opacity: 0.65;
+}
+
 .illust-locks {
   display: grid;
   min-height: 0;
@@ -1202,7 +1257,7 @@ footer {
   display: flex;
   gap: 18px;
   align-items: start;
-  margin-bottom: 32px;
+  margin-bottom: var(--space-xl);
   min-width: 0;
 }
 .ai-intro > div {
@@ -1216,72 +1271,65 @@ footer {
   max-width: 58ch;
   margin-top: 12px;
 }
-.ai-notice {
-  font-size: var(--text-base);
-  color: var(--color-accent);
-}
 .ai-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--rule-width);
+  padding: var(--rule-width);
+  background: var(--color-rule);
+  border-bottom-left-radius: var(--radius-panel);
+  border-bottom-right-radius: var(--radius-panel);
+  overflow: hidden;
+  isolation: isolate;
 }
 .ai-grid article {
-  --ai-tint: var(--color-accent);
   min-width: 0;
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-content: start;
-  gap: 10px;
-  padding: 18px;
-  border-radius: var(--radius-panel);
+  column-gap: var(--space-sm);
+  row-gap: var(--space-xs);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
   color: var(--color-ink);
   background: var(--color-panel);
-  border: var(--rule-width) solid var(--color-rule);
-}
-.ai-grid article[data-ai='titles'] {
-  --ai-tint: var(--color-ai-titles);
-}
-.ai-grid article[data-ai='summaries'] {
-  --ai-tint: var(--color-ai-summaries);
-}
-.ai-grid article[data-ai='deeper'] {
-  --ai-tint: var(--color-ai-deeper);
-}
-.ai-grid article[data-ai='chat'] {
-  --ai-tint: var(--color-ai-chat);
-}
-.ai-grid article[data-ai='ask'] {
-  --ai-tint: var(--color-ai-ask);
-}
-.ai-grid article[data-ai='search'] {
-  --ai-tint: var(--color-ai-search);
-}
-.ai-grid article[data-ai='emotion'] {
-  --ai-tint: var(--color-ai-emotion);
-}
-.ai-grid article[data-ai='time'] {
-  --ai-tint: var(--color-ai-time);
-}
-.ai-grid article[data-ai='image'] {
-  --ai-tint: var(--color-ai-image);
+  transition: background-color var(--dur-short) var(--ease-out);
 }
 .ai-grid article[data-ai='device'] {
-  --ai-tint: var(--color-ai-device);
+  grid-column: 1 / -1;
+  grid-template-columns: auto max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-md);
+  padding-block: var(--space-lg);
+  padding-inline: var(--space-xl);
+  background: color-mix(in oklch, var(--color-accent) 8%, var(--color-panel));
 }
 .ai-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: color-mix(in oklch, var(--ai-tint) 22%, var(--color-raised));
-  color: var(--ai-tint);
+  display: flex;
+  color: var(--color-accent);
+  margin-top: 3px;
+}
+.ai-grid article[data-ai='device'] .ai-icon {
+  margin-top: 0;
 }
 .ai-grid h3 {
   font-size: var(--text-base);
 }
 .ai-grid p {
+  grid-column: 2;
   font-size: var(--text-small);
+  line-height: 1.5;
   color: var(--color-muted);
+}
+.ai-grid article[data-ai='device'] p {
+  grid-column: 3;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ai-grid article:hover {
+    background: color-mix(in oklch, var(--color-accent) 5%, var(--color-panel));
+  }
+  .ai-grid article[data-ai='device']:hover {
+    background: color-mix(in oklch, var(--color-accent) 13%, var(--color-panel));
+  }
 }
 .illust-chat {
   display: grid;
@@ -1369,6 +1417,63 @@ footer {
   background: var(--button-primary-bg);
   color: var(--button-primary-fg);
 }
+.illust-emotions {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+}
+.illust-emotions [data-emotion='bad'] {
+  --emotion-tint: var(--color-error);
+}
+.illust-emotions [data-emotion='neutral'] {
+  --emotion-tint: var(--color-muted);
+}
+.illust-emotions [data-emotion='good'] {
+  --emotion-tint: var(--color-success);
+}
+.emotion-prompt,
+.emotion-trend-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.emotion-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.emotion-options > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-raised);
+  border: var(--rule-width) solid var(--color-rule);
+  color: var(--color-ink);
+  font-size: 14px;
+}
+.emotion-options > span[data-selected] {
+  border-color: var(--emotion-tint);
+  background: color-mix(in oklab, var(--emotion-tint) 18%, var(--color-raised));
+}
+.emotion-options > span > span {
+  font-size: 18px;
+  line-height: 1;
+}
+.emotion-trend {
+  display: flex;
+  gap: 6px;
+  height: 40px;
+}
+/* Equal heights on purpose: the three emotions are states, not a scale.
+ * Colour is the only difference, the way the app's heatmap draws them. */
+.emotion-trend span {
+  flex: 1;
+  height: 100%;
+  border-radius: var(--radius-control);
+  background: var(--emotion-tint);
+}
 .illust-search {
   display: grid;
   gap: 18px;
@@ -1396,6 +1501,11 @@ footer {
   gap: 14px;
   align-content: center;
 }
+.persona-caption {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
 .persona-memories {
   display: flex;
   flex-wrap: wrap;
@@ -1408,10 +1518,6 @@ footer {
   border: var(--rule-width) solid var(--color-rule);
   color: var(--color-ink);
   font-size: 14px;
-}
-.persona-chat {
-  display: grid;
-  gap: 8px;
 }
 .persona-write {
   margin: 0;
@@ -1449,26 +1555,12 @@ footer {
   stroke: var(--color-rule);
   stroke-width: 1.2;
 }
-.map-photo-sky {
-  fill: color-mix(in oklch, var(--color-ink) 12%, var(--color-raised));
-}
-.map-photo-ground {
-  fill: color-mix(in oklch, var(--color-accent) 22%, var(--color-raised));
-}
-.map-photo-window {
-  fill: color-mix(in oklch, var(--color-accent) 40%, var(--color-panel));
-}
-.map-photo-water {
-  fill: color-mix(in oklch, var(--color-accent) 32%, var(--color-panel));
-}
-.map-photo-wave {
+.map-icon {
   fill: none;
   stroke: var(--color-accent);
-  stroke-width: 1.2;
+  stroke-width: 2;
   stroke-linecap: round;
-}
-.map-photo-tree {
-  fill: color-mix(in oklch, var(--color-accent) 34%, var(--color-raised));
+  stroke-linejoin: round;
 }
 .map-stem {
   fill: none;
@@ -1692,7 +1784,7 @@ tbody th {
   gap: 8px;
 }
 .memlore-cell {
-  background: color-mix(in oklch, var(--color-accent) 22%, var(--color-compare-surface));
+  background: color-mix(in oklch, var(--color-accent) 10%, var(--color-compare-surface));
 }
 .mark {
   display: inline-flex;
@@ -1827,9 +1919,6 @@ tbody th {
 }
 .platform-list strong {
   color: var(--color-success);
-}
-footer {
-  border-top: var(--rule-width) solid var(--color-rule);
 }
 .footer-main {
   padding: 72px 0;
@@ -1999,6 +2088,17 @@ footer {
   .ai-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+  .ai-grid article[data-ai='device'] {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    padding-inline: var(--space-lg);
+  }
+  .ai-grid article[data-ai='device'] .ai-icon {
+    margin-top: 3px;
+  }
+  .ai-grid article[data-ai='device'] p {
+    grid-column: 2;
+  }
   .demo-section {
     padding-bottom: 0;
   }
@@ -2014,14 +2114,11 @@ footer {
   #locks h2 {
     order: 1;
   }
-  .locks-copy > p {
+  #locks .illust-locks {
     order: 2;
   }
-  #locks .illust-locks {
-    order: 3;
-  }
   #locks .lock-list {
-    order: 4;
+    order: 3;
   }
   .illust {
     min-height: 0;
@@ -2110,6 +2207,9 @@ footer {
   .ai-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .ai-grid article {
+    padding: var(--space-lg);
+  }
   .encrypt-scene {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
@@ -2119,8 +2219,18 @@ footer {
   }
   .encrypt-arrow {
     transform: rotate(90deg);
+    width: 52px;
+    height: 52px;
+  }
+  .sync-providers {
+    gap: 12px;
+  }
+  .sync-logo {
+    width: 30px;
+    height: 30px;
+  }
+  .sync-logo-cloud {
     width: 36px;
-    height: 56px;
   }
   .illust-transfer {
     grid-template-columns: minmax(0, 1fr);
@@ -2188,5 +2298,44 @@ footer {
   }
   .encrypt-dash {
     stroke-dasharray: none;
+  }
+  .demo-progress::after {
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+.demo-poster {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  min-width: 1024px;
+  object-fit: cover;
+  opacity: 0.5;
+}
+.demo-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--color-accent) 20%, transparent);
+}
+.demo-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--color-accent);
+  animation: demo-progress 1.4s var(--ease-out) infinite;
+}
+@keyframes demo-progress {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 250% 0;
   }
 }

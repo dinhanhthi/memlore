@@ -2,19 +2,24 @@ import { expect, it } from 'vitest'
 import * as content from '../src/content'
 import {
   ai,
+  chat,
   comparison,
   demo,
   editor,
+  emotions,
   encrypt,
+  footer,
   githubUrl,
   hero,
   locations,
   locks,
   meta,
   nav,
+  openSource,
   persona,
   platforms,
   search,
+  sync,
   transfer,
 } from '../src/content'
 import websiteIndex from '../index.html?raw'
@@ -48,12 +53,13 @@ it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
 })
 
-it('says features are free during beta and that external AI providers may charge', () => {
-  const copy = allCopy().toLowerCase()
-  expect(copy).toMatch(/free during beta/)
-  expect(copy).toMatch(/third-party|external/)
-  expect(copy).toMatch(/may charge|their own fees/)
-  expect(copy).not.toMatch(/free forever|always free|free for life/)
+it('says the journal stays free and is open for security and data', () => {
+  const body = openSource.body.toLowerCase()
+  expect(body).toMatch(/stays free/)
+  expect(body).toMatch(/secur/)
+  expect(body).toMatch(/data/)
+  expect(body).toMatch(/beta/)
+  expect(openSource.body).not.toMatch(/not a promise they stay free/)
 })
 
 it('does not include concrete currency or price strings', () => {
@@ -74,11 +80,29 @@ it('does not promise ship dates for Windows, Linux, iOS, or Android', () => {
   expect(allCopy()).not.toMatch(SHIP_DATE)
 })
 
-it('points the macOS beta download at GitHub, not a store', () => {
+it('points the beta download at GitHub, not a store', () => {
   expect(hero.download).toMatch(/download/i)
   expect(hero.download).toMatch(/beta/i)
   expect(nav.downloadAria).toMatch(/github/i)
   expect(allCopy()).not.toMatch(STORE_RELEASE)
+})
+
+it('does not pin marketing copy to a single platform', () => {
+  const marketing = [
+    hero,
+    encrypt,
+    sync,
+    search,
+    locations,
+    persona,
+    openSource,
+    footer,
+    chat,
+    editor,
+  ]
+    .flatMap(collectStrings)
+    .join('\n')
+  expect(marketing).not.toMatch(/\byour Mac\b|\bthis Mac\b|for your Mac/i)
 })
 
 it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
@@ -174,6 +198,7 @@ it('covers the required feature themes from real product capabilities', () => {
   const copy = [
     ...collectStrings(hero),
     ...collectStrings(encrypt),
+    ...collectStrings(sync),
     ...collectStrings(locks),
     ...collectStrings(ai),
     ...collectStrings(editor),
@@ -198,7 +223,8 @@ it('covers the required feature themes from real product capabilities', () => {
   expect(copy).toMatch(/own cloud|your own cloud|cloud folder/)
   expect(copy).toMatch(/sync/)
   expect(copy).toMatch(/persona/)
-  expect(copy).toMatch(/rhythm/)
+  expect(copy).toMatch(/voice/)
+  expect(copy).toMatch(/opt in/)
   expect(copy).toMatch(/map/)
   expect(copy).toMatch(/import/)
   expect(copy).toMatch(/export/)
@@ -216,6 +242,13 @@ it('does not keep the landing tour or reset chrome', () => {
   expect(demo).not.toHaveProperty('tour')
   expect(demo).not.toHaveProperty('reset')
   expect(demo.openSeparately.toLowerCase()).toMatch(/open separately/)
+})
+
+it('gates the demo behind an explicit start with a labelled poster', () => {
+  // Playwright matches this exact button name; keep them in sync.
+  expect(demo.start).toBe('Start the demo')
+  expect(demo.posterAlt.toLowerCase()).toMatch(/preview/)
+  expect(demo.posterAlt.toLowerCase()).toMatch(/journal/)
 })
 
 it('scopes the design-system picker to the demo, not the landing chrome', () => {
@@ -262,4 +295,26 @@ it('names the current macOS beta without promising other platforms a date', () =
   const macos = platforms.items.find((item) => item.name === 'macOS')
   expect(macos?.status).toMatch(/in development/i)
   expect(macos?.status).toMatch(/beta/i)
+})
+
+it('explains sync as the user’s own cloud, encrypted before it leaves the device', () => {
+  // Prose only — `sync.providers` holds the ids 'gdrive'/'icloud', which would
+  // satisfy these matches without the copy ever naming the services.
+  const copy = [sync.title, sync.body, ...collectStrings(sync.figure)].join('\n').toLowerCase()
+  expect(copy).toMatch(/google drive/)
+  expect(copy).toMatch(/icloud/)
+  expect(copy).toMatch(/encrypt/)
+  expect(copy).toMatch(/no memlore server|no server/)
+  // A new device joins with the recovery phrase, not the password — the body
+  // must not imply otherwise, so it stays off unlock mechanics entirely.
+  expect(sync.body).not.toMatch(/password/i)
+  expect(sync.providers).toContain('gdrive')
+  expect(sync.providers).toContain('icloud')
+})
+
+it('keeps emotions at exactly bad, neutral, and good', () => {
+  const keys = emotions.figure.options.map((option) => option.key)
+  expect(keys).toEqual(['bad', 'neutral', 'good'])
+  expect(new Set(emotions.figure.marks)).toEqual(new Set(keys))
+  expect(emotions.figure.selected).toBeOneOf(keys)
 })

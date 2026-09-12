@@ -47,6 +47,16 @@ on the landing page.
 The unlock / second-lock password in the demo is `memlore`. It is a sample
 credential for the mock, not a real journal password.
 
+## Demo poster
+
+The demo is the full app (3.9 MB parsed, ~1.5 MB over the wire, same origin,
+same main thread), so the
+landing page does not mount the iframe until **Start the demo** is clicked.
+Until then it shows `src/demoPoster.webp`: a Playwright screenshot of
+`demo.html` at 1280×700 (Clay dark, the seeded default), pre-blurred with
+`magick in.png -blur 0x3 out.png` and encoded with `cwebp -q 75`. Regenerate it
+after visible changes to the seeded entry or the app chrome.
+
 ## Reset and reload
 
 - **Reset demo** on the landing page reloads the iframe. That creates a new
