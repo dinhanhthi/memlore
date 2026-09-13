@@ -737,7 +737,7 @@ function DemoLive() {
     sendDemoCommand(frame.current, { command: 'theme', designSystem })
   }
   return (
-    <div className="demo-stage">
+    <div className="demo-stage" data-upright={status === 'ready' ? '' : undefined}>
       <div className="demo-stack" aria-hidden="true">
         <span />
         <span />
@@ -795,17 +795,14 @@ function DemoLive() {
                 decoding="async"
               />
               {!started && (
-                <>
-                  <button
-                    type="button"
-                    className="button"
-                    data-variant="primary"
-                    onClick={() => setStarted(true)}
-                  >
-                    <Play className="size-4" /> {demo.start}
-                  </button>
-                  <p>{demo.startHint}</p>
-                </>
+                <button
+                  type="button"
+                  className="button"
+                  data-variant="primary"
+                  onClick={() => setStarted(true)}
+                >
+                  <Play className="size-4" /> {demo.start}
+                </button>
               )}
               {started && (
                 <>

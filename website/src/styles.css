@@ -616,7 +616,7 @@ footer {
 }
 .demo-stage {
   position: relative;
-  padding: 12px 8px 20px;
+  padding: 20px 8px 20px;
   perspective: 1600px;
   perspective-origin: 50% 42%;
 }
@@ -624,16 +624,17 @@ footer {
   position: absolute;
   left: 10%;
   right: 10%;
-  top: 12px;
+  top: 20px;
   height: 78%;
   border-radius: var(--radius-panel);
   background: var(--color-raised);
   border: var(--rule-width) solid var(--color-rule);
   box-shadow: 0 18px 40px var(--color-shadow);
-  transform: scale(0.96) translateY(-14px);
+  /* Peek 8px / 16px above the window so the stack stays visible when it is upright. */
+  transform: scale(0.96) translateY(-20px);
 }
 .demo-stack span:last-child {
-  transform: scale(0.92) translateY(-28px);
+  transform: scale(0.92) translateY(-40px);
   opacity: 0.7;
 }
 .demo-window {
@@ -697,14 +698,19 @@ footer {
     transform: rotateY(-6deg) rotateX(2.5deg) translateY(0);
   }
   .demo-stage:hover .demo-window {
-    transform: rotateY(0deg) rotateX(0deg) translateY(-8px);
+    transform: rotateY(0deg) rotateX(0deg) translateY(0);
     box-shadow:
       0 1px 0 color-mix(in oklch, var(--color-ink) 16%, transparent),
       0 32px 56px var(--color-shadow),
       0 72px 110px var(--color-shadow);
   }
   .demo-stage:hover .demo-disclaimer {
-    transform: rotateY(0deg) rotateX(0deg) translateY(-8px);
+    transform: rotateY(0deg) rotateX(0deg) translateY(0);
+  }
+  /* Once the app is running the window stays upright for good. */
+  .demo-stage[data-upright] .demo-window,
+  .demo-stage[data-upright] .demo-disclaimer {
+    transform: none;
   }
 }
 .demo-viewport {

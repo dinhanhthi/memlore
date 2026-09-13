@@ -233,8 +233,6 @@ it('does not keep the landing tour or reset chrome', () => {
 it('gates the demo behind an explicit start with a labelled poster', () => {
   // Playwright matches this exact button name; keep them in sync.
   expect(demo.start).toBe('Start the demo')
-  expect(demo.startHint.toLowerCase()).toMatch(/loads the full app/)
-  expect(demo.startHint).toMatch(/\d+ MB/)
   expect(demo.posterAlt.toLowerCase()).toMatch(/preview/)
   expect(demo.posterAlt.toLowerCase()).toMatch(/journal/)
 })
