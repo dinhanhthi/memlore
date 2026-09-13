@@ -86,17 +86,7 @@ it('points the beta download at GitHub, not a store', () => {
 })
 
 it('does not pin marketing copy to a single platform', () => {
-  const marketing = [
-    hero,
-    encrypt,
-    search,
-    locations,
-    persona,
-    openSource,
-    footer,
-    chat,
-    editor,
-  ]
+  const marketing = [hero, encrypt, search, locations, persona, openSource, footer, chat, editor]
     .flatMap(collectStrings)
     .join('\n')
   expect(marketing).not.toMatch(/\byour Mac\b|\bthis Mac\b|for your Mac/i)
@@ -238,6 +228,15 @@ it('does not keep the landing tour or reset chrome', () => {
   expect(demo).not.toHaveProperty('tour')
   expect(demo).not.toHaveProperty('reset')
   expect(demo.openSeparately.toLowerCase()).toMatch(/open separately/)
+})
+
+it('gates the demo behind an explicit start with a labelled poster', () => {
+  // Playwright matches this exact button name; keep them in sync.
+  expect(demo.start).toBe('Start the demo')
+  expect(demo.startHint.toLowerCase()).toMatch(/loads the full app/)
+  expect(demo.startHint).toMatch(/\d+ MB/)
+  expect(demo.posterAlt.toLowerCase()).toMatch(/preview/)
+  expect(demo.posterAlt.toLowerCase()).toMatch(/journal/)
 })
 
 it('scopes the design-system picker to the demo, not the landing chrome', () => {

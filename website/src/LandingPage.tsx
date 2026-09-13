@@ -43,6 +43,7 @@ import {
   Mic,
   Monitor,
   PenLine,
+  Play,
   Plus,
   ScanSearch,
   Shield,
@@ -79,6 +80,7 @@ import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
 import { logoSrc } from './logoDirection'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
+import demoPoster from './demoPoster.webp'
 
 const aiIcons = {
   titles: Heading,
@@ -694,6 +696,15 @@ function DemoPlaceholder() {
 
 function DemoLive() {
   const frame = useRef<HTMLIFrameElement>(null)
+  // The demo is the full app (~1.5 MB gzipped, same origin, same main thread). Mount it
+  // only on click so it never counts against the landing page's blocking time.
+  const [started, setStarted] = useState(false)
+  const statusRef = useRef<HTMLDivElement>(null)
+  // The start button unmounts on click; hand focus to the status region so
+  // keyboard and screen-reader users are not dropped on <body>.
+  useEffect(() => {
+    if (started) statusRef.current?.focus()
+  }, [started])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
   const [theme, setTheme] = useState<DesignSystem>(DEFAULT_DESIGN_SYSTEM)
@@ -702,6 +713,7 @@ function DemoLive() {
     themeRef.current = theme
   }, [theme])
   useEffect(() => {
+    if (!started) return
     const timer = window.setTimeout(
       () => setStatus((current) => (current === 'loading' ? 'error' : current)),
       30000,
@@ -719,7 +731,7 @@ function DemoLive() {
       window.removeEventListener('message', listener)
       window.clearTimeout(timer)
     }
-  }, [attempt])
+  }, [attempt, started])
   const changeTheme = (designSystem: DesignSystem) => {
     setTheme(designSystem)
     sendDemoCommand(frame.current, { command: 'theme', designSystem })
@@ -763,18 +775,46 @@ function DemoLive() {
           </a>
         </div>
         <div className="demo-viewport">
-          <iframe
-            ref={frame}
-            key={attempt}
-            src="./demo.html"
-            title={demo.iframeTitle}
-            onError={() => setStatus('error')}
-          />
+          {started && (
+            <iframe
+              ref={frame}
+              key={attempt}
+              src="./demo.html"
+              title={demo.iframeTitle}
+              onError={() => setStatus('error')}
+            />
+          )}
           {status !== 'ready' && (
-            <div className="demo-status" role="status">
-              <BookOpen className="size-8" />
-              <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
-              <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+            <div className="demo-status" role="status" ref={statusRef} tabIndex={-1}>
+              <img
+                className="demo-poster"
+                src={demoPoster}
+                alt={started ? '' : demo.posterAlt}
+                width={1280}
+                height={700}
+                decoding="async"
+              />
+              {!started && (
+                <>
+                  <button
+                    type="button"
+                    className="button"
+                    data-variant="primary"
+                    onClick={() => setStarted(true)}
+                  >
+                    <Play className="size-4" /> {demo.start}
+                  </button>
+                  <p>{demo.startHint}</p>
+                </>
+              )}
+              {started && (
+                <>
+                  {status === 'loading' && <span className="demo-progress" aria-hidden="true" />}
+                  <BookOpen className="size-8" />
+                  <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
+                  <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+                </>
+              )}
               {status === 'error' && (
                 <div className="button-row">
                   <button

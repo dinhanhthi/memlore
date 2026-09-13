@@ -56,6 +56,9 @@ export const demo = {
   placeholderBody:
     'The live journal is a desktop app, so it cannot run here. When the iOS and Android apps arrive, their view will take this place.',
   iframeTitle: 'Interactive Memlore demo with fictional journal entries',
+  posterAlt: 'Blurred preview of the Memlore journal with a sample entry open',
+  start: 'Start the demo',
+  startHint: 'Loads the full app here, about 1.5 MB.',
   loadingTitle: 'Opening your sample journal…',
   loadingText: 'There are a few memories to unpack.',
   errorTitle: 'The demo is taking a little longer.',

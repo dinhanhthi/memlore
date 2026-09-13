@@ -37,7 +37,17 @@ function demoFrame(page: Page) {
   return page.frameLocator(`iframe[title="${IFRAME_TITLE}"]`)
 }
 
+async function startDemo(page: Page) {
+  const start = page.getByRole('button', { name: 'Start the demo' })
+  await expect(start).toBeVisible()
+  await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toHaveCount(0)
+  await start.click()
+  await expect(page.locator('.demo-progress')).toBeVisible({ timeout: 2000 })
+  await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
+}
+
 async function waitForDemoReady(page: Page) {
+  await startDemo(page)
   await expect(page.getByRole('radio', { name: 'Clay' })).toBeEnabled({
     timeout: 60_000,
   })
@@ -109,7 +119,7 @@ test('landing and demo.html load from production assets', async ({ page }) => {
   const landing = attachErrorCollectors(page)
   await page.goto('/')
   await expect(page).toHaveTitle('Memlore — A little life. A lasting story.')
-  await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
+  await startDemo(page)
   const landingScripts = await page
     .locator('script[src]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('src') ?? ''))
@@ -179,7 +189,7 @@ for (const viewport of VIEWPORTS) {
       expect(lockOrder!.intro).toBeLessThan(lockOrder!.figure)
       expect(lockOrder!.figure).toBeLessThan(lockOrder!.list)
     } else {
-      await expect(page.locator(`iframe[title="${IFRAME_TITLE}"]`)).toBeVisible()
+      await expect(page.locator('.demo-poster')).toBeVisible()
       await expect(page.locator('.demo-placeholder')).toHaveCount(0)
     }
     await page.screenshot({
