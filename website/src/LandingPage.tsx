@@ -21,6 +21,7 @@ import {
   BookOpen,
   CalendarClock,
   Check,
+  Cloud,
   Code2,
   Cpu,
   Download,
@@ -35,7 +36,6 @@ import {
   Laptop,
   Lightbulb,
   Lock,
-  LockKeyhole,
   Maximize2,
   Menu,
   MessageCircle,
@@ -45,11 +45,13 @@ import {
   PenLine,
   Play,
   Plus,
+  RefreshCw,
   ScanSearch,
-  Shield,
+  ServerOff,
   Smartphone,
   Sparkles,
   UserRound,
+  Users,
   Video,
   X,
 } from 'lucide-react'
@@ -70,6 +72,7 @@ import {
   persona,
   platforms,
   search,
+  sync,
   transfer,
   type ComparisonLevel,
   type ComparisonMark,
@@ -366,14 +369,26 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   )
 }
 
-function EncryptArrow() {
+function EncryptArrow({ label, blocked = false }: { label: string; blocked?: boolean }) {
   return (
-    <svg className="encrypt-arrow" viewBox="0 0 72 40" aria-hidden="true">
-      <path className="encrypt-dash" d="M8 11 H54" />
-      <path d="M48 6 L58 11 L48 16" />
-      <path className="encrypt-dash" d="M64 29 H18" />
-      <path d="M24 24 L14 29 L24 34" />
-    </svg>
+    <div className="encrypt-link">
+      {blocked ? (
+        <svg className="encrypt-arrow encrypt-arrow-blocked" viewBox="0 0 72 40" aria-hidden="true">
+          <path d="M6 20 H28" />
+          <path d="M66 20 H44" />
+          <path d="M32 13 L40 27" />
+          <path d="M40 13 L32 27" />
+        </svg>
+      ) : (
+        <svg className="encrypt-arrow" viewBox="0 0 72 40" aria-hidden="true">
+          <path className="encrypt-dash" d="M8 11 H54" />
+          <path d="M48 6 L58 11 L48 16" />
+          <path className="encrypt-dash" d="M64 29 H18" />
+          <path d="M24 24 L14 29 L24 34" />
+        </svg>
+      )}
+      <small>{label}</small>
+    </div>
   )
 }
 
@@ -385,26 +400,125 @@ function EncryptFigure() {
           <div className="encrypt-card-body">
             <FileText className="size-10" />
           </div>
-          <small>{encrypt.figure.words}</small>
+          <small>{encrypt.figure.content}</small>
         </article>
-        <EncryptArrow />
-        <article className="encrypt-card encrypt-card-lock">
-          <div className="encrypt-card-body">
-            <span className="encrypt-orbit" />
-            <LockKeyhole className="size-6" />
-          </div>
-          <small>{encrypt.figure.password}</small>
-        </article>
-        <EncryptArrow />
+        <EncryptArrow label={encrypt.figure.password} />
         <article className="encrypt-card">
           <div className="encrypt-card-body">
-            <Shield className="size-10" />
+            <span className="encrypt-orbit" />
+            <Cloud className="size-8" />
           </div>
-          <small>{encrypt.figure.sealed}</small>
+          <small>{encrypt.figure.cloud}</small>
+        </article>
+        <EncryptArrow label={encrypt.figure.blocked} blocked />
+        <article className="encrypt-card encrypt-card-muted">
+          <div className="encrypt-card-body">
+            <Users className="size-10" />
+          </div>
+          <small>{encrypt.figure.others}</small>
         </article>
         <p className="encrypt-unseen">
           <EyeOff className="size-5" />
           {encrypt.figure.unseen}
+        </p>
+      </div>
+    </figure>
+  )
+}
+
+/* Brand marks: Google Drive (official geometry) and iCloud. Fills are brand
+   colours on purpose — the rest of the figure paints through the tokens. */
+function GoogleDriveMark() {
+  return (
+    <svg className="sync-logo" viewBox="0 0 87.3 78" aria-hidden="true">
+      <path
+        d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+        fill="#0066da"
+      />
+      <path
+        d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
+        fill="#00ac47"
+      />
+      <path
+        d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+        fill="#ea4335"
+      />
+      <path
+        d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+        fill="#00832d"
+      />
+      <path
+        d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+        fill="#2684fc"
+      />
+      <path
+        d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+        fill="#ffba00"
+      />
+    </svg>
+  )
+}
+
+function ICloudMark() {
+  return (
+    <svg className="sync-logo sync-logo-cloud" viewBox="0 0 64 40" aria-hidden="true">
+      <g fill="#3693f3">
+        <circle cx="22" cy="19" r="14" />
+        <circle cx="40" cy="15" r="11" />
+        <circle cx="50" cy="26" r="10" />
+        <rect x="14" y="22" width="40" height="14" rx="7" />
+      </g>
+    </svg>
+  )
+}
+
+const syncLogos = { gdrive: GoogleDriveMark, icloud: ICloudMark }
+
+function SyncLink({ icon: Icon, label }: { icon: typeof Lock; label: string }) {
+  return (
+    <div className="encrypt-link sync-link">
+      <Icon className="size-4" />
+      <svg className="encrypt-arrow" viewBox="0 0 72 40" aria-hidden="true">
+        <path className="encrypt-dash" d="M8 11 H54" />
+        <path d="M48 6 L58 11 L48 16" />
+        <path className="encrypt-dash" d="M64 29 H18" />
+        <path d="M24 24 L14 29 L24 34" />
+      </svg>
+      <small>{label}</small>
+    </div>
+  )
+}
+
+function SyncFigure() {
+  return (
+    <figure className="illust illust-encrypt illust-sync" aria-hidden="true">
+      <div className="encrypt-scene">
+        <article className="encrypt-card">
+          <div className="encrypt-card-body">
+            <Laptop className="size-10" />
+          </div>
+          <small>{sync.figure.device}</small>
+        </article>
+        <SyncLink icon={Lock} label={sync.figure.encrypted} />
+        <article className="encrypt-card">
+          <div className="encrypt-card-body sync-providers">
+            {sync.providers.map((provider) => {
+              const Mark = syncLogos[provider.id]
+              return <Mark key={provider.id} />
+            })}
+          </div>
+          <small>{sync.figure.cloud}</small>
+        </article>
+        <SyncLink icon={RefreshCw} label={sync.figure.synced} />
+        <article className="encrypt-card">
+          <div className="encrypt-card-body">
+            <Smartphone className="size-10" />
+          </div>
+          <small>{sync.figure.otherDevice}</small>
+        </article>
+        <p className="encrypt-unseen">
+          <ServerOff className="size-5" />
+          {sync.figure.noServer}
         </p>
       </div>
     </figure>
@@ -938,6 +1052,13 @@ export default function LandingPage() {
             <p>{encrypt.body}</p>
           </div>
           <EncryptFigure />
+        </section>
+        <section className="split split-flip" id="sync">
+          <SyncFigure />
+          <div>
+            <h2>{sync.title}</h2>
+            <p>{sync.body}</p>
+          </div>
         </section>
         <section className="split split-flip" id="locks">
           <LocksFigure />

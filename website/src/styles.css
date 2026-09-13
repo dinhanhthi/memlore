@@ -910,7 +910,7 @@ footer {
 }
 .encrypt-scene {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 80px minmax(0, 1fr) 80px minmax(0, 1fr);
   gap: 8px 4px;
   align-items: stretch;
   justify-items: stretch;
@@ -981,11 +981,30 @@ footer {
   transform: translate(-50%, -50%);
   animation: encrypt-spin 10s linear infinite;
 }
+.encrypt-link {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  align-self: center;
+}
+.encrypt-link small {
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  text-align: center;
+  text-wrap: balance;
+}
+.encrypt-card-muted {
+  color: var(--color-muted);
+}
+.encrypt-arrow-blocked {
+  color: var(--color-muted);
+}
 .encrypt-arrow {
   align-self: center;
   justify-self: center;
-  width: 56px;
-  height: 36px;
+  width: 72px;
+  height: 40px;
   color: var(--color-accent);
   overflow: visible;
 }
@@ -1024,6 +1043,24 @@ footer {
     transform: translate(-50%, -50%) rotate(1turn);
   }
 }
+.sync-link svg.size-4 {
+  color: var(--color-accent);
+}
+.sync-providers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.sync-logo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.sync-logo-cloud {
+  width: 42px;
+}
+
 .illust-locks {
   display: grid;
   min-height: 0;
@@ -2135,8 +2172,8 @@ tbody th {
   }
   .encrypt-arrow {
     transform: rotate(90deg);
-    width: 36px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
   }
   .illust-transfer {
     grid-template-columns: minmax(0, 1fr);

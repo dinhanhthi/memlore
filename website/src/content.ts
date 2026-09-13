@@ -31,7 +31,7 @@ export const hero = {
   titleAccent: 'A lasting story.',
   descriptionLead: 'Memlore is a private journal.',
   description: 'For the days you want to remember, and the thoughts you need to put somewhere.',
-  download: 'Download beta',
+  download: 'Download for Mac',
   downloadAria: 'Download the beta from GitHub',
   tryDemo: 'Try the demo',
   followGithub: 'Follow the journey',
@@ -44,7 +44,7 @@ export const hero = {
 
 export const demo = {
   title: 'Get a feel for it.',
-  subtitle: 'A real little journal. A made-up life. Yours to explore.',
+  subtitle: 'A mockup of the Memlore app with fake data.',
   cue: 'Click around. It works like the real app.',
   themeAria: 'Choose appearance',
   themes: {
@@ -69,13 +69,32 @@ export const demo = {
 }
 
 export const encrypt = {
-  title: 'Even we cannot read it.',
-  body: 'Locked with your password, on your device. Memlore has no servers and no backdoor. A password is required — always. Files on disk stay sealed without it. A lost password cannot be recovered — not even by us.',
+  title: 'No server. No backdoor. We cannot read it.',
+  body: 'Everything is encrypted on your device with your password — including what syncs to your own cloud. There is no Memlore server in between, and no way back in without that password.',
   figure: {
-    words: 'Your words',
+    content: 'Your content',
+    cloud: 'Your cloud',
+    others: 'Others (even us)',
     password: 'Your password',
-    sealed: 'Sealed',
-    unseen: 'Memlore cannot read this',
+    blocked: 'No access',
+    unseen: 'Encrypted before it leaves your device',
+  },
+}
+
+export const sync = {
+  title: 'Your cloud. Your account. Your key.',
+  body: 'Memlore seals each entry on your device first, then leaves the sealed file in a folder of your own Google Drive or iCloud Drive. Your other devices pick it up and open it with your password. There is no Memlore server in between — we never hold your files, your account, or your key, and you can turn sync off or take the folder back at any time.',
+  providers: [
+    { id: 'gdrive' as const, name: 'Google Drive' },
+    { id: 'icloud' as const, name: 'iCloud Drive' },
+  ],
+  figure: {
+    device: 'This device',
+    otherDevice: 'Your other devices',
+    encrypted: 'Encrypted with your password',
+    synced: 'Synced',
+    cloud: 'Your own cloud folder',
+    noServer: 'No Memlore server in between',
   },
 }
 
@@ -430,7 +449,7 @@ export const footer = {
   titleLead: 'The ordinary days',
   titleAccent: 'are worth keeping.',
   tryDemo: 'Try the demo',
-  download: 'Download beta',
+  download: 'Download for Mac',
   downloadAria: 'Download the beta from GitHub',
   note: 'Made for your life. Made in the open.',
   github: 'GitHub',
