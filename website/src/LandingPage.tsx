@@ -340,27 +340,27 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   }
   if (mark === 'yes') {
     return (
-      <span className="mark mark-yes" aria-label={label}>
+      <span className="mark mark-yes" role="img" aria-label={label}>
         <Check className="size-3" aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'no') {
     return (
-      <span className="mark mark-no" aria-label={label}>
+      <span className="mark mark-no" role="img" aria-label={label}>
         <X className="size-3" aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'soon') {
     return (
-      <span className="mark mark-soon" aria-label={label}>
+      <span className="mark mark-soon" role="img" aria-label={label}>
         {comparison.soon}
       </span>
     )
   }
   return (
-    <span className="mark mark-partial" aria-label={label}>
+    <span className="mark mark-partial" role="img" aria-label={label}>
       —
     </span>
   )
