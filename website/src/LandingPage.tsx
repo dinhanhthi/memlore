@@ -1013,9 +1013,12 @@ function Demo({ wide }: { wide: boolean }) {
         {wide ? (
           <p className="demo-cue">
             {demo.cue}
-            <svg className="demo-cue-arrow" viewBox="0 0 64 80" aria-hidden="true">
-              <path className="demo-cue-shaft" d="M44 6 C 44 38 32 62 12 76" />
-              <path className="demo-cue-head" d="M12 76 L26 75 L18 63 Z" />
+            <svg className="demo-cue-arrow" viewBox="0 0 64 72" aria-hidden="true">
+              <path
+                className="demo-cue-shaft"
+                d="M38.2 6 C38.5 7.2 39.7 10.7 39.9 13.1 C40 15.5 39.8 18.2 39.2 20.5 C38.5 22.9 37.4 25.4 36.1 27.4 C34.7 29.4 32.9 31.2 31 32.5 C29.1 33.9 26.8 34.9 24.7 35.3 C22.7 35.8 20.4 35.8 18.5 35.4 C16.5 35 14.7 34.1 13.3 32.9 C11.9 31.8 10.8 30.1 10.2 28.5 C9.7 26.9 9.6 24.9 10 23.2 C10.4 21.5 11.4 19.7 12.8 18.3 C14.1 16.9 16.1 15.6 18.2 15 C20.3 14.3 22.9 14 25.4 14.3 C27.9 14.6 30.7 15.4 33.1 16.8 C35.6 18.2 38.1 20.2 40 22.5 C42 24.9 43.7 27.8 44.8 30.9 C45.8 33.9 46.1 37.3 46.4 40.8 C46.7 44.3 46.4 50 46.4 51.8"
+              />
+              <path className="demo-cue-head" d="M46.4 64.8 L38.6 50.8 L54.3 50.8 Z" />
             </svg>
           </p>
         ) : null}

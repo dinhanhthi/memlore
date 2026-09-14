@@ -603,6 +603,7 @@ footer {
   stroke: currentColor;
   stroke-width: 2.4;
   stroke-linecap: round;
+  stroke-linejoin: round;
   stroke-dasharray: 7 6;
   animation: demo-cue-dash 1.1s linear infinite;
 }
