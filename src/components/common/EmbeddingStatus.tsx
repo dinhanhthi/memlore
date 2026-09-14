@@ -182,7 +182,7 @@ export function EmbeddingStatus({ compact = false, className }: EmbeddingStatusP
         data-testid="embedding-status"
         data-state={status}
         className={cn(
-          'text-fg-muted hover:bg-surface-subtle hover:text-fg flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent px-2 transition-colors duration-150',
+          'text-fg-muted hover:bg-surface-subtle hover:text-fg flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent px-2 transition-colors duration-(--motion-duration-fast)',
           className,
         )}
       >
@@ -221,7 +221,7 @@ export function EmbeddingStatus({ compact = false, className }: EmbeddingStatusP
           onClick={handleLearnMore}
           aria-label={t('embedding_status.learn_more_aria')}
           data-testid="embedding-status-learn-more"
-          className="text-fg-muted hover:bg-surface-subtle hover:text-fg ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent transition-colors duration-150"
+          className="text-fg-muted hover:bg-surface-subtle hover:text-fg ml-auto flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent transition-colors duration-(--motion-duration-fast)"
         >
           <CircleHelp className="size-3.5" strokeWidth={1.75} />
         </button>

@@ -246,12 +246,15 @@ export function ComboBox({
           className={cn(
             'text-fg-muted absolute top-1/2 right-2 -translate-y-1/2',
             'flex size-6 items-center justify-center rounded',
-            'hover:text-fg hover:bg-accent/10 transition-colors duration-150',
+            'hover:text-fg hover:bg-accent/10 transition-colors duration-(--motion-duration-fast)',
             'disabled:cursor-not-allowed disabled:opacity-50',
           )}
         >
           <ChevronDown
-            className={cn('size-4 transition-transform duration-150', open && 'rotate-180')}
+            className={cn(
+              'size-4 transition-transform duration-(--motion-duration-fast)',
+              open && 'rotate-180',
+            )}
             strokeWidth={1.75}
           />
         </button>

@@ -323,7 +323,7 @@ export function LocationPicker({
                     onClick={() => void pick(sug)}
                     className={cn(
                       'cursor-pointer px-3 py-2 text-sm',
-                      'transition-colors duration-100',
+                      'transition-colors duration-(--motion-duration-fast)',
                       isLastAlias
                         ? 'border-border-default border-b-2'
                         : idx !== suggestions.length - 1
@@ -373,7 +373,7 @@ export function LocationPicker({
               className={cn(
                 'flex w-full items-center justify-between',
                 'text-fg-muted hover:text-fg text-xs font-medium',
-                'transition-colors duration-150',
+                'transition-colors duration-(--motion-duration-fast)',
               )}
             >
               <span>{t('location_picker.saved_locations')}</span>
@@ -392,7 +392,7 @@ export function LocationPicker({
                     onClick={() => pickSavedAlias(alias)}
                     className={cn(
                       'cursor-pointer px-3 py-2 text-sm',
-                      'transition-colors duration-100',
+                      'transition-colors duration-(--motion-duration-fast)',
                       idx !== savedAliases.length - 1 ? 'border-border-default border-b' : '',
                       'text-fg hover:bg-accent/5',
                     )}

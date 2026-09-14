@@ -61,7 +61,7 @@ export function AddLocationPopup({ onSave, onClose }: AddLocationPopupProps) {
           className={cn(
             'text-fg-muted hover:text-fg',
             'outline-none',
-            'transition-colors duration-150',
+            'transition-colors duration-(--motion-duration-fast)',
           )}
         >
           <X className="size-4" strokeWidth={1.75} />

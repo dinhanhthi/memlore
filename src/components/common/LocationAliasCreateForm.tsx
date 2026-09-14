@@ -189,7 +189,7 @@ export function LocationAliasCreateForm({
                   if (!disabled) void pick(sug)
                 }}
                 className={cn(
-                  'cursor-pointer px-3 py-2 text-sm transition-colors duration-100',
+                  'cursor-pointer px-3 py-2 text-sm transition-colors duration-(--motion-duration-fast)',
                   idx !== suggestions.length - 1
                     ? 'border-border-default surface-soft:border-border-default border-b'
                     : '',

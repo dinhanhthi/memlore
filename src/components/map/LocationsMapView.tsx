@@ -173,10 +173,12 @@ export function LocationsMapView() {
         data-open={overlayOpen}
         inert={!overlayOpen}
         className={cn(
-          'border-border-default absolute inset-y-0 right-0 z-1200 flex transform-gpu flex-col border-l shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none',
+          'border-border-default absolute inset-y-0 right-0 z-1200 flex transform-gpu flex-col border-l shadow-2xl transition-transform ease-(--motion-ease-out-expo) motion-reduce:transition-none',
           OVERLAY_WIDTH_CLASS,
           'bg-panel-3',
-          overlayOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full',
+          overlayOpen
+            ? 'translate-x-0 duration-(--motion-duration-slow)'
+            : 'pointer-events-none translate-x-full duration-(--motion-duration-spring)',
         )}
       >
         <div className="border-border-default flex items-center justify-end border-b px-2 py-1.5">

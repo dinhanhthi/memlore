@@ -494,7 +494,7 @@ function EntryCardImpl({
                 aria-label={t('entry_card.delete_aria')}
                 onClick={handleDeleteClick}
                 className={cn(
-                  'shrink-0 rounded-md p-1 transition-opacity duration-150',
+                  'shrink-0 rounded-md p-1 transition-opacity duration-(--motion-duration-fast)',
                   // opacity reveal (not a ring): keyboard focus must un-hide the button,
                   // or Tab lands on an invisible-but-clickable delete control.
                   'text-fg-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
@@ -510,7 +510,7 @@ function EntryCardImpl({
                 aria-label={t('entry_card.favorite_aria')}
                 onClick={handleFavoriteClick}
                 className={cn(
-                  'shrink-0 rounded-md p-1 transition-opacity duration-150',
+                  'shrink-0 rounded-md p-1 transition-opacity duration-(--motion-duration-fast)',
                   entry.is_favorite
                     ? 'text-warning'
                     : 'text-fg-muted hover:text-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',

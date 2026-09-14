@@ -80,7 +80,7 @@ export function EmotionHistogram({ period }: EmotionHistogramProps) {
               style={{ backgroundColor: 'var(--color-surface-subtle)' }}
             >
               <div
-                className="h-full rounded-full transition-[transform] duration-300 motion-reduce:transition-none"
+                className="h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
                 style={{
                   width: `${Math.max(widthPct, count > 0 ? 4 : 0)}%`,
                   backgroundColor: fill,

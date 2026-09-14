@@ -355,7 +355,7 @@ function PickerRow({ label, active, icon, journal, onClick }: PickerRowProps) {
       className={cn(
         'flex w-full min-w-0 items-center gap-2 rounded-lg py-1.5 text-left text-sm',
         journal ? 'pr-2.5 pl-1.5' : 'pr-2.5 pl-2.5',
-        'transition-colors duration-150',
+        'transition-colors duration-(--motion-duration-fast)',
         active ? 'bg-accent-soft text-accent-text font-semibold' : 'text-fg hover:bg-panel-1',
       )}
     >

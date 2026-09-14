@@ -267,7 +267,7 @@ export function Select({
         </span>
         <ChevronDown
           className={cn(
-            'text-fg-muted size-4 shrink-0 transition-transform duration-150',
+            'text-fg-muted size-4 shrink-0 transition-transform duration-(--motion-duration-fast)',
             open && 'rotate-180',
           )}
           strokeWidth={1.75}

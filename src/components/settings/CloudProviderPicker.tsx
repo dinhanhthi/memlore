@@ -56,7 +56,7 @@ export function CloudProviderPicker({
           <div
             className={cn(
               'flex h-full min-w-0 flex-col rounded-xl',
-              'motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-150',
+              'motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-(--motion-duration-fast)',
               'motion-reduce:transition-none',
               selected
                 ? 'border-accent bg-accent-soft border'

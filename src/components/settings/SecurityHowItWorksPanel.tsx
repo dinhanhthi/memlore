@@ -105,7 +105,7 @@ function SecurityHowItWorksBody() {
                     <span>{t(`security.how_security_works.sections.${sectionKey}.title`)}</span>
                     <ChevronDown
                       className={cn(
-                        'text-fg-muted size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
+                        'text-fg-muted size-4 shrink-0 transition-transform duration-(--motion-duration-base) motion-reduce:transition-none',
                         isOpen && 'rotate-180',
                       )}
                       strokeWidth={1.75}

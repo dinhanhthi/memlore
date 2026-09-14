@@ -99,7 +99,7 @@ export function PasswordInput({
           'absolute top-1/2 right-3 -translate-y-1/2',
           'flex items-center justify-center rounded-lg p-1',
           'text-fg-muted hover:text-fg',
-          'transition-colors duration-150',
+          'transition-colors duration-(--motion-duration-fast)',
           'disabled:cursor-not-allowed disabled:opacity-50',
         )}
       >

@@ -92,7 +92,7 @@ export function TemplatePicker({ templates, onSelect, onClose }: TemplatePickerP
                 className={cn(
                   'text-fg bg-elevated cursor-pointer rounded-xl p-3.5 text-left',
                   'border-border-default hover:border-accent/60 border',
-                  'transition-colors duration-200',
+                  'transition-colors duration-(--motion-duration-base)',
                 )}
               >
                 <MiniPreview lines={lines} />

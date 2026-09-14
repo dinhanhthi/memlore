@@ -94,6 +94,9 @@ export function MediaGalleryCarousel({
       return
     }
     setClosing(true)
+    // Must outlast the closing transition below, which runs on
+    // `--motion-duration-fast` (150ms). Bump this if that token grows, or the
+    // overlay unmounts mid-fade.
     closeTimerRef.current = window.setTimeout(onClose, 200)
   }, [onClose, reducedMotion])
   useEffect(() => {
@@ -142,8 +145,11 @@ export function MediaGalleryCarousel({
   const overlay = (
     <div
       className={cn(
-        'absolute inset-0 z-40 flex flex-col bg-black/90 transition-opacity duration-200 ease-out motion-reduce:transition-none',
-        shown ? 'opacity-100' : 'opacity-0',
+        'absolute inset-0 z-40 flex flex-col bg-black/90 transition-opacity ease-(--motion-ease-out-expo) motion-reduce:transition-none',
+        // Modal open/close asymmetry — the exit is quicker than the entrance.
+        shown
+          ? 'opacity-100 duration-(--motion-duration-base)'
+          : 'opacity-0 duration-(--motion-duration-fast)',
       )}
       onClick={closeIfBackdrop}
       role="dialog"
@@ -194,8 +200,10 @@ export function MediaGalleryCarousel({
           blob URL per item. */}
       <div
         className={cn(
-          'relative flex min-h-0 flex-1 items-center justify-center px-4 transition-transform duration-200 ease-out motion-reduce:transition-none',
-          shown ? 'scale-100' : 'scale-95',
+          'relative flex min-h-0 flex-1 items-center justify-center px-4 transition-transform ease-(--motion-ease-out-expo) motion-reduce:transition-none',
+          shown
+            ? 'scale-100 duration-(--motion-duration-base)'
+            : 'scale-96 duration-(--motion-duration-fast)',
         )}
         onClick={closeIfBackdrop}
       >

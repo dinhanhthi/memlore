@@ -257,7 +257,7 @@ export function AppearanceSettings() {
                                   onClick={() => setAccentPreset(opt.id)}
                                   style={{ background: opt.hex }}
                                   className={cn(
-                                    'ring-offset-panel-2 size-6 rounded-full transition-shadow duration-150',
+                                    'ring-offset-panel-2 size-6 rounded-full transition-shadow duration-(--motion-duration-fast)',
                                     'outline-none',
                                     selected
                                       ? 'ring-accent ring-2 ring-offset-2'
@@ -277,7 +277,7 @@ export function AppearanceSettings() {
                               onClick={() => setAccentPreset('custom')}
                               style={{ background: accentHex }}
                               className={cn(
-                                'ring-offset-panel-2 size-6 rounded-full transition-shadow duration-150',
+                                'ring-offset-panel-2 size-6 rounded-full transition-shadow duration-(--motion-duration-fast)',
                                 'outline-none',
                                 accentPreset === 'custom'
                                   ? 'ring-accent ring-2 ring-offset-2'
@@ -471,7 +471,7 @@ export function AppearanceSettings() {
                                 // Clean's `[class~='rounded-xl']` corner-radius sweep,
                                 // so these preset cards keep a fixed radius at every
                                 // Corner radius setting. Do not "tidy" it to rounded-xl.
-                                'flex flex-col items-center gap-2 rounded-(--radius-xl) p-3 transition-[box-shadow,border-color] duration-150 outline-none',
+                                'flex flex-col items-center gap-2 rounded-(--radius-xl) p-3 transition-[box-shadow,border-color] duration-(--motion-duration-fast) outline-none',
                                 selected
                                   ? 'gradient-border-primary border border-transparent [--border-gradient-width:2px]'
                                   : 'border-border-default hover:bg-surface-hi border',

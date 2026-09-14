@@ -115,8 +115,14 @@ export function SlideOverPanel({
           onClick={onClose}
           aria-hidden="true"
           className={cn(
-            'xj-scrim absolute inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none',
-            open ? 'opacity-100' : 'pointer-events-none opacity-0',
+            'xj-scrim absolute inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity ease-(--motion-ease-out-expo) motion-reduce:transition-none',
+            // Open is an invitation, close gets out of the way: the exit runs
+            // on the shorter duration so dismissal never feels sticky.
+            // `--motion-duration-spring` is borrowed for its 350ms value only —
+            // the easing stays out-expo, so nothing overshoots on the way out.
+            open
+              ? 'opacity-100 duration-(--motion-duration-slow)'
+              : 'pointer-events-none opacity-0 duration-(--motion-duration-spring)',
           )}
         />
         {/* Panel — parked off-screen right via `translate-x-full`; slides in
@@ -128,9 +134,11 @@ export function SlideOverPanel({
           aria-label={title}
           inert={!open}
           className={cn(
-            'bg-elevated border-border-default absolute inset-y-0 right-0 z-50 flex w-full transform-gpu flex-col border-l shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none',
+            'bg-elevated border-border-default absolute inset-y-0 right-0 z-50 flex w-full transform-gpu flex-col border-l shadow-2xl transition-transform ease-(--motion-ease-out-expo) motion-reduce:transition-none',
             maxWidthClass,
-            open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
+            open
+              ? 'translate-x-0 duration-(--motion-duration-slow)'
+              : 'pointer-events-none translate-x-full duration-(--motion-duration-spring)',
           )}
         >
           <div className="border-border-default flex shrink-0 items-center justify-between gap-3 border-b px-6 py-4">

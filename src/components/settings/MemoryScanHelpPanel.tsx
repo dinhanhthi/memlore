@@ -69,7 +69,7 @@ function MemoryScanHelpBody() {
               <span>{t(`user_memory.scan_help.${sectionKey}_title`)}</span>
               <ChevronDown
                 className={cn(
-                  'text-fg-muted size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none',
+                  'text-fg-muted size-4 shrink-0 transition-transform duration-(--motion-duration-base) motion-reduce:transition-none',
                   isOpen && 'rotate-180',
                 )}
                 strokeWidth={1.75}

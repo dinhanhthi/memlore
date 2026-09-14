@@ -112,7 +112,7 @@ function SecretKeyField({
         onClick={onToggleVisible}
         className={cn(
           'text-fg-muted absolute right-3 flex items-center',
-          'hover:text-fg transition-colors duration-150',
+          'hover:text-fg transition-colors duration-(--motion-duration-fast)',
           'outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
         )}
@@ -630,7 +630,7 @@ export function LocationSettings() {
                           className={cn(
                             'text-fg-muted hover:text-fg shrink-0',
                             'outline-none',
-                            'transition-colors duration-150',
+                            'transition-colors duration-(--motion-duration-fast)',
                           )}
                         >
                           <Plus className="size-4" strokeWidth={1.75} />
@@ -686,7 +686,7 @@ export function LocationSettings() {
                                   aria-pressed={isDefault}
                                   className={cn(
                                     'outline-none',
-                                    'transition-colors duration-150',
+                                    'transition-colors duration-(--motion-duration-fast)',
                                     isDefault
                                       ? 'text-accent'
                                       : 'text-fg-subtle hover:text-fg disabled:opacity-50',
@@ -711,7 +711,7 @@ export function LocationSettings() {
                                     'text-fg-subtle',
                                     'hover:text-danger',
                                     'outline-none',
-                                    'transition-colors duration-150',
+                                    'transition-colors duration-(--motion-duration-fast)',
                                   )}
                                 >
                                   <Trash2 className="size-4" strokeWidth={1.75} />
