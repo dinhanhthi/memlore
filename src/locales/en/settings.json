@@ -478,8 +478,7 @@
     "author_website": "dinhanhthi.com",
     "author_email": "me@dinhanhthi.com",
     "repo_title": "Open Source",
-    "repo_label": "github.com/dinhanhthi/memlore",
-    "license": "Free & open source under AGPL-3.0-or-later — see LICENSE in the repository."
+    "license": "Free & open source under AGPL-3.0-or-later — see LICENSE in the <repoLink>repository</repoLink>. Found a problem in the app? Please <issuesLink>open an issue on GitHub</issuesLink>."
   },
   "location": {
     "tabs": {

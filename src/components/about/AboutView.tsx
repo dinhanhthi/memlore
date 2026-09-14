@@ -1,8 +1,8 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useRef } from 'react'
-import { Code2, ExternalLink, Globe, Mail } from 'lucide-react'
+import { ExternalLink, Globe, Mail } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { useLogoDirection, logoSrc, ALL_LOGO_DIRECTIONS } from '../../hooks/useLogoDirection'
@@ -13,6 +13,7 @@ import { IconCustom } from '../common/IconCustom'
 const AUTHOR_WEBSITE_URL = 'https://dinhanhthi.com'
 const AUTHOR_EMAIL = 'me@dinhanhthi.com'
 const REPO_URL = 'https://github.com/dinhanhthi/memlore'
+const ISSUES_URL = 'https://github.com/dinhanhthi/memlore/issues'
 
 function ExternalLinkRow({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -32,6 +33,18 @@ function ExternalLinkRow({ href, icon, label }: { href: string; icon: ReactNode;
       <span className="text-fg-muted">{icon}</span>
       <span>{label}</span>
       <ExternalLink className="size-3 opacity-60" strokeWidth={1.75} />
+    </a>
+  )
+}
+
+function InlineExternalLink({ href, children }: { href: string; children?: ReactNode }) {
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    void openUrl(href)
+  }
+  return (
+    <a href={href} onClick={handleClick} className="text-accent underline-offset-2 hover:underline">
+      {children}
     </a>
   )
 }
@@ -94,16 +107,16 @@ export function AboutView() {
         </SettingsSection>
 
         <SettingsSection title={t('about_section.repo_title')}>
-          <div className="flex flex-col gap-2">
-            <p className="text-fg-secondary text-sm leading-relaxed">
-              {t('about_section.license')}
-            </p>
-            <ExternalLinkRow
-              href={REPO_URL}
-              icon={<Code2 className="size-3.5" strokeWidth={1.75} />}
-              label={t('about_section.repo_label')}
+          <p className="text-fg-secondary text-sm leading-relaxed">
+            <Trans
+              i18nKey="about_section.license"
+              ns="settings"
+              components={{
+                repoLink: <InlineExternalLink href={REPO_URL} />,
+                issuesLink: <InlineExternalLink href={ISSUES_URL} />,
+              }}
             />
-          </div>
+          </p>
         </SettingsSection>
       </div>
     </RestoredScroll>
