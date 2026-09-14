@@ -8,7 +8,6 @@ import { getTabScroll, tabScrollKey } from '../../lib/tabScrollPositions'
 import { useTabStore } from '../../stores/tabStore'
 import { useEntries } from '../../hooks/useEntries'
 import { EMPTY_TAGS, useEntryTags } from '../../hooks/useEntryTags'
-import { useTemplates } from '../../hooks/useTemplates'
 import { formatGroupDateLabel, groupEntriesByDate, toISODate } from '../../lib/dates'
 import { resolveFirstDayOfWeek } from '../../lib/firstDayOfWeek'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
@@ -35,7 +34,6 @@ import { Paginator } from '../common/Paginator'
 import { EntryCard } from '../entries/EntryCard'
 import { ENTRY_CARD_IDLE_BG } from '../entries/entryCardIdleBg'
 import EntryListSkeleton from '../entries/EntryListSkeleton'
-import { TemplatePicker } from '../templates/TemplatePicker'
 import { EntryListFilterRow } from './EntryListFilterRow'
 import { SecondPanel } from './SecondPanel'
 
@@ -126,7 +124,6 @@ export function EntryList({
 }: EntryListProps) {
   const { t, i18n } = useTranslation('nav')
   const { attachTag } = useTags()
-  const { templates } = useTemplates()
   const enqueuePendingTemplate = useTemplateStore((s) => s.enqueuePendingTemplate)
   const selectedEntryId = useSelectedEntryId()
   const tabId = useTabStore((s) => s.activeTabId)
@@ -140,8 +137,6 @@ export function EntryList({
   const selectedCardRef = useRef<HTMLDivElement | null>(null)
   const updateActiveTab = useUpdateActiveTab()
   const journals = useJournalStore((s) => s.journals)
-  const templatePickerOpen = useUiStore((s) => s.templatePickerOpen)
-  const setTemplatePickerOpen = useUiStore((s) => s.setTemplatePickerOpen)
   // Starred filter: plain component state, not uiStore — intentionally does
   // NOT persist across app restarts or survive a tab switch (avoids the
   // "hidden filter" trap where a stale toggle silently hides entries).
@@ -380,21 +375,13 @@ export function EntryList({
     ],
   )
 
-  const handleTemplateSelected = async (template: Template) => {
-    setTemplatePickerOpen(false)
-    // The "blank" predefined template intentionally carries empty content —
-    // don't enqueue it, just create a plain entry. The name field stores the
-    // slug key ('blank') now that display names are resolved via i18n.
-    const isBlank = template.name === 'blank' && template.is_predefined
-    await createEntryWithOptionalTemplate(isBlank ? null : template)
-  }
-
-  // The ⌘N shortcut bypasses the picker and creates a blank entry directly —
-  // same fast-path the keyboard shortcut has always had.
+  // Entry creation funnels through `memlore:new-entry`: ⌘N dispatches it with
+  // no detail (blank entry, the fast-path it has always had), TemplatePickerHost
+  // dispatches it with the picked template after switching to this view.
   useEffect(() => {
     const handler = (e: Event) => {
-      const seedHtml = (e as CustomEvent<{ seedHtml?: string }>).detail?.seedHtml
-      void createEntryWithOptionalTemplate(null, seedHtml)
+      const detail = (e as CustomEvent<{ seedHtml?: string; template?: Template | null }>).detail
+      void createEntryWithOptionalTemplate(detail?.template ?? null, detail?.seedHtml)
     }
     window.addEventListener('memlore:new-entry', handler)
     return () => window.removeEventListener('memlore:new-entry', handler)
@@ -613,14 +600,6 @@ export function EntryList({
             variant="compact"
           />
         </>
-      )}
-
-      {templatePickerOpen && (
-        <TemplatePicker
-          templates={templates}
-          onSelect={handleTemplateSelected}
-          onClose={() => setTemplatePickerOpen(false)}
-        />
       )}
     </ListFrame>
   )

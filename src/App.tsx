@@ -14,6 +14,7 @@ import { FooterBar } from './components/layout/FooterBar'
 import { WindowDragRegion } from './components/layout/WindowDragRegion'
 import { QuitConfirmDialog } from './components/layout/QuitConfirmDialog'
 import { SearchOverlay } from './components/search/SearchOverlay'
+import { TemplatePickerHost } from './components/templates/TemplatePickerHost'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { EmbeddingExplainerPanel } from './components/ai/EmbeddingExplainerPanel'
 import { AdoptedAiSetupModal } from './components/ai/AdoptedAiSetupModal'
@@ -124,6 +125,7 @@ function App() {
   // "I saved it"). The stash survives until confirmed, so we surface it again.
   // Stored in uiStore (not local useState) so the reveal modal is not bound to
   // the Settings subtree — it survives category switches and tab closes.
+  const templatePickerOpen = useUiStore((s) => s.templatePickerOpen)
   const pendingRotationPhrase = useUiStore((s) => s.pendingRotationPhrase)
   const pendingRotationRevealIsReset = useUiStore((s) => s.pendingRotationRevealIsReset)
   const setPendingRotationPhrase = useUiStore((s) => s.setPendingRotationPhrase)
@@ -418,6 +420,7 @@ function App() {
         </div>
       </div>
       <SearchOverlay />
+      {templatePickerOpen && <TemplatePickerHost />}
       <CommandPalette />
       <EmbeddingExplainerPanel />
       {/* New device adopted a vault that already has AI slots: ask, then
