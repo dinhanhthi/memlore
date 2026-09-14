@@ -1,4 +1,5 @@
 export const githubUrl = 'https://github.com/dinhanhthi/memlore'
+export const authorUrl = 'https://dinhanhthi.com'
 
 export const meta = {
   title: 'Memlore — A little life. A lasting story.',
@@ -479,6 +480,7 @@ export const footer = {
   tryDemo: 'Try the demo',
   download: 'Download for Mac',
   downloadAria: 'Download the beta from GitHub',
-  note: 'Made for your life. Made in the open.',
+  note: 'Made with ❤️ by',
+  author: 'Thi',
   github: 'GitHub',
 }

@@ -8,6 +8,7 @@ import {
   editor,
   emotions,
   encrypt,
+  authorUrl,
   footer,
   githubUrl,
   hero,
@@ -51,6 +52,12 @@ function product(name: string) {
 
 it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
+})
+
+it('credits the author with the public personal site', () => {
+  expect(footer.note).toBe('Made with ❤️ by')
+  expect(footer.author).toBe('Thi')
+  expect(authorUrl).toBe('https://dinhanhthi.com')
 })
 
 it('says the journal stays free and is open for security and data', () => {

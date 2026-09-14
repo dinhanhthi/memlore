@@ -1947,12 +1947,21 @@ tbody th {
 .footer-bottom .wordmark {
   font-size: 20px;
 }
+.footer-credit a {
+  color: var(--color-ink);
+}
+.footer-credit a:hover {
+  color: var(--color-accent);
+}
 .footer-bottom > a:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   white-space: nowrap;
+}
+.footer-bottom > a:last-child:hover {
+  color: var(--color-accent);
 }
 .skip-link {
   position: fixed;

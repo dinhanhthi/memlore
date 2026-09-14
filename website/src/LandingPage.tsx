@@ -64,6 +64,7 @@ import {
   editor,
   emotions,
   encrypt,
+  authorUrl,
   footer,
   githubUrl,
   hero,
@@ -1360,7 +1361,12 @@ export default function LandingPage() {
           <a className="wordmark" href="#main">
             {nav.wordmark}
           </a>
-          <p>{footer.note}</p>
+          <p className="footer-credit">
+            {footer.note}{' '}
+            <a href={authorUrl} target="_blank" rel="noreferrer">
+              {footer.author}
+            </a>
+          </p>
           <a href={githubUrl} target="_blank" rel="noreferrer">
             {footer.github} <ArrowUpRight className="size-4" />
           </a>
