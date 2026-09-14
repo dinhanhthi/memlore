@@ -1773,10 +1773,6 @@
   background-color: var(--color-surface-hi);
 }
 
-:root.ds-clay .xj-sidebar-nav button:not(.xj-nav-active):hover {
-  background-color: var(--nav-hover-bg);
-}
-
 :root.ds-clay .xj-nav-active {
   /* Light: raised soft chip (same fill as second/third panels). Dark: wash only.
      --shadow-chip, not --elev-1: see the token note (clipped by the strip). */

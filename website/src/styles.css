@@ -412,7 +412,8 @@ footer {
 }
 .demo-status .button {
   min-height: var(--button-height-md);
-  font-size: var(--text-small);
+  font-size: var(--text-md);
+  font-weight: normal;
 }
 .download:focus-visible,
 .button:focus-visible {

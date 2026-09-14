@@ -206,7 +206,9 @@ export function Sidebar() {
                   'group relative flex items-center gap-3 px-2.5 py-2 text-sm font-medium',
                   'h-9 transition-[background-color,color,box-shadow] duration-(--motion-duration-fast) ease-(--motion-ease-out-expo)',
                   'w-full text-left select-none',
-                  isClean && 'h-8 gap-2 px-2',
+                  // Collapsed keeps the default h-9/px-2.5 so the item stays
+                  // square (36×36, matching the CTA) with the icon centred.
+                  isClean && !sidebarCollapsed && 'h-8 gap-2 px-2',
                   isActive
                     ? isClean
                       ? 'xj-nav-active text-fg z-10 rounded-md bg-(--nav-active-bg) font-medium'

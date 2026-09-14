@@ -51,20 +51,20 @@ export function coerceSurfaceStyle(v: unknown): SurfaceStyle {
 
 /**
  * Clean-only corner-radius level — orthogonal to the design-system
- * union. `low` is today's Clean rendering (stamps no class);
- * `medium` stamps `.rad-medium`; `high` stamps `.rad-high`.
+ * union. `low` stamps no class; `medium` stamps `.rad-medium`;
+ * `high` (the default) stamps `.rad-high`.
  */
 export type CornerRadius = 'low' | 'medium' | 'high'
 
 export const CORNER_RADII: readonly CornerRadius[] = ['low', 'medium', 'high']
 
-export const DEFAULT_CORNER_RADIUS: CornerRadius = 'low'
+export const DEFAULT_CORNER_RADIUS: CornerRadius = 'high'
 
 function isCornerRadius(v: unknown): v is CornerRadius {
   return typeof v === 'string' && (CORNER_RADII as readonly string[]).includes(v)
 }
 
-/** Anything not in `CORNER_RADII` falls back to the default (low). */
+/** Anything not in `CORNER_RADII` falls back to the default (high). */
 export function coerceCornerRadius(v: unknown): CornerRadius {
   return isCornerRadius(v) ? v : DEFAULT_CORNER_RADIUS
 }

@@ -61,7 +61,7 @@ describe('boot IIFE lockstep', () => {
       expect(script).toContain('surface-lumen')
       expect(script).toContain('#05070d')
       const stamp = runBootIife(script, { designSystem: 'lumen', theme: 'light' })
-      expect(stamp.className).toBe('ds-signature dark surface-lumen')
+      expect(stamp.className).toBe('ds-signature dark surface-lumen rad-high')
       expect(stamp.backgroundColor).toBe('#05070d')
     },
   )
@@ -72,7 +72,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'lumen',
       theme: 'light',
     })
-    expect(stamp.className).toBe('ds-signature dark surface-lumen')
+    expect(stamp.className).toBe('ds-signature dark surface-lumen rad-high')
     expect(stamp.backgroundColor).toBe('#05070d')
   })
 
@@ -82,7 +82,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'soft',
       theme: 'light',
     })
-    expect(stamp.className).toBe('ds-signature dark surface-lumen')
+    expect(stamp.className).toBe('ds-signature dark surface-lumen rad-high')
     expect(stamp.backgroundColor).toBe('#05070d')
   })
 
@@ -92,7 +92,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'lumen',
       theme: 'dark',
     })
-    expect(stamp.className).toBe('ds-clean dark')
+    expect(stamp.className).toBe('ds-clean dark rad-high')
     expect(stamp.className).not.toMatch(/surface-/)
     expect(stamp.backgroundColor).toBe('#252525')
   })
@@ -105,7 +105,7 @@ describe('boot IIFE lockstep', () => {
         surfaceStyle: 'lumen',
         theme: 'light',
       })
-      expect(stamp.className).toBe('ds-clean')
+      expect(stamp.className).toBe('ds-clean rad-high')
       expect(stamp.className).not.toMatch(/\bdark\b/)
       expect(stamp.className).not.toMatch(/surface-/)
       expect(stamp.backgroundColor).toBe('#ffffff')
@@ -118,7 +118,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'lumen',
       theme: 'dark',
     })
-    expect(stamp.className).toBe('ds-clay dark')
+    expect(stamp.className).toBe('ds-clay dark rad-high')
     expect(stamp.className).not.toMatch(/surface-/)
     expect(stamp.backgroundColor).toBe('#171513')
   })
@@ -129,7 +129,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'lumen',
       theme: 'light',
     })
-    expect(stamp.className).toBe('ds-clay')
+    expect(stamp.className).toBe('ds-clay rad-high')
     expect(stamp.className).not.toMatch(/\bdark\b/)
     expect(stamp.className).not.toMatch(/surface-/)
     expect(stamp.backgroundColor).toBe('#ebe3d6')
@@ -155,7 +155,7 @@ describe('boot IIFE lockstep', () => {
       surfaceStyle: 'soft',
       theme: 'dark',
     })
-    expect(stamp.className).toBe('ds-signature dark surface-soft')
+    expect(stamp.className).toBe('ds-signature dark surface-soft rad-high')
     expect(stamp.backgroundColor).toBe('#0d0d0d')
   })
 
@@ -181,19 +181,19 @@ describe('boot IIFE lockstep', () => {
     expect(stamp.className).not.toContain('rad-high')
   })
 
-  it.each(iifes)('$label missing / invalid cornerRadius stamps neither rad class', ({ script }) => {
+  it.each(iifes)('$label missing / invalid cornerRadius stamps rad-high', ({ script }) => {
     const missing = runBootIife(script, { designSystem: 'clean', theme: 'dark' })
-    expect(missing.className).toBe('ds-clean dark')
+    expect(missing.className).toBe('ds-clean dark rad-high')
+    expect(missing.className).toContain('rad-high')
     expect(missing.className).not.toContain('rad-medium')
-    expect(missing.className).not.toContain('rad-high')
 
     const invalid = runBootIife(script, {
       designSystem: 'clean',
       theme: 'dark',
       cornerRadius: 'HIGH',
     })
-    expect(invalid.className).toBe('ds-clean dark')
+    expect(invalid.className).toBe('ds-clean dark rad-high')
+    expect(invalid.className).toContain('rad-high')
     expect(invalid.className).not.toContain('rad-medium')
-    expect(invalid.className).not.toContain('rad-high')
   })
 })

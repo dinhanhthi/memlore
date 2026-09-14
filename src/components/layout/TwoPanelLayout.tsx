@@ -168,7 +168,8 @@ export function TwoPanelLayout() {
         <div
           className={cn(
             'z-30 flex min-w-0 flex-1',
-            !isClean && 'p-2',
+            !isClean && !isClay && 'p-2',
+            isClay && 'p-2 pl-0',
             !editorDistractionActive && !isClean && !isClay && (sidebarRight ? 'pr-0' : 'pl-0'),
           )}
         >

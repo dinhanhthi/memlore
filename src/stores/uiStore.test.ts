@@ -200,7 +200,7 @@ describe('uiStore', () => {
         theme: 'dark',
         designSystem: DEFAULT_DESIGN_SYSTEM,
         surfaceStyle: 'deep',
-        cornerRadius: 'low',
+        cornerRadius: DEFAULT_CORNER_RADIUS,
         reducedMotion: true,
         disableGradientPrimary: false,
         logoFollowsCursor: false,
@@ -390,11 +390,11 @@ describe('uiStore', () => {
   })
 
   describe('cornerRadius', () => {
-    it("defaults to 'low'", () => {
-      expect(useUiStore.getState().cornerRadius).toBe('low')
+    it("defaults to 'high'", () => {
+      expect(useUiStore.getState().cornerRadius).toBe('high')
     })
 
-    it("rehydrate coerces a garbage value ('HIGH') to 'low'", async () => {
+    it("rehydrate coerces a garbage value ('HIGH') to 'high'", async () => {
       globalThis.localStorage.setItem(
         'memlore-ui',
         JSON.stringify({
@@ -405,7 +405,7 @@ describe('uiStore', () => {
 
       await useUiStore.persist.rehydrate()
 
-      expect(useUiStore.getState().cornerRadius).toBe('low')
+      expect(useUiStore.getState().cornerRadius).toBe('high')
     })
 
     it("rehydrate keeps a valid stored 'high'", async () => {

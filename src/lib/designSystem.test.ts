@@ -55,8 +55,8 @@ describe('cornerRadius constants', () => {
     expect(CORNER_RADII).toEqual(['low', 'medium', 'high'])
   })
 
-  it("defaults to 'low'", () => {
-    expect(DEFAULT_CORNER_RADIUS).toBe('low')
+  it("defaults to 'high'", () => {
+    expect(DEFAULT_CORNER_RADIUS).toBe('high')
   })
 })
 
@@ -117,12 +117,12 @@ describe('coerceCornerRadius', () => {
     expect(coerceCornerRadius('high')).toBe('high')
   })
 
-  it("maps undefined / null / 'lumen' / 'HIGH' / 42 to 'low'", () => {
-    expect(coerceCornerRadius(undefined)).toBe('low')
-    expect(coerceCornerRadius(null)).toBe('low')
-    expect(coerceCornerRadius('lumen')).toBe('low')
-    expect(coerceCornerRadius('HIGH')).toBe('low')
-    expect(coerceCornerRadius(42)).toBe('low')
+  it("maps undefined / null / 'lumen' / 'HIGH' / 42 to 'high'", () => {
+    expect(coerceCornerRadius(undefined)).toBe('high')
+    expect(coerceCornerRadius(null)).toBe('high')
+    expect(coerceCornerRadius('lumen')).toBe('high')
+    expect(coerceCornerRadius('HIGH')).toBe('high')
+    expect(coerceCornerRadius(42)).toBe('high')
   })
 })
 
