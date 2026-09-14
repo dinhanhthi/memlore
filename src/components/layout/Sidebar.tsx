@@ -8,6 +8,7 @@ import { useJournals } from '../../hooks/useJournals'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
 import { cn } from '../../lib/cn'
 import { isMiddleClick, isNewTabModifier } from '../../lib/modifierClick'
+import { triggerNewEntry } from '../../lib/newEntry'
 import { SIDEBAR_VIEW_ICONS } from '../../lib/viewIcons'
 import { useTabStore } from '../../stores/tabStore'
 import type { ActiveView } from '../../stores/uiStore'
@@ -119,12 +120,7 @@ export function Sidebar() {
       size="sm"
       aria-label={newEntryLabel}
       icon={<PenLine className="size-4 shrink-0" strokeWidth={2} />}
-      onClick={() => {
-        // EntryList owns the event listener, so ensure it mounts before
-        // dispatching when New Entry is clicked from a non-entry view.
-        updateActiveTab({ activeView: 'entries', selectedEntryId: null })
-        requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('memlore:new-entry')))
-      }}
+      onClick={triggerNewEntry}
       // px-2.5 centers the 16px icon in the collapsed ~36px CTA (w-12 − px-1.5×2).
       // gap-0 overrides primary's gap-2 so label spacing can live on the span.
       className="h-9 w-full min-w-0 justify-start gap-0 overflow-hidden px-2.5"

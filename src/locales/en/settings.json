@@ -60,6 +60,13 @@
       "title": "Start at login",
       "hint": "Launch Memlore when you log in."
     },
+    "new_entry_mode": {
+      "title": "New Entry button",
+      "hint": "Choose what happens when you click New Entry.",
+      "radiogroup_label": "New Entry button behavior",
+      "blank": "Blank entry",
+      "template": "From template"
+    },
     "uninstall": {
       "title": "Uninstall Memlore",
       "hint": "Permanently erase every journal, entry, photo and setting stored on this computer.",

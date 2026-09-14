@@ -41,6 +41,7 @@ beforeEach(() => {
     reducedMotion: false,
     uiLanguage: 'en',
     timeFormat: '24h',
+    newEntryMode: 'blank',
     rotationBusy: false,
     deviceRenameBusy: false,
     deviceRemovalBusy: false,
@@ -123,6 +124,17 @@ describe('uiStore', () => {
     })
   })
 
+  describe('setNewEntryMode', () => {
+    it('defaults to blank', () => {
+      expect(useUiStore.getState().newEntryMode).toBe('blank')
+    })
+
+    it('sets mode to template', () => {
+      useUiStore.getState().setNewEntryMode('template')
+      expect(useUiStore.getState().newEntryMode).toBe('template')
+    })
+  })
+
   describe('toggleTheme — basic light↔dark cycle', () => {
     it('moves off light on first toggle (advances cycle)', () => {
       useUiStore.setState({ theme: 'light' })
@@ -196,6 +208,7 @@ describe('uiStore', () => {
         mediaPageSize: 20,
         uiLanguage: 'en',
         timeFormat: '12h',
+        newEntryMode: 'blank',
         addedProviders: [],
       })
       // Orphaned settings-nav keys from older releases must not reappear.
@@ -273,6 +286,20 @@ describe('uiStore', () => {
       await useUiStore.persist.rehydrate()
 
       expect(useUiStore.getState().uiFontScale).toBe(1)
+    })
+
+    it('rehydrate coerces an unknown newEntryMode back to blank', async () => {
+      globalThis.localStorage.setItem(
+        'memlore-ui',
+        JSON.stringify({
+          state: { newEntryMode: 'garbage' },
+          version: 0,
+        }),
+      )
+
+      await useUiStore.persist.rehydrate()
+
+      expect(useUiStore.getState().newEntryMode).toBe('blank')
     })
   })
 

@@ -25,6 +25,11 @@ export function coerceTheme(value: unknown): Theme {
 
 export type TimeFormat = '24h' | '12h'
 
+/** What the "New Entry" trigger points (sidebar button, ⌘N, dashboard Write,
+ *  command palette) do on click: create a blank entry immediately, or open
+ *  the template picker first. */
+export type NewEntryMode = 'blank' | 'template'
+
 /**
  * Interface font-size multiplier. Scales body/UI text tokens and the two
  * sidebars' icons via the runtime `--ui-font-scale` CSS variable (see
@@ -178,6 +183,8 @@ interface UiState {
    */
   mediaPageSize: number
   timeFormat: TimeFormat
+  /** See `NewEntryMode`. Persisted like `timeFormat`. */
+  newEntryMode: NewEntryMode
   /**
    * Current UI language preference. Persisted to localStorage (this store's
    * `memlore-ui` key) — never written to the SQLite `settings` table and
@@ -299,6 +306,7 @@ interface UiState {
   setMediaPageSize: (size: number) => void
   setUiLanguage: (lang: LanguagePreference) => void
   setTimeFormat: (format: TimeFormat) => void
+  setNewEntryMode: (mode: NewEntryMode) => void
   setEntryListRange: (view: EntryListViewKey, range: TimeRange) => void
   setEntryListSort: (view: EntryListViewKey, sort: SortOrder) => void
   setEntryListLockFilter: (view: EntryListViewKey, lockFilter: LockFilter) => void
@@ -346,6 +354,7 @@ export const useUiStore = create<UiState>()(
       mediaPageSize: 20,
       uiLanguage: 'en',
       timeFormat: '24h',
+      newEntryMode: 'blank',
       entryListFilters: {},
       pendingRotationPhrase: null,
       pendingRotationRevealIsReset: false,
@@ -400,6 +409,8 @@ export const useUiStore = create<UiState>()(
       setUiLanguage: (uiLanguage: LanguagePreference) => set({ uiLanguage }),
 
       setTimeFormat: (timeFormat: TimeFormat) => set({ timeFormat }),
+
+      setNewEntryMode: (newEntryMode: NewEntryMode) => set({ newEntryMode }),
 
       setEntryListRange: (view, range) =>
         set((state) => ({
@@ -479,6 +490,7 @@ export const useUiStore = create<UiState>()(
         uiFontScale: state.uiFontScale,
         mediaPageSize: state.mediaPageSize,
         timeFormat: state.timeFormat,
+        newEntryMode: state.newEntryMode,
         uiLanguage: state.uiLanguage,
         addedProviders: state.addedProviders,
       }),
@@ -521,6 +533,9 @@ export const useUiStore = create<UiState>()(
         // `.map`) assumes an array, so snap back to empty rather than throw.
         if (!Array.isArray(state.addedProviders)) {
           state.addedProviders = []
+        }
+        if (state.newEntryMode !== 'blank' && state.newEntryMode !== 'template') {
+          state.newEntryMode = 'blank'
         }
       },
     },

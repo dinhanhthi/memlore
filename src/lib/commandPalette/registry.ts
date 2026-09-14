@@ -39,6 +39,7 @@ import { useSecondLockStore } from '../../stores/secondLockStore'
 import { useInvisibleLockStore } from '../../stores/invisibleLockStore'
 import { AiIcon } from '../../components/common/AiIcon'
 import { canLock, lockApp } from '../lock'
+import { triggerNewEntry } from '../newEntry'
 import {
   coerceDesignSystem,
   coerceSurfaceStyle,
@@ -801,16 +802,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.new_entry',
     icon: Plus,
     keywords: ['create', 'write', 'add'],
-    run: () => {
-      // The `memlore:new-entry` listener is owned by EntryList, which is only
-      // mounted while activeView is in the entries-list family. Switch the view
-      // first, then defer the dispatch to the next frame so EntryList's mount
-      // effect has had time to attach its listener before the event fires.
-      useTabStore.getState().updateActiveTab({ activeView: 'entries', selectedEntryId: null })
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent('memlore:new-entry'))
-      })
-    },
+    run: () => triggerNewEntry(),
   },
   {
     id: 'action.new_journal',

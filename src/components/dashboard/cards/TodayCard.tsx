@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useOnThisDay } from '../../../hooks/useOnThisDay'
 import { getIntlLocale } from '../../../lib/dates'
-import { useTabStore } from '../../../stores/tabStore'
+import { triggerNewEntry } from '../../../lib/newEntry'
 import type { Entry } from '../../../types/entry'
 import { Button } from '../../common/Button'
 import { EMOTION_BY_KEY } from '../../common/emotions'
@@ -32,18 +32,11 @@ export function TodayCard() {
     day: 'numeric',
   }).format(now)
 
-  const handleWrite = () => {
-    useTabStore.getState().updateActiveTab({ activeView: 'entries', selectedEntryId: null })
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new CustomEvent('memlore:new-entry'))
-    })
-  }
-
   return (
     <DashboardCard
       title={title}
       action={
-        <Button variant="primary" size="xs" onClick={handleWrite}>
+        <Button variant="primary" size="xs" onClick={triggerNewEntry}>
           {t('actions.write')}
         </Button>
       }

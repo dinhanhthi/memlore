@@ -60,6 +60,13 @@
       "title": "Khởi động cùng hệ thống",
       "hint": "Mở Memlore khi bạn đăng nhập."
     },
+    "new_entry_mode": {
+      "title": "Nút Mục mới",
+      "hint": "Chọn hành vi khi bạn nhấn nút Mục mới.",
+      "radiogroup_label": "Hành vi nút Mục mới",
+      "blank": "Mục trống",
+      "template": "Từ mẫu"
+    },
     "uninstall": {
       "title": "Gỡ cài đặt Memlore",
       "hint": "Xóa vĩnh viễn mọi nhật ký, mục viết, ảnh và cài đặt được lưu trên máy này.",

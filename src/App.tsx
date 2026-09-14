@@ -63,10 +63,11 @@ import { useInvisibleLockAutoLock } from './hooks/useInvisibleLockAutoLock'
 import { useSecondLock } from './hooks/useSecondLock'
 import { useSecondLockAutoLock } from './hooks/useSecondLockAutoLock'
 import { useUiStore } from './stores/uiStore'
-import { applyLaunchView, useTabStore } from './stores/tabStore'
+import { applyLaunchView } from './stores/tabStore'
 import { useSyncStore } from './stores/syncStore'
 import { useOnboardingStore } from './stores/onboardingStore'
 import { isEditorMounted } from './lib/editorMount'
+import { triggerNewEntry } from './lib/newEntry'
 
 /** Mount the last-tab quit confirm on every auth/shell branch. */
 function withQuitConfirm(node: ReactNode) {
@@ -231,13 +232,7 @@ function App() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault()
-        // EntryList owns `memlore:new-entry` and only mounts on entries-family
-        // views — switch first, then dispatch on the next frame so the listener
-        // is attached (same sequence as command palette `action.new_entry`).
-        useTabStore.getState().updateActiveTab({ activeView: 'entries', selectedEntryId: null })
-        requestAnimationFrame(() => {
-          window.dispatchEvent(new CustomEvent('memlore:new-entry'))
-        })
+        triggerNewEntry()
       }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'k') {
         e.preventDefault()

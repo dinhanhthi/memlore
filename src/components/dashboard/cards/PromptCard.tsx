@@ -28,6 +28,9 @@ export function PromptCard() {
 
   const handleWriteNow = () => {
     if (!prompt) return
+    // Bypasses triggerNewEntry()/newEntryMode on purpose: this seeds the entry
+    // with the prompt text, and template mode would otherwise silently
+    // discard that seed in favor of the picked template.
     useTabStore.getState().updateActiveTab({ activeView: 'entries', selectedEntryId: null })
     requestAnimationFrame(() => {
       window.dispatchEvent(

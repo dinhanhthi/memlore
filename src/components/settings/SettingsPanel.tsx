@@ -20,7 +20,12 @@ import { useVersionRetention } from '../../hooks/useVersionRetention'
 import { cn } from '../../lib/cn'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
 import { useTabStore } from '../../stores/tabStore'
-import { type SettingsCategory, type TimeFormat, useUiStore } from '../../stores/uiStore'
+import {
+  type NewEntryMode,
+  type SettingsCategory,
+  type TimeFormat,
+  useUiStore,
+} from '../../stores/uiStore'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { AiIcon } from '../common/AiIcon'
 import { SegmentedControl } from '../common/SegmentedControl'
@@ -101,6 +106,8 @@ function GeneralDetail() {
   const { t } = useTranslation('settings')
   const timeFormat = useUiStore((s) => s.timeFormat)
   const setTimeFormat = useUiStore((s) => s.setTimeFormat)
+  const newEntryMode = useUiStore((s) => s.newEntryMode)
+  const setNewEntryMode = useUiStore((s) => s.setNewEntryMode)
   const {
     enabled: startAtLogin,
     loading: startAtLoginLoading,
@@ -163,6 +170,23 @@ function GeneralDetail() {
                 checked={startAtLogin}
                 onChange={toggleStartAtLogin}
                 disabled={startAtLoginLoading}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              className={rowClass}
+              divider={false}
+              title={t('general.new_entry_mode.title')}
+              hint={t('general.new_entry_mode.hint')}
+            >
+              <SegmentedControl<NewEntryMode>
+                ariaLabel={t('general.new_entry_mode.radiogroup_label')}
+                value={newEntryMode}
+                onChange={setNewEntryMode}
+                options={(['blank', 'template'] as NewEntryMode[]).map((opt) => ({
+                  value: opt,
+                  label: t(`general.new_entry_mode.${opt}`),
+                }))}
               />
             </SettingsRow>
 
