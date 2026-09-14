@@ -273,7 +273,7 @@ export function CalendarPanel() {
               aria-haspopup="dialog"
               aria-expanded={monthPickerOpen}
               {...monthInteractions.getReferenceProps()}
-              className="hover:text-accent rounded-md px-0.5 transition-colors duration-150 outline-none"
+              className="hover:text-accent rounded-md px-0.5 transition-colors duration-(--motion-duration-fast) outline-none"
             >
               {currentMonth + 1}
             </button>
@@ -285,7 +285,7 @@ export function CalendarPanel() {
               aria-haspopup="dialog"
               aria-expanded={yearPickerOpen}
               {...yearInteractions.getReferenceProps()}
-              className="text-fg-muted hover:text-accent rounded-md px-0.5 font-bold transition-colors duration-150 outline-none"
+              className="text-fg-muted hover:text-accent rounded-md px-0.5 font-bold transition-colors duration-(--motion-duration-fast) outline-none"
             >
               {currentYear}
             </button>

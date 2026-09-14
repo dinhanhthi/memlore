@@ -153,7 +153,7 @@ export function TagEditorModal({
                   aria-label={c.name}
                   onClick={() => setColor(c.hex)}
                   className={cn(
-                    'h-8 w-8 rounded-full transition-[filter] duration-200 hover:brightness-110',
+                    'h-8 w-8 rounded-full transition-[filter] duration-(--motion-duration-base) hover:brightness-110',
                     color === c.hex && 'ring-focus-ring shadow-sm ring-2 ring-offset-2',
                   )}
                   style={{ backgroundColor: c.hex }}
@@ -164,7 +164,7 @@ export function TagEditorModal({
                 aria-label={t('tag_editor.no_color')}
                 onClick={() => setColor(null)}
                 className={cn(
-                  'border-border-default text-fg-muted flex h-8 w-8 items-center justify-center rounded-full border text-xs transition-[filter] duration-200 hover:brightness-110',
+                  'border-border-default text-fg-muted flex h-8 w-8 items-center justify-center rounded-full border text-xs transition-[filter] duration-(--motion-duration-base) hover:brightness-110',
                   color === null && 'ring-focus-ring shadow-sm ring-2 ring-offset-2',
                 )}
                 title={t('tag_editor.no_color')}

@@ -322,7 +322,7 @@ function SearchOverlayContent({
                             'group bg-elevated rounded-md',
                             'border-border-default hover:border-border-default hover:bg-surface-hi border',
                             'w-full px-3.5 py-3 text-left',
-                            'cursor-pointer transition-colors duration-200',
+                            'cursor-pointer transition-colors duration-(--motion-duration-base)',
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -353,7 +353,7 @@ function SearchOverlayContent({
                               'group bg-elevated rounded-md',
                               'border-border-default hover:border-border-default hover:bg-surface-hi border',
                               'w-full px-3.5 py-3 text-left',
-                              'cursor-pointer transition-colors duration-200',
+                              'cursor-pointer transition-colors duration-(--motion-duration-base)',
                             )}
                           >
                             <div className="flex items-start justify-between gap-2">

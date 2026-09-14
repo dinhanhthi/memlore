@@ -164,7 +164,7 @@ export const JournalStep = forwardRef<JournalStepHandle, JournalStepProps>(funct
               onClick={() => handleColorChange(c.hex)}
               style={{ backgroundColor: c.hex }}
               className={cn(
-                'size-8 rounded-full transition-[filter] duration-200 hover:brightness-110',
+                'size-8 rounded-full transition-[filter] duration-(--motion-duration-base) hover:brightness-110',
                 'motion-reduce:transition-none',
                 'outline-none',
                 color === c.hex && 'ring-focus-ring shadow-sm ring-2 ring-offset-2',

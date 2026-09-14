@@ -279,7 +279,7 @@ export function JournalForm({ journal, onSave, onCancel, externalError }: Journa
                     setColor(c.hex)
                   }}
                   className={cn(
-                    'h-8 w-8 rounded-full transition-[filter] duration-200 hover:brightness-110',
+                    'h-8 w-8 rounded-full transition-[filter] duration-(--motion-duration-base) hover:brightness-110',
                     color === c.hex && 'ring-focus-ring shadow-sm ring-2 ring-offset-2',
                   )}
                   style={{ backgroundColor: c.hex }}

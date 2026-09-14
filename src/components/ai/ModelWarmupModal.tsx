@@ -245,7 +245,7 @@ function WarmupLoadingModal({
         >
           {t('ai.on_device_llm.warmup.more_info', { defaultValue: 'More info' })}
           <ChevronDown
-            className="size-3.5 transition-transform duration-200 motion-reduce:transition-none"
+            className="size-3.5 transition-transform duration-(--motion-duration-base) motion-reduce:transition-none"
             style={moreOpen ? { transform: 'rotate(180deg)' } : undefined}
             strokeWidth={1.75}
             aria-hidden

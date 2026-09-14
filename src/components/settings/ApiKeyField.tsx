@@ -99,7 +99,7 @@ export function ApiKeyField({
           onClick={() => setVisible((v) => !v)}
           className={cn(
             'text-fg-muted absolute top-1/2 right-3 -translate-y-1/2',
-            'hover:text-fg transition-colors duration-150',
+            'hover:text-fg transition-colors duration-(--motion-duration-fast)',
             'outline-none',
           )}
         >

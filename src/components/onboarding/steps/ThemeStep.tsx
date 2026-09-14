@@ -73,7 +73,7 @@ export function ThemeStep() {
                   // "Design-system preview thumbnails" block in globals.css.
                   `dsp-${id}`,
                   'flex flex-col items-center gap-1.5 rounded-xl border p-1.5 outline-none',
-                  'transition-[box-shadow,border-color] duration-150',
+                  'transition-[box-shadow,border-color] duration-(--motion-duration-fast)',
                   selected
                     ? 'border-accent ring-accent ring-1'
                     : 'border-border-default hover:border-border-strong',
@@ -155,7 +155,7 @@ export function ThemeStep() {
                   onClick={() => setAccentPreset(opt.id)}
                   style={{ backgroundColor: opt.hex }}
                   className={cn(
-                    'ring-offset-elevated size-6 rounded-full transition-[box-shadow] duration-150',
+                    'ring-offset-elevated size-6 rounded-full transition-[box-shadow] duration-(--motion-duration-fast)',
                     'outline-none',
                     selected ? 'ring-accent ring-2 ring-offset-2' : 'border-border-default border',
                   )}

@@ -87,7 +87,7 @@ export function Toggle({
           // Base track shape — height/width comes from `s.track`.
           'relative inline-flex shrink-0 items-center rounded-full shadow-(--shadow-control)',
           s.track,
-          'transition-[background-color,border-color,box-shadow] duration-150',
+          'transition-[background-color,border-color,box-shadow] duration-(--motion-duration-fast)',
           // Active/disabled state
           disabled ? 'cursor-not-allowed opacity-65' : 'cursor-pointer',
           // Track background — ON: gradient fill, no border; OFF: surface-hi fill + hairline border
@@ -106,7 +106,7 @@ export function Toggle({
             'absolute top-1/2 -translate-y-1/2 rounded-full shadow-sm',
             checked ? 'bg-fg-inverse' : 'bg-fg-muted',
             s.knob,
-            'transition-[left] duration-150',
+            'transition-[left] duration-(--motion-duration-fast)',
             checked ? s.knobOn : s.knobOff,
           ].join(' ')}
         />

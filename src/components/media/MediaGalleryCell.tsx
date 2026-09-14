@@ -318,7 +318,7 @@ export function MediaGalleryCell({
       {variant === 'rich' && !isLockedPlaceholder && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-200 group-hover:bg-black/25 group-hover:opacity-100 motion-reduce:transition-none"
+          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-(--motion-duration-base) group-hover:bg-black/25 group-hover:opacity-100 motion-reduce:transition-none"
         >
           <span className="flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm">
             <ZoomIn className="size-5" strokeWidth={2} aria-hidden="true" />
