@@ -91,3 +91,6 @@ node_modules
 website/.hallmark/
 .hallmark/
 .grok/
+
+# Decoded signing assets (provisioning profile) — never commit
+.ci/

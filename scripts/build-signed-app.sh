@@ -14,11 +14,53 @@
 #   A provisioning profile can only be embedded in a .app bundle
 #   (Contents/embedded.provisionprofile) — never in a bare Mach-O. That is why
 #   `pnpm tauri dev` can never test Touch ID, and why signing the raw
-#   target/debug binary is a dead end. Four experiments confirmed this:
+#   target/debug binary is a dead end. Four early experiments pointed this way,
+#   but they were CONFOUNDED and should not be cited on their own — the identity
+#   resolution below prefers "Apple Development" (team SAM5K74884) while every
+#   profile installed locally belongs to team 86H6CNLN4C, so rows 3 and 4 mixed
+#   a cert/profile/entitlement-prefix mismatch into the result:
 #     ad-hoc                              -> errSecMissingEntitlement
 #     Apple Development, no entitlement   -> errSecMissingEntitlement
-#     Apple Development + entitlement     -> SIGKILL at launch
-#     Developer ID + entitlement          -> SIGKILL at launch
+#     Apple Development + entitlement     -> SIGKILL at launch   (confounded)
+#     Developer ID + entitlement          -> SIGKILL at launch   (confounded)
+#   See the isolated re-run below, which reaches the same conclusion properly.
+#
+# RE-RUN 2026-09-14 — the entitlement is confirmed as the cause, and the
+# hardened runtime is confirmed irrelevant. Isolated on the debug bundle,
+# signing only (no rebuild between rows), launched from a terminal:
+#
+#     signature     hardened runtime  entitlement   result
+#     ad-hoc        no                no            RUNS
+#     Developer ID  yes               no            RUNS
+#     Developer ID  yes               yes           dead at spawn
+#     Developer ID  no                yes           dead at spawn
+#
+# So `keychain-access-groups` alone is what AMFI rejects. A release build signed
+# Developer ID *without* the entitlement also launches fine, but that is not the
+# path taken — see below.
+#
+# RESOLVED 2026-09-15: a genuine *Developer ID* provisioning profile IS the fix.
+# With "Memlore Developer ID" (ProvisionsAllDevices => true,
+# keychain-access-groups => 86H6CNLN4C.*, expires 2044) embedded and the bundle
+# signed Developer ID + hardened runtime + entitlement, the app runs and Touch
+# ID enables. Releases now ship that way: tauri.conf.json sets
+# bundle.macOS.entitlements plus bundle.macOS.files, which embeds the profile
+# before codesign runs.
+#
+# TRAP, for whoever reads this next: embedding the wildcard `86H6CNLN4C.*`
+# profile from ~/Library/Developer/Xcode/UserData/Provisioning Profiles/ does
+# NOT test any of this. That is a *Mac Development* profile whose
+# DeveloperCertificates array holds the development cert, so pairing it with a
+# Developer ID signature is an invalid combination AMFI rejects for an unrelated
+# reason. It was tried; it failed; that failure is not evidence.
+#
+# Two further notes from the same session:
+#   - `open` cannot launch this debug bundle at all on this machine
+#     ("Launchd job spawn failed", NSPOSIXErrorDomain 163) regardless of how it
+#     is signed, including as-built ad-hoc. Launch it from a terminal instead;
+#     contrary to the note further down, that does work and shows the window.
+#   - The binary links no non-system dylibs (`otool -L`), so ort/ONNX Runtime
+#     is static — nothing extra to sign or notarize for a universal build.
 #
 # USAGE
 #   ./scripts/build-signed-app.sh          # build, sign, and open
@@ -128,7 +170,13 @@ fi
 # ─── Build ────────────────────────────────────────────────────────────────────
 
 echo "Building the app bundle (this takes a few minutes)…"
-(cd "$REPO_ROOT" && pnpm tauri build --debug --bundles app)
+# --no-sign is required, not optional: tauri.conf.json sets
+# bundle.createUpdaterArtifacts, and the CLI hard-errors ("A public key has been
+# found, but no private key") whenever it produces an updater artifact without
+# TAURI_SIGNING_PRIVATE_KEY. --bundles app still produces one. This script
+# re-codesigns the bundle itself below, so skipping the CLI's signing costs
+# nothing here.
+(cd "$REPO_ROOT" && pnpm tauri build --debug --bundles app --no-sign)
 
 if [[ ! -d "$APP" ]]; then
   echo "Expected bundle not found at: $APP"
@@ -155,9 +203,14 @@ codesign -d --entitlements - "$APP" 2>/dev/null | grep -A1 keychain-access-group
 
 # ─── Launch ───────────────────────────────────────────────────────────────────
 #
-# `open` launches it in the GUI session. Running Contents/MacOS/Memlore
-# straight from a terminal starts the process but it exits without a proper
-# session, which looks like a crash and is not one.
+# `open` launches it in the GUI session, which is the right thing when it works.
+#
+# It does NOT always work: on at least one machine `open` refuses this debug
+# bundle outright ("Launchd job spawn failed", NSPOSIXErrorDomain 163) no matter
+# how it is signed, including as-built ad-hoc, while launching
+# Contents/MacOS/Memlore from a terminal runs fine and shows the window. If `open`
+# fails for you, fall back to running the executable directly rather than
+# concluding the signature is broken.
 
 if [[ "$DO_OPEN" == true ]]; then
   echo ""
@@ -166,4 +219,6 @@ if [[ "$DO_OPEN" == true ]]; then
 else
   echo ""
   echo "Built and signed. Launch with:  open \"$APP\""
+  echo "If open fails (Launchd job spawn failed), run it directly instead:"
+  echo "  \"${APP}/Contents/MacOS/Memlore\""
 fi

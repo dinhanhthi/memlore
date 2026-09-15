@@ -15,6 +15,30 @@ pnpm tauri dev
 
 Optional: copy `.env.example` to `.env` if you need Google Drive OAuth in development.
 
+### Building a bundle locally
+
+`pnpm tauri dev` needs nothing extra. Producing a **bundle** does, because the
+release configuration is signing-aware and two of its inputs are deliberately
+not in the repository:
+
+- `bundle.createUpdaterArtifacts` is on, so the CLI refuses to bundle without an
+  updater signing key: _"A public key has been found, but no private key."_
+- `bundle.macOS.files` embeds `.ci/memlore.provisionprofile`, which is gitignored
+  because it is a signing asset. Without that file the build hard-fails.
+
+So an unprivileged local bundle needs both flags:
+
+```bash
+pnpm tauri build --no-sign --bundles app
+```
+
+Fully signed bundles are produced by CI on a `v*` tag, and by
+`scripts/build-signed-app.sh` for maintainers who hold the certificate and the
+Developer ID provisioning profile. That script is also the only way to exercise
+Touch ID unlock — `pnpm tauri dev` never can, because the
+`keychain-access-groups` entitlement it needs is provisioning-profile
+restricted. Read that script's header before touching anything signing-related.
+
 ## UI playground (`web/`)
 
 `web/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.

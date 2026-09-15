@@ -53,7 +53,7 @@ pnpm test                         # frontend
 cd src-tauri && cargo test        # backend
 pnpm lint && pnpm format:check
 
-pnpm tauri build                  # current platform
+pnpm tauri build --no-sign        # current platform (see CONTRIBUTING.md)
 ```
 
 Optional `.env` (copy `.env.example`): [Google Drive OAuth](docs/gdrive-oauth-setup.md) and [MapKit JS](docs/mapkit-js-setup.md).

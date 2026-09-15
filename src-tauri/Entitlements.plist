@@ -5,6 +5,9 @@
     <!--
       Required for biometric (Touch ID) unlock.
 
+      TODO(later): this file and Entitlements.release.plist must list the same
+      entitlements and nothing enforces it — see docs/LATER.md.
+
       `commands/keychain.rs` stores the os_kek as a generic password guarded by
       a SecAccessControl with BIOMETRY_CURRENT_SET. macOS refuses that with
       errSecMissingEntitlement ("A required entitlement isn't present") unless

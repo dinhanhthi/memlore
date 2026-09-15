@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Release entitlements, referenced by tauri.conf.json > bundle > macOS >
+      entitlements. Kept separate from Entitlements.plist because that file
+      carries the Xcode-only $(AppIdentifierPrefix) token, which `codesign`
+      does not expand — scripts/build-signed-app.sh resolves it at sign time,
+      but tauri-bundler hands the file to codesign verbatim, so the team
+      prefix has to be literal here.
+
+      The Team ID is public information (it appears in the signature of every
+      shipped build), so committing it is not a secret leak.
+
+      Required for biometric (Touch ID) unlock: commands/keychain.rs stores the
+      os_kek as a generic password guarded by a SecAccessControl with
+      BIOMETRY_CURRENT_SET, and macOS refuses that without this entitlement.
+
+      This entitlement is provisioning-profile restricted. A bundle declaring
+      it is killed at spawn unless Contents/embedded.provisionprofile holds a
+      *Developer ID* profile covering the access group — see
+      docs/plans/2026-09-14-release-v0.1.0/phase-0-signing-spike.md for the
+      isolated experiment table. The profile is supplied via
+      bundle.macOS.files, which the bundler copies in before codesign runs.
+    -->
+    <key>keychain-access-groups</key>
+    <array>
+        <string>86H6CNLN4C.app.memlore</string>
+    </array>
+</dict>
+</plist>
