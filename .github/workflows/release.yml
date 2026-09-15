@@ -1,0 +1,322 @@
+name: Release
+
+# Publishes a signed + notarized universal macOS build.
+#
+# Trigger: pushing a `v*` tag. A tag containing `-beta` or `-rc` is published as
+# a GitHub prerelease, which is what separates the two update channels: the app's
+# stable endpoint reads /releases/latest/download/latest.json, and GitHub's
+# "latest" excludes prereleases, so stable users never see a beta. The beta
+# channel resolves the newest release (prereleases included) through the API.
+#
+# Third-party actions are pinned to commit SHAs. This one job holds every signing
+# secret at once — most importantly the minisign updater key, which cannot be
+# rotated after the first release (see .github/release-setup.md) — so a moved
+# mutable tag upstream would be enough to exfiltrate it.
+#
+# Required secrets are documented in .github/release-setup.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 90
+
+    steps:
+      # workflow_dispatch can be fired from a branch, where github.ref_name is
+      # the branch name. Without this guard that produces a real, non-prerelease
+      # release tagged "main" whose latest.json declares version "main" — served
+      # straight to every stable client from /releases/latest. Manual runs stay
+      # allowed, but only from a v* tag ref.
+      - name: Require a v* tag ref
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF" in
+            refs/tags/v*) echo "Releasing from $GITHUB_REF" ;;
+            *)
+              echo "::error::This workflow only runs from a v* tag ref (got $GITHUB_REF). Push a tag, or re-dispatch selecting a tag rather than a branch."
+              exit 1
+              ;;
+          esac
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The job never pushes; leaving a write-scoped token in .git/config
+          # only widens what a compromised later step could reach.
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      # Install before any signing material is written to disk, so no lifecycle
+      # script can run while the certificate and notarization key sit
+      # unencrypted in $RUNNER_TEMP.
+      - run: pnpm install --frozen-lockfile
+
+      # The tag is the only input a human types by hand here, and a mismatch is
+      # invisible until users fail to receive an update: latest.json would
+      # advertise the tag's version while the shipped binary reports the
+      # config's, so clients already on the config version see nothing to
+      # update to.
+      - name: Check the tag matches tauri.conf.json
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          CONFIG_VERSION="$(python3 -c 'import json;print(json.load(open("src-tauri/tauri.conf.json"))["version"])')"
+          echo "tag=$VERSION  tauri.conf.json=$CONFIG_VERSION"
+          if [ "$VERSION" != "$CONFIG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match tauri.conf.json version $CONFIG_VERSION. Bump the version files (/cf-ship does this) before tagging."
+            exit 1
+          fi
+
+      # These are embedded into the binary by option_env! at compile time
+      # (src-tauri/build.rs), or consumed by the bundler. A build missing any of
+      # them still succeeds and still launches — it just ships with dead Google
+      # Drive sync, blank maps, no Google Fonts, an unnotarized bundle Gatekeeper
+      # blocks, or unsigned updater artifacts no client will accept. Every one of
+      # those is discovered by users rather than by CI, so fail loudly instead.
+      # Only names and pass/fail are printed, never values.
+      - name: Assert required secrets are present
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
+          MEMLORE_MAPKIT_TOKEN: ${{ secrets.MEMLORE_MAPKIT_TOKEN }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            GDRIVE_CLIENT_ID GDRIVE_CLIENT_SECRET GOOGLE_FONTS_API_KEY MEMLORE_MAPKIT_TOKEN \
+            APPLE_API_ISSUER APPLE_API_KEY TAURI_SIGNING_PRIVATE_KEY
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            else
+              echo "ok: $name"
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      # Import the Developer ID certificate into a throwaway keychain, then read
+      # the signing identity back out of it. Resolving the identity from the
+      # imported certificate (rather than taking it as a separate secret) means
+      # it can never drift from the certificate actually being used.
+      #
+      # Grep for "Developer ID Application" specifically. The Tauri docs example
+      # greps "Apple Development", which is a development certificate and cannot
+      # be distributed.
+      - name: Import Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          # Remove the decoded .p12 even if an import step below fails.
+          trap 'rm -f "$CERT_PATH"' EXIT
+
+          if [ -z "${APPLE_CERTIFICATE:-}" ]; then
+            echo "::error::Missing required secret: APPLE_CERTIFICATE"
+            exit 1
+          fi
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT_PATH" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No 'Developer ID Application' identity in the imported certificate. An 'Apple Development' certificate cannot be distributed."
+            security find-identity -v -p codesigning "$KEYCHAIN" || true
+            exit 1
+          fi
+          echo "Resolved signing identity: $IDENTITY"
+          echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      # The App Store Connect key is stored as base64 file *contents*; the
+      # APPLE_API_KEY_PATH that Tauri reads is a path this step creates.
+      - name: Stage App Store Connect API key
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_API_KEY_P8:-}" ]; then
+            echo "::error::Missing required secret: APPLE_API_KEY_P8 — without it notarization is silently skipped and Gatekeeper blocks the result."
+            exit 1
+          fi
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          echo "$APPLE_API_KEY_P8" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      # bundle.macOS.files in tauri.conf.json embeds this at
+      # Contents/embedded.provisionprofile, before codesign runs.
+      #
+      # The profile is mandatory, not optional: Entitlements.release.plist
+      # declares keychain-access-groups (Touch ID unlock), which is a
+      # provisioning-profile restricted entitlement. A bundle declaring it
+      # without a valid embedded profile is killed at spawn on every user's
+      # machine — so a wrong or expired profile ships an app that launches for
+      # nobody. Both cases are refused below rather than shipped.
+      - name: Stage provisioning profile and check it
+        env:
+          MACOS_PROVISION_PROFILE: ${{ secrets.MACOS_PROVISION_PROFILE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MACOS_PROVISION_PROFILE:-}" ]; then
+            echo "::error::Missing required secret: MACOS_PROVISION_PROFILE"
+            exit 1
+          fi
+          mkdir -p .ci
+          echo "$MACOS_PROVISION_PROFILE" | base64 --decode > .ci/memlore.provisionprofile
+
+          PLIST="$RUNNER_TEMP/profile.plist"
+          if ! security cms -D -i .ci/memlore.provisionprofile > "$PLIST" 2>/dev/null; then
+            echo "::error::MACOS_PROVISION_PROFILE is not a decodable provisioning profile. Regenerate it with: base64 -i <file>.provisionprofile | pbcopy"
+            exit 1
+          fi
+
+          NAME="$(plutil -extract Name raw "$PLIST")"
+          EXPIRY="$(plutil -extract ExpirationDate raw "$PLIST")"
+          # Name and ExpirationDate exist in every profile, so they fail hard.
+          # ProvisionsAllDevices is absent from Mac Development profiles — which
+          # is exactly the case being detected — so it defaults instead.
+          ALL_DEVICES="$(plutil -extract ProvisionsAllDevices raw "$PLIST" 2>/dev/null || echo false)"
+          echo "Profile: $NAME (ProvisionsAllDevices=$ALL_DEVICES, expires $EXPIRY)"
+
+          if [ "$ALL_DEVICES" != "true" ]; then
+            echo "::error::Not a Developer ID profile (ProvisionsAllDevices=$ALL_DEVICES). A Mac Development profile pins itself to specific machines and cannot be distributed."
+            exit 1
+          fi
+
+          # plutil -extract ... raw emits ISO-8601 ("2044-09-10T04:00:02Z"),
+          # NOT the "2044-09-10 04:00:02 +0000" that plutil -p prints. Getting
+          # this wrong makes `date` fail, which aborts the step under
+          # `set -euo pipefail` — verified locally against the real profile.
+          EXPIRY_EPOCH="$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$EXPIRY" "+%s")"
+          NOW_EPOCH="$(date -u "+%s")"
+          DAYS_LEFT="$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))"
+          echo "Days until expiry: $DAYS_LEFT"
+          # A negative value (already expired) also fails this comparison.
+          if [ "$DAYS_LEFT" -lt 30 ]; then
+            echo "::error::Provisioning profile expires in $DAYS_LEFT days. Renew it before releasing — an expired embedded profile makes the app unlaunchable for every user."
+            exit 1
+          fi
+
+      # Dev-facing release notes come from CHANGELOG.md. Tolerant by design:
+      # rc/beta tags do not get changelog sections, and this workflow must be
+      # usable before CHANGELOG.md exists at all.
+      - name: Extract release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY=""
+          if [ -f CHANGELOG.md ]; then
+            # Matched with literal string comparison, not a regex. Escaping the
+            # version for a regex does not work here: awk processes backslash
+            # escapes in -v assignments, so a pre-escaped "1\.0\.0" arrives
+            # back as "1.0.0" and the dots are wildcards again — which makes
+            # "## v1a0a0" a match. Verified locally.
+            BODY="$(awk -v v="$VERSION" '
+              function is_version_heading(line, ver,   rest, nxt) {
+                if (substr(line, 1, 3) != "## ") return 0
+                rest = substr(line, 4)
+                if (substr(rest, 1, 1) == "v") rest = substr(rest, 2)
+                if (substr(rest, 1, length(ver)) != ver) return 0
+                nxt = substr(rest, length(ver) + 1, 1)
+                return (nxt == "" || nxt == " " || nxt == "(")
+              }
+              is_version_heading($0, v) { found = 1; next }
+              found && substr($0, 1, 3) == "## " { exit }
+              found { print }
+            ' CHANGELOG.md)"
+          fi
+          if [ -z "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
+            BODY="See the commit history for changes in ${GITHUB_REF_NAME}."
+            echo "No CHANGELOG.md section for $VERSION — using a placeholder body."
+          fi
+          DELIM="notes-$(uuidgen)"
+          {
+            echo "body<<$DELIM"
+            printf '%s\n' "$BODY"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signing — APPLE_SIGNING_IDENTITY and APPLE_API_KEY_PATH arrive from
+          # $GITHUB_ENV, set by the steps above. APPLE_CERTIFICATE is passed too
+          # because the bundler runs its own keychain setup; dropping it is a
+          # candidate cleanup once a real run confirms the identity alone suffices.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # Updater artifact signing (minisign). This key cannot be rotated
+          # after release — every installed client carries its public half.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Compile-time secrets read by src-tauri/build.rs via option_env!
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
+          MEMLORE_MAPKIT_TOKEN: ${{ secrets.MEMLORE_MAPKIT_TOKEN }}
+        with:
+          args: --target universal-apple-darwin
+          tagName: ${{ github.ref_name }}
+          releaseName: Memlore ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          # Must stay false: /releases/latest does not serve drafts, so drafting
+          # would leave the stable update channel on the previous release.
+          releaseDraft: false
+          # Drives the two update channels. A -beta or -rc tag becomes a
+          # prerelease, which GitHub's /releases/latest excludes.
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          # Uploads latest.json, the manifest the in-app updater reads.
+          uploadUpdaterJson: true
+
+      - name: Clean up signing assets
+        if: always()
+        run: |
+          rm -rf .ci "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/profile.plist" "$RUNNER_TEMP/certificate.p12"
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$SIGNING_KEYCHAIN" 2>/dev/null || true
+          fi
