@@ -900,7 +900,6 @@ footer {
 }
 .illust {
   min-width: 0;
-  min-height: 280px;
   padding: 28px;
   border-radius: var(--radius-panel);
   background: var(--color-panel);
@@ -1341,7 +1340,6 @@ footer {
 .chat-window {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 280px;
 }
 .chat-chrome {
   display: flex;
