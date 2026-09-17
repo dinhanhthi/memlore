@@ -106,6 +106,18 @@ Longer walkthroughs live in `docs/gdrive-oauth-setup.md` and
 are reading this from a fresh clone, those files are not there; the table above
 is self-sufficient.
 
+> 🚨 **Release blocker, not a secret:** the Google Cloud OAuth consent screen
+> must be set to **In production**, not **Testing**. A Testing project with an
+> External user type issues refresh tokens that expire after **7 days**, so
+> every user silently loses Drive sync once a week and has to reconnect. Setting
+> the secrets correctly does not fix this — it is a console setting.
+>
+> Publishing needs no heavyweight review: Memlore requests only `drive.appdata`,
+> which Google classifies as **non-sensitive**, so no CASA assessment and no
+> annual audit. It does need a Privacy policy URL and a Homepage URL on the
+> consent screen. Optional _brand verification_ only affects whether the app
+> name and logo appear on Google's consent screen.
+
 ## Verifying a release
 
 ```bash

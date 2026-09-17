@@ -67,6 +67,13 @@
       "blank": "Blank entry",
       "template": "From template"
     },
+    "update_channel": {
+      "title": "Update channel",
+      "hint": "Beta builds get new features earlier but are less tested.",
+      "radiogroup_label": "Update channel",
+      "stable": "Stable",
+      "beta": "Beta"
+    },
     "uninstall": {
       "title": "Uninstall Memlore",
       "hint": "Permanently erase every journal, entry, photo and setting stored on this computer.",
@@ -470,6 +477,7 @@
   "about_section": {
     "heading_title": "Memlore",
     "heading_description": "A little life. A lasting story.",
+    "version": "Version {{version}}",
     "description": "A cross-platform, privacy-first, local-first journal — with rich, optional AI.",
     "principles_title": "Core principles",
     "principles": {

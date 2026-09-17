@@ -67,6 +67,13 @@
       "blank": "Mục trống",
       "template": "Từ mẫu"
     },
+    "update_channel": {
+      "title": "Kênh cập nhật",
+      "hint": "Bản beta nhận tính năng mới sớm hơn nhưng ít được kiểm thử hơn.",
+      "radiogroup_label": "Kênh cập nhật",
+      "stable": "Ổn định",
+      "beta": "Beta"
+    },
     "uninstall": {
       "title": "Gỡ cài đặt Memlore",
       "hint": "Xóa vĩnh viễn mọi nhật ký, mục viết, ảnh và cài đặt được lưu trên máy này.",
@@ -470,6 +477,7 @@
   "about_section": {
     "heading_title": "Memlore",
     "heading_description": "Một đời bé nhỏ. Một câu chuyện ở lại.",
+    "version": "Phiên bản {{version}}",
     "description": "Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
     "principles_title": "Nguyên tắc cốt lõi",
     "principles": {

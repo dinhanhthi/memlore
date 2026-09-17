@@ -30,6 +30,10 @@ export type TimeFormat = '24h' | '12h'
  *  the template picker first. */
 export type NewEntryMode = 'blank' | 'template'
 
+/** Release channel the in-app updater checks. `beta` also sees prereleases;
+ *  `stable` never does (see `src-tauri/src/commands/updater.rs`). */
+export type UpdateChannel = 'stable' | 'beta'
+
 /**
  * Interface font-size multiplier. Scales body/UI text tokens and the two
  * sidebars' icons via the runtime `--ui-font-scale` CSS variable (see
@@ -185,6 +189,8 @@ interface UiState {
   timeFormat: TimeFormat
   /** See `NewEntryMode`. Persisted like `timeFormat`. */
   newEntryMode: NewEntryMode
+  /** See `UpdateChannel`. Persisted like `newEntryMode`; read by `useUpdater`. */
+  updateChannel: UpdateChannel
   /**
    * Current UI language preference. Persisted to localStorage (this store's
    * `memlore-ui` key) — never written to the SQLite `settings` table and
@@ -307,6 +313,7 @@ interface UiState {
   setUiLanguage: (lang: LanguagePreference) => void
   setTimeFormat: (format: TimeFormat) => void
   setNewEntryMode: (mode: NewEntryMode) => void
+  setUpdateChannel: (channel: UpdateChannel) => void
   setEntryListRange: (view: EntryListViewKey, range: TimeRange) => void
   setEntryListSort: (view: EntryListViewKey, sort: SortOrder) => void
   setEntryListLockFilter: (view: EntryListViewKey, lockFilter: LockFilter) => void
@@ -355,6 +362,7 @@ export const useUiStore = create<UiState>()(
       uiLanguage: 'en',
       timeFormat: '24h',
       newEntryMode: 'blank',
+      updateChannel: 'stable',
       entryListFilters: {},
       pendingRotationPhrase: null,
       pendingRotationRevealIsReset: false,
@@ -411,6 +419,8 @@ export const useUiStore = create<UiState>()(
       setTimeFormat: (timeFormat: TimeFormat) => set({ timeFormat }),
 
       setNewEntryMode: (newEntryMode: NewEntryMode) => set({ newEntryMode }),
+
+      setUpdateChannel: (updateChannel: UpdateChannel) => set({ updateChannel }),
 
       setEntryListRange: (view, range) =>
         set((state) => ({
@@ -491,6 +501,7 @@ export const useUiStore = create<UiState>()(
         mediaPageSize: state.mediaPageSize,
         timeFormat: state.timeFormat,
         newEntryMode: state.newEntryMode,
+        updateChannel: state.updateChannel,
         uiLanguage: state.uiLanguage,
         addedProviders: state.addedProviders,
       }),
@@ -536,6 +547,9 @@ export const useUiStore = create<UiState>()(
         }
         if (state.newEntryMode !== 'blank' && state.newEntryMode !== 'template') {
           state.newEntryMode = 'blank'
+        }
+        if (state.updateChannel !== 'stable' && state.updateChannel !== 'beta') {
+          state.updateChannel = 'stable'
         }
       },
     },

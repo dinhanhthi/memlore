@@ -25,5 +25,22 @@
   },
   "combobox": {
     "toggle_aria": "Bật/tắt gợi ý"
+  },
+  "updater": {
+    "checking": "Đang kiểm tra bản cập nhật…",
+    "checking_body": "Đang tìm phiên bản Memlore mới hơn.",
+    "available": "Đã có bản cập nhật",
+    "available_body": "Memlore {{version}} đã sẵn sàng để cài đặt. Memlore sẽ khởi động lại để hoàn tất.",
+    "notes": "Có gì mới",
+    "up_to_date": "Bạn đang dùng bản mới nhất",
+    "up_to_date_body": "Bạn đang chạy phiên bản Memlore mới nhất.",
+    "failed": "Không kiểm tra được bản cập nhật",
+    "failed_body": "Memlore không thể kiểm tra bản cập nhật. Hãy kiểm tra kết nối Internet rồi thử lại.",
+    "install_failed": "Không cài đặt được bản cập nhật",
+    "install_failed_body": "Memlore không thể cài đặt bản cập nhật này. Hãy thử lại sau, hoặc tải phiên bản mới nhất từ GitHub.",
+    "installing": "Đang tải và cài đặt…",
+    "install": "Cập nhật ngay",
+    "later": "Để sau",
+    "close": "Đóng"
   }
 }

@@ -22,6 +22,7 @@ import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
 import { useTabStore } from '../../stores/tabStore'
 import {
   type NewEntryMode,
+  type UpdateChannel,
   type SettingsCategory,
   type TimeFormat,
   useUiStore,
@@ -108,6 +109,8 @@ function GeneralDetail() {
   const setTimeFormat = useUiStore((s) => s.setTimeFormat)
   const newEntryMode = useUiStore((s) => s.newEntryMode)
   const setNewEntryMode = useUiStore((s) => s.setNewEntryMode)
+  const updateChannel = useUiStore((s) => s.updateChannel)
+  const setUpdateChannel = useUiStore((s) => s.setUpdateChannel)
   const {
     enabled: startAtLogin,
     loading: startAtLoginLoading,
@@ -186,6 +189,23 @@ function GeneralDetail() {
                 options={(['blank', 'template'] as NewEntryMode[]).map((opt) => ({
                   value: opt,
                   label: t(`general.new_entry_mode.${opt}`),
+                }))}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              className={rowClass}
+              divider={false}
+              title={t('general.update_channel.title')}
+              hint={t('general.update_channel.hint')}
+            >
+              <SegmentedControl<UpdateChannel>
+                ariaLabel={t('general.update_channel.radiogroup_label')}
+                value={updateChannel}
+                onChange={setUpdateChannel}
+                options={(['stable', 'beta'] as UpdateChannel[]).map((opt) => ({
+                  value: opt,
+                  label: t(`general.update_channel.${opt}`),
                 }))}
               />
             </SettingsRow>

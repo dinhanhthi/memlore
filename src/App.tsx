@@ -14,6 +14,7 @@ import { FooterBar } from './components/layout/FooterBar'
 import { WindowDragRegion } from './components/layout/WindowDragRegion'
 import { QuitConfirmDialog } from './components/layout/QuitConfirmDialog'
 import { SearchOverlay } from './components/search/SearchOverlay'
+import { UpdateAvailableModal } from './components/common/UpdateAvailableModal'
 import { TemplatePickerHost } from './components/templates/TemplatePickerHost'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { EmbeddingExplainerPanel } from './components/ai/EmbeddingExplainerPanel'
@@ -55,6 +56,7 @@ import { useTabShortcuts } from './hooks/useTabShortcuts'
 import { useTabNavigation } from './hooks/useTabNavigation'
 import { useFlushTabSessionOnClose, useTabSessionHydrated } from './hooks/useTabSessionRestore'
 import { useMenuEvents } from './hooks/useMenuEvents'
+import { runStartupUpdateCheck } from './hooks/useUpdater'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { useMediaCompressionEvents } from './hooks/useMediaCompressionEvents'
 import { useAIProviderLifecycle } from './hooks/useAIProviderLifecycle'
@@ -97,6 +99,12 @@ function App() {
   useEffect(() => {
     if (hydrated) applyLaunchView()
   }, [hydrated])
+  // One silent update check per launch. Reads the user's channel from the
+  // (synchronously hydrated) ui store at call time. A no-op in dev builds
+  // (the Rust command returns `None` under debug_assertions).
+  useEffect(() => {
+    void runStartupUpdateCheck()
+  }, [])
   const {
     isLocked,
     encryptionMode,
@@ -477,6 +485,10 @@ function App() {
         variant={celebrationVariant}
         onClose={() => useOnboardingStore.getState().dismissCelebration()}
       />
+      {/* Opens itself when the updater state machine leaves `idle` — the silent
+          startup check (only when it found something), or the
+          `Check For Updates…` menu item (also reports up-to-date / failure). */}
+      <UpdateAvailableModal />
       {/* Surfaces the result of a Google Drive connect the user started during
           onboarding but let finish in the background (see DriveStep). */}
       <GdriveConnectToaster />

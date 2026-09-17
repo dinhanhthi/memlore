@@ -53,6 +53,7 @@ pub fn mock_app_with_state(
         .manage(key_state)
         .manage(Mutex::new(startup))
         .manage(GDriveSessionState::new())
+        .manage(crate::commands::updater::PendingUpdate::default())
         .build(ctx)
         .expect("mock app")
 }

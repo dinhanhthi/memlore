@@ -1381,6 +1381,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -1422,6 +1423,13 @@ pub fn run() {
                 )?;
                 let sync_now_item =
                     MenuItem::with_id(app, "sync-now", "Sync Now", true, None::<&str>)?;
+                let check_updates_item = MenuItem::with_id(
+                    app,
+                    "check-updates",
+                    "Check For Updates…",
+                    true,
+                    None::<&str>,
+                )?;
                 let file_submenu = SubmenuBuilder::new(app, "File")
                     .item(&new_entry_item)
                     .item(&new_entry_from_template_item)
@@ -1435,6 +1443,7 @@ pub fn run() {
                         Some("About Memlore"),
                         Some(about_metadata),
                     )?)
+                    .item(&check_updates_item)
                     .separator()
                     .item(&settings_item)
                     .separator()
@@ -1552,6 +1561,7 @@ pub fn run() {
             app.manage(commands::audio::AudioSamplesState::new());
             app.manage(commands::audio::AudioStreamState::new());
             app.manage(commands::audio::AudioSessionState::new());
+            app.manage(commands::updater::PendingUpdate::default());
             // Phase 6 v2 R11+: two-slot AI provider registry. Holds independent
             // `Arc<dyn AIProvider>` instances for the generation (chat + image)
             // and embedding slots. Empty on app start; populated from the
@@ -1773,6 +1783,11 @@ pub fn run() {
             "sync-now" => {
                 if let Err(e) = app.emit("menu:sync-now", ()) {
                     log::warn!("Failed to emit menu:sync-now: {e}");
+                }
+            }
+            "check-updates" => {
+                if let Err(e) = app.emit("menu:check-updates", ()) {
+                    log::warn!("Failed to emit menu:check-updates: {e}");
                 }
             }
             "close-tab" => {
@@ -2267,6 +2282,10 @@ pub fn run() {
             commands::ai_audit::get_ai_audit_retention_days,
             commands::ai_audit::set_ai_audit_retention_days,
             commands::ai_audit::summarize_ai_usage,
+            // In-app updater (stable/beta channel resolved at call time)
+            commands::updater::check_for_update,
+            commands::updater::install_update,
+            commands::updater::app_version,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

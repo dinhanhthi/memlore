@@ -6,6 +6,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { useLogoDirection, logoSrc, ALL_LOGO_DIRECTIONS } from '../../hooks/useLogoDirection'
+import { useAppVersion } from '../../hooks/useAppVersion'
 import { useUiStore } from '../../stores/uiStore'
 import { SettingsSection } from '../settings/SettingsSection'
 import { IconCustom } from '../common/IconCustom'
@@ -52,6 +53,8 @@ function InlineExternalLink({ href, children }: { href: string; children?: React
 export function AboutView() {
   const { t } = useTranslation('settings')
   const isClay = useUiStore((s) => s.designSystem) === 'clay'
+  // Which build am I on? — the first thing a bug report needs.
+  const version = useAppVersion()
   const principleKeys = ['local_first', 'private', 'ai_optional', 'yours']
 
   return (
@@ -71,6 +74,11 @@ export function AboutView() {
             {t('about_section.heading_title')}
           </h1>
           <p className="text-fg-muted mt-1 text-sm">{t('about_section.heading_description')}</p>
+          {version != null && (
+            <p className="text-fg-muted mt-1 font-mono text-xs">
+              {t('about_section.version', { version })}
+            </p>
+          )}
         </div>
 
         <div className="mb-7 space-y-3">

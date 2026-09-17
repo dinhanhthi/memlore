@@ -25,5 +25,22 @@
   },
   "combobox": {
     "toggle_aria": "Toggle suggestions"
+  },
+  "updater": {
+    "checking": "Checking for updates…",
+    "checking_body": "Looking for a newer version of Memlore.",
+    "available": "Update available",
+    "available_body": "Memlore {{version}} is ready to install. Memlore restarts to finish the update.",
+    "notes": "What's new",
+    "up_to_date": "You're up to date",
+    "up_to_date_body": "You're already running the latest version of Memlore.",
+    "failed": "Update check failed",
+    "failed_body": "Memlore could not check for updates. Check your internet connection and try again.",
+    "install_failed": "Update could not be installed",
+    "install_failed_body": "Memlore could not install this update. Try again later, or download the latest version from GitHub.",
+    "installing": "Downloading and installing…",
+    "install": "Update now",
+    "later": "Later",
+    "close": "Close"
   }
 }

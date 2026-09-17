@@ -42,6 +42,7 @@ beforeEach(() => {
     uiLanguage: 'en',
     timeFormat: '24h',
     newEntryMode: 'blank',
+    updateChannel: 'stable',
     rotationBusy: false,
     deviceRenameBusy: false,
     deviceRemovalBusy: false,
@@ -135,6 +136,17 @@ describe('uiStore', () => {
     })
   })
 
+  describe('setUpdateChannel', () => {
+    it('defaults to stable', () => {
+      expect(useUiStore.getState().updateChannel).toBe('stable')
+    })
+
+    it('sets channel to beta', () => {
+      useUiStore.getState().setUpdateChannel('beta')
+      expect(useUiStore.getState().updateChannel).toBe('beta')
+    })
+  })
+
   describe('toggleTheme — basic light↔dark cycle', () => {
     it('moves off light on first toggle (advances cycle)', () => {
       useUiStore.setState({ theme: 'light' })
@@ -209,6 +221,7 @@ describe('uiStore', () => {
         uiLanguage: 'en',
         timeFormat: '12h',
         newEntryMode: 'blank',
+        updateChannel: 'stable',
         addedProviders: [],
       })
       // Orphaned settings-nav keys from older releases must not reappear.
@@ -300,6 +313,20 @@ describe('uiStore', () => {
       await useUiStore.persist.rehydrate()
 
       expect(useUiStore.getState().newEntryMode).toBe('blank')
+    })
+
+    it('rehydrate coerces an unknown updateChannel back to stable', async () => {
+      globalThis.localStorage.setItem(
+        'memlore-ui',
+        JSON.stringify({
+          state: { updateChannel: 'nightly' },
+          version: 0,
+        }),
+      )
+
+      await useUiStore.persist.rehydrate()
+
+      expect(useUiStore.getState().updateChannel).toBe('stable')
     })
   })
 

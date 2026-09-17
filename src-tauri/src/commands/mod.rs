@@ -37,4 +37,5 @@ pub mod sync;
 pub mod tags;
 pub mod templates;
 pub mod uninstall;
+pub mod updater;
 pub mod window_chrome;

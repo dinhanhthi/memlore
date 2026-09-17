@@ -5,6 +5,7 @@ import { useUiStore } from '../stores/uiStore'
 import { requestCloseActiveTab } from '../lib/requestCloseActiveTab'
 import { triggerNewEntry } from '../lib/newEntry'
 import { useSync } from './useSync'
+import { checkForUpdates } from './useUpdater'
 
 export function useMenuEvents() {
   const newTab = useTabStore((s) => s.newTab)
@@ -35,6 +36,12 @@ export function useMenuEvents() {
 
       listen('menu:sync-now', () => {
         void syncNow().catch(() => {})
+      }),
+
+      // Memlore > Check For Updates… — the explicit path, so it also reports
+      // "you're up to date", unlike the silent check at startup.
+      listen('menu:check-updates', () => {
+        void checkForUpdates()
       }),
 
       // Window > Close Tab (⌘W) — same path as the webview keydown handler.
