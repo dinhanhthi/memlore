@@ -352,7 +352,7 @@ export function useEntries(params: UseEntriesParams = {}): {
         throw err
       }
     }
-    emitStreakRefresh()
+    await emitStreakRefresh()
     // emitEntriesChanged() is bridged at the app level to
     // queryClient.invalidateQueries({ queryKey: ['entries'] }) — no explicit
     // invalidate needed here.
@@ -398,7 +398,7 @@ export function useEntries(params: UseEntriesParams = {}): {
 
   const deleteEntry = async (id: string): Promise<void> => {
     await softDeleteEntry(id)
-    emitStreakRefresh()
+    await emitStreakRefresh()
     // emitEntriesChanged() triggers the bridge → invalidateQueries(['entries']).
     emitEntriesChanged()
     // Soft-delete cascades to media rows — invalidate the gallery cache too.

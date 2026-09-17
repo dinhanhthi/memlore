@@ -24,6 +24,11 @@ vi.mock('../lib/tauri', () => ({
   updateEntryLocation: vi.fn(),
   getSetting: vi.fn().mockResolvedValue(null),
   listJournals: vi.fn(),
+  recalculateStreak: vi.fn().mockResolvedValue({
+    current_streak: 0,
+    longest_streak: 0,
+    last_entry_date: null,
+  }),
 }))
 
 // Import after mock registration
@@ -96,6 +101,11 @@ beforeEach(() => {
   vi.mocked(tauri.listFavoriteEntriesPaged).mockResolvedValue(makePagedResult([]))
   vi.mocked(tauri.listEntriesByTagPaged).mockResolvedValue(makePagedResult([]))
   vi.mocked(tauri.getSetting).mockResolvedValue(null)
+  vi.mocked(tauri.recalculateStreak).mockResolvedValue({
+    current_streak: 0,
+    longest_streak: 0,
+    last_entry_date: null,
+  })
   // Reset Zustand state so the self-heal test's pre-seed doesn't leak into
   // subsequent tests.
   useJournalStore.setState({ journals: [], activeJournalId: null })
@@ -394,6 +404,52 @@ describe('useEntries', () => {
     })
 
     expect(tauri.softDeleteEntry).toHaveBeenCalledWith('e1')
+    expect(eventListener).toHaveBeenCalledOnce()
+
+    window.removeEventListener('memlore:entries-changed', eventListener)
+  })
+
+  it('createEntry still fires entries-changed when streak refresh fails', async () => {
+    vi.mocked(tauri.listAllEntriesPaged).mockResolvedValue(makePagedResult([]))
+    vi.mocked(tauri.createEntry).mockResolvedValue(makeEntry({ id: 'new-entry' }))
+    vi.mocked(tauri.recalculateStreak).mockRejectedValue(new Error('db error'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const eventListener = vi.fn()
+    window.addEventListener('memlore:entries-changed', eventListener)
+
+    const { result } = renderHook(() => useEntries(), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await result.current.createEntry({
+        journal_id: 'journal-1',
+        entry_date: Date.now(),
+      })
+    })
+
+    expect(eventListener).toHaveBeenCalledOnce()
+    window.removeEventListener('memlore:entries-changed', eventListener)
+  })
+
+  it('deleteEntry still fires entries-changed when streak refresh fails', async () => {
+    vi.mocked(tauri.listAllEntriesPaged).mockResolvedValue(
+      makePagedResult([makeEntry({ id: 'e1' })], 1),
+    )
+    vi.mocked(tauri.softDeleteEntry).mockResolvedValue(undefined)
+    vi.mocked(tauri.recalculateStreak).mockRejectedValue(new Error('db error'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const eventListener = vi.fn()
+    window.addEventListener('memlore:entries-changed', eventListener)
+
+    const { result } = renderHook(() => useEntries(), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await result.current.deleteEntry('e1')
+    })
+
     expect(eventListener).toHaveBeenCalledOnce()
 
     window.removeEventListener('memlore:entries-changed', eventListener)

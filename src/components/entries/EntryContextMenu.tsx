@@ -39,6 +39,7 @@ import {
 import { LOCATION_SUBMENU_PANE_CLASS } from '../../lib/entryContextLocationSubmenu'
 import { applyLocationAliasToEntry } from '../../hooks/applyLocationAliasToEntry'
 import { emitEntriesChanged } from '../../hooks/useEntries'
+import { emitStreakRefresh } from '../../hooks/useStreaks'
 import { useTitleStream } from '../../hooks/useTitleStreamController'
 import { useAiTitleSuggestionsEnabled } from '../../hooks/useAiTitleSuggestionsEnabled'
 import { useAiMultiEntrySummaryEnabled } from '../../hooks/useAiMultiEntrySummaryEnabled'
@@ -382,6 +383,7 @@ export function EntryContextMenu({
   async function handleDateChange(timestamp: number) {
     try {
       await updateEntryDate(entryId, timestamp)
+      await emitStreakRefresh()
       // Mirror EditorHeader: a manual date pick must block the
       // EXIF-suggestion machinery from overwriting the user's choice
       // if this happens to be the entry currently open in the editor.

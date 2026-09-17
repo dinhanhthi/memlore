@@ -17,6 +17,7 @@ import {
 import type { GenerateImageResult, MediaRow } from '../../lib/tauri'
 import { useEntryDateSuggestion } from '../../hooks/useEntryDateSuggestion'
 import { applyEntryWeather } from '../../hooks/applyEntryWeather'
+import { emitStreakRefresh } from '../../hooks/useStreaks'
 import { EntryMetadataSuggestionModal } from './EntryMetadataSuggestionModal'
 import type { EntryMetadataSuggestionPayload } from './EntryMetadataSuggestionModal'
 import { useEditorMetricsStore } from '../../stores/editorMetricsStore'
@@ -278,7 +279,7 @@ export function Editor({
       // batch of new EXIF dates. Only explicit modal/pill interaction
       // sets the durable flag (see modal `onConfirm` / `onClose` + the
       // date pill's manual edit path in EditorHeader).
-      void updateEntryDate(entryId, suggestion.date)
+      void updateEntryDate(entryId, suggestion.date).then(() => emitStreakRefresh())
     }
   }, [suggestion, entryId, entryDateUserEdited])
 
@@ -934,6 +935,7 @@ export function Editor({
                 // Apply date if picked.
                 if (payload.date !== undefined) {
                   await updateEntryDate(entryId, payload.date)
+                  await emitStreakRefresh()
                 }
                 // Apply location if picked. The modal reverse-geocoded
                 // the chosen coords; prefer the modal's freshly-fetched

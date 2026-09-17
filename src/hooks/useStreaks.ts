@@ -4,9 +4,25 @@ import type { StreakInfo } from '../lib/tauri'
 
 const STREAK_REFRESH_EVENT = 'memlore:streak-refresh'
 
-/** Call this after entry create/delete to refresh the streak display globally. */
-export function emitStreakRefresh() {
-  window.dispatchEvent(new Event(STREAK_REFRESH_EVENT))
+type StreakRefreshEvent = CustomEvent<StreakInfo>
+
+/**
+ * Recalculate streak once and push the result to every `useStreaks`
+ * subscriber (footer pill, dashboard card). Await this after a mutation
+ * that changes day-buckets — create, delete, or `updateEntryDate` — so
+ * the footer paints before `emitEntriesChanged` floods the backend mutex
+ * with list refetches.
+ *
+ * Never throws: a streak IPC failure must not abort entry create/delete
+ * or skip `emitEntriesChanged` / `markEntryDateUserEdited`.
+ */
+export async function emitStreakRefresh(): Promise<void> {
+  try {
+    const updated = await recalculateStreak()
+    window.dispatchEvent(new CustomEvent(STREAK_REFRESH_EVENT, { detail: updated }))
+  } catch (err) {
+    console.error('Failed to refresh streak:', err)
+  }
 }
 
 /**
@@ -18,18 +34,17 @@ export function useStreaks() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const applyStreak = useCallback((info: StreakInfo) => {
+    setStreakInfo(info)
+    setIsLoading(false)
+    setError(null)
+  }, [])
+
   const refresh = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    try {
-      const updated = await recalculateStreak()
-      setStreakInfo(updated)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-    } finally {
-      setIsLoading(false)
-    }
+    await emitStreakRefresh()
+    setIsLoading(false)
   }, [])
 
   useEffect(() => {
@@ -40,8 +55,7 @@ export function useStreaks() {
     recalculateStreak()
       .then((info) => {
         if (cancelled) return
-        setStreakInfo(info)
-        setIsLoading(false)
+        applyStreak(info)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -53,16 +67,20 @@ export function useStreaks() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [applyStreak])
 
-  // Listen for global refresh events from entry mutations
+  // Apply the already-computed payload from emitStreakRefresh — do not
+  // kick off another recalculate_streak, which would queue behind the
+  // entries-list refetch on AppState's mutex and leave the footer stale.
   useEffect(() => {
-    const handler = () => {
-      refresh()
+    const handler = (e: Event) => {
+      const info = (e as StreakRefreshEvent).detail
+      if (!info) return
+      applyStreak(info)
     }
     window.addEventListener(STREAK_REFRESH_EVENT, handler)
     return () => window.removeEventListener(STREAK_REFRESH_EVENT, handler)
-  }, [refresh])
+  }, [applyStreak])
 
   return { streakInfo, isLoading, error, refresh }
 }

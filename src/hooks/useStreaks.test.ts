@@ -83,10 +83,46 @@ describe('useStreaks', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await act(async () => {
-      emitStreakRefresh()
-      await new Promise((r) => setTimeout(r, 10))
+      await emitStreakRefresh()
     })
     await waitFor(() => expect(result.current.streakInfo?.current_streak).toBe(1))
     expect(tauri.recalculateStreak).toHaveBeenCalledTimes(2)
+  })
+
+  it('pushes one recalculate result to every mounted useStreaks subscriber', async () => {
+    const initial = makeStreak({ current_streak: 0 })
+    const updated = makeStreak({ current_streak: 1 })
+    vi.mocked(tauri.recalculateStreak).mockResolvedValue(initial)
+
+    const footer = renderHook(() => useStreaks())
+    const card = renderHook(() => useStreaks())
+    await waitFor(() => expect(footer.result.current.isLoading).toBe(false))
+    await waitFor(() => expect(card.result.current.isLoading).toBe(false))
+
+    vi.mocked(tauri.recalculateStreak).mockResolvedValue(updated)
+    await act(async () => {
+      await emitStreakRefresh()
+    })
+
+    expect(footer.result.current.streakInfo?.current_streak).toBe(1)
+    expect(card.result.current.streakInfo?.current_streak).toBe(1)
+    // Two mount fetches + one shared emit recalculate — not one per subscriber.
+    expect(tauri.recalculateStreak).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not reject when recalculateStreak fails', async () => {
+    const initial = makeStreak({ current_streak: 3 })
+    vi.mocked(tauri.recalculateStreak)
+      .mockResolvedValueOnce(initial)
+      .mockRejectedValueOnce(new Error('db error'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useStreaks())
+    await waitFor(() => expect(result.current.streakInfo?.current_streak).toBe(3))
+
+    await act(async () => {
+      await expect(emitStreakRefresh()).resolves.toBeUndefined()
+    })
+    expect(result.current.streakInfo?.current_streak).toBe(3)
   })
 })
