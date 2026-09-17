@@ -8,6 +8,7 @@ import { Tooltip } from '../common/Tooltip'
 import { EMOTION_BY_KEY } from '../common/emotions'
 import { updateEntryDate, markEntryDateUserEdited, collectEntryExifDates } from '../../lib/tauri'
 import { emitEntriesChanged, emitEntryPatched } from '../../hooks/useEntries'
+import { emitStreakRefresh } from '../../hooks/useStreaks'
 import { useEditorMetricsStore } from '../../stores/editorMetricsStore'
 import { useEditorDistractionStore } from '../../stores/editorDistractionStore'
 import { useEditorDistractionEnabled } from '../../hooks/useEditorDistractionEnabled'
@@ -125,6 +126,7 @@ export function EditorHeader({
       // index. `keepPreviousData` in useEntries prevents the list
       // from flashing to a Loading placeholder during the refetch.
       emitEntriesChanged()
+      emitStreakRefresh()
       // Refetch into EditorPanel state so the date pill we just rendered
       // from picks up the new `entry_date`. Without this, the pill keeps
       // showing the old date until the user navigates away and back.
@@ -286,6 +288,7 @@ export function EditorHeader({
               // invalidate (see handleDateChange for the same reasoning).
               if (payload.date !== undefined) {
                 emitEntriesChanged()
+                emitStreakRefresh()
               } else {
                 emitEntryPatched(entry.id, { entry_date_user_edited: true })
               }

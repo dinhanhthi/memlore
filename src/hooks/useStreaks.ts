@@ -4,7 +4,7 @@ import type { StreakInfo } from '../lib/tauri'
 
 const STREAK_REFRESH_EVENT = 'memlore:streak-refresh'
 
-/** Call this after entry create/delete to refresh the streak display globally. */
+/** Call this after entry create/delete/date-change to refresh the streak display globally. */
 export function emitStreakRefresh() {
   window.dispatchEvent(new Event(STREAK_REFRESH_EVENT))
 }

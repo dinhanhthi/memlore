@@ -39,6 +39,7 @@ import {
 import { LOCATION_SUBMENU_PANE_CLASS } from '../../lib/entryContextLocationSubmenu'
 import { applyLocationAliasToEntry } from '../../hooks/applyLocationAliasToEntry'
 import { emitEntriesChanged } from '../../hooks/useEntries'
+import { emitStreakRefresh } from '../../hooks/useStreaks'
 import { useTitleStream } from '../../hooks/useTitleStreamController'
 import { useAiTitleSuggestionsEnabled } from '../../hooks/useAiTitleSuggestionsEnabled'
 import { useAiMultiEntrySummaryEnabled } from '../../hooks/useAiMultiEntrySummaryEnabled'
@@ -388,6 +389,7 @@ export function EntryContextMenu({
       await markEntryDateUserEdited(entryId)
       setEntryDateUserEdited(true)
       emitEntriesChanged()
+      emitStreakRefresh()
     } catch (err) {
       console.error('Failed to update entry date:', err)
     }
