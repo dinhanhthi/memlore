@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { legal, nav } from '../content'
-import HeadFollowLogo, { preloadHeadSprites } from '../HeadFollowLogo'
+import { preloadHeadSprites } from '../HeadFollowLogo'
 import { SiteFooterBar } from '../SiteFooterBar'
+import { SiteHeader } from '../SiteHeader'
 import { isExternalHref, parseInline, parseLegalMarkdown, type LegalBlock } from './markdown'
 
 function Inline({ text }: { text: string }) {
@@ -54,12 +55,7 @@ export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms';
       <a className="skip-link" href="#main">
         {nav.skip}
       </a>
-      <header className="site-header">
-        <a className="wordmark" href="index.html" aria-label={legal.homeAria}>
-          <HeadFollowLogo alt="" className="wordmark-head" size={36} />
-          {nav.wordmark}
-        </a>
-      </header>
+      <SiteHeader homeHref="index.html" sectionPrefix="index.html" />
       <main id="main">
         <article className="legal-article">
           {heading ? <BlockView block={heading} /> : null}
