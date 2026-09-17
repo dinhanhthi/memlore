@@ -53,6 +53,11 @@ function renderInline(nodes: JSONContent[] | undefined): string {
         const src = (node.attrs?.src as string | null) ?? ''
         return `![${alt}](${src})`
       }
+      if (node.type === 'mention') {
+        const label = (node.attrs?.label as string | null) ?? ''
+        const id = (node.attrs?.id as string | null) ?? ''
+        return `[${label}](entry:${id})`
+      }
       return renderNode(node).trimEnd()
     })
     .join('')
@@ -200,7 +205,7 @@ function renderTable(table: JSONContent): string {
  *
  * Handles: paragraph, heading (h1-h3), bold, italic, strike, code inline,
  * codeBlock, blockquote, bulletList, orderedList, taskList, table,
- * horizontalRule, hardBreak, link, image, video, audio.
+ * horizontalRule, hardBreak, link, image, video, audio, mention.
  *
  * Unknown node types produce an HTML comment:
  *   `<!-- unsupported: <type> -->`

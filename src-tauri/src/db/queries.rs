@@ -1814,8 +1814,8 @@ fn row_to_attachable_entry(row: &rusqlite::Row) -> Result<AttachableEntry> {
 /// and searches content too, not just the title.
 ///
 /// **Search-path ordering and limit:** the non-empty path inherits
-/// `search_entries_with_locked_view`'s hard-coded `ORDER BY rank LIMIT 50`
-/// (BM25 relevance), applied _before_ this function's `.take(limit)`. So:
+/// `search_entries_with_locked_view`'s `ORDER BY rank LIMIT 50` (this caller
+/// passes `mention_mode: false`), applied _before_ `.take(limit)`. So:
 /// - results are BM25-ranked, not `entry_date DESC`;
 /// - any caller `limit > 50` is silently truncated to at most 50 rows.
 /// The empty-query browse path honors `limit` directly via SQL `LIMIT`.
@@ -1846,7 +1846,7 @@ pub fn list_attachable_entries(
         rows.collect()
     } else {
         let results =
-            search_entries_with_locked_view(conn, trimmed, None, LockedView::Hidden, None)?;
+            search_entries_with_locked_view(conn, trimmed, None, LockedView::Hidden, None, false)?;
         Ok(results
             .into_iter()
             .take(limit)
@@ -3280,13 +3280,21 @@ use crate::db::filters::{HasMediaFilter, SearchFilters};
 /// diacritic is folded at MATCH time by the `remove_diacritics 2` tokenizer,
 /// so the two sides stay symmetric.
 ///
+/// When `prefix` is true the LAST token is emitted as `"tok"*` (an FTS5
+/// prefix query) so a half-typed word still matches; earlier tokens are
+/// unchanged. `prefix: false` is the historical exact-token behaviour.
+///
 /// Returns None when the input is blank (caller should short-circuit to empty results).
-fn sanitize_fts_query(raw: &str) -> Option<String> {
-    let tokens: Vec<String> = raw
-        .split_whitespace()
-        .map(|word| {
+fn sanitize_fts_query(raw: &str, prefix: bool) -> Option<String> {
+    let words: Vec<&str> = raw.split_whitespace().collect();
+    let last = words.len().saturating_sub(1);
+    let tokens: Vec<String> = words
+        .iter()
+        .enumerate()
+        .map(|(i, word)| {
             let folded = word.replace('đ', "d").replace('Đ', "D");
-            format!("\"{}\"", folded.replace('"', ""))
+            let star = if prefix && i == last { "*" } else { "" };
+            format!("\"{}\"{}", folded.replace('"', ""), star)
         })
         .collect();
     if tokens.is_empty() {
@@ -3364,17 +3372,22 @@ pub fn search_entries(
     query: &str,
     filters: Option<&SearchFilters>,
 ) -> Result<Vec<SearchResult>> {
-    search_entries_with_locked_view(conn, query, filters, LockedView::Revealed, None)
+    search_entries_with_locked_view(conn, query, filters, LockedView::Revealed, None, false)
 }
 
+/// `mention_mode` tunes the query for @-mention autocomplete: the last token
+/// is prefix-matched (`"tok"*`) so a half-typed word still matches, and title
+/// matches are ranked above body matches (`bm25(entries_fts, 10.0, 1.0)`).
+/// When false, behaviour is unchanged: exact-token matching ordered by `rank`.
 pub fn search_entries_with_locked_view(
     conn: &Connection,
     query: &str,
     filters: Option<&SearchFilters>,
     locked_view: LockedView,
     active_vault_id: Option<&str>,
+    mention_mode: bool,
 ) -> Result<Vec<SearchResult>> {
-    let safe_query = match sanitize_fts_query(query) {
+    let safe_query = match sanitize_fts_query(query, mention_mode) {
         Some(q) => q,
         None => return Ok(vec![]),
     };
@@ -3399,7 +3412,11 @@ pub fn search_entries_with_locked_view(
         append_filter_clauses(&mut sql, &mut params, filters.unwrap());
     }
 
-    sql.push_str(" ORDER BY rank LIMIT 50");
+    if mention_mode {
+        sql.push_str(" ORDER BY bm25(entries_fts, 10.0, 1.0) LIMIT 50");
+    } else {
+        sql.push_str(" ORDER BY rank LIMIT 50");
+    }
 
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
@@ -11238,14 +11255,26 @@ mod tests {
         let conn = setup();
         let (public_entry, _, _) = seed_locked_view_entries(&conn);
 
-        let revealed =
-            search_entries_with_locked_view(&conn, "searchable", None, LockedView::Revealed, None)
-                .unwrap();
+        let revealed = search_entries_with_locked_view(
+            &conn,
+            "searchable",
+            None,
+            LockedView::Revealed,
+            None,
+            false,
+        )
+        .unwrap();
         assert_eq!(revealed.len(), 3);
 
-        let covered =
-            search_entries_with_locked_view(&conn, "searchable", None, LockedView::Covered, None)
-                .unwrap();
+        let covered = search_entries_with_locked_view(
+            &conn,
+            "searchable",
+            None,
+            LockedView::Covered,
+            None,
+            false,
+        )
+        .unwrap();
         assert_eq!(covered.len(), 1);
         assert_eq!(covered[0].id, public_entry);
         assert_eq!(covered[0].title.as_deref(), Some("Public"));
@@ -11259,6 +11288,71 @@ mod tests {
                 .unwrap();
         assert_eq!(browsed.len(), 1);
         assert_eq!(browsed[0].id, public_entry);
+    }
+
+    // ── mention mode: prefix matching + title-first ranking ────────────────
+
+    #[test]
+    fn sanitize_fts_query_without_prefix_is_unchanged() {
+        assert_eq!(
+            sanitize_fts_query("trip to paris", false).unwrap(),
+            "\"trip\" \"to\" \"paris\""
+        );
+    }
+
+    #[test]
+    fn sanitize_fts_query_prefix_stars_only_last_token() {
+        assert_eq!(
+            sanitize_fts_query("trip to pari", true).unwrap(),
+            "\"trip\" \"to\" \"pari\"*"
+        );
+    }
+
+    #[test]
+    fn sanitize_fts_query_prefix_stars_single_token() {
+        assert_eq!(sanitize_fts_query("tri", true).unwrap(), "\"tri\"*");
+    }
+
+    #[test]
+    fn sanitize_fts_query_blank_is_none_for_both_flags() {
+        assert!(sanitize_fts_query("   ", false).is_none());
+        assert!(sanitize_fts_query("   ", true).is_none());
+    }
+
+    #[test]
+    fn search_entries_mention_mode_prefix_matches_partial_title() {
+        let conn = setup();
+        let journal_id = make_journal(&conn, "Journal");
+        make_entry(&conn, &journal_id, "Trip to Paris", "some body text");
+
+        let mention =
+            search_entries_with_locked_view(&conn, "tri", None, LockedView::Revealed, None, true)
+                .unwrap();
+        assert_eq!(mention.len(), 1);
+        assert_eq!(mention[0].title.as_deref(), Some("Trip to Paris"));
+
+        let plain =
+            search_entries_with_locked_view(&conn, "tri", None, LockedView::Revealed, None, false)
+                .unwrap();
+        assert!(plain.is_empty(), "whole-token search must not match 'tri'");
+    }
+
+    #[test]
+    fn search_entries_mention_mode_ranks_title_above_body() {
+        let conn = setup();
+        let journal_id = make_journal(&conn, "Journal");
+        make_entry(&conn, &journal_id, "Notes", "visited paris again");
+        make_entry(&conn, &journal_id, "Trip to Paris", "weekend notes");
+
+        let results =
+            search_entries_with_locked_view(&conn, "pari", None, LockedView::Revealed, None, true)
+                .unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results[0].title.as_deref(),
+            Some("Trip to Paris"),
+            "title match must outrank body match in mention mode"
+        );
     }
 
     #[test]
@@ -11439,6 +11533,7 @@ mod tests {
             None,
             LockedView::Revealed,
             Some("test-vault"),
+            false,
         )
         .unwrap();
         assert_eq!(revealed_search.len(), 3);

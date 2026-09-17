@@ -203,6 +203,28 @@ describe('exportMarkdown — image', () => {
   })
 })
 
+// ── mention ───────────────────────────────────────────────────────────────────
+
+describe('exportMarkdown — mention', () => {
+  it('renders mention as an entry link inline with surrounding text', () => {
+    const node: JSONContent = {
+      type: 'mention',
+      attrs: { id: 'e1', label: 'Trip to Paris' },
+    }
+    expect(exportMarkdown(doc(p(text('Before '), node, text(' after'))))).toBe(
+      'Before [Trip to Paris](entry:e1) after\n\n',
+    )
+  })
+
+  it('renders mention with empty label', () => {
+    const node: JSONContent = {
+      type: 'mention',
+      attrs: { id: 'e1', label: '' },
+    }
+    expect(exportMarkdown(doc(p(node)))).toBe('[](entry:e1)\n\n')
+  })
+})
+
 // ── video ─────────────────────────────────────────────────────────────────────
 
 describe('exportMarkdown — video', () => {

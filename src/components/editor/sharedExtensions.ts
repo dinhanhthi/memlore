@@ -17,6 +17,7 @@ import { createLowlight, common } from 'lowlight'
 import { MediaNodeView } from './MediaNodeView'
 import { Video } from './extensions/Video'
 import { Audio } from './extensions/Audio'
+import { Mention } from './extensions/Mention'
 
 export const lowlight = createLowlight(common)
 
@@ -179,6 +180,10 @@ export function buildSharedExtensions({ mathExtensions = [] }: SharedExtensionsO
     ImageWithMediaId,
     VideoWithMediaId,
     AudioWithMediaId,
+    // Unconditional on purpose — never gate this behind a setting. An editor
+    // bound to Yjs with a schema missing `mention` permanently strips existing
+    // mentions from the document (same hazard as the math nodes).
+    Mention,
     HorizontalRule,
     ...mathExtensions,
   ]

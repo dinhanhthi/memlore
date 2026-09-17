@@ -122,7 +122,7 @@ export const locks = {
 
 export const editor = {
   title: 'Feature-rich editor',
-  body: 'The Editor fully supports Markdown, math, code, media, and optional plugins. It responds quickly, even with very long content.',
+  body: 'The Editor fully supports Markdown, math, code, media, @-mentions, and optional plugins. It responds quickly, even with very long content.',
   slashItems: [
     { label: 'Heading 1', hint: '#' },
     { label: 'Image' },
@@ -150,6 +150,11 @@ export const editor = {
       id: 'slash' as const,
       title: 'Slash command',
       sample: "Type / for a heading, image, or today's date.",
+    },
+    {
+      id: 'mention' as const,
+      title: 'Mentions',
+      sample: 'Type @ to link another entry by its title.',
     },
     {
       id: 'markdown' as const,
