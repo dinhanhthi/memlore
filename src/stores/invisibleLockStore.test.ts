@@ -126,6 +126,45 @@ describe('useInvisibleLockStore', () => {
     expect(useTabHistoryStore.getState().histories).toEqual({})
   })
 
+  // Closing the tabs is not enough: `entriesById` accumulates for the whole
+  // session, so anything that resolves a title from it (tab strip, mention
+  // chips) would keep reading a hidden entry's title after the vault relocks.
+  it('lockSession drops invisible entries from the store', () => {
+    const visible = makeEntry('entry-visible', false)
+    const invisible = makeEntry('entry-invisible', true)
+    useEntryStore.setState({
+      entries: [visible, invisible],
+      entriesById: {
+        [visible.id]: visible,
+        [invisible.id]: invisible,
+      },
+    })
+    useInvisibleLockStore.getState().unlockSession('vault-a')
+
+    useInvisibleLockStore.getState().lockSession()
+
+    expect(useEntryStore.getState().entriesById).toEqual({ [visible.id]: visible })
+    expect(useEntryStore.getState().entries).toEqual([visible])
+  })
+
+  it('unlockSession A→B drops the previous vault entries from the store', () => {
+    const visible = makeEntry('entry-visible', false)
+    const invisible = makeEntry('entry-invisible', true)
+    useEntryStore.setState({
+      entries: [visible, invisible],
+      entriesById: {
+        [visible.id]: visible,
+        [invisible.id]: invisible,
+      },
+    })
+    useInvisibleLockStore.getState().unlockSession('vault-a')
+
+    useInvisibleLockStore.getState().unlockSession('vault-b')
+
+    expect(useEntryStore.getState().entriesById).toEqual({ [visible.id]: visible })
+    expect(useEntryStore.getState().entries).toEqual([visible])
+  })
+
   it('lockSession resets a dangling invisible-journal selection', () => {
     const visible = makeJournal('journal-visible', false)
     const invisible = makeJournal('journal-invisible', true)

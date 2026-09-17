@@ -8,6 +8,7 @@ import { useEditorFixedTitleSetting } from '../../hooks/useEditorFixedTitleEnabl
 import { useEditorJustifySetting } from '../../hooks/useEditorJustifyEnabled'
 import { useEditorRightToLeftSetting } from '../../hooks/useEditorRightToLeftEnabled'
 import { useEditorMathSetting } from '../../hooks/useEditorMathEnabled'
+import { useMentionIncludeLockedSetting } from '../../hooks/useMentionIncludeLocked'
 import { useEditorTypographySetting } from '../../hooks/useEditorTypography'
 import { useTheme } from '../../hooks/useTheme'
 import { useThemeCustomization } from '../../hooks/useThemeCustomization'
@@ -32,6 +33,7 @@ import {
 } from '../../lib/themeColors'
 import { useTabStore } from '../../stores/tabStore'
 import { type EditorTab } from '../../stores/uiStore'
+import { Callout } from '../common/Callout'
 import { RadioOptionPill } from '../common/RadioOptionPill'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { CustomGoogleFontModal } from './CustomGoogleFontModal'
@@ -303,6 +305,7 @@ export function EditorSettings() {
   const { t } = useTranslation('settings')
   const { mathEnabled, setMathEnabled } = useEditorMathSetting()
   const { emojiShortcodesEnabled, setEmojiShortcodesEnabled } = useEditorEmojiShortcodesSetting()
+  const { includeLocked, setIncludeLocked } = useMentionIncludeLockedSetting()
   const { fixedTitleEnabled, setFixedTitleEnabled } = useEditorFixedTitleSetting()
   const { rightToLeftEnabled, setRightToLeftEnabled } = useEditorRightToLeftSetting()
   const { justifyEnabled, setJustifyEnabled } = useEditorJustifySetting()
@@ -413,6 +416,27 @@ export function EditorSettings() {
                         onChange={(next) => void setEmojiShortcodesEnabled(next)}
                       />
                     </SettingsRow>
+
+                    <SettingsRow
+                      className={ROW}
+                      divider={false}
+                      title={t('editor.mention_include_locked.title')}
+                      hint={t('editor.mention_include_locked.hint')}
+                    >
+                      <Toggle
+                        ariaLabel={t('editor.mention_include_locked.title')}
+                        checked={includeLocked}
+                        onChange={(next) => void setIncludeLocked(next)}
+                      />
+                    </SettingsRow>
+
+                    {includeLocked && (
+                      <div className={ROW}>
+                        <Callout tone="warning" size="sm" className="mb-3.5">
+                          {t('editor.mention_include_locked.warning')}
+                        </Callout>
+                      </div>
+                    )}
 
                     <SettingsRow
                       className={ROW}

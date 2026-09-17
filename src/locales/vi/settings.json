@@ -110,6 +110,11 @@
       "title": "Mã emoji",
       "hint": "Gõ :từ_khóa: để chèn emoji. Mặc định tắt."
     },
+    "mention_include_locked": {
+      "title": "Cho phép nhắc đến mục đã khóa",
+      "hint": "Cho phép lượt nhắc @ tìm thấy cả mục nằm sau khóa thứ hai hoặc trong vault của Khóa vô hình. Mặc định tắt.",
+      "warning": "Tiêu đề của mục đã khóa hoặc đang ẩn sẽ được lưu bên trong mục nhắc đến nó. Tiêu đề đó vẫn tìm kiếm được ở mục kia và được gửi tới nhà cung cấp AI của bạn khi mục kia được lập chỉ mục — kể cả sau khi bạn khóa mục gốc trở lại."
+    },
     "fixed_title": {
       "title": "Cố định tiêu đề mục",
       "hint": "Ghim tiêu đề khi nội dung cuộn. Mặc định tắt."
@@ -910,6 +915,7 @@
   },
   "security": {
     "encryption_callout": "Nhật ký của bạn được mã hóa đầu cuối với AES-256-GCM. Cần có mật khẩu và không thể tắt — chúng tôi không có cách khôi phục dữ liệu nếu bạn mất mật khẩu.",
+    "mention_include_locked_warning": "Tùy chọn \"Cho phép nhắc đến mục đã khóa\" đang bật: tiêu đề của các mục được lớp khóa này bảo vệ có thể bị nhắc đến bên trong mục khác và lộ ra theo cách đó — vẫn tìm kiếm được, và được gửi tới nhà cung cấp AI của bạn khi mục nhắc đến được lập chỉ mục. Tắt \"Cho phép nhắc đến mục đã khóa\" trong Cài đặt → Trình soạn thảo → Chung chỉ ngăn các lượt nhắc mới — những tiêu đề đã được ghi vào các mục khác vẫn còn ở đó.",
     "tabs": {
       "device_password": "Mật khẩu thiết bị",
       "second_lock": "Khóa thứ hai",

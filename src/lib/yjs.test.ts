@@ -127,4 +127,34 @@ describe('extractPlainText', () => {
     const result = extractPlainText(doc)
     expect(result).toContain('Hello world')
   })
+
+  it('includes a mention label alongside the surrounding text', () => {
+    const doc = createYDoc('entry-1')
+    const paragraph = new Y.XmlElement('paragraph')
+    const before = new Y.XmlText()
+    before.insert(0, 'See ')
+    const mention = new Y.XmlElement('mention')
+    mention.setAttribute('label', 'Trip to Paris')
+    const after = new Y.XmlText()
+    after.insert(0, ' for details')
+    paragraph.insert(0, [before, mention, after])
+    doc.getXmlFragment('default').insert(0, [paragraph])
+
+    expect(extractPlainText(doc)).toBe('See Trip to Paris for details')
+  })
+
+  it('does not throw when a mention has no label attribute', () => {
+    const doc = createYDoc('entry-1')
+    const paragraph = new Y.XmlElement('paragraph')
+    const before = new Y.XmlText()
+    before.insert(0, 'See ')
+    const mention = new Y.XmlElement('mention')
+    const after = new Y.XmlText()
+    after.insert(0, ' for details')
+    paragraph.insert(0, [before, mention, after])
+    doc.getXmlFragment('default').insert(0, [paragraph])
+
+    expect(() => extractPlainText(doc)).not.toThrow()
+    expect(extractPlainText(doc)).toBe('See  for details')
+  })
 })

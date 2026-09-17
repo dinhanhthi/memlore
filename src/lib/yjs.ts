@@ -89,6 +89,12 @@ const BLOCK_TAGS = new Set([
 ])
 
 function xmlElementToText(elem: Y.XmlElement): string {
+  // A mention is an inline atom node: it has no Y.XmlText children, so the
+  // loop below would yield '' and the mentioned entry's title would vanish
+  // from content_text (the FTS index and the embedding input).
+  if (elem.nodeName?.toLowerCase() === 'mention') {
+    return elem.getAttribute('label') ?? ''
+  }
   let result = ''
   for (let i = 0; i < elem.length; i++) {
     const child = elem.get(i)

@@ -110,6 +110,11 @@
       "title": "Emoji shortcodes",
       "hint": "Type :keyword: to insert emojis. Off by default."
     },
+    "mention_include_locked": {
+      "title": "Include locked entries in mentions",
+      "hint": "Let @-mentions find entries kept behind the second lock or in an invisible vault. Off by default.",
+      "warning": "The title of a locked or hidden entry is stored inside the entry that mentions it. It stays searchable there and is sent to your AI provider when that entry is indexed — even after you lock the entry again."
+    },
     "fixed_title": {
       "title": "Fixed entry title",
       "hint": "Pin the title while the body scrolls. Off by default."
@@ -910,6 +915,7 @@
   },
   "security": {
     "encryption_callout": "Your journal is end-to-end encrypted with AES-256-GCM. A password is required and cannot be disabled — we have no way to recover your data if you lose it.",
+    "mention_include_locked_warning": "\"Include locked entries in mentions\" is on: titles of entries protected by this lock can be mentioned inside other entries and are exposed there — searchable, and sent to your AI provider when the mentioning entry is indexed. Turning off \"Include locked entries in mentions\" in Settings → Editor → General only stops new mentions — titles already written into other entries stay there.",
     "tabs": {
       "device_password": "Device password",
       "second_lock": "Second lock",

@@ -160,6 +160,16 @@
   "emoji_shortcode": {
     "listbox_label": "Insert emoji"
   },
+  "mention": {
+    "listbox_label": "Entries",
+    "menu_label": "Mention actions",
+    "empty": "No matching entry",
+    "unavailable": "Entry unavailable",
+    "untitled": "Untitled",
+    "open": "Open",
+    "open_new_tab": "Open in new tab",
+    "copy_title": "Copy title"
+  },
   "slash": {
     "listbox_label": "Insert block",
     "basic_blocks": "Basic blocks",

@@ -307,8 +307,9 @@ export const searchEntries = (
   filters?: SearchFilters,
   lockedView: LockedView = 'revealed',
   activeVaultId: string | null = null,
+  mentionMode = false,
 ): Promise<SearchResult[]> =>
-  invoke('search_entries', { query, filters, lockedView, activeVaultId })
+  invoke('search_entries', { query, filters, lockedView, activeVaultId, mentionMode })
 
 export const semanticSearch = (
   query: string,

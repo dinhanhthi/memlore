@@ -160,6 +160,16 @@
   "emoji_shortcode": {
     "listbox_label": "Chèn emoji"
   },
+  "mention": {
+    "listbox_label": "Các mục",
+    "menu_label": "Thao tác với lượt nhắc",
+    "empty": "Không có mục phù hợp",
+    "unavailable": "Mục không khả dụng",
+    "untitled": "Không tiêu đề",
+    "open": "Mở",
+    "open_new_tab": "Mở trong tab mới",
+    "copy_title": "Sao chép tiêu đề"
+  },
   "slash": {
     "listbox_label": "Chèn khối",
     "basic_blocks": "Khối cơ bản",

@@ -29,6 +29,7 @@ import {
   writeAppleJournalImportReport,
   type ImportFormat,
   type ImportSummary,
+  searchEntries,
   semanticSearch,
   setEntryLocked,
   setEntryInvisible,
@@ -229,6 +230,33 @@ describe('search wrappers', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(invoke).mockResolvedValue([])
+  })
+
+  // `mention_mode` is a plain `bool` on the Rust side, not an `Option`, so a
+  // missing or misspelled key fails argument deserialization at runtime and
+  // breaks every entry search. `tsc` cannot see across the IPC boundary.
+  it('invokes entry search with mentionMode defaulted to false', async () => {
+    await searchEntries('query')
+
+    expect(invoke).toHaveBeenCalledWith('search_entries', {
+      query: 'query',
+      filters: undefined,
+      lockedView: 'revealed',
+      activeVaultId: null,
+      mentionMode: false,
+    })
+  })
+
+  it('invokes entry search with mentionMode enabled', async () => {
+    await searchEntries('query', undefined, 'hidden', 'vault-a', true)
+
+    expect(invoke).toHaveBeenCalledWith('search_entries', {
+      query: 'query',
+      filters: undefined,
+      lockedView: 'hidden',
+      activeVaultId: 'vault-a',
+      mentionMode: true,
+    })
   })
 
   it('invokes semantic search with the locked-view and activeVaultId', async () => {

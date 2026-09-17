@@ -14,6 +14,11 @@ use crate::{AppState, EncryptionKeyState};
 /// Search entries using FTS5. Returns up to 50 results ordered by relevance (rank).
 /// Soft-deleted entries are excluded. Malformed queries return empty results (not an error).
 ///
+/// `mention_mode` (default `false` from the JS wrapper) switches to
+/// @-mention autocomplete behaviour: the last token is prefix-matched so a
+/// half-typed word still matches, and title matches are ranked above body
+/// matches. `false` leaves the Search modal path byte-identical to before.
+///
 /// Phase 3: all fields are stored as plaintext at the app layer. FTS5 matches
 /// against the plaintext `content_text` column. Results carry plaintext
 /// `title` / `preview_text` — no decryption step required.
@@ -25,6 +30,7 @@ pub fn search_entries(
     filters: Option<SearchFilters>,
     locked_view: LockedView,
     active_vault_id: Option<String>,
+    mention_mode: bool,
 ) -> Result<Vec<SearchResult>, String> {
     key_state.with_key(|_key| {
         let conn = state.lock()?;
@@ -50,6 +56,7 @@ pub fn search_entries(
                 filters.as_ref(),
                 locked_view,
                 active_vault_id.as_deref(),
+                mention_mode,
             )
             .map_err(|e| e.to_string())
         }

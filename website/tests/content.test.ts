@@ -190,11 +190,12 @@ it('explains encryption for a non-technical reader', () => {
   expect(copy).not.toMatch(/argon2|aes-256|sqlcipher|ciphertext|zeroize/)
 })
 
-it('names the editor and lists slash commands, GFM, and later plugins', () => {
+it('names the editor and lists slash commands, mentions, GFM, and later plugins', () => {
   expect(editor.title.toLowerCase()).toMatch(/editor/)
   expect(editor.panes.map((pane) => pane.id)).toEqual(
-    expect.arrayContaining(['slash', 'markdown', 'plugins']),
+    expect.arrayContaining(['slash', 'mention', 'markdown', 'plugins']),
   )
+  expect(editor.body.toLowerCase()).toMatch(/mention/)
   const copy = collectStrings(editor).join('\n').toLowerCase()
   expect(copy).toMatch(/slash/)
   expect(copy).toMatch(/github flavored markdown|\bgfm\b/)
