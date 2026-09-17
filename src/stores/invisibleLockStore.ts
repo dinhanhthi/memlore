@@ -55,19 +55,39 @@ export function closeTabsForEntryIds(entryIds: ReadonlySet<string>) {
   }
 }
 
-function clearOpenInvisibleTabs() {
+/**
+ * Close every tab showing an invisible entry, then drop those entries from the
+ * store.
+ *
+ * Closing the tabs is not enough on its own: `entriesById` accumulates for the
+ * whole session and is never replaced wholesale, so every consumer that
+ * resolves an entry by id — the tab strip's title and journal colour
+ * (`TitleBar`), a mention chip — would keep reading a hidden entry's live title
+ * after the vault relocked. Dropping the rows spares each of them its own mask.
+ *
+ * Not a hard guarantee: `updateEntry` upserts unconditionally, so a late
+ * autosave or title-stream resolution landing after the lock can put a row
+ * back. No reader exposes one today (the tab is closed, a mention chip
+ * re-masks on its next render), but a new by-id reader still has to think
+ * about lock state rather than trusting this to have emptied the map.
+ */
+function clearInvisibleEntriesAndTabs() {
+  const { entriesById, removeEntry } = useEntryStore.getState()
   const invisibleEntryIds = new Set(
-    Object.values(useEntryStore.getState().entriesById)
+    Object.values(entriesById)
       .filter((entry) => entry.is_invisible)
       .map((entry) => entry.id),
   )
+  // Order is free — the ids are already materialised, and `closeTabsForEntryIds`
+  // reads only the tab stores.
   closeTabsForEntryIds(invisibleEntryIds)
+  for (const id of invisibleEntryIds) removeEntry(id)
 }
 
 /** Same UI clear as lockSession (tabs + journal selection) without touching activeVaultId. */
 function clearInvisibleSessionUi() {
   clearInvisibleJournalSelection()
-  clearOpenInvisibleTabs()
+  clearInvisibleEntriesAndTabs()
 }
 
 /**
