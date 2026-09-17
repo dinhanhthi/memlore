@@ -38,6 +38,7 @@
     "../web/**/*.test.tsx",
     "playwright.config.ts",
     "tests/landing.spec.ts",
+    "tests/legal.spec.ts",
     "test-results",
     "playwright-report",
     "dist"

@@ -40,6 +40,10 @@ below.
 4. **Test users → Add users** — add the Google account you will use to connect
    Drive. Only those accounts can finish OAuth while the app is in Testing.
 
+> ⚠️ **Testing status expires refresh tokens after 7 days**, so every user has
+> to reconnect Drive weekly. That is fine for development and **must not ship**
+> — see "Going to production" below.
+
 #### Data Access
 
 1. Sidebar → **Data Access** → **Add or remove scopes**.
@@ -55,6 +59,68 @@ below.
 > **"This app isn't verified" warning** is expected during development. Click
 > **Advanced → Go to Memlore (unsafe)** to proceed. Skip **Verification Center**
 > until you publish.
+
+---
+
+## Going to production
+
+**This step is required before a public release.** While publishing status is
+**Testing** with an **External** user type, Google issues refresh tokens that
+expire after **7 days** — so every user is silently logged out of Drive sync
+once a week and has to reconnect. From Google's OAuth docs, verbatim:
+
+> "A Google Cloud Platform project with an OAuth consent screen configured for
+> an external user type and a publishing status of 'Testing' is issued a refresh
+> token expiring in 7 days"
+
+The fix is to publish the app: **APIs & Services → OAuth consent screen →
+Publish app**.
+
+### No heavyweight verification is needed
+
+Memlore requests exactly one scope — `drive.appdata`
+(`src-tauri/src/sync/gdrive_oauth.rs:56`) — which Google classifies as
+**non-sensitive**, because the app can only ever see its own hidden
+`appDataFolder`, never the user's other files. Per Google:
+
+> "If your app utilizes only **non-sensitive** scopes, it is not mandatory for
+> your app to complete the app verification process."
+
+So there is **no CASA security assessment, no annual third-party audit, and no
+multi-week review**. Those apply to _restricted_ Drive scopes (`drive`,
+`drive.readonly`, `drive.metadata`, …), which this app deliberately avoids. This
+is a concrete payoff of the `appDataFolder` design — do not widen the scope
+without re-reading this section.
+
+### What publishing actually requires
+
+The consent screen must be complete before Google lets you publish:
+
+- App name and support email (already set above)
+- **Homepage URL** — the deployed `website/` origin (the index page)
+- **Privacy policy URL** — `{homepage}/privacy.html`
+- **Terms of service URL** — optional on the consent screen; available at `{homepage}/terms.html`
+- App logo, if you want one
+
+### Optional: brand verification
+
+A lighter-weight review, needed **only** if you want the app name and logo shown
+on Google's consent screen:
+
+> "if you want your app to display an app name and logo on the OAuth consent
+> screen, you will need to complete a lighter-weight verification process known
+> as 'brand-verification'."
+
+Google's documentation does not clearly state whether an "unverified app"
+interstitial still appears for a _published_ app that has skipped brand
+verification. Check it yourself after publishing, with a Google account that is
+**not** in your test-user list — a test user's experience is not representative.
+
+### After publishing — verify it actually took
+
+1. Connect Drive with a fresh Google account that was never a test user.
+2. Leave it more than 7 days, then confirm sync still runs without a reconnect
+   prompt. This is the only real proof; nothing in the console reports it.
 
 ---
 

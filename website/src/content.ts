@@ -1,5 +1,6 @@
 export const githubUrl = 'https://github.com/dinhanhthi/memlore'
 export const authorUrl = 'https://dinhanhthi.com'
+export const contactEmail = 'me@dinhanhthi.com'
 
 export const meta = {
   title: 'Memlore — A little life. A lasting story.',
@@ -488,4 +489,197 @@ export const footer = {
   note: 'Made with ❤️ by',
   author: 'Thi',
   github: 'GitHub',
+}
+
+export type LegalSection = {
+  id: string
+  heading: string
+  paragraphs: string[]
+  bullets?: string[]
+}
+
+export const legal = {
+  updatedLabel: 'Last updated',
+  updated: '17 September 2026',
+  privacyLink: 'Privacy',
+  termsLink: 'Terms',
+  homeAria: 'Memlore home',
+}
+
+export const privacy = {
+  title: 'Memlore — Privacy Policy',
+  description:
+    'How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.',
+  heading: 'Privacy Policy',
+  intro:
+    'Memlore is a private journal. This page explains what the app and this website do with information — and what they never do.',
+  googleUserDataPolicyUrl: 'https://developers.google.com/terms/api-services-user-data-policy',
+  sections: [
+    {
+      id: 'whoWeAre',
+      heading: 'Who we are',
+      paragraphs: [
+        'Memlore is made by Anh-Thi Dinh. It is an open-source journal app.',
+        `Questions: ${contactEmail}.`,
+      ],
+    },
+    {
+      id: 'whatWeDoNotCollect',
+      heading: 'What we do not collect',
+      paragraphs: [
+        'There is no Memlore server and no Memlore account. The app does not watch you.',
+      ],
+      bullets: ['No telemetry', 'No analytics', 'No advertising', 'No tracking pixels'],
+    },
+    {
+      id: 'onYourDevice',
+      heading: 'Your journal on your device',
+      paragraphs: [
+        'Your journal lives on your device, in an encrypted local database. We cannot read it.',
+      ],
+    },
+    {
+      id: 'googleDrive',
+      heading: 'Optional Google Drive sync',
+      paragraphs: [
+        'If you sync, you connect your own Google account. Memlore asks only for the drive.appdata scope: https://www.googleapis.com/auth/drive.appdata.',
+        'Synced files sit in Google Drive’s hidden Application Data folder. They are not visible in drive.google.com.',
+        'Entries, media, and settings are encrypted on your device before they are uploaded. A small sync list and device registry — IDs, timestamps, deletion flags, and your device name, not journal text — are stored as JSON in the hidden Application Data folder. Memlore cannot read your other Drive files.',
+        'The refresh token is stored only in the encrypted database on your device. The access token stays in memory and is never written to disk.',
+      ],
+    },
+    {
+      id: 'googleLimitedUse',
+      heading: 'Google API Limited Use',
+      paragraphs: [
+        "Memlore's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.",
+      ],
+    },
+    {
+      id: 'googleUserData',
+      heading: 'How Google user data is used',
+      paragraphs: [
+        'Google user data is not sold, not used for ads, and not transferred to third parties except as needed to operate Drive sync in your own account.',
+        'Memlore reads your Google account email, and your Drive storage quota, so the app can show which account is connected. Both stay only in the encrypted database on your device. They are not sent to a Memlore server. Disconnecting clears them.',
+        'You can disconnect in the app. You can also disconnect in Google Drive → Settings → Manage apps.',
+      ],
+    },
+    {
+      id: 'icloudDrive',
+      heading: 'Optional iCloud Drive',
+      paragraphs: [
+        'iCloud Drive is the same idea: your own cloud, files encrypted on your device before they leave. This is not Google data.',
+      ],
+    },
+    {
+      id: 'optionalAi',
+      heading: 'Optional AI',
+      paragraphs: [
+        'AI stays off until you opt in and accept a privacy notice. You choose the provider — local or on-device, or a hosted one.',
+        'Hosted providers receive the entry text you send them. That is not a transfer of Google API data. Memlore does not operate those AI services.',
+      ],
+    },
+    {
+      id: 'mapsAndSpeech',
+      heading: 'Optional maps, places, and speech',
+      paragraphs: [
+        'Maps, geocoding, and speech-to-text run only if you turn them on. They talk to the provider you choose — for example Nominatim/OpenStreetMap, Mapbox, MapTiler, Apple MapKit, or your speech-to-text provider.',
+      ],
+    },
+    {
+      id: 'appUpdates',
+      heading: 'App updates',
+      paragraphs: [
+        'The app may request GitHub release metadata so it can tell you when an update is available. That check is not telemetry.',
+      ],
+    },
+    {
+      id: 'thisWebsite',
+      heading: 'This website',
+      paragraphs: [
+        'This marketing website does not set analytics cookies and does not collect journal data. The interactive demo uses sample data only.',
+      ],
+    },
+    {
+      id: 'children',
+      heading: 'Children',
+      paragraphs: ['Memlore is not directed at children under 13.'],
+    },
+    {
+      id: 'changes',
+      heading: 'Changes',
+      paragraphs: [
+        'This policy may change. The date at the top of the page shows when it was last updated.',
+      ],
+    },
+    {
+      id: 'contact',
+      heading: 'How to reach us',
+      paragraphs: [`Privacy questions: ${contactEmail}.`],
+    },
+  ] satisfies LegalSection[],
+}
+
+export const terms = {
+  title: 'Memlore — Terms of Service',
+  description:
+    'The terms for using Memlore: an AGPL-licensed journal still in development, with your writing remaining yours.',
+  heading: 'Terms of Service',
+  intro:
+    'These terms cover the Memlore app and this website. If you do not agree, please do not use them.',
+  sections: [
+    {
+      id: 'license',
+      heading: 'The software and your journal',
+      paragraphs: [
+        'The Memlore software is licensed under AGPL-3.0-or-later. Your journal belongs to you. Using the app does not relicense what you write.',
+      ],
+    },
+    {
+      id: 'inDevelopment',
+      heading: 'Still in development',
+      paragraphs: [
+        'Memlore is in development. Today’s build is a macOS beta. Features and file formats may change.',
+      ],
+    },
+    {
+      id: 'yourData',
+      heading: 'Your data, your keys',
+      paragraphs: [
+        'You own your journal. You are responsible for your password, your 24-word recovery phrase, and your backups.',
+        'If you lose the recovery phrase and lose your devices, the journal cannot be recovered. That is by design.',
+      ],
+    },
+    {
+      id: 'thirdParties',
+      heading: 'Optional third-party services',
+      paragraphs: [
+        'Optional services — Google, Apple, AI providers, and map, geocoding, or speech-to-text providers — have their own terms. Memlore is not those services.',
+      ],
+    },
+    {
+      id: 'acceptableUse',
+      heading: 'Acceptable use',
+      paragraphs: [
+        'Do not use Memlore for unlawful purposes. Do not try to break the encryption of someone else’s data.',
+      ],
+    },
+    {
+      id: 'noWarranty',
+      heading: 'No warranty',
+      paragraphs: ['Memlore is provided "as is", without warranty of any kind.'],
+    },
+    {
+      id: 'liability',
+      heading: 'Limitation of liability',
+      paragraphs: [
+        'To the extent permitted by law, Memlore and its author are not liable for lost data, lost access, or other damages arising from use of the app.',
+      ],
+    },
+    {
+      id: 'contact',
+      heading: 'Contact',
+      paragraphs: [`Questions about these terms: ${contactEmail}.`],
+    },
+  ] satisfies LegalSection[],
 }

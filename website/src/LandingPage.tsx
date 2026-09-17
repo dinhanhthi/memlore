@@ -68,6 +68,7 @@ import {
   footer,
   githubUrl,
   hero,
+  legal,
   locations,
   locks,
   nav,
@@ -1370,6 +1371,10 @@ export default function LandingPage() {
               {footer.author}
             </a>
           </p>
+          <nav className="footer-legal" aria-label={`${legal.privacyLink} and ${legal.termsLink}`}>
+            <a href="privacy.html">{legal.privacyLink}</a>
+            <a href="terms.html">{legal.termsLink}</a>
+          </nav>
           <a href={githubUrl} target="_blank" rel="noreferrer">
             {footer.github} <ArrowUpRight className="size-4" />
           </a>

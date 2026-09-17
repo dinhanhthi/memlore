@@ -1963,6 +1963,76 @@ tbody th {
 .footer-bottom > a:last-child:hover {
   color: var(--color-accent);
 }
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  min-width: 0;
+}
+.footer-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.footer-legal a:hover {
+  color: var(--color-accent);
+}
+.footer-legal a[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.legal-article {
+  max-width: 40rem;
+  padding-block: var(--space-2xl) var(--space-3xl);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.legal-article h1 {
+  font-family: var(--font-title);
+  font-size: clamp(2.25rem, 4.2vw, 3.25rem);
+  color: var(--color-ink);
+}
+.legal-updated {
+  margin-top: var(--space-sm);
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+.legal-intro {
+  margin-top: var(--space-lg);
+  font-size: var(--text-lead);
+  line-height: 1.6;
+}
+.legal-article section {
+  margin-top: var(--space-xl);
+}
+.legal-article h2 {
+  font-family: var(--font-title);
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  color: var(--color-ink);
+  margin-bottom: var(--space-sm);
+}
+.legal-article p + p {
+  margin-top: 0.85rem;
+}
+.legal-article ul {
+  margin-top: var(--space-sm);
+  padding-left: 1.25rem;
+}
+.legal-article li + li {
+  margin-top: var(--space-2xs);
+}
+.legal-article a {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.legal-article a:hover {
+  color: var(--color-accent);
+}
 .skip-link {
   position: fixed;
   z-index: calc(var(--z-sticky-nav) + 1);
@@ -2253,6 +2323,9 @@ tbody th {
   .footer-bottom {
     flex-wrap: wrap;
     gap: 8px;
+  }
+  .footer-legal {
+    flex: 1 1 12rem;
   }
   .footer-bottom p {
     order: 3;

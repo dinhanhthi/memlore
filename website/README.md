@@ -92,9 +92,13 @@ after visible changes to the seeded entry or the app chrome.
 | Path                            | Role                                              |
 | ------------------------------- | ------------------------------------------------- |
 | `src/LandingPage.tsx`           | Marketing page                                    |
+| `privacy.html`                  | Public Privacy Policy page                        |
+| `terms.html`                    | Public Terms of Service page                      |
+| `src/legal/`                    | Shared LegalPage and privacy/terms Vite entries   |
 | `src/content.ts`                | English copy                                      |
 | `src/demoBridge.ts`             | Parent → iframe commands (theme, navigate, reset) |
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |
 | `tokens.css` / `src/styles.css` | Dark-only Hallmark Workbench tokens               |
 | `tests/landing.spec.ts`         | Production-preview Playwright smoke               |
+| `tests/legal.spec.ts`           | Privacy / terms production-preview Playwright     |
 | `playwright.config.ts`          | Website-only Playwright (port 4176)               |
