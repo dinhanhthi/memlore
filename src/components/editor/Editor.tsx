@@ -935,7 +935,7 @@ export function Editor({
                 // Apply date if picked.
                 if (payload.date !== undefined) {
                   await updateEntryDate(entryId, payload.date)
-                  emitStreakRefresh()
+                  await emitStreakRefresh()
                 }
                 // Apply location if picked. The modal reverse-geocoded
                 // the chosen coords; prefer the modal's freshly-fetched

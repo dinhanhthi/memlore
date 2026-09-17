@@ -383,13 +383,13 @@ export function EntryContextMenu({
   async function handleDateChange(timestamp: number) {
     try {
       await updateEntryDate(entryId, timestamp)
+      await emitStreakRefresh()
       // Mirror EditorHeader: a manual date pick must block the
       // EXIF-suggestion machinery from overwriting the user's choice
       // if this happens to be the entry currently open in the editor.
       await markEntryDateUserEdited(entryId)
       setEntryDateUserEdited(true)
       emitEntriesChanged()
-      emitStreakRefresh()
     } catch (err) {
       console.error('Failed to update entry date:', err)
     }

@@ -115,6 +115,10 @@ export function EditorHeader({
     setShowDatePicker(false)
     try {
       await updateEntryDate(entry.id, timestamp)
+      // Recalc + push to FooterBar before emitEntriesChanged invalidates
+      // the entry list — that refetch holds AppState's mutex and would
+      // otherwise delay recalculate_streak until the footer looks stale.
+      await emitStreakRefresh()
       // Durable backend flag — keeps the multi-EXIF date modal from
       // re-popping for this entry once the user has explicitly set
       // a date manually. Session flag stays for the current render.
@@ -126,7 +130,6 @@ export function EditorHeader({
       // index. `keepPreviousData` in useEntries prevents the list
       // from flashing to a Loading placeholder during the refetch.
       emitEntriesChanged()
-      emitStreakRefresh()
       // Refetch into EditorPanel state so the date pill we just rendered
       // from picks up the new `entry_date`. Without this, the pill keeps
       // showing the old date until the user navigates away and back.
@@ -281,6 +284,7 @@ export function EditorHeader({
             try {
               if (payload.date !== undefined) {
                 await updateEntryDate(entry.id, payload.date)
+                await emitStreakRefresh()
               }
               await markEntryDateUserEdited(entry.id)
               setEntryDateUserEdited(true)
@@ -288,7 +292,6 @@ export function EditorHeader({
               // invalidate (see handleDateChange for the same reasoning).
               if (payload.date !== undefined) {
                 emitEntriesChanged()
-                emitStreakRefresh()
               } else {
                 emitEntryPatched(entry.id, { entry_date_user_edited: true })
               }
