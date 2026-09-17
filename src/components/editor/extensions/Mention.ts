@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { MentionNodeView } from '../MentionNodeView'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -68,6 +70,10 @@ export const Mention = Node.create({
       mergeAttributes({ 'data-type': 'mention' }, HTMLAttributes),
       `@${String(node.attrs.label ?? '')}`,
     ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MentionNodeView)
   },
 
   addCommands() {

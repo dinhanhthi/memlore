@@ -32,6 +32,7 @@ import { useLockAction } from './hooks/useLockAction'
 import { useLanguageHydration } from './hooks/useLanguageHydration'
 import { getEditorMathEnabled, hydrateEditorMathEnabled } from './hooks/useEditorMathEnabled'
 import { hydrateEditorEmojiShortcodesEnabled } from './hooks/useEditorEmojiShortcodesEnabled'
+import { hydrateMentionIncludeLocked } from './hooks/useMentionIncludeLocked'
 import { hydrateEditorDistractionEnabled } from './hooks/useEditorDistractionEnabled'
 import { hydrateLayoutPreset } from './hooks/useLayoutPreset'
 import { hydrateDashboardCards } from './hooks/useDashboardCards'
@@ -172,6 +173,7 @@ function App() {
       if (getEditorMathEnabled()) void ensureMathExtensions()
     })
     void hydrateEditorEmojiShortcodesEnabled()
+    void hydrateMentionIncludeLocked()
     void hydrateEditorFixedTitleEnabled()
     void hydrateMediaViewMode()
     void hydrateEditorJustifyEnabled()

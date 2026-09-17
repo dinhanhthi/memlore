@@ -2,8 +2,10 @@ import { useState, type SubmitEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { useSecondLock } from '../../hooks/useSecondLock'
+import { useMentionIncludeLocked } from '../../hooks/useMentionIncludeLocked'
 import { MIN_SECOND_LOCK_PASSWORD_LEN, validateNewPassword } from '../../lib/secondLockPassword'
 import { Button } from '../common/Button'
+import { Callout } from '../common/Callout'
 import { PasswordInput } from '../common/PasswordInput'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { SecondLockPromptModal } from '../common/SecondLockPromptModal'
@@ -26,6 +28,7 @@ function toAutoLockOption(minutes: number): AutoLockOption {
 
 export function SecondLockSettings() {
   const { t } = useTranslation('settings')
+  const mentionIncludeLocked = useMentionIncludeLocked()
   const optionLabel = (value: AutoLockOption): string =>
     value === '0'
       ? t('security.second_lock.auto_lock_never')
@@ -175,6 +178,12 @@ export function SecondLockSettings() {
       <p className="text-fg-muted text-sm leading-relaxed">
         {t('security.second_lock.description')}
       </p>
+
+      {mentionIncludeLocked && (
+        <Callout tone="warning" size="sm">
+          {t('security.mention_include_locked_warning')}
+        </Callout>
+      )}
 
       {!isEnabled ? (
         <SettingsSurfaceCard className="flex flex-col gap-3 p-4">

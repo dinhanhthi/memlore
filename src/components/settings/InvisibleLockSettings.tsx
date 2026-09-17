@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useInvisibleLock } from '../../hooks/useInvisibleLock'
+import { useMentionIncludeLocked } from '../../hooks/useMentionIncludeLocked'
 import { MIN_SECOND_LOCK_PASSWORD_LEN } from '../../lib/passwordStrength'
 import { Button } from '../common/Button'
 import { Callout } from '../common/Callout'
@@ -41,6 +42,7 @@ function optionLabel(value: AutoLockOption): string {
 
 export function InvisibleLockSettings() {
   const { t } = useTranslation('settings')
+  const mentionIncludeLocked = useMentionIncludeLocked()
   const {
     isSessionUnlocked,
     autoLockMinutes,
@@ -195,6 +197,12 @@ export function InvisibleLockSettings() {
       <p className="text-fg-muted text-sm leading-relaxed">
         {t('security.invisible_lock.description')}
       </p>
+
+      {mentionIncludeLocked && (
+        <Callout tone="warning" size="sm">
+          {t('security.mention_include_locked_warning')}
+        </Callout>
+      )}
 
       <SettingsGroup>
         {/* Open or create vault */}
