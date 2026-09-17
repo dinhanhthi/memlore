@@ -495,6 +495,24 @@ export const legal = {
   updatedLabel: 'Last updated',
   privacyLink: 'Privacy',
   termsLink: 'Terms',
-  linksAria: 'Privacy, terms, and GitHub',
+  changelogLink: 'Changelog',
+  linksAria: 'Changelog, privacy, terms, and GitHub',
   homeAria: 'Memlore home',
+}
+
+export const changelog = {
+  metaTitle: 'Memlore — Changelog',
+  metaDescription:
+    'What changed in each version of Memlore, written for the people who use it rather than the people who build it.',
+  title: 'What’s new',
+  intro: 'Every version of Memlore, in plain words.',
+  beta: 'Beta',
+  betaNote: 'A test version. Stable is what most people should run.',
+  releasedLabel: 'Released',
+  badgeLabel: 'Current version',
+  kinds: {
+    new: 'New',
+    improved: 'Improved',
+    fixed: 'Fixed',
+  } satisfies Record<'new' | 'improved' | 'fixed', string>,
 }

@@ -6,7 +6,7 @@ export function SiteFooterBar({
   current,
 }: {
   homeHref: string
-  current?: 'privacy' | 'terms'
+  current?: 'privacy' | 'terms' | 'changelog'
 }) {
   return (
     <div className="footer-bottom">
@@ -22,6 +22,9 @@ export function SiteFooterBar({
         </p>
       </div>
       <nav className="footer-links" aria-label={legal.linksAria}>
+        <a href="changelog.html" aria-current={current === 'changelog' ? 'page' : undefined}>
+          {legal.changelogLink}
+        </a>
         <a href="privacy.html" aria-current={current === 'privacy' ? 'page' : undefined}>
           {legal.privacyLink}
         </a>

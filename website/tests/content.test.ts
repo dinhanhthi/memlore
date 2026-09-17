@@ -96,9 +96,13 @@ it('does not promise ship dates for Windows, Linux, iOS, or Android', () => {
   expect(allCopy()).not.toMatch(SHIP_DATE)
 })
 
-it('points the beta download at GitHub, not a store', () => {
+it('points the download at GitHub, not a store', () => {
   expect(hero.download).toMatch(/download/i)
-  expect(hero.download).toMatch(/beta/i)
+  // Deliberately no /beta/i assertion on the button label. It was dropped from
+  // the copy in f617a60, and v0.1.0 ships as a real signed, notarized release
+  // rather than a beta — so calling the primary download a beta would now be
+  // wrong. What still matters is that it goes to GitHub and never implies an
+  // app store.
   expect(nav.downloadAria).toMatch(/github/i)
   expect(allCopy()).not.toMatch(STORE_RELEASE)
 })

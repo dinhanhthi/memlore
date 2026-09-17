@@ -20,6 +20,7 @@ export function renderLandingStaticHtml(): string {
     section(sync.title, sync.body),
     `<nav aria-label="${escapeHtml(legal.linksAria)}">`,
     `<a href="index.html">${escapeHtml(nav.wordmark)}</a>`,
+    `<a href="changelog.html">${escapeHtml(legal.changelogLink)}</a>`,
     `<a href="privacy.html">${escapeHtml(legal.privacyLink)}</a>`,
     `<a href="terms.html">${escapeHtml(legal.termsLink)}</a>`,
     `<a href="${escapeHtml(githubUrl)}">${escapeHtml(footer.github)}</a>`,

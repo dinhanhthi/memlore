@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Menu, X } from 'lucide-react'
-import { githubUrl, nav } from './content'
+import { changelog, githubUrl, legal, nav } from './content'
+import { latestStableVersion } from './changelog/changelogData'
 import HeadFollowLogo from './HeadFollowLogo'
 
 const COMPACT_QUERY = '(max-width: 68rem)'
@@ -116,20 +117,31 @@ export function SiteHeader({
     <>
       {open ? <div className="nav-backdrop" aria-hidden="true" onClick={close} /> : null}
       <header className="site-header" data-nav-open={open ? 'true' : undefined}>
-        <a
-          className="wordmark"
-          href={homeHref}
-          aria-label={nav.homeAria}
-          onClick={() => {
-            if (!open) return
-            setOpen(false)
-            document.getElementById('main')?.removeAttribute('inert')
-            document.querySelector('footer')?.removeAttribute('inert')
-          }}
-        >
-          <HeadFollowLogo alt="" className="wordmark-head" size={36} />
-          {nav.wordmark}
-        </a>
+        <div className="header-brand">
+          <a
+            className="wordmark"
+            href={homeHref}
+            aria-label={nav.homeAria}
+            onClick={() => {
+              if (!open) return
+              setOpen(false)
+              document.getElementById('main')?.removeAttribute('inert')
+              document.querySelector('footer')?.removeAttribute('inert')
+            }}
+          >
+            <HeadFollowLogo alt="" className="wordmark-head" size={36} />
+            {nav.wordmark}
+          </a>
+          {/* Version comes from changelogData, never tauri.conf.json: the config
+              carries whatever was last bumped, including a prerelease. */}
+          <a
+            className="version-badge"
+            href="changelog.html"
+            aria-label={`${changelog.badgeLabel} ${latestStableVersion} — ${legal.changelogLink}`}
+          >
+            v{latestStableVersion}
+          </a>
+        </div>
         <nav
           id="site-nav"
           aria-label={nav.mainAria}
