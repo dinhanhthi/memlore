@@ -95,6 +95,8 @@ after visible changes to the seeded entry or the app chrome.
 | `privacy.html`                  | Public Privacy Policy page                        |
 | `terms.html`                    | Public Terms of Service page                      |
 | `src/legal/`                    | Shared LegalPage and privacy/terms Vite entries   |
+| `src/legal/privacy.md`          | Privacy Policy copy (Markdown)                    |
+| `src/legal/terms.md`            | Terms of Service copy (Markdown)                  |
 | `src/content.ts`                | English copy                                      |
 | `src/demoBridge.ts`             | Parent → iframe commands (theme, navigate, reset) |
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |

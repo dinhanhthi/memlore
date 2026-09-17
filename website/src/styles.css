@@ -337,10 +337,10 @@ footer {
   overflow: visible;
   background: var(--download-face);
   color: var(--download-face-ink);
-  box-shadow:
+  /* box-shadow:
     0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 22%, transparent),
     0 0 22px var(--download-halo),
-    0 10px 28px var(--color-shadow);
+    0 10px 28px var(--color-shadow); */
 }
 .download-glow {
   position: absolute;
@@ -421,12 +421,12 @@ footer {
   outline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .download:hover {
+  /* .download:hover {
     box-shadow:
       0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 40%, transparent),
       0 0 28px var(--download-halo),
       0 12px 32px var(--color-shadow);
-  }
+  } */
   .button:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
@@ -1939,13 +1939,26 @@ tbody th {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px 48px;
+  flex-wrap: wrap;
   border-top: var(--rule-width) solid var(--color-rule);
-  padding: 24px 0;
+  padding: 28px 0 32px;
   font-size: 16px;
+}
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
 }
 .footer-bottom .wordmark {
   font-size: 20px;
+}
+.footer-credit {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  white-space: nowrap;
 }
 .footer-credit a {
   color: var(--color-ink);
@@ -1953,38 +1966,32 @@ tbody th {
 .footer-credit a:hover {
   color: var(--color-accent);
 }
-.footer-bottom > a:last-child {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  white-space: nowrap;
-}
-.footer-bottom > a:last-child:hover {
-  color: var(--color-accent);
-}
-.footer-legal {
+.footer-links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
+  gap: 4px 28px;
   min-width: 0;
 }
-.footer-legal a {
+.footer-links a {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 44px;
   white-space: nowrap;
+  color: var(--color-muted);
 }
-.footer-legal a:hover {
+.footer-links a:hover {
   color: var(--color-accent);
 }
-.footer-legal a[aria-current='page'] {
+.footer-links a[aria-current='page'] {
+  color: var(--color-ink);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 .legal-article {
-  max-width: 40rem;
+  max-width: 56rem;
+  margin-inline: auto;
   padding-block: var(--space-2xl) var(--space-3xl);
   line-height: 1.7;
   overflow-wrap: anywhere;
@@ -2004,15 +2011,13 @@ tbody th {
   font-size: var(--text-lead);
   line-height: 1.6;
 }
-.legal-article section {
-  margin-top: var(--space-xl);
-}
 .legal-article h2 {
   font-family: var(--font-title);
   font-size: clamp(1.25rem, 2.2vw, 1.65rem);
   letter-spacing: -0.03em;
   line-height: 1.25;
   color: var(--color-ink);
+  margin-top: var(--space-xl);
   margin-bottom: var(--space-sm);
 }
 .legal-article p + p {
@@ -2321,15 +2326,8 @@ tbody th {
     grid-template-columns: minmax(0, 1fr);
   }
   .footer-bottom {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .footer-legal {
-    flex: 1 1 12rem;
-  }
-  .footer-bottom p {
-    order: 3;
-    width: 100%;
+    align-items: center;
+    gap: 16px;
   }
 }
 @media (max-width: 26rem) {

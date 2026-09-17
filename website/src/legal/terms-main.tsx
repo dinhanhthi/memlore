@@ -4,12 +4,12 @@ import '@fontsource-variable/fraunces/index.css'
 import '@fontsource-variable/geist/index.css'
 import '@fontsource-variable/geist-mono/index.css'
 import '@fontsource-variable/baloo-2/index.css'
-import { terms } from '../content'
 import LegalPage from './LegalPage'
+import termsMarkdown from './terms.md?raw'
 import '../styles.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LegalPage doc={terms} />
+    <LegalPage kind="terms" source={termsMarkdown} />
   </StrictMode>,
 )

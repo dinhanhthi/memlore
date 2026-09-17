@@ -11,7 +11,7 @@ import { SettingsSection } from '../settings/SettingsSection'
 import { IconCustom } from '../common/IconCustom'
 
 const AUTHOR_WEBSITE_URL = 'https://dinhanhthi.com'
-const AUTHOR_EMAIL = 'me@dinhanhthi.com'
+const AUTHOR_EMAIL = 'contact@memlore.app'
 const REPO_URL = 'https://github.com/dinhanhthi/memlore'
 const ISSUES_URL = 'https://github.com/dinhanhthi/memlore/issues'
 

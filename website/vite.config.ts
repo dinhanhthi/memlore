@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { renderLegalStaticHtml } from './src/legal/markdown'
+import { renderLandingStaticHtml } from './src/prerender'
 
 const ALIASED_TAURI = new Set([
   '@tauri-apps/api/core',
@@ -26,6 +29,36 @@ function tauriAliasGuard() {
   }
 }
 
+// Google's OAuth verification reviewer fetches raw HTML and does not run JS, so a
+// client-rendered page reads as blank — "insufficient content" on the policy, and
+// no app description or privacy link on the homepage. Both block publishing. Bake
+// the copy into the shell; React replaces it on mount.
+const ROOT_MARKER = '<div id="root"></div>'
+
+function staticArticleFor(path: string): string | undefined {
+  if (/\/index\.html$/.test(path)) return renderLandingStaticHtml()
+  const kind = path.match(/\/(privacy|terms)\.html$/)?.[1]
+  if (!kind) return
+  return renderLegalStaticHtml(
+    readFileSync(fileURLToPath(new URL(`./src/legal/${kind}.md`, import.meta.url)), 'utf8'),
+  )
+}
+
+function prerenderStaticShells() {
+  return {
+    name: 'prerender-static-shells',
+    transformIndexHtml(html: string, ctx: { path: string }) {
+      const article = staticArticleFor(ctx.path)
+      if (!article) return
+      if (!html.includes(ROOT_MARKER)) {
+        throw new Error(`prerender-static-shells: ${ROOT_MARKER} not found in ${ctx.path}`)
+      }
+      // Function replacement: `$&` and friends in the copy are literal, not patterns.
+      return html.replace(ROOT_MARKER, () => `<div id="root">${article}</div>`)
+    },
+  }
+}
+
 const TAURI_MOCK_IDS = [...ALIASED_TAURI]
 
 export default defineConfig({
@@ -41,7 +74,7 @@ export default defineConfig({
   cacheDir: fileURLToPath(new URL('./.cache/vite', import.meta.url)),
   base: './',
   publicDir: fileURLToPath(new URL('../public', import.meta.url)),
-  plugins: [tailwindcss(), react(), tauriAliasGuard()],
+  plugins: [tailwindcss(), react(), tauriAliasGuard(), prerenderStaticShells()],
   optimizeDeps: {
     exclude: TAURI_MOCK_IDS,
     // These heavy deps are reached only through dynamic imports (the lazy stats

@@ -64,11 +64,9 @@ import {
   editor,
   emotions,
   encrypt,
-  authorUrl,
   footer,
   githubUrl,
   hero,
-  legal,
   locations,
   locks,
   nav,
@@ -85,6 +83,7 @@ import {
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
+import { SiteFooterBar } from './SiteFooterBar'
 import { logoSrc } from './logoDirection'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
 import demoPoster from './demoPoster.webp'
@@ -1361,24 +1360,7 @@ export default function LandingPage() {
             </a>
           </div>
         </div>
-        <div className="footer-bottom">
-          <a className="wordmark" href="#main">
-            {nav.wordmark}
-          </a>
-          <p className="footer-credit">
-            {footer.note}{' '}
-            <a href={authorUrl} target="_blank" rel="noreferrer">
-              {footer.author}
-            </a>
-          </p>
-          <nav className="footer-legal" aria-label={`${legal.privacyLink} and ${legal.termsLink}`}>
-            <a href="privacy.html">{legal.privacyLink}</a>
-            <a href="terms.html">{legal.termsLink}</a>
-          </nav>
-          <a href={githubUrl} target="_blank" rel="noreferrer">
-            {footer.github} <ArrowUpRight className="size-4" />
-          </a>
-        </div>
+        <SiteFooterBar homeHref="#main" />
       </footer>
     </>
   )

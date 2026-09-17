@@ -70,18 +70,30 @@ test('terms.html loads from production assets', async ({ page }) => {
 
 test('homepage footer Privacy and Terms links navigate to the legal pages', async ({ page }) => {
   await page.goto('/')
-  const legalNav = page.getByRole('navigation', { name: 'Privacy and Terms' })
-  await legalNav.getByRole('link', { name: 'Privacy' }).click()
+  const footer = page.getByRole('contentinfo')
+  await footer.getByRole('link', { name: 'Privacy' }).click()
   await expect(page).toHaveURL(/privacy\.html/)
   await expect(page).toHaveTitle('Memlore — Privacy Policy')
 
   await page.goto('/')
-  await page
-    .getByRole('navigation', { name: 'Privacy and Terms' })
-    .getByRole('link', { name: 'Terms' })
-    .click()
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click()
   await expect(page).toHaveURL(/terms\.html/)
   await expect(page).toHaveTitle('Memlore — Terms of Service')
+})
+
+test('legal page footers link Privacy and Terms', async ({ page }) => {
+  await page.goto('/privacy.html')
+  const footer = page.getByRole('contentinfo')
+  await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+  await footer.getByRole('link', { name: 'Terms' }).click()
+  await expect(page).toHaveURL(/terms\.html/)
+  await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Terms' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
 })
 
 test('compact privacy.html has no root overflow', async ({ page }) => {
@@ -90,3 +102,18 @@ test('compact privacy.html has no root overflow', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expectNoRootOverflow(page)
 })
+
+// Google's OAuth verification reviewer fetches the raw HTML and does not execute
+// JS. Every other test here renders through React, so only this one fails if the
+// build-time prerender silently stops firing.
+for (const [path, marker] of [
+  ['/privacy.html', 'Limited Use'],
+  ['/terms.html', 'Terms'],
+  ['/index.html', 'privacy.html'],
+] as const) {
+  test(`${path} serves its content without JavaScript`, async ({ request }) => {
+    const html = await (await request.get(path)).text()
+    expect(html).toContain('<main id="main">')
+    expect(html).toContain(marker)
+  })
+}

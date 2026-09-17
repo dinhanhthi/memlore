@@ -13,7 +13,6 @@ import {
   footer,
   githubUrl,
   hero,
-  legal,
   locations,
   locks,
   meta,
@@ -21,20 +20,19 @@ import {
   openSource,
   persona,
   platforms,
-  privacy,
   search,
   sync,
-  terms,
   transfer,
 } from '../src/content'
 import websiteIndex from '../index.html?raw'
 import privacyHtml from '../privacy.html?raw'
 import termsHtml from '../terms.html?raw'
+import privacyMarkdown from '../src/legal/privacy.md?raw'
+import termsMarkdown from '../src/legal/terms.md?raw'
+import { parseLegalMarkdown } from '../src/legal/markdown'
 
 const GOOGLE_USER_DATA_POLICY_URL =
   'https://developers.google.com/terms/api-services-user-data-policy'
-const LIMITED_USE =
-  "Memlore's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements."
 
 const PRICE =
   /\$\s*\d|€\s*\d|£\s*\d|\d[\d,]*(?:\.\d+)?\s*(?:usd|eur|gbp|dollars?)|\b(?:usd|eur|gbp)\s*\d|\b\d+(?:\.\d+)?\s*\/\s*(?:mo|month|yr|year)\b/i
@@ -95,11 +93,7 @@ it('does not promise ship dates for Windows, Linux, iOS, or Android', () => {
     expect(item.status).toMatch(/^coming soon$/i)
     expect(item.status).not.toMatch(SHIP_DATE)
   }
-  // legal.updated is a last-updated stamp on the policy pages, not a ship date.
-  const copyWithoutLegalUpdated = collectStrings(content)
-    .filter((value) => value !== legal.updated)
-    .join('\n')
-  expect(copyWithoutLegalUpdated).not.toMatch(SHIP_DATE)
+  expect(allCopy()).not.toMatch(SHIP_DATE)
 })
 
 it('points the beta download at GitHub, not a store', () => {
@@ -343,85 +337,136 @@ it('keeps emotions at exactly bad, neutral, and good', () => {
 })
 
 it('names the privacy policy and keeps a non-empty description', () => {
-  expect(privacy.heading).toBe('Privacy Policy')
-  expect(privacy.title.trim().length).toBeGreaterThan(0)
-  expect(privacy.description.trim().length).toBeGreaterThan(0)
+  const privacy = parseLegalMarkdown(privacyMarkdown)
+  expect(privacy.blocks[0]).toEqual({ type: 'h1', text: 'Privacy Policy' })
+  expect(privacy.meta.title.trim().length).toBeGreaterThan(0)
+  expect(privacy.meta.description.trim().length).toBeGreaterThan(0)
 })
 
 it('names Google Drive and the drive.appdata scope in the privacy copy', () => {
-  const copy = collectStrings(privacy).join('\n')
-  expect(copy).toMatch(/Google Drive/)
-  expect(copy).toMatch(/drive\.appdata/)
+  expect(privacyMarkdown).toMatch(/Google Drive/)
+  expect(privacyMarkdown).toMatch(/drive\.appdata/)
+})
+
+it('keeps every Google Drive disclosure under a single heading', () => {
+  const headings = [...privacyMarkdown.matchAll(/^## .+$/gm)].map((match) => match[0])
+  const googleHeadings = headings.filter((heading) => /google/i.test(heading))
+  expect(googleHeadings).toEqual(['## Optional Google Drive sync'])
+})
+
+it('describes optional iCloud Drive sync with the same honesty as Drive', () => {
+  const copy = privacyMarkdown.toLowerCase()
+  expect(copy).toMatch(/icloud drive/)
+  expect(copy).toMatch(/finder/)
+  expect(copy).toMatch(/does not store an apple password|does not store.*icloud token/)
+  expect(copy).toMatch(/disconnecting does not delete/)
 })
 
 it('includes the Google Limited Use sentence and the official policy URL', () => {
-  expect(collectStrings(privacy).join('\n')).toContain(LIMITED_USE)
-  expect(privacy.googleUserDataPolicyUrl).toBe(GOOGLE_USER_DATA_POLICY_URL)
+  expect(privacyMarkdown).toContain(
+    "Memlore's use and transfer to any other app of information received from Google APIs",
+  )
+  expect(privacyMarkdown).toContain('Limited Use requirements')
+  expect(privacyMarkdown).toContain(
+    `[Google API Services User Data Policy](${GOOGLE_USER_DATA_POLICY_URL})`,
+  )
+})
+
+it('says how long Google user data is kept and how to delete it', () => {
+  const copy = privacyMarkdown.toLowerCase()
+  expect(copy).toMatch(/until you disconnect/)
+  expect(copy).toMatch(/deleted from the local database/)
+  expect(copy).toMatch(/disconnecting in the app does not delete/)
+  expect(copy).toMatch(/manage apps/)
+})
+
+it('states every Limited Use prohibited purpose for Google user data', () => {
+  const copy = privacyMarkdown.toLowerCase()
+  expect(copy).toMatch(/train generalized or non-personalized ai or ml models/)
+  expect(copy).toMatch(/data brokers/)
+  expect(copy).toMatch(/targeted, personalized, or interest-based ads/)
+  expect(copy).toMatch(/credit-worthiness, lending/)
+  expect(copy).toMatch(/no human at memlore reads your google user data/)
 })
 
 it('says the privacy policy includes no Memlore server and no telemetry', () => {
-  const copy = collectStrings(privacy).join('\n').toLowerCase()
+  const copy = privacyMarkdown.toLowerCase()
   expect(copy).toMatch(/no memlore server/)
   expect(copy).toMatch(/no telemetry|no analytics/)
 })
 
 it('says AI in the privacy policy is optional and opt-in', () => {
-  const copy = collectStrings(privacy).join('\n').toLowerCase()
+  const copy = privacyMarkdown.toLowerCase()
   expect(copy).toMatch(/\bai\b/)
   expect(copy).toMatch(/optional/)
   expect(copy).toMatch(/opt in|opt-in/)
 })
 
+it('does not mix Google API language into the AI section', () => {
+  const ai = privacyMarkdown.split(/^## Optional AI\s*$/m)[1]?.split(/^## /m)[0] ?? ''
+  expect(ai.length).toBeGreaterThan(0)
+  expect(ai).not.toMatch(/google/i)
+})
+
+it('does not claim an age limit the app does not enforce', () => {
+  expect(privacyMarkdown).not.toMatch(/under 13|children/i)
+})
+
 it('lists the shipped contact email on the privacy policy', () => {
-  expect(contactEmail).toBe('me@dinhanhthi.com')
-  expect(collectStrings(privacy).join('\n')).toContain(contactEmail)
+  expect(contactEmail).toBe('contact@memlore.app')
+  expect(privacyMarkdown).toContain(contactEmail)
+  expect(termsMarkdown).toContain(contactEmail)
 })
 
 it('says the Google account email stays on the device', () => {
-  const copy = collectStrings(privacy).join('\n').toLowerCase()
+  const copy = privacyMarkdown.toLowerCase()
   expect(copy).toMatch(/google account email|email of (the |your )?google account/)
   expect(copy).toMatch(/on (your|the) device|\blocal\b/)
 })
 
 it('does not claim Google sees only encrypted data, and names the plaintext sync list', () => {
-  const copy = collectStrings(privacy).join('\n').toLowerCase()
+  const copy = privacyMarkdown.toLowerCase()
   expect(copy).not.toMatch(/only encrypted data|sees only encrypted/)
   expect(copy).toMatch(/sync (list|manifest)|\bjson\b/)
   expect(copy).toMatch(/not journal text|not (your )?journal/)
 })
 
 it('names AGPL in the terms copy', () => {
-  expect(collectStrings(terms).join('\n')).toMatch(/AGPL/)
+  expect(termsMarkdown).toMatch(/AGPL/)
 })
 
 it('says the terms cover a beta still in development', () => {
-  const copy = collectStrings(terms).join('\n').toLowerCase()
+  const copy = termsMarkdown.toLowerCase()
   expect(copy).toMatch(/beta/)
   expect(copy).toMatch(/in development/)
 })
 
 it('says the software is provided as is, without warranty', () => {
-  const copy = collectStrings(terms).join('\n').toLowerCase()
+  const copy = termsMarkdown.toLowerCase()
   expect(copy).toMatch(/as is/)
   expect(copy).toMatch(/no warranty|without warranty/)
 })
 
 it('says the user owns their journal in the terms copy', () => {
-  const copy = collectStrings(terms).join('\n').toLowerCase()
+  const copy = termsMarkdown.toLowerCase()
   expect(copy).toMatch(/belongs to you|you own/)
   expect(copy).toMatch(/journal|data/)
 })
 
 it('keeps HTML title and description fields for both legal pages', () => {
-  expect(privacy.title.trim().length).toBeGreaterThan(0)
-  expect(privacy.description.trim().length).toBeGreaterThan(0)
-  expect(terms.title.trim().length).toBeGreaterThan(0)
-  expect(terms.description.trim().length).toBeGreaterThan(0)
+  const privacy = parseLegalMarkdown(privacyMarkdown)
+  const terms = parseLegalMarkdown(termsMarkdown)
+  expect(privacy.meta.title.trim().length).toBeGreaterThan(0)
+  expect(privacy.meta.description.trim().length).toBeGreaterThan(0)
+  expect(terms.meta.title.trim().length).toBeGreaterThan(0)
+  expect(terms.meta.description.trim().length).toBeGreaterThan(0)
 })
 
 it('keeps the legal HTML titles and descriptions in sync with the copy source', () => {
-  expect(privacyHtml).toContain(`<title>${privacy.title}</title>`)
-  expect(privacyHtml).toContain(`content="${privacy.description}"`)
-  expect(termsHtml).toContain(`<title>${terms.title}</title>`)
-  expect(termsHtml).toContain(`content="${terms.description}"`)
+  const privacy = parseLegalMarkdown(privacyMarkdown)
+  const terms = parseLegalMarkdown(termsMarkdown)
+  expect(privacyHtml).toContain(`<title>${privacy.meta.title}</title>`)
+  expect(privacyHtml).toContain(`content="${privacy.meta.description}"`)
+  expect(termsHtml).toContain(`<title>${terms.meta.title}</title>`)
+  expect(termsHtml).toContain(`content="${terms.meta.description}"`)
 })

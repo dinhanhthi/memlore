@@ -102,6 +102,68 @@ The consent screen must be complete before Google lets you publish:
 - **Terms of service URL** — optional on the consent screen; available at `{homepage}/terms.html`
 - App logo, if you want one
 
+Google rejects the submission one error at a time, so expect to iterate. The two
+below are the ones this project actually hit.
+
+#### The domain must be verified in Search Console
+
+> "The website of your home page URL ... is not registered to you."
+
+Google Cloud reads domain ownership from **Google Search Console only**. Google
+Analytics on the site proves nothing here.
+
+1. Open [Search Console](https://search.google.com/search-console) **with the same
+   Google account that owns the Cloud project**. If the project lives under a
+   different account, verify with one and add the other under **Settings → Users
+   and permissions** as an **Owner**.
+2. Add a **Domain property** (`memlore.app`) and verify with the **DNS TXT** record
+   at the registrar. One record covers `www`, http/https, and every subdomain. A
+   URL-prefix property verified via the Analytics tag also works, but only when
+   `gtag.js` sits in `<head>` — GTM-injected or footer snippets fail.
+3. Back in Cloud Console → Google Auth Platform → **Branding** → add the domain to
+   **Authorized domains**, then re-save the Homepage / Privacy / Terms URLs.
+   `console.cloud.google.com/apis/credentials/domainverification` should list it.
+4. **Reply to the rejection email** to confirm ownership is verified. Fixing it
+   silently in the console does not restart the review.
+
+#### The homepage and legal pages must be readable without JavaScript
+
+> "Your privacy policy page at ... does not have sufficient content."
+
+**Google's reviewer fetches the raw HTML and does not execute JS.** The `website/`
+legal pages are React entry points, so their shells are empty — a client-rendered
+privacy policy reads as a blank page and is rejected no matter how complete the
+copy is. `website/vite.config.ts` therefore carries a `prerenderLegalPages` plugin
+that bakes the article into `privacy.html` / `terms.html` at build time, and
+`website/tests/legal.spec.ts` asserts the raw HTTP body still contains it. Do not
+remove either — every other test renders through React and would pass on a blank
+page.
+
+The **homepage has the same problem and the same fix**. Google requires it to
+describe the app, explain why the app asks for user data, and link the privacy
+policy — none of which a reviewer can see on an empty shell, and a policy the
+homepage never links to reads as unrelated to the app. `website/src/prerender.ts`
+renders that summary from `src/content.ts`, so the static text is always copy the
+React page shows too; never add crawler-only text there.
+
+Check the deployed page the way Google does, not in a browser:
+
+```bash
+curl -s https://memlore.app/privacy.html | grep -c "Limited Use"    # must be >= 1
+curl -s https://memlore.app/ | grep -c "privacy.html"              # must be >= 1
+```
+
+Wait for `deploy-website.yml` to finish **and** both greps to pass before you tick
+"I have fixed the issues". Resubmitting against the old deploy just burns a cycle,
+and the panel keeps showing the previous attempt's errors until a new review runs.
+
+The policy copy itself must cover what Google user data is accessed, how it is
+used, who it is shared with, how it is protected, how long it is kept and how to
+delete it — plus an explicit statement that it is not sold to data brokers, not
+used for ads, not used to train generalized or non-personalized AI/ML models, and
+not used for credit or lending decisions. `website/src/legal/privacy.md` covers
+all of these; `website/tests/content.test.ts` guards them.
+
 ### Optional: brand verification
 
 A lighter-weight review, needed **only** if you want the app name and logo shown

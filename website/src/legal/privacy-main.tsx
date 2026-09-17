@@ -4,12 +4,12 @@ import '@fontsource-variable/fraunces/index.css'
 import '@fontsource-variable/geist/index.css'
 import '@fontsource-variable/geist-mono/index.css'
 import '@fontsource-variable/baloo-2/index.css'
-import { privacy } from '../content'
 import LegalPage from './LegalPage'
+import privacyMarkdown from './privacy.md?raw'
 import '../styles.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LegalPage doc={privacy} />
+    <LegalPage kind="privacy" source={privacyMarkdown} />
   </StrictMode>,
 )
