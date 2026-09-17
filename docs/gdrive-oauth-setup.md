@@ -73,114 +73,99 @@ once a week and has to reconnect. From Google's OAuth docs, verbatim:
 > an external user type and a publishing status of 'Testing' is issued a refresh
 > token expiring in 7 days"
 
-The fix is to publish the app: **APIs & Services → OAuth consent screen →
-Publish app**.
+The fix is to publish the app: **Google Auth Platform → Audience → Publish app**,
+which moves publishing status to **In production**.
 
 ### No heavyweight verification is needed
 
 Memlore requests exactly one scope — `drive.appdata`
 (`src-tauri/src/sync/gdrive_oauth.rs:56`) — which Google classifies as
 **non-sensitive**, because the app can only ever see its own hidden
-`appDataFolder`, never the user's other files. Per Google:
+`appDataFolder`:
 
 > "If your app utilizes only **non-sensitive** scopes, it is not mandatory for
 > your app to complete the app verification process."
 
-So there is **no CASA security assessment, no annual third-party audit, and no
-multi-week review**. Those apply to _restricted_ Drive scopes (`drive`,
-`drive.readonly`, `drive.metadata`, …), which this app deliberately avoids. This
-is a concrete payoff of the `appDataFolder` design — do not widen the scope
-without re-reading this section.
+No CASA assessment, no annual audit, no multi-week review. Those apply to
+_restricted_ Drive scopes (`drive`, `drive.readonly`, `drive.metadata`, …), which
+this app deliberately avoids — do not widen the scope without re-reading this.
 
 ### What publishing actually requires
 
-The consent screen must be complete before Google lets you publish:
+An app name, a support email, a **Homepage URL** (the deployed `website/` origin)
+and a **Privacy policy URL** (`{homepage}/privacy.html`). Terms and a logo are
+optional.
 
-- App name and support email (already set above)
-- **Homepage URL** — the deployed `website/` origin (the index page)
-- **Privacy policy URL** — `{homepage}/privacy.html`
-- **Terms of service URL** — optional on the consent screen; available at `{homepage}/terms.html`
-- App logo, if you want one
+Google rejects one error at a time. The two this project hit:
 
-Google rejects the submission one error at a time, so expect to iterate. The two
-below are the ones this project actually hit.
+#### "not registered to you" — verify the domain in Search Console
 
-#### The domain must be verified in Search Console
+Google Cloud reads ownership from **Search Console only**; Google Analytics proves
+nothing here. Verify with the **same account that owns the Cloud project** (or add
+that account under Search Console → Settings → Users and permissions as an Owner),
+using a **Domain property** + DNS TXT record — one record covers `www`, http/https
+and every subdomain. Then add the domain under **Branding → Authorized domains**
+and re-save the URLs.
 
-> "The website of your home page URL ... is not registered to you."
+#### "does not have sufficient content" — the pages must work without JavaScript
 
-Google Cloud reads domain ownership from **Google Search Console only**. Google
-Analytics on the site proves nothing here.
+**Google's reviewer fetches raw HTML and runs no JS.** Every `website/` page is a
+React entry point, so its shell is empty: the policy reads as blank, and the
+homepage shows no app description and no privacy link. The `prerenderStaticShells`
+plugin in `website/vite.config.ts` bakes the copy in at build time —
+`src/legal/markdown.ts` for the legal pages, `src/prerender.ts` for the landing,
+both sourced from `src/content.ts` so the static text is never crawler-only.
+`website/tests/legal.spec.ts` asserts the raw HTTP body; do not delete it, because
+every other test runs JS and would pass on a blank page.
 
-1. Open [Search Console](https://search.google.com/search-console) **with the same
-   Google account that owns the Cloud project**. If the project lives under a
-   different account, verify with one and add the other under **Settings → Users
-   and permissions** as an **Owner**.
-2. Add a **Domain property** (`memlore.app`) and verify with the **DNS TXT** record
-   at the registrar. One record covers `www`, http/https, and every subdomain. A
-   URL-prefix property verified via the Analytics tag also works, but only when
-   `gtag.js` sits in `<head>` — GTM-injected or footer snippets fail.
-3. Back in Cloud Console → Google Auth Platform → **Branding** → add the domain to
-   **Authorized domains**, then re-save the Homepage / Privacy / Terms URLs.
-   `console.cloud.google.com/apis/credentials/domainverification` should list it.
-4. **Reply to the rejection email** to confirm ownership is verified. Fixing it
-   silently in the console does not restart the review.
-
-#### The homepage and legal pages must be readable without JavaScript
-
-> "Your privacy policy page at ... does not have sufficient content."
-
-**Google's reviewer fetches the raw HTML and does not execute JS.** The `website/`
-legal pages are React entry points, so their shells are empty — a client-rendered
-privacy policy reads as a blank page and is rejected no matter how complete the
-copy is. `website/vite.config.ts` therefore carries a `prerenderLegalPages` plugin
-that bakes the article into `privacy.html` / `terms.html` at build time, and
-`website/tests/legal.spec.ts` asserts the raw HTTP body still contains it. Do not
-remove either — every other test renders through React and would pass on a blank
-page.
-
-The **homepage has the same problem and the same fix**. Google requires it to
-describe the app, explain why the app asks for user data, and link the privacy
-policy — none of which a reviewer can see on an empty shell, and a policy the
-homepage never links to reads as unrelated to the app. `website/src/prerender.ts`
-renders that summary from `src/content.ts`, so the static text is always copy the
-React page shows too; never add crawler-only text there.
-
-Check the deployed page the way Google does, not in a browser:
+Check the deploy the way Google does, and only then resubmit:
 
 ```bash
-curl -s https://memlore.app/privacy.html | grep -c "Limited Use"    # must be >= 1
-curl -s https://memlore.app/ | grep -c "privacy.html"              # must be >= 1
+curl -s https://memlore.app/privacy.html | grep -c "Limited Use"   # >= 1
+curl -s https://memlore.app/ | grep -c "privacy.html"              # >= 1
 ```
 
-Wait for `deploy-website.yml` to finish **and** both greps to pass before you tick
-"I have fixed the issues". Resubmitting against the old deploy just burns a cycle,
-and the panel keeps showing the previous attempt's errors until a new review runs.
+The policy must say what Google data is accessed, how it is used, shared,
+protected, retained and deleted, plus that it is not sold to data brokers and not
+used for ads, AI training, or credit decisions. `website/src/legal/privacy.md`
+covers this; `website/tests/content.test.ts` guards it.
 
-The policy copy itself must cover what Google user data is accessed, how it is
-used, who it is shared with, how it is protected, how long it is kept and how to
-delete it — plus an explicit statement that it is not sold to data brokers, not
-used for ads, not used to train generalized or non-personalized AI/ML models, and
-not used for credit or lending decisions. `website/src/legal/privacy.md` covers
-all of these; `website/tests/content.test.ts` guards them.
+### Verification Center has two cards — only one can block you
 
-### Optional: brand verification
+| Card            | Gates                                 | Memlore                                                            |
+| --------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| **Data access** | Sensitive / restricted scopes         | "Verification is not required" — `drive.appdata` is non-sensitive  |
+| **Branding**    | App name + logo on the consent screen | Cosmetic. Unresolved = "Your branding is not being shown to users" |
 
-A lighter-weight review, needed **only** if you want the app name and logo shown
-on Google's consent screen:
+Brand verification is the "lighter-weight verification process" Google mentions for
+showing an app name and logo. Skipping it costs only that.
 
-> "if you want your app to display an app name and logo on the OAuth consent
-> screen, you will need to complete a lighter-weight verification process known
-> as 'brand-verification'."
+Two things that cost an afternoon to learn:
 
-Google's documentation does not clearly state whether an "unverified app"
-interstitial still appears for a _published_ app that has skipped brand
-verification. Check it yourself after publishing, with a Google account that is
-**not** in your test-user list — a test user's experience is not representative.
+- The Audience page's "Your app requires verification" banner is generic and
+  contradicts the Data access card. Ignore it.
+- A Branding card reading "Resolve the following issues and verify again" means
+  **nothing is queued** — no review is running and no email is coming. There is no
+  progress indicator anywhere, and no API or `gcloud` command reports one.
+
+**Once the pages are genuinely fixed, pick "I believe the issues found are
+incorrect"** — its subtitle is "Request additional review", and that is the path
+that gets the live site looked at again. "I have fixed the issues" ("Request
+re-verification") queued nothing here, however many times it was submitted: the
+card never changed and no email ever arrived. The wording feels wrong, but by then
+the listed issues really are stale — verify with the `curl` checks above first, so
+the claim is true when you make it.
+
+**Publishing status is the only thing that matters, and it lives on Audience, not
+here.** Set it to **In production** there.
 
 ### After publishing — verify it actually took
 
-1. Connect Drive with a fresh Google account that was never a test user.
+1. Connect Drive with a Google account that was never a test user. Without brand
+   verification the app appears as **"Memlore (Unverified)" with no logo** — on the
+   consent screen and under drive.google.com → Settings → Manage apps. Expected,
+   not a misconfiguration: the logo set in the Cloud project is simply not served
+   until brand verification passes.
 2. Leave it more than 7 days, then confirm sync still runs without a reconnect
    prompt. This is the only real proof; nothing in the console reports it.
 
