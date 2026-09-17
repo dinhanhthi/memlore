@@ -43,7 +43,7 @@ beforeEach(() => {
   // when there is nothing to install.
   mockedInvoke.mockResolvedValue(null)
   globalThis.localStorage.clear()
-  useUiStore.setState({ updateChannel: 'stable' })
+  useUiStore.setState({ updateChannel: 'stable', autoCheckUpdates: true })
 })
 
 describe('useUpdater', () => {
@@ -321,6 +321,27 @@ describe('useUpdater', () => {
       await runStartupUpdateCheck()
 
       expect(mockedInvoke).toHaveBeenCalledTimes(1)
+    })
+
+    it('reaches the network not at all when the user turned auto-check off', async () => {
+      useUiStore.setState({ autoCheckUpdates: false })
+
+      await runStartupUpdateCheck()
+
+      expect(mockedInvoke).not.toHaveBeenCalled()
+    })
+
+    it('leaves the menu item working when auto-check is off', async () => {
+      useUiStore.setState({ autoCheckUpdates: false })
+      mockedInvoke.mockResolvedValue(AVAILABLE)
+      const { result } = renderHook(() => useUpdater())
+
+      await act(async () => {
+        await result.current.check()
+      })
+
+      expect(mockedInvoke).toHaveBeenCalledWith('check_for_update', { channel: 'stable' })
+      expect(result.current.status).toBe('available')
     })
   })
 

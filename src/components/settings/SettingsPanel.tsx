@@ -111,6 +111,8 @@ function GeneralDetail() {
   const setNewEntryMode = useUiStore((s) => s.setNewEntryMode)
   const updateChannel = useUiStore((s) => s.updateChannel)
   const setUpdateChannel = useUiStore((s) => s.setUpdateChannel)
+  const autoCheckUpdates = useUiStore((s) => s.autoCheckUpdates)
+  const setAutoCheckUpdates = useUiStore((s) => s.setAutoCheckUpdates)
   const {
     enabled: startAtLogin,
     loading: startAtLoginLoading,
@@ -193,6 +195,21 @@ function GeneralDetail() {
               />
             </SettingsRow>
 
+            <SettingsRow
+              className={rowClass}
+              divider={false}
+              title={t('general.auto_check_updates.title')}
+              hint={t('general.auto_check_updates.hint')}
+            >
+              <Toggle
+                ariaLabel={t('general.auto_check_updates.title')}
+                checked={autoCheckUpdates}
+                onChange={setAutoCheckUpdates}
+              />
+            </SettingsRow>
+
+            {/* Deliberately stays enabled when auto-check is off: the channel
+                still decides what `Memlore > Check For Updates…` looks at. */}
             <SettingsRow
               className={rowClass}
               divider={false}

@@ -43,6 +43,7 @@ beforeEach(() => {
     timeFormat: '24h',
     newEntryMode: 'blank',
     updateChannel: 'stable',
+    autoCheckUpdates: true,
     rotationBusy: false,
     deviceRenameBusy: false,
     deviceRemovalBusy: false,
@@ -147,6 +148,17 @@ describe('uiStore', () => {
     })
   })
 
+  describe('setAutoCheckUpdates', () => {
+    it('defaults to on', () => {
+      expect(useUiStore.getState().autoCheckUpdates).toBe(true)
+    })
+
+    it('turns the automatic check off', () => {
+      useUiStore.getState().setAutoCheckUpdates(false)
+      expect(useUiStore.getState().autoCheckUpdates).toBe(false)
+    })
+  })
+
   describe('toggleTheme — basic light↔dark cycle', () => {
     it('moves off light on first toggle (advances cycle)', () => {
       useUiStore.setState({ theme: 'light' })
@@ -222,6 +234,7 @@ describe('uiStore', () => {
         timeFormat: '12h',
         newEntryMode: 'blank',
         updateChannel: 'stable',
+        autoCheckUpdates: true,
         addedProviders: [],
       })
       // Orphaned settings-nav keys from older releases must not reappear.
@@ -327,6 +340,34 @@ describe('uiStore', () => {
       await useUiStore.persist.rehydrate()
 
       expect(useUiStore.getState().updateChannel).toBe('stable')
+    })
+
+    it('rehydrate coerces a non-boolean autoCheckUpdates back to on', async () => {
+      globalThis.localStorage.setItem(
+        'memlore-ui',
+        JSON.stringify({
+          state: { autoCheckUpdates: 'off' },
+          version: 0,
+        }),
+      )
+
+      await useUiStore.persist.rehydrate()
+
+      expect(useUiStore.getState().autoCheckUpdates).toBe(true)
+    })
+
+    it('rehydrate keeps a deliberate autoCheckUpdates opt-out', async () => {
+      globalThis.localStorage.setItem(
+        'memlore-ui',
+        JSON.stringify({
+          state: { autoCheckUpdates: false },
+          version: 0,
+        }),
+      )
+
+      await useUiStore.persist.rehydrate()
+
+      expect(useUiStore.getState().autoCheckUpdates).toBe(false)
     })
   })
 

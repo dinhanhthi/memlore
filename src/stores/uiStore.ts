@@ -192,6 +192,12 @@ interface UiState {
   /** See `UpdateChannel`. Persisted like `newEntryMode`; read by `useUpdater`. */
   updateChannel: UpdateChannel
   /**
+   * Opt-out (default on) for the automatic launch-time update check — see
+   * `runStartupUpdateCheck` in `useUpdater.ts` for the privacy rationale.
+   * Off never disables `Memlore > Check For Updates…`.
+   */
+  autoCheckUpdates: boolean
+  /**
    * Current UI language preference. Persisted to localStorage (this store's
    * `memlore-ui` key) — never written to the SQLite `settings` table and
    * never synced. Interface language is a per-device preference: a user on
@@ -314,6 +320,7 @@ interface UiState {
   setTimeFormat: (format: TimeFormat) => void
   setNewEntryMode: (mode: NewEntryMode) => void
   setUpdateChannel: (channel: UpdateChannel) => void
+  setAutoCheckUpdates: (enabled: boolean) => void
   setEntryListRange: (view: EntryListViewKey, range: TimeRange) => void
   setEntryListSort: (view: EntryListViewKey, sort: SortOrder) => void
   setEntryListLockFilter: (view: EntryListViewKey, lockFilter: LockFilter) => void
@@ -363,6 +370,7 @@ export const useUiStore = create<UiState>()(
       timeFormat: '24h',
       newEntryMode: 'blank',
       updateChannel: 'stable',
+      autoCheckUpdates: true,
       entryListFilters: {},
       pendingRotationPhrase: null,
       pendingRotationRevealIsReset: false,
@@ -421,6 +429,8 @@ export const useUiStore = create<UiState>()(
       setNewEntryMode: (newEntryMode: NewEntryMode) => set({ newEntryMode }),
 
       setUpdateChannel: (updateChannel: UpdateChannel) => set({ updateChannel }),
+
+      setAutoCheckUpdates: (autoCheckUpdates: boolean) => set({ autoCheckUpdates }),
 
       setEntryListRange: (view, range) =>
         set((state) => ({
@@ -502,6 +512,7 @@ export const useUiStore = create<UiState>()(
         timeFormat: state.timeFormat,
         newEntryMode: state.newEntryMode,
         updateChannel: state.updateChannel,
+        autoCheckUpdates: state.autoCheckUpdates,
         uiLanguage: state.uiLanguage,
         addedProviders: state.addedProviders,
       }),
@@ -550,6 +561,11 @@ export const useUiStore = create<UiState>()(
         }
         if (state.updateChannel !== 'stable' && state.updateChannel !== 'beta') {
           state.updateChannel = 'stable'
+        }
+        // Must be a `typeof` test, not a truthiness one: a persisted `false`
+        // is a deliberate opt-out and has to survive the relaunch.
+        if (typeof state.autoCheckUpdates !== 'boolean') {
+          state.autoCheckUpdates = true
         }
       },
     },

@@ -167,6 +167,12 @@ export function dismissUpdate(): void {
  */
 export async function runStartupUpdateCheck(): Promise<void> {
   if (startupChecked) return
+  // Opt-out (default on): this is the only unsolicited outbound request the
+  // app makes, and it fires before the user unlocks. Nothing identifying is
+  // sent, so what GitHub can learn is the user's IP and launch cadence — an
+  // unrequested request all the same. `checkForUpdates` is deliberately not
+  // gated, so `Memlore > Check For Updates…` keeps working when this is off.
+  if (!useUiStore.getState().autoCheckUpdates) return
   startupChecked = true
   await checkForUpdates({ silent: true })
 }

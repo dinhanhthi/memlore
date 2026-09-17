@@ -67,6 +67,10 @@
       "blank": "Blank entry",
       "template": "From template"
     },
+    "auto_check_updates": {
+      "title": "Automatically check for updates",
+      "hint": "When Memlore starts, it contacts GitHub to see whether a newer version exists. Turn this off and Memlore will not contact GitHub by itself — you can still check any time from the Memlore menu."
+    },
     "update_channel": {
       "title": "Update channel",
       "hint": "Beta builds get new features earlier but are less tested.",

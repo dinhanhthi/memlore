@@ -67,6 +67,10 @@
       "blank": "Mục trống",
       "template": "Từ mẫu"
     },
+    "auto_check_updates": {
+      "title": "Tự động kiểm tra cập nhật",
+      "hint": "Khi Memlore khởi động, ứng dụng sẽ kết nối tới GitHub để xem có phiên bản mới hơn hay không. Tắt tuỳ chọn này thì Memlore sẽ không tự kết nối tới GitHub nữa — bạn vẫn có thể kiểm tra bất cứ lúc nào từ menu Memlore."
+    },
     "update_channel": {
       "title": "Kênh cập nhật",
       "hint": "Bản beta nhận tính năng mới sớm hơn nhưng ít được kiểm thử hơn.",
