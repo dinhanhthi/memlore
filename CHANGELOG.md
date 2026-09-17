@@ -1,0 +1,39 @@
+# Changelog
+
+Developer-facing release notes. Each `v*` tag's section becomes the body of its
+GitHub Release. The plain-language version for users lives on the website's
+changelog page.
+
+Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
+`index.html`, `vite.config.ts` and `package.json` count toward a bump —
+`website/`, `web/`, `docs/` and `e2e/` do not.
+
+## v0.1.0 (unreleased)
+
+First signed public release. There is no previous version to diff against, so
+this section describes what ships rather than what changed.
+
+### Added
+
+- **Signed, notarized macOS builds.** Universal binary (`x86_64` + `arm64`),
+  signed with a Developer ID certificate and notarized through App Store
+  Connect, published as a `.dmg` from CI on a `v*` tag. Requires macOS 13.
+- **In-app updater** with two channels. `Memlore > Check For Updates…` checks on
+  demand; an automatic check runs once per launch and can be turned off in
+  Settings → General. The **Beta** channel opts into prereleases. Update
+  archives are verified against a minisign public key compiled into the app, so
+  a tampered download is rejected rather than installed.
+- **Touch ID unlock** — the `keychain-access-groups` entitlement and a Developer
+  ID provisioning profile are embedded at bundle time, which is what makes
+  `BIOMETRY_CURRENT_SET` usable in a distributed build.
+
+### Notes for maintainers
+
+- The updater's minisign keypair **cannot be rotated** after this release: its
+  public half is compiled into every shipped binary and Tauri's updater has no
+  in-band key rotation. See `.github/release-setup.md`.
+- `bundle.createUpdaterArtifacts` is on, so any local `tauri build` needs either
+  `TAURI_SIGNING_PRIVATE_KEY` or `--no-sign`. `CONTRIBUTING.md` covers this.
+- An expired embedded provisioning profile makes the app unlaunchable for every
+  user, not just degraded. `release.yml` refuses to build when under 30 days
+  remain, and rejects a Mac Development profile outright.
