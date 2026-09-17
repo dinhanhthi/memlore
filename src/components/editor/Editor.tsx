@@ -47,6 +47,7 @@ import { ImageBubbleMenu } from './ImageBubbleMenu'
 import { VideoBubbleMenu } from './VideoBubbleMenu'
 import { MathEditModal } from './MathEditModal'
 import { SlashMenuExtension } from './extensions/SlashMenu'
+import { MentionSuggestion } from './extensions/MentionSuggestion'
 import { EmojiShortcodes } from './extensions/EmojiShortcodes'
 import { EditorDropIndicator } from './extensions/EditorDropIndicator'
 
@@ -588,6 +589,7 @@ export function Editor({
             })
           },
         }),
+        MentionSuggestion.configure({ getCurrentEntryId: () => entryIdRef.current ?? null }),
       ],
       editable,
       editorProps: {

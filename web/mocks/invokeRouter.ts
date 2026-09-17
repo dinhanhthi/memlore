@@ -1,4 +1,4 @@
-import type { Entry } from '../../src/types/entry'
+import type { Entry, SearchResult } from '../../src/types/entry'
 import type {
   ChatAttachableEntry,
   ChatEntriesInRangeCount,
@@ -274,6 +274,33 @@ function chatSearchAttachableEntries(args: Record<string, unknown>): ChatAttacha
     .map((e) => ({ id: e.id, title: e.title, entryDate: e.entry_date }))
 }
 
+/** Title/preview substring search — enough for the `@` mention menu and the
+ *  search panel in the web harness. `isAttachableEntry` drops locked and
+ *  invisible rows, matching `searchMentionCandidates`' default privacy gate
+ *  (`lockedView: 'hidden'`, `activeVaultId: null`). `filters` / `mentionMode`
+ *  are ignored — a scenario override can model them if a demo needs it. */
+function searchEntries(args: Record<string, unknown>): SearchResult[] {
+  const query = String(args.query ?? '')
+    .trim()
+    .toLowerCase()
+  if (query === '') return []
+  return entries
+    .filter(isAttachableEntry)
+    .filter(
+      (e) =>
+        (e.title ?? '').toLowerCase().includes(query) ||
+        (e.preview_text ?? '').toLowerCase().includes(query),
+    )
+    .sort((a, b) => b.entry_date - a.entry_date)
+    .map((e) => ({
+      id: e.id,
+      journal_id: e.journal_id,
+      title: e.title,
+      preview_text: e.preview_text,
+      entry_date: e.entry_date,
+    }))
+}
+
 /** Attachable entries in `[start, end)` — half-open, matching the
  *  backend's `count_entries_in_range` contract. Shared by the range count
  *  command and the period branch of `chatRagPreflight`. */
@@ -528,6 +555,10 @@ const SAFE_DEFAULTS: Record<string, unknown | ((args: Record<string, unknown>) =
   chat_search_attachable_entries: chatSearchAttachableEntries,
   chat_count_entries_in_range: chatCountEntriesInRange,
   chat_rag_preflight: chatRagPreflight,
+
+  // Mention menu (`@`) — pairs with the `get_entry` handler in
+  // `web/scenarios/index.ts` that resolves each chip's title.
+  search_entries: searchEntries,
 }
 
 export async function route(cmd: string, args: Record<string, unknown>): Promise<unknown> {
