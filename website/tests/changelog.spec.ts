@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test'
-import { changelog } from '../src/content'
 import { releases } from '../src/changelog/changelogData'
 
 const IGNORED_CONSOLE = [/ResizeObserver loop/i]
@@ -31,8 +30,8 @@ async function cssVarColor(page: Page, token: string) {
 test('changelog.html loads from production assets', async ({ page }) => {
   const errors = attachErrorCollectors(page)
   await page.goto('/changelog.html')
-  await expect(page).toHaveTitle(changelog.metaTitle)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(changelog.title)
+  await expect(page).toHaveTitle('Memlore — Changelog')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What’s new')
   const scripts = await page
     .locator('script[src]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('src') ?? ''))
@@ -53,7 +52,7 @@ test('changelog menubar link is current and points at this page', async ({ page 
 test('version table of contents is absent with the live release list', async ({ page }) => {
   await page.goto('/changelog')
   expect(releases.length).toBeLessThanOrEqual(4)
-  await expect(page.getByRole('navigation', { name: changelog.tocAria })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'Release versions' })).toHaveCount(0)
   for (const release of releases) {
     await expect(
       page.getByRole('heading', { level: 2, name: `v${release.version}` }),

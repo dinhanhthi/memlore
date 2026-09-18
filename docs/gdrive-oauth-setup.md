@@ -113,8 +113,10 @@ and re-save the URLs.
 React entry point, so its shell is empty: the policy reads as blank, and the
 homepage shows no app description and no privacy link. The `prerenderStaticShells`
 plugin in `website/vite.config.ts` bakes the copy in at build time —
-`src/legal/markdown.ts` for the legal pages, `src/prerender.ts` for the landing,
-both sourced from `src/content.ts` so the static text is never crawler-only.
+`src/legal/markdown.ts` for the legal pages, `src/prerender.ts` for the landing.
+`prerenderCopy` duplicates the landing strings from the components on purpose and
+`website/tests/prerender.test.ts` fails if they drift, so the static text is never
+crawler-only.
 `website/tests/legal.spec.ts` asserts the raw HTTP body; do not delete it, because
 every other test runs JS and would pass on a blank page.
 

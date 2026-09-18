@@ -1,5 +1,3 @@
-import { legal } from '../content'
-
 export type LegalMeta = {
   title: string
   description: string
@@ -160,7 +158,7 @@ export function renderLegalStaticHtml(source: string): string {
   return [
     '<main id="main"><article class="legal-article">',
     heading ? renderBlock(heading) : '',
-    `<p class="legal-updated">${escapeHtml(`${legal.updatedLabel} ${meta.updated}`)}</p>`,
+    `<p class="legal-updated">${escapeHtml(`Last updated ${meta.updated}`)}</p>`,
     ...rest.map((block, index) => renderBlock(block, index === firstParagraph)),
     '</article></main>',
   ].join('')

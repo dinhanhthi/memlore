@@ -2014,7 +2014,7 @@ tbody th {
 }
 .legal-article h2 {
   font-family: var(--font-title);
-  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
   letter-spacing: -0.03em;
   line-height: 1.25;
   color: var(--color-ink);

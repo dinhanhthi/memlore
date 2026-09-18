@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Menu, X } from 'lucide-react'
-import { githubUrl, nav } from './content'
+import { githubUrl } from './links'
 import HeadFollowLogo from './HeadFollowLogo'
 import { useWideViewport } from './useWideViewport'
 
@@ -105,7 +105,7 @@ export function SiteHeader({
           <a
             className="wordmark"
             href={homeHref}
-            aria-label={nav.homeAria}
+            aria-label="Memlore home"
             onClick={() => {
               if (!open) return
               setOpen(false)
@@ -114,29 +114,29 @@ export function SiteHeader({
             }}
           >
             <HeadFollowLogo alt="" className="wordmark-head" size={36} />
-            {nav.wordmark}
+            Memlore
           </a>
         </div>
         <nav
           id="site-nav"
-          aria-label={nav.mainAria}
+          aria-label="Main navigation"
           onClick={(event) => {
             const target = event.target
             if (target instanceof Element && target.closest('a')) close()
           }}
         >
-          <a href={`${sectionPrefix}#demo`}>{nav.demo}</a>
-          <a href={`${sectionPrefix}#features`}>{nav.features}</a>
-          <a href={`${sectionPrefix}#compare`}>{nav.compare}</a>
+          <a href={`${sectionPrefix}#demo`}>Demo</a>
+          <a href={`${sectionPrefix}#features`}>Features</a>
+          <a href={`${sectionPrefix}#compare`}>Compare</a>
           <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
-            {nav.changelog}
+            Changelog
           </a>
           <details ref={docMenuRef} className="doc-menu">
-            <summary>{nav.doc}</summary>
+            <summary>Doc</summary>
             <p>
-              {nav.docDisclosure}{' '}
+              Documentation is coming soon. For now, explore the{' '}
               <a href={githubUrl} target="_blank" rel="noreferrer">
-                {nav.docReadme}
+                GitHub README
               </a>
               .
             </p>
@@ -144,14 +144,18 @@ export function SiteHeader({
         </nav>
         <div className="header-actions">
           <GitHubLink className="header-github" />
-          <DownloadLink className="download" label={nav.download} ariaLabel={nav.downloadAria} />
+          <DownloadLink
+            className="download"
+            label="Download"
+            ariaLabel="Download the beta from GitHub"
+          />
           <button
             ref={toggleRef}
             type="button"
             className="nav-toggle"
             aria-expanded={open}
             aria-controls="site-nav"
-            aria-label={open ? nav.closeMenu : nav.menu}
+            aria-label={open ? 'Close menu' : 'Open menu'}
             onClick={() => setOpen((value) => !value)}
           >
             {open ? (
