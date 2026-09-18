@@ -118,14 +118,16 @@ cd .. && pnpm test
 pnpm exec tsc -b --force
 pnpm lint
 pnpm website:test
+pnpm format:check
 ```
 
-Two known pre-existing failures that are **not** yours and must not block a release — confirm they are still the only ones:
+**All of these are expected to pass cleanly.** There is no allowance for a
+"known" failure: the two that used to be listed here — the Clay
+`globals.test.ts` assertion and the repo-wide `prettier` abort on the malformed
+importer fixture — were fixed on 2026-09-18. A red check is now a real one, so
+investigate it rather than shipping past it.
 
-- `src/styles/globals.test.ts` — the Clay "retunes Clay second-panel selected/hover" assertion.
-- `pnpm format` / `pnpm format:check` abort repo-wide on the deliberately malformed importer fixture `src-tauri/tests/fixtures/apple-journal/Entries/2024-03-06_malformed-cocoa.html`. Run `cargo fmt` separately and prettier on the files you touched.
-
-Both are logged in `docs/LATER.md`.
+`pnpm lint` reports warnings and exits 0; only errors block.
 
 ### Step B6: Commit and push
 
