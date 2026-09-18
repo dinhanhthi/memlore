@@ -81,7 +81,8 @@ import {
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
-import { DownloadLink, SiteHeader, useWideViewport } from './SiteHeader'
+import { DownloadLink, SiteHeader } from './SiteHeader'
+import { useWideViewport } from './useWideViewport'
 import { SiteFooterBar } from './SiteFooterBar'
 import { logoSrc } from './logoDirection'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
@@ -903,10 +904,6 @@ export default function LandingPage() {
                 {hero.tryDemo} <ArrowDown className="size-4" />
               </a>
             </div>
-            <p className="availability">
-              <Laptop className="size-4" />
-              <span>{hero.availability}</span>
-            </p>
           </div>
           <div className="hero-portrait">
             <div className="mascot-halo">
@@ -916,8 +913,8 @@ export default function LandingPage() {
                 <span className="hero-head">
                   <img
                     src={logoSrc('straight')}
-                    width={280}
-                    height={280}
+                    width={230}
+                    height={230}
                     alt={hero.mascotAltStill}
                   />
                 </span>
@@ -1163,7 +1160,14 @@ export default function LandingPage() {
                   <span>{item.name}</span>
                   {item.name === 'macOS' ? (
                     <strong>
-                      <Check className="size-3.5" /> {item.status}
+                      <a
+                        href={githubUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={nav.downloadAria}
+                      >
+                        <Check className="size-3.5" /> {item.status}
+                      </a>
                     </strong>
                   ) : (
                     <small>{item.status}</small>

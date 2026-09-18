@@ -250,7 +250,6 @@ footer {
   display: flex;
   align-items: center;
   gap: 28px;
-  font-size: var(--text-md);
 }
 .site-header nav > a,
 .doc-menu summary {
@@ -309,8 +308,8 @@ footer {
   color: var(--color-accent);
 }
 .github-mark {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex-shrink: 0;
 }
 .doc-menu {
@@ -347,7 +346,6 @@ footer {
   border: 0;
   border-radius: var(--button-radius);
   font-size: 1rem;
-  font-weight: var(--button-font-weight);
   letter-spacing: var(--button-letter-spacing);
   line-height: 1;
   white-space: nowrap;
@@ -365,10 +363,6 @@ footer {
   overflow: visible;
   background: var(--download-face);
   color: var(--download-face-ink);
-  /* box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 22%, transparent),
-    0 0 22px var(--download-halo),
-    0 10px 28px var(--color-shadow); */
 }
 .download-glow {
   position: absolute;
@@ -449,12 +443,6 @@ footer {
   outline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
-  /* .download:hover {
-    box-shadow:
-      0 0 0 1px color-mix(in oklch, var(--download-glow-hot) 40%, transparent),
-      0 0 28px var(--download-halo),
-      0 12px 32px var(--color-shadow);
-  } */
   .button:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
@@ -592,7 +580,7 @@ footer {
   margin-bottom: 28px;
 }
 .section-heading h2 {
-  font-size: clamp(1.8rem, 3vw, 2.65rem);
+  font-size: clamp(1.55rem, 2.3vw, 2.2rem);
 }
 .section-heading p {
   margin-top: 10px;
@@ -602,7 +590,7 @@ footer {
   align-items: start;
   overflow: visible;
   margin-bottom: 0;
-  padding-bottom: 56px;
+  padding-bottom: 40px;
 }
 .demo-cue {
   position: relative;
@@ -612,7 +600,7 @@ footer {
   color: var(--color-success);
   font-family: var(--font-title);
   font-style: italic;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   line-height: 2.25;
   text-align: left;
   text-wrap: balance;
@@ -1462,7 +1450,7 @@ footer {
 .emotion-prompt,
 .emotion-trend-label {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .emotion-options {
@@ -1491,15 +1479,17 @@ footer {
 }
 .emotion-trend {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  height: 40px;
 }
-/* Equal heights on purpose: the three emotions are states, not a scale.
+/* Equal sizes on purpose: the three emotions are states, not a scale.
  * Colour is the only difference, the way the app's heatmap draws them. */
 .emotion-trend span {
-  flex: 1;
-  height: 100%;
-  border-radius: var(--radius-control);
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   background: var(--emotion-tint);
 }
 .illust-search {
@@ -1939,7 +1929,7 @@ tbody th {
 .platform-list small {
   margin-left: auto;
   font-weight: 400;
-  font-size: 16px;
+  font-size: var(--text-small);
   color: var(--color-muted);
   display: flex;
   align-items: center;
@@ -1947,6 +1937,14 @@ tbody th {
 }
 .platform-list strong {
   color: var(--color-success);
+}
+.platform-list strong a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.platform-list strong a:hover {
+  text-decoration: underline;
 }
 .footer-main {
   padding: 72px 0;
@@ -1958,7 +1956,7 @@ tbody th {
 .footer-main h2 {
   font-family: var(--font-title);
   font-weight: 400;
-  font-size: clamp(2.4rem, 4.5vw, 4rem);
+  font-size: clamp(2rem, 4.5vw, 3rem);
 }
 .footer-actions {
   justify-content: center;
@@ -1971,7 +1969,7 @@ tbody th {
   flex-wrap: wrap;
   border-top: var(--rule-width) solid var(--color-rule);
   padding: 28px 0 32px;
-  font-size: 16px;
+  font-size: var(--text-small);
 }
 .footer-brand {
   display: flex;
@@ -2117,12 +2115,12 @@ tbody th {
 }
 .changelog-article h1 {
   font-family: var(--font-title);
-  font-size: clamp(2.25rem, 4.2vw, 3.25rem);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
   color: var(--color-ink);
 }
 .changelog-intro {
-  margin-top: var(--space-md);
-  font-size: var(--text-lead);
+  margin-top: 0.5rem;
+  font-size: 1.1rem;
   line-height: 1.6;
   color: var(--color-muted);
 }
@@ -2140,7 +2138,7 @@ tbody th {
 .changelog-release h2 {
   margin: 0;
   font-family: var(--font-title);
-  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  font-size: clamp(1.2rem, 2.6vw, 1.5rem);
   letter-spacing: -0.03em;
   line-height: 1.2;
   color: var(--color-ink);
@@ -2243,6 +2241,9 @@ tbody th {
   }
   .nav-toggle {
     display: grid;
+  }
+  .header-actions {
+    gap: 0;
   }
   .header-actions .download {
     display: none;

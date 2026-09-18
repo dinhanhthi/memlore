@@ -3,23 +3,7 @@ import { Download, Menu, X } from 'lucide-react'
 import { changelog, githubUrl, legal, nav } from './content'
 import { latestStableVersion } from './changelog/changelogData'
 import HeadFollowLogo from './HeadFollowLogo'
-
-const COMPACT_QUERY = '(max-width: 68rem)'
-
-export function useWideViewport() {
-  const [wide, setWide] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-    return !window.matchMedia(COMPACT_QUERY).matches
-  })
-  useEffect(() => {
-    const mq = window.matchMedia(COMPACT_QUERY)
-    const update = () => setWide(!mq.matches)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
-  return wide
-}
+import { useWideViewport } from './useWideViewport'
 
 export function DownloadLink({
   className,
@@ -64,7 +48,6 @@ function GitHubLink({ className }: { className: string }) {
   return (
     <a className={`github-link ${className}`} href={githubUrl} target="_blank" rel="noreferrer">
       <GitHubMark />
-      <span className="github-label">{nav.github}</span>
     </a>
   )
 }

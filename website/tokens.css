@@ -39,11 +39,11 @@
   --font-wordmark: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
   --text-xs: 0.75rem;
-  --text-small: 0.92rem;
-  --text-md: 1rem;
-  --text-base: 1.125rem;
+  --text-small: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-base: 1rem;
   --text-lead: 1.25rem;
-  --text-heading: clamp(2rem, 3.4vw, 3rem);
+  --text-heading: clamp(1.75rem, 2.6vw, 2.5rem);
   --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
   --text-display-s: clamp(2rem, 4vw + 0.6rem, 3.4rem);
   --space-3xs: 0.125rem;

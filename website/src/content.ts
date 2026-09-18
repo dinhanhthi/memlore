@@ -38,7 +38,6 @@ export const hero = {
   downloadAria: 'Download the beta from GitHub',
   tryDemo: 'Try the demo',
   followGithub: 'Follow the journey',
-  availability: 'More platforms coming.',
   mascotAlt: 'Memlore’s dog mascot. The head follows your cursor.',
   mascotAltStill: 'Memlore’s dog mascot.',
   portraitLead: 'A place to land.',
@@ -475,10 +474,10 @@ export const platforms = {
   intro:
     'We’re starting with macOS and taking the time to make it feel right. Follow along as Memlore grows.',
   items: [
-    { name: 'macOS' as const, status: 'In development · beta' },
+    { name: 'macOS' as const, status: 'In development · beta', href: githubUrl },
     { name: 'Windows & Linux' as const, status: 'Coming soon' },
     { name: 'iOS & Android' as const, status: 'Coming soon' },
-  ] satisfies { name: PlatformName; status: string }[],
+  ] satisfies { name: PlatformName; status: string; href?: string }[],
 }
 
 export const footer = {

@@ -5,7 +5,7 @@
 </div>
 
 > [!WARNING]
-> Memlore is in **beta** and under active development. What is here today is reasonably stable, with a lot more still to come. Current focus is the **desktop macOS** app and the **web** version; Windows, Linux, iOS, and Android are planned.
+> Memlore is  under active development. What is here today is reasonably stable, with a lot more still to come. Current focus is the **desktop macOS** app and the **web** version; Windows, Linux, iOS, and Android are planned.
 
 <img src="public/screenshot.png" width="100%" alt="Screenshot" />
 

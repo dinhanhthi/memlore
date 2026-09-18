@@ -316,6 +316,7 @@ it('names the current macOS beta without promising other platforms a date', () =
   const macos = platforms.items.find((item) => item.name === 'macOS')
   expect(macos?.status).toMatch(/in development/i)
   expect(macos?.status).toMatch(/beta/i)
+  expect(macos?.href).toBe(githubUrl)
 })
 
 it('explains sync as the user’s own cloud, encrypted before it leaves the device', () => {
