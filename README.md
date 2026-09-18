@@ -58,6 +58,29 @@ pnpm tauri build --no-sign        # current platform (see CONTRIBUTING.md)
 
 Optional `.env` (copy `.env.example`): [Google Drive OAuth](docs/gdrive-oauth-setup.md) and [MapKit JS](docs/mapkit-js-setup.md).
 
+### 📦 Releasing
+
+Releases are cut with `/cf-ship`, a custom guide for
+[Coding Friend](https://github.com/dinhanhthi/coding-friend) — an AI coding
+assistant toolkit of skills, agents and hooks. Its skills live in
+`.coding-friend/skills/` and are version-controlled so the release procedure
+travels with the repo (`.coding-friend/config.json` stays local).
+
+`.coding-friend/skills/cf-ship-custom/` holds that procedure:
+
+| File                                                          | What it does                                                                                                           |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [`README.md`](.coding-friend/skills/cf-ship-custom/README.md) | Usage guide — which command for which situation, and what to check when a release misbehaves                           |
+| `SKILL.md`                                                    | The contract the assistant follows, loaded on demand                                                                   |
+| `scripts/bump-info.sh`                                        | Reads commits since the last published tag, names the release state, and computes the next version. Writes nothing     |
+| `scripts/bump.sh`                                             | Writes the version into `package.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock`, then verifies all four agree |
+
+Releases are stable by default; `--rc` / `--beta` opt into a GitHub prerelease,
+which is what keeps a build off the stable update channel. Changes under
+`website/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
+[`.github/release-setup.md`](.github/release-setup.md) for the signing and
+notarization secrets CI needs.
+
 ### 🔄 Reset local state
 
 ```bash

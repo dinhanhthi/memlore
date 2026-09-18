@@ -140,13 +140,21 @@ covers this; `website/tests/content.test.ts` guards it.
 Brand verification is the "lighter-weight verification process" Google mentions for
 showing an app name and logo. Skipping it costs only that.
 
-Two things that cost an afternoon to learn:
+Three things that cost an afternoon to learn:
 
 - The Audience page's "Your app requires verification" banner is generic and
   contradicts the Data access card. Ignore it.
 - A Branding card reading "Resolve the following issues and verify again" means
   **nothing is queued** — no review is running and no email is coming. There is no
   progress indicator anywhere, and no API or `gcloud` command reports one.
+- Passing brand verification does **not** clear the **OAuth user cap** on
+  Audience — it keeps reading "N users / 100 user cap" forever. The cap belongs to
+  the Data access card, not Branding, and Google's own note on that page says it
+  "does not apply if you are requesting only approved sensitive or restricted
+  scopes". With `drive.appdata` alone the counter is dormant, not pending: it is
+  lifetime, never decreases (not even after a user revokes), and cannot be raised
+  or reset. Widening to `drive` / `drive.readonly` / `drive.metadata` later would
+  switch it on with the early grants already spent.
 
 **Once the pages are genuinely fixed, pick "I believe the issues found are
 incorrect"** — its subtitle is "Request additional review", and that is the path

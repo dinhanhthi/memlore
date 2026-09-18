@@ -73,7 +73,8 @@ ds-bundle/
 .claude/
 .agents/
 .cursor/
-.coding-friend/
+.coding-friend/*
+!.coding-friend/skills/
 .design-sync/
 CLAUDE.md
 AGENTS.md
