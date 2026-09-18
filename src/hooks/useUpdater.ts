@@ -27,7 +27,12 @@ export type UpdaterStatus =
   | 'checking'
   | 'available'
   | 'up-to-date'
+  /** Installing in the background. Deliberately renders nothing: the user
+   *  asked for an update, not for their session to be blocked. */
   | 'downloading'
+  /** Installed on disk, waiting for the user to relaunch. `UpdateReadyCard`
+   *  offers Restart / Later; nothing is forced. */
+  | 'ready-to-restart'
   /** The *check* failed — a network problem in practice. */
   | 'error'
   /** Download, signature verification or swap failed. Kept apart from
@@ -59,6 +64,15 @@ let inFlight: Promise<UpdateInfo | null> | null = null
  *  resolves against a stale epoch publishes nothing: its answer is no longer
  *  what the user is looking at. */
 let epoch = 0
+
+/** A bundle has been swapped in on disk and is waiting for a relaunch. Latches
+ *  for the rest of the session: there is nothing left to download, so both
+ *  checking again and installing again are refused. This is also what makes
+ *  "Later" final — the card can only be raised by a successful install. */
+let installed = false
+/** What `installed` refers to. `dismissUpdate()` nulls `snapshot.update`, so
+ *  "Later" would otherwise lose the version the card needs to name. */
+let installedUpdate: UpdateInfo | null = null
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener)
@@ -92,6 +106,20 @@ function message(e: unknown): string {
  */
 export async function checkForUpdates(options?: { silent?: boolean }): Promise<void> {
   const silent = options?.silent ?? false
+  // A newer build is already on disk. Re-offering "Update now" would download
+  // it a second time, so the only remaining step is a relaunch.
+  //
+  // But an *explicit* check still has to answer: returning silently here is the
+  // same "menu item looks dead" bug the in-flight guard above exists to avoid,
+  // and the honest answer is "restart to apply". So re-raise the card, without
+  // touching the network. A silent startup check stays silent — it must not
+  // pop an uninvited card at boot after the user chose Later.
+  if (installed) {
+    if (!silent && installedUpdate) {
+      publish({ status: 'ready-to-restart', update: installedUpdate, error: null })
+    }
+    return
+  }
   if (snapshot.status === 'checking' || snapshot.status === 'downloading') return
   if (silent && inFlight) return
 
@@ -129,27 +157,57 @@ export async function checkForUpdates(options?: { silent?: boolean }): Promise<v
 }
 
 /**
- * Download, install and restart. The command does not return on success —
- * the app relaunches — so only the failure path publishes anything. There are
- * no progress events (the backend passes empty progress closures), hence the
- * indeterminate `downloading` status.
+ * Download and install in the background, then ask for a relaunch.
+ *
+ * Nothing blocks: the caller's modal closes the moment this starts, because
+ * `downloading` renders no UI at all. On success the status becomes
+ * `ready-to-restart` and `UpdateReadyCard` appears; the app is never restarted
+ * from here. There are no progress events (the backend passes empty progress
+ * closures), so there is nothing to show anyway.
  */
 export async function installUpdate(): Promise<void> {
-  if (snapshot.status === 'downloading') return
+  if (snapshot.status === 'downloading' || installed) return
   epoch += 1
+  const startedAt = epoch
   publish({ ...snapshot, status: 'downloading', error: null })
-  // The restart kills the process from Rust, bypassing the window's
-  // `CloseRequested` flush — WKWebView would drop the tab session on disk.
+  // Kept from when this command restarted the app itself: the install can still
+  // be the last thing that happens before the process goes away (the user may
+  // quit while it runs), and WKWebView skips the `CloseRequested` disk flush.
   flushTabSession()
   try {
     await invoke('install_update')
+    // Latched regardless of epoch — the bundle is on disk either way, and
+    // checking again after this point would just re-download it.
+    installed = true
+    installedUpdate = snapshot.update
+    if (epoch !== startedAt) return
+    publish({ ...snapshot, status: 'ready-to-restart', error: null })
   } catch (e) {
     console.error('[updater] install_update failed', e)
+    // Surfaced as a toast by `UpdateReadyCard`, never as a modal: a background
+    // failure must not hijack a session the user did not interrupt.
     publish({ ...snapshot, status: 'install-failed', error: message(e) })
   }
 }
 
-/** "Later" — close the modal and drop the pending update from the UI. */
+/**
+ * Relaunch into the installed build — the only place the app exits for an
+ * update, and only ever from the user pressing "Restart".
+ */
+export async function restartApp(): Promise<void> {
+  // This is now the real exit point: Rust kills the process, so the window's
+  // `CloseRequested` flush never runs and the tab session would be lost.
+  flushTabSession()
+  try {
+    await invoke('restart_app')
+  } catch (e) {
+    // The card stays up so the user can retry or just quit normally — the
+    // update is already on disk either way.
+    console.error('[updater] restart_app failed', e)
+  }
+}
+
+/** "Later" / "Close" — drop whatever the updater was showing. */
 export function dismissUpdate(): void {
   epoch += 1
   publish(IDLE)
@@ -185,6 +243,7 @@ export function useUpdater() {
       ...state,
       check: checkForUpdates,
       install: installUpdate,
+      restart: restartApp,
       dismiss: dismissUpdate,
     }),
     [state],
@@ -197,5 +256,7 @@ export function __resetUpdaterForTests(): void {
   startupChecked = false
   inFlight = null
   epoch = 0
+  installed = false
+  installedUpdate = null
   listeners.clear()
 }

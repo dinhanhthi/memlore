@@ -16,7 +16,9 @@ import {
   useUpdater,
   checkForUpdates,
   installUpdate,
+  restartApp,
   runStartupUpdateCheck,
+  dismissUpdate,
   __resetUpdaterForTests,
 } from './useUpdater'
 
@@ -276,8 +278,8 @@ describe('useUpdater', () => {
       const late = deferred<unknown>()
       let checks = 0
       // First check answers at once; the second one is still in flight when the
-      // user starts the install. `install_update` never resolves (the app
-      // restarts instead).
+      // user starts the install. `install_update` is held open so the state
+      // machine stays on `downloading`.
       mockedInvoke.mockImplementation((cmd) => {
         if (cmd !== 'check_for_update') return new Promise(() => {})
         checks += 1
@@ -353,7 +355,7 @@ describe('useUpdater', () => {
         await result.current.check()
       })
       mockedInvoke.mockClear()
-      // The real command never resolves — the app restarts instead.
+      // Held open so the intermediate state is observable.
       mockedInvoke.mockReturnValue(new Promise(() => {}))
 
       act(() => {
@@ -364,7 +366,7 @@ describe('useUpdater', () => {
       expect(mockedInvoke).toHaveBeenCalledWith('install_update')
     })
 
-    it('flushes the tab session before the app restarts', async () => {
+    it('flushes the tab session before installing', async () => {
       mockedInvoke.mockReturnValue(new Promise(() => {}))
 
       void installUpdate()
@@ -394,6 +396,157 @@ describe('useUpdater', () => {
       const { result } = renderHook(() => useUpdater())
       expect(result.current.status).toBe('install-failed')
       expect(result.current.error).toBe('signature mismatch')
+    })
+  })
+
+  describe('a background install that finished', () => {
+    /** Drive a check + install to completion, leaving an update staged. */
+    async function installFrom(update = AVAILABLE) {
+      mockedInvoke.mockResolvedValue(update)
+      await checkForUpdates()
+      mockedInvoke.mockResolvedValue(null)
+      await installUpdate()
+    }
+
+    it('asks to restart instead of restarting on its own', async () => {
+      await installFrom()
+
+      const { result } = renderHook(() => useUpdater())
+      expect(result.current.status).toBe('ready-to-restart')
+      // The version is what the card shows.
+      expect(result.current.update).toEqual(AVAILABLE)
+      expect(mockedInvoke).not.toHaveBeenCalledWith('restart_app')
+    })
+
+    it('re-raises the card on an explicit check after Later, instead of doing nothing', async () => {
+      // The menu item must never look dead — that was the whole point of the
+      // in-flight guard fix. Once a build is staged, "Check For Updates…" has
+      // an honest answer ("restart to apply"), so silence is the wrong one.
+      await installFrom()
+      dismissUpdate()
+      mockedInvoke.mockClear()
+
+      await checkForUpdates()
+
+      const { result } = renderHook(() => useUpdater())
+      expect(result.current.status).toBe('ready-to-restart')
+      expect(result.current.update).toEqual(AVAILABLE)
+      // …and it must not re-download the 85 MB bundle to say so.
+      expect(mockedInvoke).not.toHaveBeenCalled()
+    })
+
+    it('stays silent on a startup check after Later — no uninvited card', async () => {
+      await installFrom()
+      dismissUpdate()
+
+      await checkForUpdates({ silent: true })
+
+      const { result } = renderHook(() => useUpdater())
+      expect(result.current.status).toBe('idle')
+    })
+
+    it('restarts only when the user asks', async () => {
+      await installFrom()
+      mockedInvoke.mockClear()
+
+      await restartApp()
+
+      expect(mockedInvoke).toHaveBeenCalledWith('restart_app')
+    })
+
+    it('flushes the tab session before restart_app — the real exit point', async () => {
+      await installFrom()
+      mockedInvoke.mockClear()
+      mockedFlush.mockClear()
+
+      await restartApp()
+
+      expect(mockedFlush).toHaveBeenCalledTimes(1)
+      expect(mockedFlush.mock.invocationCallOrder[0]).toBeLessThan(
+        mockedInvoke.mock.invocationCallOrder[0],
+      )
+    })
+
+    it('keeps the card up when restart_app fails, instead of losing the update', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+      await installFrom()
+      mockedInvoke.mockRejectedValue('ipc gone')
+
+      await restartApp()
+
+      const { result } = renderHook(() => useUpdater())
+      expect(result.current.status).toBe('ready-to-restart')
+      logged.mockRestore()
+    })
+
+    it('"Later" hides the card, and an explicit check never re-downloads', async () => {
+      await installFrom()
+      const { result } = renderHook(() => useUpdater())
+
+      act(() => {
+        result.current.dismiss()
+      })
+      expect(result.current.status).toBe('idle')
+
+      mockedInvoke.mockClear()
+      mockedInvoke.mockResolvedValue(AVAILABLE)
+      await act(async () => {
+        await result.current.check()
+      })
+
+      // An explicit check answers rather than going quiet — a silent menu item
+      // is the bug the in-flight guard exists to prevent. But it answers from
+      // the latch, never by downloading the same 85 MB bundle twice.
+      expect(result.current.status).toBe('ready-to-restart')
+      expect(mockedInvoke).not.toHaveBeenCalled()
+    })
+
+    it('refuses a second install of an update already on disk', async () => {
+      await installFrom()
+      mockedInvoke.mockClear()
+
+      await installUpdate()
+
+      expect(mockedInvoke).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('a background install that failed', () => {
+    /** The statuses `UpdateAvailableModal` renders. A background failure must
+     *  not be one of them — it is a bottom-right toast, not a takeover. */
+    const MODAL_STATUSES = ['checking', 'available', 'up-to-date', 'error']
+
+    it('never lands in a status the modal renders', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockedInvoke.mockResolvedValue(AVAILABLE)
+      await checkForUpdates()
+      mockedInvoke.mockRejectedValue('signature mismatch')
+
+      await installUpdate()
+
+      const { result } = renderHook(() => useUpdater())
+      expect(MODAL_STATUSES).not.toContain(result.current.status)
+      expect(result.current.status).toBe('install-failed')
+      logged.mockRestore()
+    })
+
+    it('leaves the updater usable — nothing was staged, so a retry can check', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockedInvoke.mockRejectedValue('signature mismatch')
+      await installUpdate()
+      const { result } = renderHook(() => useUpdater())
+
+      // What `UpdateReadyCard` does after toasting the failure.
+      act(() => {
+        result.current.dismiss()
+      })
+      mockedInvoke.mockResolvedValue(AVAILABLE)
+      await act(async () => {
+        await result.current.check()
+      })
+
+      expect(result.current.status).toBe('available')
+      logged.mockRestore()
     })
   })
 

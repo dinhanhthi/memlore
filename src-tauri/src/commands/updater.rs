@@ -3,6 +3,12 @@
 //!
 //! One binary serves both channels: the endpoint is chosen at runtime from the
 //! user's setting and overrides the one baked into `tauri.conf.json`.
+//!
+//! Installing and relaunching are **two** commands. `install_update` swaps the
+//! bundle on disk and returns, so the download runs in the background while the
+//! user keeps working; the relaunch happens only when the user asks for it via
+//! `restart_app`. An update that quits the app out from under an open editor is
+//! worse than an update applied on the next ordinary launch.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -216,6 +222,11 @@ pub async fn check_for_update<R: Runtime>(
     Ok(Some(info))
 }
 
+/// Download and install the build the last `check_for_update` found, then
+/// return. **It does not relaunch** — on macOS `download_and_install` swaps the
+/// bundle without touching the running process, so the user stays in their
+/// session and the new version takes effect on the next launch (either
+/// `restart_app`, or an ordinary quit-and-reopen).
 #[tauri::command]
 pub async fn install_update<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     // Take the handle out and drop the guard before awaiting — a std
@@ -232,8 +243,18 @@ pub async fn install_update<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
         .await
         .map_err(|e| e.to_string())?;
 
-    // On macOS `download_and_install` swaps the bundle but does NOT relaunch;
-    // without this restart the user just sees the app freeze and quit.
+    Ok(())
+}
+
+/// Relaunch into the freshly installed build. The only exit point of an
+/// update, and always user-initiated (the "Restart" button on the
+/// update-ready card) — never called by `install_update`.
+///
+/// `AppHandle::restart` is `-> !`: it does not return, so the `Ok` is
+/// unreachable and exists only to keep the command's signature uniform with
+/// every other one.
+#[tauri::command]
+pub fn restart_app<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     app.restart()
 }
 
@@ -400,6 +421,10 @@ mod tests {
             .expect_err("nothing to install");
         assert!(err.contains("no pending update"), "got {err}");
     }
+
+    // `restart_app` has no test: `AppHandle::restart` terminates the process,
+    // so calling it here would kill the test runner. Its whole body is that one
+    // call, and it is registered in `generate_handler!` next to the others.
 
     #[test]
     fn user_agent_identifies_memlore() {

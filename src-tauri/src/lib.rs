@@ -2285,6 +2285,7 @@ pub fn run() {
             // In-app updater (stable/beta channel resolved at call time)
             commands::updater::check_for_update,
             commands::updater::install_update,
+            commands::updater::restart_app,
             commands::updater::app_version,
         ])
         .build(tauri::generate_context!())

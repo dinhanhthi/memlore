@@ -15,6 +15,7 @@ import { WindowDragRegion } from './components/layout/WindowDragRegion'
 import { QuitConfirmDialog } from './components/layout/QuitConfirmDialog'
 import { SearchOverlay } from './components/search/SearchOverlay'
 import { UpdateAvailableModal } from './components/common/UpdateAvailableModal'
+import { UpdateReadyCard } from './components/common/UpdateReadyCard'
 import { TemplatePickerHost } from './components/templates/TemplatePickerHost'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { EmbeddingExplainerPanel } from './components/ai/EmbeddingExplainerPanel'
@@ -489,6 +490,10 @@ function App() {
           startup check (only when it found something), or the
           `Check For Updates…` menu item (also reports up-to-date / failure). */}
       <UpdateAvailableModal />
+      {/* The other half of the updater: a persistent bottom-right card once a
+          background install has finished (Restart / Later), and a toast if that
+          install failed. Never blocks the session. */}
+      <UpdateReadyCard />
       {/* Surfaces the result of a Google Drive connect the user started during
           onboarding but let finish in the background (see DriveStep). */}
       <GdriveConnectToaster />

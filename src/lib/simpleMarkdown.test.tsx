@@ -113,4 +113,42 @@ describe('renderSimpleMarkdown', () => {
       expect(htmlWithRefs('## About [id=abc]')).toContain('data-entry="abc"')
     })
   })
+
+  describe('`code` spans', () => {
+    it('renders a single span as <code>', () => {
+      const out = html('Now builds for `x86_64` too.')
+      expect(out).toMatch(/<code[^>]*>x86_64<\/code>/)
+      expect(out).not.toContain('`')
+    })
+
+    it('renders two spans on one line', () => {
+      const out = html('Both `x86_64` and `arm64` ship.')
+      expect(out).toMatch(/<code[^>]*>x86_64<\/code>/)
+      expect(out).toMatch(/<code[^>]*>arm64<\/code>/)
+    })
+
+    it('leaves an unclosed backtick literal without swallowing the line', () => {
+      const out = html('See `bundle.createUpdaterArtifacts for the flag.')
+      expect(out).not.toContain('<code')
+      expect(out).toContain('`bundle.createUpdaterArtifacts for the flag.')
+    })
+
+    it('renders a code span inside bold', () => {
+      const out = html('- **`CONTRIBUTING.md`** was added.')
+      expect(out).toMatch(/<strong><code[^>]*>CONTRIBUTING\.md<\/code><\/strong>/)
+    })
+
+    it('does not parse markdown inside a code span', () => {
+      const out = html('Literal `**not bold**` here.')
+      expect(out).not.toContain('<strong')
+      expect(out).toMatch(/<code[^>]*>\*\*not bold\*\*<\/code>/)
+    })
+
+    it('leaves an underscore inside a code span alone', () => {
+      // The italic branch would otherwise eat `snake_case_name`.
+      const out = html('Set `snake_case_name` first.')
+      expect(out).not.toContain('<em')
+      expect(out).toMatch(/<code[^>]*>snake_case_name<\/code>/)
+    })
+  })
 })

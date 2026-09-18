@@ -2,40 +2,45 @@ import { AlertTriangle, ArrowDownToLine, CheckCircle2, Loader2 } from 'lucide-re
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
 import { Modal } from './Modal'
+import { renderSimpleMarkdown } from '../../lib/simpleMarkdown'
 import { useUpdater, type UpdaterStatus } from '../../hooks/useUpdater'
 
-const TITLE_KEY: Record<Exclude<UpdaterStatus, 'idle'>, string> = {
+/** The states that belong in a modal — the ones the user is waiting on an
+ *  answer for. Everything after "Update now" happens in the background
+ *  (`downloading`), on a card (`ready-to-restart`) or in a toast
+ *  (`install-failed`), so none of those open this. */
+type ModalStatus = 'checking' | 'available' | 'up-to-date' | 'error'
+
+function isModalStatus(status: UpdaterStatus): status is ModalStatus {
+  return (
+    status === 'checking' || status === 'available' || status === 'up-to-date' || status === 'error'
+  )
+}
+
+const TITLE_KEY: Record<ModalStatus, string> = {
   checking: 'updater.checking',
   available: 'updater.available',
-  downloading: 'updater.available',
   'up-to-date': 'updater.up_to_date',
   error: 'updater.failed',
-  'install-failed': 'updater.install_failed',
 }
 
 /**
- * The only UI of the updater state machine (`useUpdater`): it opens itself
- * whenever the shared status leaves `idle`. The silent startup check only
- * leaves `idle` when it actually found something, so this stays invisible at
- * boot; the `Check For Updates…` menu item drives the checking / up-to-date /
- * error states too.
+ * The question-asking half of the updater UI (`useUpdater`): "there's a new
+ * version, want it?", plus the menu item's checking / up-to-date / failed
+ * answers. The silent startup check only leaves `idle` when it actually found
+ * something, so this stays invisible at boot.
+ *
+ * It never blocks: pressing "Update now" closes it immediately and the install
+ * continues in the background.
  */
 export function UpdateAvailableModal() {
   const { t } = useTranslation('common')
   const { status, update, error, install, dismiss } = useUpdater()
 
-  if (status === 'idle') return null
-
-  // Installing is non-dismissable: the app is being swapped under us and will
-  // restart. Checking stays closable — it can take up to the backend's 30s
-  // timeout, and a modal the user cannot escape would be worse than a late
-  // result (which `useUpdater` drops once this closes). No progress events
-  // exist (the backend installs with empty progress callbacks), so the
-  // download is indeterminate.
-  const busy = status === 'downloading'
+  if (!isModalStatus(status)) return null
 
   return (
-    <Modal onClose={busy ? () => {} : dismiss} disableEsc={busy} disableBackdrop={busy}>
+    <Modal onClose={dismiss}>
       <Modal.Header>{t(TITLE_KEY[status])}</Modal.Header>
 
       <Modal.Body fitContent className="space-y-3">
@@ -50,17 +55,11 @@ export function UpdateAvailableModal() {
           </p>
         )}
 
-        {(status === 'error' || status === 'install-failed') && (
+        {status === 'error' && (
           <div className="space-y-2">
             <p className="text-fg-secondary flex items-start gap-2 text-sm">
               <AlertTriangle className="text-fg-muted mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
-              <span>
-                {t(
-                  status === 'install-failed'
-                    ? 'updater.install_failed_body'
-                    : 'updater.failed_body',
-                )}
-              </span>
+              <span>{t('updater.failed_body')}</span>
             </p>
             {error != null && (
               <p className="text-fg-muted font-mono text-xs break-words">{error}</p>
@@ -68,7 +67,7 @@ export function UpdateAvailableModal() {
           </div>
         )}
 
-        {(status === 'available' || status === 'downloading') && update != null && (
+        {status === 'available' && update != null && (
           <>
             <p className="text-fg text-sm">
               {t('updater.available_body', { version: update.version })}
@@ -76,10 +75,13 @@ export function UpdateAvailableModal() {
             {update.notes != null && update.notes.trim() !== '' && (
               <div className="space-y-1">
                 <p className="text-fg-secondary text-xs font-semibold">{t('updater.notes')}</p>
-                {/* Release notes are remote text: rendered as plain text, never markdown or HTML. */}
-                <p className="text-fg-secondary max-h-60 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap">
-                  {update.notes}
-                </p>
+                {/* Release notes are remote text. `renderSimpleMarkdown` only
+                    ever builds React element trees with text leaves — no raw
+                    HTML escape hatch — so the GitHub release body cannot inject
+                    markup however it is written. */}
+                <div className="text-fg-secondary max-h-60 space-y-2 overflow-y-auto text-sm leading-relaxed">
+                  {renderSimpleMarkdown(update.notes)}
+                </div>
               </div>
             )}
           </>
@@ -87,17 +89,19 @@ export function UpdateAvailableModal() {
       </Modal.Body>
 
       <Modal.Footer className="items-center">
-        {status === 'downloading' ? (
-          <p className="text-fg-secondary flex items-center gap-2 text-sm">
-            <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" strokeWidth={1.75} />
-            <span>{t('updater.installing')}</span>
-          </p>
-        ) : status === 'available' ? (
+        {status === 'available' ? (
           <>
             <Button variant="secondary" size="md" onClick={dismiss}>
               {t('updater.later')}
             </Button>
-            <Button variant="primary" size="md" disabled={busy} onClick={() => void install()}>
+            <Button
+              variant="primary"
+              size="md"
+              // Closing is implicit: `install()` moves the state machine to
+              // `downloading`, which this modal does not render. The download
+              // must not be something the user has to sit and watch.
+              onClick={() => void install()}
+            >
               <ArrowDownToLine className="size-4" strokeWidth={1.75} />
               {t('updater.install')}
             </Button>

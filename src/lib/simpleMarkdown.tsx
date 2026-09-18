@@ -14,6 +14,8 @@ import { Fragment, type ReactNode } from 'react'
  * - Numbered lines starting with `1. ` (any digits) → also `<li>`.
  * - `**bold**` / `__bold__` → `<strong>`.
  * - `*italic*` / `_italic_` → `<em>`.
+ * - `` `code` `` → `<code>`, monospaced. Nothing inside a code span is
+ *   parsed further, so `` `**not bold**` `` shows its asterisks.
  * - Blank lines separate paragraphs.
  * - Single newlines inside a paragraph become `<br />` so the preview
  *   preserves the writer's line breaks instead of collapsing them.
@@ -124,19 +126,33 @@ export function renderSimpleMarkdown(text: string, options?: SimpleMarkdownOptio
   return <>{blocks}</>
 }
 
-/// Inline grammar: `**bold**` / `__bold__` / `*italic*` / `_italic_`.
+/** Inline `<code>` styling. Same shape as the `<code>` in `EditorSettings`;
+ *  `em` sizing so a code span inside a heading is not suddenly body-sized. */
+const CODE_CLASS =
+  'border-border-default bg-fg/5 rounded border px-1 py-0.5 font-mono text-[0.85em]'
+
+/// Inline grammar: `` `code` ``, `**bold**` / `__bold__`, `*italic*` / `_italic_`.
 /// Tokenise rather than regex-replace so partial markers (a stream in
 /// progress) render as plain text instead of breaking.
+///
+/// Emphasis renders its content recursively so `` **`x86_64`** `` nests —
+/// terminating, because the inner text is always strictly shorter.
 function renderInline(text: string, options?: SimpleMarkdownOptions): ReactNode {
   const tokens = tokeniseInline(text)
   return tokens.map((tok, i) => {
     switch (tok.kind) {
       case 'text':
         return <Fragment key={i}>{tok.value}</Fragment>
+      case 'code':
+        return (
+          <code key={i} className={CODE_CLASS}>
+            {tok.value}
+          </code>
+        )
       case 'bold':
-        return <strong key={i}>{tok.value}</strong>
+        return <strong key={i}>{renderInline(tok.value, options)}</strong>
       case 'italic':
-        return <em key={i}>{tok.value}</em>
+        return <em key={i}>{renderInline(tok.value, options)}</em>
       case 'entryRef': {
         // No renderer supplied → the marker is just text, byte-for-byte
         // what the model wrote. Never silently swallowed: a caller that
@@ -154,7 +170,7 @@ function renderInline(text: string, options?: SimpleMarkdownOptions): ReactNode 
 }
 
 interface InlineToken {
-  kind: 'text' | 'bold' | 'italic' | 'entryRef'
+  kind: 'text' | 'code' | 'bold' | 'italic' | 'entryRef'
   value: string
 }
 
@@ -172,6 +188,21 @@ function tokeniseInline(text: string): InlineToken[] {
   let i = 0
   let buf = ''
   while (i < text.length) {
+    // Code first: a code span is opaque, so `` `**x**` `` must not be seen by
+    // the emphasis branches below. An unclosed or empty backtick pair falls
+    // through and renders literally instead of swallowing the rest of the line.
+    if (text[i] === '`') {
+      const close = text.indexOf('`', i + 1)
+      if (close > i + 1) {
+        if (buf) {
+          out.push({ kind: 'text', value: buf })
+          buf = ''
+        }
+        out.push({ kind: 'code', value: text.slice(i + 1, close) })
+        i = close + 1
+        continue
+      }
+    }
     if (text[i] === '[') {
       const match = text.slice(i).match(ENTRY_REF_RE)
       if (match && match[1]) {
