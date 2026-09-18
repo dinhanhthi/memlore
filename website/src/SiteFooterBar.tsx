@@ -1,12 +1,12 @@
 import { ArrowUpRight } from 'lucide-react'
-import { authorUrl, footer, githubUrl, legal, nav } from './content'
+import { footer, githubUrl, legal, nav } from './content'
 
 export function SiteFooterBar({
   homeHref,
   current,
 }: {
   homeHref: string
-  current?: 'privacy' | 'terms' | 'changelog'
+  current?: 'privacy' | 'terms' | 'changelog' | 'about'
 }) {
   return (
     <div className="footer-bottom">
@@ -14,14 +14,11 @@ export function SiteFooterBar({
         <a className="wordmark" href={homeHref}>
           {nav.wordmark}
         </a>
-        <p className="footer-credit">
-          {footer.note}{' '}
-          <a href={authorUrl} target="_blank" rel="noreferrer">
-            {footer.author}
-          </a>
-        </p>
       </div>
       <nav className="footer-links" aria-label={legal.linksAria}>
+        <a href="/about" aria-current={current === 'about' ? 'page' : undefined}>
+          {legal.aboutLink}
+        </a>
         <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
           {legal.changelogLink}
         </a>

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Menu, X } from 'lucide-react'
-import { changelog, githubUrl, legal, nav } from './content'
-import { latestStableVersion } from './changelog/changelogData'
+import { githubUrl, nav } from './content'
 import HeadFollowLogo from './HeadFollowLogo'
 import { useWideViewport } from './useWideViewport'
 
@@ -116,15 +115,6 @@ export function SiteHeader({
           >
             <HeadFollowLogo alt="" className="wordmark-head" size={36} />
             {nav.wordmark}
-          </a>
-          {/* Version comes from changelogData, never tauri.conf.json: the config
-              carries whatever was last bumped, including a prerelease. */}
-          <a
-            className="version-badge"
-            href="/changelog"
-            aria-label={`${changelog.badgeLabel} ${latestStableVersion} — ${legal.changelogLink}`}
-          >
-            v{latestStableVersion}
           </a>
         </div>
         <nav

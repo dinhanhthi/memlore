@@ -94,13 +94,29 @@ test('terms.html loads from production assets', async ({ page }) => {
   expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
 })
 
+test('/about loads from production assets', async ({ page }) => {
+  const errors = attachErrorCollectors(page)
+  await page.goto('/about')
+  await expect(page).toHaveTitle('Memlore — About')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('About')
+  await expect(page.getByRole('main').getByRole('link', { name: 'Thi' })).toHaveAttribute(
+    'href',
+    'https://dinhanhthi.com',
+  )
+  await expectProductionScripts(page)
+  expect(errors.pageErrors, errors.pageErrors.join('\n')).toEqual([])
+  expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
+})
+
 for (const path of [
   '/privacy.html',
   '/terms.html',
   '/changelog.html',
+  '/about.html',
   '/privacy',
   '/terms',
   '/changelog',
+  '/about',
 ] as const) {
   test(`${path} keeps Demo, Features, Compare, Changelog, Doc, GitHub, and Download in the menu bar`, async ({
     page,
@@ -130,6 +146,27 @@ test('homepage footer Privacy and Terms links navigate to the legal pages', asyn
   await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click()
   await expect(page).toHaveURL(/\/terms$/)
   await expect(page).toHaveTitle('Memlore — Terms of Service')
+})
+
+test('homepage footer About link navigates to the About page', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('contentinfo').getByRole('link', { name: 'About' }).click()
+  await expect(page).toHaveURL(/\/about$/)
+  await expect(page).toHaveTitle('Memlore — About')
+  await expect(page.getByRole('contentinfo').getByRole('link', { name: 'About' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+})
+
+test('the footer no longer credits the author', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('contentinfo')).not.toContainText(/made with/i)
+})
+
+test('the header no longer shows a version badge', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.version-badge')).toHaveCount(0)
 })
 
 test('legal page footers link Privacy and Terms', async ({ page }) => {
@@ -212,6 +249,7 @@ for (const [path, marker] of [
   ['/privacy.html', 'Limited Use'],
   ['/terms.html', 'Terms'],
   ['/index.html', 'privacy.html'],
+  ['/about.html', 'made with'],
 ] as const) {
   test(`${path} serves its content without JavaScript`, async ({ request }) => {
     const html = await (await request.get(path)).text()

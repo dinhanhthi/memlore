@@ -24,6 +24,7 @@ export function renderLandingStaticHtml(): string {
     // React replaces this markup with the clean `/privacy` URLs on mount.
     `<nav aria-label="${escapeHtml(legal.linksAria)}">`,
     `<a href="index.html">${escapeHtml(nav.wordmark)}</a>`,
+    `<a href="about.html">${escapeHtml(legal.aboutLink)}</a>`,
     `<a href="changelog.html">${escapeHtml(legal.changelogLink)}</a>`,
     `<a href="privacy.html">${escapeHtml(legal.privacyLink)}</a>`,
     `<a href="terms.html">${escapeHtml(legal.termsLink)}</a>`,

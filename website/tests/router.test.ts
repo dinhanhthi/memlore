@@ -4,6 +4,7 @@ import indexHtml from '../index.html?raw'
 import privacyHtml from '../privacy.html?raw'
 import termsHtml from '../terms.html?raw'
 import changelogHtml from '../changelog.html?raw'
+import aboutHtml from '../about.html?raw'
 
 // The `.html` forms must keep resolving: https://memlore.app/privacy.html is the URL
 // registered on Memlore's Google OAuth consent screen, and any link a user already
@@ -29,13 +30,13 @@ it('resolves clean URLs, the legacy .html URLs Google OAuth has on file, and any
   }
 })
 
-// `about` is absent on purpose — phase 2 adds about.html.
 it('titles the same page the static shell does, so SPA navigation cannot drift from it', () => {
   for (const [name, html] of [
     ['home', indexHtml],
     ['privacy', privacyHtml],
     ['terms', termsHtml],
     ['changelog', changelogHtml],
+    ['about', aboutHtml],
   ] as const) {
     expect(html).toContain(`<title>${ROUTES[name].title}</title>`)
   }

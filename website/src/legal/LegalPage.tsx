@@ -42,7 +42,13 @@ function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean }) {
   )
 }
 
-export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms'; source: string }) {
+export default function LegalPage({
+  kind,
+  source,
+}: {
+  kind: 'privacy' | 'terms' | 'about'
+  source: string
+}) {
   const { meta, blocks } = parseLegalMarkdown(source)
   const heading = blocks.find((block) => block.type === 'h1')
   const rest = heading ? blocks.filter((block) => block !== heading) : blocks

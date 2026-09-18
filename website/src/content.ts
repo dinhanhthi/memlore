@@ -1,5 +1,4 @@
 export const githubUrl = 'https://github.com/dinhanhthi/memlore'
-export const authorUrl = 'https://dinhanhthi.com'
 export const contactEmail = 'contact@memlore.app'
 
 export const meta = {
@@ -486,17 +485,16 @@ export const footer = {
   tryDemo: 'Try the demo',
   download: 'Download for Mac',
   downloadAria: 'Download the beta from GitHub',
-  note: 'Made with ❤️ by',
-  author: 'Thi',
   github: 'GitHub',
 }
 
 export const legal = {
   updatedLabel: 'Last updated',
+  aboutLink: 'About',
   privacyLink: 'Privacy',
   termsLink: 'Terms',
   changelogLink: 'Changelog',
-  linksAria: 'Changelog, privacy, terms, and GitHub',
+  linksAria: 'About, changelog, privacy, terms, and GitHub',
   homeAria: 'Memlore home',
 }
 
@@ -509,7 +507,6 @@ export const changelog = {
   beta: 'Beta',
   betaNote: 'A test version. Stable is what most people should run.',
   releasedLabel: 'Released',
-  badgeLabel: 'Current version',
   tocTitle: 'Versions',
   tocAria: 'Release versions',
   kinds: {

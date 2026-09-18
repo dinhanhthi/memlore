@@ -214,25 +214,6 @@ footer {
   letter-spacing: -1px;
   white-space: nowrap;
 }
-/* Sibling of .wordmark, not a child: the wordmark is itself an <a>, and an
-   anchor cannot nest inside another anchor. */
-.version-badge {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border: var(--rule-width) solid var(--color-rule);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  letter-spacing: 0;
-  white-space: nowrap;
-  color: var(--color-muted);
-  transition: color var(--dur-micro) var(--ease-out);
-}
-.version-badge:hover {
-  color: var(--color-ink);
-  border-color: var(--color-muted);
-}
 .wordmark-head,
 .hero-head,
 .footer-head {
@@ -1985,18 +1966,6 @@ tbody th {
 }
 .footer-bottom .wordmark {
   font-size: 20px;
-}
-.footer-credit {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: var(--text-small);
-  white-space: nowrap;
-}
-.footer-credit a {
-  color: var(--color-ink);
-}
-.footer-credit a:hover {
-  color: var(--color-accent);
 }
 .footer-links {
   display: flex;

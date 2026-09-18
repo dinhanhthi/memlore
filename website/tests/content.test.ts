@@ -9,7 +9,6 @@ import {
   editor,
   emotions,
   encrypt,
-  authorUrl,
   footer,
   githubUrl,
   hero,
@@ -27,6 +26,7 @@ import {
 import websiteIndex from '../index.html?raw'
 import privacyHtml from '../privacy.html?raw'
 import termsHtml from '../terms.html?raw'
+import aboutMarkdown from '../src/legal/about.md?raw'
 import privacyMarkdown from '../src/legal/privacy.md?raw'
 import termsMarkdown from '../src/legal/terms.md?raw'
 import { parseLegalMarkdown } from '../src/legal/markdown'
@@ -63,10 +63,9 @@ it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
 })
 
-it('credits the author with the public personal site', () => {
-  expect(footer.note).toBe('Made with ❤️ by')
-  expect(footer.author).toBe('Thi')
-  expect(authorUrl).toBe('https://dinhanhthi.com')
+it('credits the author on the About page', () => {
+  expect(aboutMarkdown).toContain('dinhanhthi.com')
+  expect(aboutMarkdown).toContain('made with')
 })
 
 it('says the journal stays free and is open for security and data', () => {
