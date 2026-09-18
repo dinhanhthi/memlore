@@ -1,0 +1,14 @@
+name = "memlore-stats"
+main = "src/index.ts"
+compatibility_date = "2026-09-18"
+
+routes = [{ pattern = "dl.memlore.app", custom_domain = true }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "memlore-stats"
+# Replace with the id printed by `wrangler d1 create memlore-stats` (see README.md).
+database_id = "PASTE_FROM_wrangler_d1_create"
+
+[triggers]
+crons = ["0 0 * * *"]

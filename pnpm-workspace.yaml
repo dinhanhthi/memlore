@@ -1,5 +1,11 @@
 allowBuilds:
   core-js: true
+  # wrangler pulls both in. esbuild only needs its postinstall for a binary
+  # wrangler ships itself (deploy --dry-run bundles fine without it), and
+  # workerd only for local `wrangler dev`, which this repo does not use.
+  # Without these, `pnpm install --frozen-lockfile` fails on a clean checkout.
+  esbuild: false
+  workerd: false
 
 ignoredBuiltDependencies:
   - core-js@3.49.0
