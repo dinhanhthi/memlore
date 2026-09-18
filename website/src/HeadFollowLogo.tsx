@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- preloadHeadSprites warms the sprite cache for the same component's directions */
 import { useEffect, useRef, useState } from 'react'
 import {
   ALL_LOGO_DIRECTIONS,

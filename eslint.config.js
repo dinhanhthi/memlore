@@ -27,12 +27,24 @@ export default defineConfig([
       // react-hooks v7 refs rule produces false positives with third-party
       // callback refs (floating-ui, useRef assignments in effects, etc.)
       'react-hooks/refs': 'off',
-      // react-hooks v7 set-state-in-effect: fixed where possible,
-      // disabled inline at data-fetching call sites (would require
-      // adopting a data-fetching library to fix properly).
+      // react-hooks v7 set-state-in-effect: fixed where possible; otherwise
+      // disabled inline with a per-site reason. Most are data-fetch call sites
+      // (would require adopting a data-fetching library to fix properly), the
+      // rest are prop-driven resets, timer ticks and hydration races.
       'react-hooks/set-state-in-effect': 'error',
-      // react-hooks v7 purity: fixed where it triggers.
+      // react-hooks v7 purity: fixed where possible; otherwise disabled inline
+      // with a per-site reason. React Compiler is not enabled, so the render
+      // -phase `Date.now()` these guard is advisory, not a miscompile.
       'react-hooks/purity': 'error',
+    },
+  },
+  {
+    // App entry points mount the tree and export nothing, which is exactly what
+    // the rule reports ("Fast refresh only works when a file has exports").
+    // Nothing imports them, so there is no refresh boundary to preserve.
+    files: ['src/main.tsx', 'web/main.tsx', 'website/src/main.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

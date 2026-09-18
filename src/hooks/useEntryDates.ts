@@ -48,6 +48,7 @@ export function useEntryDates(journalId: string | null): UseEntryDatesResult {
   }, [journalId, lockedView, activeVaultId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fires the memoized data-fetch; would need TanStack Query to fix properly
     void fetchDates()
   }, [fetchDates])
 

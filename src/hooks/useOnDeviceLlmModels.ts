@@ -292,6 +292,7 @@ export function useOnDeviceLlmModels(): UseOnDeviceLlmModelsReturn {
   // Hydrate on mount.
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrates the catalog on mount; would need TanStack Query to fix properly
     void hydrate(() => cancelled)
     return () => {
       cancelled = true

@@ -22,6 +22,7 @@ export function useAttachableEntries(
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- debounced data-fetch; would need TanStack Query to fix properly
     setLoading(true)
 
     const handle = setTimeout(() => {

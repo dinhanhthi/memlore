@@ -39,7 +39,6 @@ export function useSemanticSearch(query: string, filters?: SearchFilters) {
   useEffect(() => {
     const trimmed = query.trim()
     if (!trimmed) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- search reset; would need TanStack Query to fix properly
       setResults([])
       setIsLoading(false)
       setError(null)

@@ -31,7 +31,6 @@ export function useSearch(query: string, filters?: SearchFilters) {
     // command routes to list_entries_with_filters.
     const hasFilters = filters !== undefined && Object.keys(filters).length > 0
     if (!trimmed && !hasFilters) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- search reset; would need TanStack Query to fix properly
       setResults([])
       setIsLoading(false)
       setError(null)

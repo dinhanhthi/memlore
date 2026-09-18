@@ -228,6 +228,7 @@ export function useOnDeviceModels(currentModelId: string | null = null): UseOnDe
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrates the catalog on mount; would need TanStack Query to fix properly
     void refresh()
   }, [refresh])
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Select ships with selectTriggerHeightClass so callers can match the trigger height without a second import */
 import {
   autoUpdate,
   flip,

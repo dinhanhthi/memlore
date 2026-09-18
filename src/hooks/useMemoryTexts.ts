@@ -36,6 +36,7 @@ export function useMemoryTexts(memoryIds: string[]): {
   useEffect(() => {
     const uniqueIds = idsKey.length > 0 ? idsKey.split('\0') : []
     if (uniqueIds.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- idsKey-keyed data-fetch; would need TanStack Query to fix properly
       setTexts(new Map())
       setLoading(false)
       return

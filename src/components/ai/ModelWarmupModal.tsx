@@ -111,6 +111,7 @@ export function ModelWarmupModal() {
     const remaining = WARMUP_FLICKER_GUARD_MS - (Date.now() - startingSince)
     if (remaining <= 0) {
       // Already past the boundary — one immediate tick to flip visibility.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot timer tick that flips visibility at the flicker-guard boundary
       setNow(Date.now())
       return
     }

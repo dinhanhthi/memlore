@@ -40,6 +40,7 @@ export function WaveformIndicator({ active, bars = 32 }: WaveformIndicatorProps)
 
   useEffect(() => {
     if (!active) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the bars when capture stops; levels are otherwise driven by the interval below
       setLevels(new Array(bars).fill(0))
       return
     }

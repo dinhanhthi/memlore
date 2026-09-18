@@ -22,6 +22,7 @@ export function WeeklyReviewCard() {
   const { t: tAi } = useTranslation('ai')
   const bulk = useAiBulkContextConsent()
   const anchorSec = useMemo(
+    // eslint-disable-next-line react-hooks/purity -- deliberately pinned to mount time; the staleness this causes is the TODO(later) below
     () => shiftPeriodAnchor('weekly', Math.floor(Date.now() / 1000), -1, i18n.language),
     [i18n.language],
   )

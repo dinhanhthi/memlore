@@ -107,6 +107,7 @@ export function SyncStatus({
   // Compute the retry label from the scheduler's backoff ETA.
   const retryLabel = (() => {
     if (!retryAt) return null
+    // eslint-disable-next-line react-hooks/purity -- the ETA is relative to now; the row re-renders when the sync store pushes a status, not on a ticker
     const remainMs = retryAt - Date.now()
     if (remainMs <= 0) return t('sync.retry_soon')
     const mins = Math.ceil(remainMs / 60_000)

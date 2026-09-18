@@ -32,6 +32,7 @@ export function useMathExtensions(doc: Y.Doc | null): MathExtensionsState {
 
   useEffect(() => {
     if (!mathHydrated) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- lazy-loads the KaTeX extensions and resets them when hydration flips
       setExtensions([])
       setReady(false)
       setLoadFailed(false)

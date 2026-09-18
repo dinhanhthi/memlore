@@ -39,6 +39,7 @@ export function usePeriodReview({
 
   useEffect(() => {
     const requestId = ++requestIdRef.current
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- bounds-keyed data-fetch (stale responses dropped via requestIdRef); would need TanStack Query to fix properly
     setPhase({ kind: 'idle' })
     void getPeriodReview(bounds.start, bounds.end, kind)
       .then((result) => {

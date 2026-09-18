@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- isRewriteSnapshotCurrent is the menu's own revision guard and is unit-tested alongside it */
 import type { Editor } from '@tiptap/react'
 import { isTextSelection } from '@tiptap/core'
 import { BubbleMenu } from '@tiptap/react/menus'

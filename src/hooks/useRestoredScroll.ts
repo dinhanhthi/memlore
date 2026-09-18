@@ -32,6 +32,7 @@ export function useRestoredScroll(
 
   useLayoutEffect(() => {
     if (!key || !ready) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the restored flag when there is no key yet or the port is not ready
       setRestored(false)
       return
     }

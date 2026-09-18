@@ -10,6 +10,7 @@ export function useTabSessionHydrated(): boolean {
     const unsub = useTabStore.persist.onFinishHydration(() => {
       setHydrated(true)
     })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors zustand-persist hydration, which can finish before this subscription lands
     if (useTabStore.persist.hasHydrated()) setHydrated(true)
     return unsub
   }, [])

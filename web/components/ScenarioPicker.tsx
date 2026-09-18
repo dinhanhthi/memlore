@@ -145,7 +145,9 @@ export function ScenarioPicker({
     dragRef.current = null
     try {
       localStorage.setItem(POS_KEY, JSON.stringify(posRef.current))
-    } catch {}
+    } catch {
+      // Blocked storage (private window) — the picker position is a convenience.
+    }
   }, [])
 
   const setDockedPersist = useCallback((next: boolean) => {

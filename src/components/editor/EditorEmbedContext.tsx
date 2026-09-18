@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- context module: the provider component and its useEditorEmbedded reader belong together */
 /**
  * Marks whether the editor is rendered in an "embedded" shell.
  *

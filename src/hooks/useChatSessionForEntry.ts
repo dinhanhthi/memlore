@@ -27,6 +27,7 @@ export function useChatSessionForEntry(entryId: string | null | undefined) {
 
   useEffect(() => {
     if (!entryId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- entryId-keyed data-fetch; would need TanStack Query to fix properly
       setSessionRef(null)
       return
     }

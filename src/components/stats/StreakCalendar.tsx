@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- getLevel is the calendar's bucket scale and is unit-tested alongside it */
 import { useTranslation } from 'react-i18next'
 import { statsStreakCalendar } from '../../lib/tauri'
 import type { StreakCalendarDay } from '../../lib/tauri'

@@ -92,6 +92,7 @@ function EmbeddingExplainerBody() {
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-driven reset: collapse every section on close, expand all on open
       setOpenSectionIds(new Set())
       return
     }

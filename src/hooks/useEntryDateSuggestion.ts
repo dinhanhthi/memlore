@@ -75,6 +75,7 @@ export function useEntryDateSuggestion({
   // Initial fetch on mount / entryId change. Also re-runs when the
   // user-edited flag flips back to false (e.g. opening a fresh entry).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fires the memoized suggestion fetch; would need TanStack Query to fix properly
     void triggerCheck()
   }, [triggerCheck])
 

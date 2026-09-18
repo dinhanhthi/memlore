@@ -49,6 +49,7 @@ export function useStreaks() {
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- on-mount data-fetch; would need TanStack Query to fix properly
     setIsLoading(true)
     setError(null)
 
