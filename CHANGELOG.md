@@ -18,14 +18,16 @@ this section describes what ships rather than what changed.
 - **Signed, notarized macOS builds.** Universal binary (`x86_64` + `arm64`),
   signed with a Developer ID certificate and notarized through App Store
   Connect, published as a `.dmg` from CI on a `v*` tag. Requires macOS 13.
+  [#7632d80](https://github.com/dinhanhthi/memlore/commit/7632d80) [#756ff1f](https://github.com/dinhanhthi/memlore/commit/756ff1f)
 - **In-app updater** with two channels. `Memlore > Check For Updates…` checks on
   demand; an automatic check runs once per launch and can be turned off in
   Settings → General. The **Beta** channel opts into prereleases. Update
   archives are verified against a minisign public key compiled into the app, so
   a tampered download is rejected rather than installed.
+  [#7fce287](https://github.com/dinhanhthi/memlore/commit/7fce287) [#ee8dbd4](https://github.com/dinhanhthi/memlore/commit/ee8dbd4)
 - **Touch ID unlock** — the `keychain-access-groups` entitlement and a Developer
   ID provisioning profile are embedded at bundle time, which is what makes
-  `BIOMETRY_CURRENT_SET` usable in a distributed build.
+  `BIOMETRY_CURRENT_SET` usable in a distributed build. [#7632d80](https://github.com/dinhanhthi/memlore/commit/7632d80)
 
 ### Notes for maintainers
 

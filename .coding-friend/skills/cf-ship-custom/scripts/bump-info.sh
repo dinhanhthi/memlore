@@ -68,6 +68,13 @@ cd "$REPO_ROOT"
 # that is the whole exclusion mechanism, so keep the two lists in sync with the
 # mapping printed at the end of the output.
 APP_PATHS=(src/ src-tauri/ public/ index.html vite.config.ts package.json)
+# Resolved here so the changelog links are printed ready-made below. Leaving the
+# model to build "[#hash](url)" from a bare base URL is how v0.1.0 shipped with
+# no commit links at all — the instruction said "append commit links" and never
+# said in what shape.
+REPO_URL="$(git remote get-url origin 2>/dev/null \
+  | sed 's|git@github.com:|https://github.com/|' \
+  | sed 's|\.git$||')"
 EXCLUDED_PATHS="website/ web/ docs/ e2e/"
 # Conventional-commit scopes that never count toward a bump, however many app
 # files the commit touched.
@@ -264,7 +271,15 @@ print_commits() {
     echo "  (none)"
     return
   fi
-  printf '%s\n' "$list" | tr -d '\000-\010\013\014\016-\037\177' | sed 's/^/  | /'
+  # Each line becomes:  | <hash> <subject>   ->   [#<hash>](<repo>/commit/<hash>)
+  # The trailing markdown is the exact string to paste into CHANGELOG.md, so the
+  # link format is never reinvented and never omitted.
+  printf '%s\n' "$list" \
+    | tr -d '\000-\010\013\014\016-\037\177' \
+    | while read -r hash subject; do
+        printf '  | %s %s   ->   [#%s](%s/commit/%s)\n' \
+          "$hash" "$subject" "$hash" "$REPO_URL" "$hash"
+      done
 }
 
 # ─── Output ───────────────────────────────────────────────────────────────────

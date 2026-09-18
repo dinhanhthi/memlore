@@ -77,13 +77,24 @@ Use the version `bump-info.sh` printed under "Next version". Only `-beta.N` and 
 
 There are **two audiences**. Update both.
 
-**`CHANGELOG.md` (root) — developers.** A new `## v{version} ({today})` section, today's date from `date +%Y-%m-%d`, never `(unreleased)` for a release you are shipping. Backtick inline code (file names, config keys, command names). Append commit links:
+**`CHANGELOG.md` (root) — developers.** A new `## v{version} ({today})` section, today's date from `date +%Y-%m-%d`, never `(unreleased)` for a release you are shipping. Backtick inline code (file names, config keys, command names).
 
-```bash
-git remote get-url origin | sed 's|git@github.com:|https://github.com/|' | sed 's|\.git$||'
+**Every entry ends with its commit link.** `bump-info.sh` prints each commit with the link already built, so copy it rather than constructing one:
+
+```
+  | d81b365 fix(updater): install in the background   ->   [#d81b365](https://github.com/dinhanhthi/memlore/commit/d81b365)
 ```
 
-This file is the source for the GitHub Release body — `release.yml` extracts the section matching the tag.
+So an entry looks like:
+
+```markdown
+- **Update installs in the background.** The app no longer freezes or quits on
+  its own; a card asks before restarting. [#d81b365](https://github.com/dinhanhthi/memlore/commit/d81b365)
+```
+
+When one entry consolidates several commits (which the net-changes rule below makes common), append every relevant link. When an entry describes something with no single commit behind it — a first release, say — omit the link rather than inventing one.
+
+This file is the source for the GitHub Release body — `release.yml` extracts the section matching the tag, so these links are what a reader clicks on the release page.
 
 **`website/src/changelogData.ts` — users.** Plain language, no commit hashes, no file paths, no internal identifiers. "Memlore now tells you when a new version is out", not "added `tauri-plugin-updater`". This drives the public changelog page and the version badge in the site nav.
 
@@ -193,6 +204,7 @@ Name the channel explicitly, since a `-beta`/`-rc` tag is published as a prerele
 - **NEVER count `website/`, `web/`, `docs/` or `e2e/` changes, or `(website)`-scoped commits, toward a bump.** This is the user's explicit requirement.
 - `HAS APP CHANGES: no` means nothing to release. It does not mean patch.
 - One feature, one changelog bullet. Entries are net changes versus the previous release, never a commit dump.
+- **Every `CHANGELOG.md` entry that has a commit behind it carries its link.** v0.1.0 shipped with none because the instruction said "append commit links" without saying in what shape; `bump-info.sh` now prints them ready-made, so there is no excuse to omit them.
 - Changelog sections use today's real date. Never `(unreleased)` on a release.
 - Update **both** changelogs — `CHANGELOG.md` for developers, `website/src/changelogData.ts` for users.
 - The tag and `src-tauri/tauri.conf.json` must match exactly. `release.yml` fails the build otherwise, on purpose.
