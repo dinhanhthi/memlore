@@ -1,6 +1,6 @@
 [package]
 name = "memlore"
-version = "0.1.0-rc.1"
+version = "0.1.0"
 description = "Memlore — a privacy-first local journal app"
 authors = []
 license = "AGPL-3.0-or-later"

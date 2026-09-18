@@ -8,7 +8,7 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
 `website/`, `web/`, `docs/` and `e2e/` do not.
 
-## v0.1.0 (unreleased)
+## v0.1.0 (2026-09-18)
 
 First signed public release. There is no previous version to diff against, so
 this section describes what ships rather than what changed.

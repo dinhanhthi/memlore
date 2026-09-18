@@ -26,7 +26,7 @@ export type ChangelogRelease = {
 export const releases: ChangelogRelease[] = [
   {
     version: '0.1.0',
-    date: '2026-09-17',
+    date: '2026-09-18',
     stable: true,
     items: [
       {
