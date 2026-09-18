@@ -11,3 +11,6 @@ src-tauri/swift/**/.swiftpm/
 pnpm-lock.yaml
 *.gen.ts
 website/src/naturalEarthLand.ts
+# Importer test fixtures are byte-exact inputs; one is deliberately malformed
+# HTML that prettier cannot parse, which aborts the whole run.
+src-tauri/tests/fixtures/
