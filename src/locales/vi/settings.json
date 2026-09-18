@@ -491,11 +491,11 @@
       "yours": "Của bạn — đồng bộ qua Drive của riêng bạn nếu muốn. Xuất bất cứ lúc nào."
     },
     "author_title": "Tác giả",
-    "author_name": "Anh-Thi Dinh",
-    "author_website": "dinhanhthi.com",
+    "author_name": "Anh-Thi DINH",
+    "author_website": "https://memlore.app",
     "author_email": "contact@memlore.app",
     "repo_title": "Mã nguồn mở",
-    "license": "Miễn phí & mã nguồn mở theo AGPL-3.0-or-later — xem LICENSE trong <repoLink>kho mã nguồn</repoLink>. Gặp sự cố trong ứng dụng? Hãy <issuesLink>mở issue trên GitHub</issuesLink>."
+    "license": "Miễn phí & mã nguồn mở theo AGPL-3.0 license — xem LICENSE trong <repoLink>github.com/dinhanhthi/memlore</repoLink>. Gặp sự cố trong ứng dụng? Hãy <issuesLink>mở issue trên GitHub</issuesLink>."
   },
   "location": {
     "tabs": {

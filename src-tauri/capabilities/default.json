@@ -26,6 +26,8 @@
         { "url": "https://ai.google.dev/*" },
         { "url": "https://aistudio.google.com/*" },
         { "url": "https://fonts.google.com/*" },
+        { "url": "https://memlore.app" },
+        { "url": "https://memlore.app/*" },
         { "url": "https://dinhanhthi.com" },
         { "url": "https://dinhanhthi.com/*" },
         { "url": "https://github.com/dinhanhthi/*" },

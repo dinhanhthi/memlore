@@ -1398,8 +1398,18 @@ pub fn run() {
             {
                 let about_metadata = AboutMetadata {
                     name: Some("Memlore".into()),
-                    authors: Some(vec!["Anh-Thi DINH".into()]),
-                    credits: Some("GitHub: https://github.com/dinhanhthi/memlore".into()),
+                    // macOS About ignores authors/website/license; they live in credits.
+                    credits: Some(
+                        [
+                            "Author: Anh-Thi DINH",
+                            "Website: https://memlore.app",
+                            "Email: contact@memlore.app",
+                            "",
+                            "Open source under the AGPL-3.0 license",
+                            "github.com/dinhanhthi/memlore",
+                        ]
+                        .join("\n"),
+                    ),
                     icon: Some(tauri::include_image!("icons/icon.png")),
                     ..Default::default()
                 };

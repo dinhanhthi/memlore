@@ -491,11 +491,11 @@
       "yours": "Yours — sync through your own Drive if you want. Export anytime."
     },
     "author_title": "Author",
-    "author_name": "Anh-Thi Dinh",
-    "author_website": "dinhanhthi.com",
+    "author_name": "Anh-Thi DINH",
+    "author_website": "https://memlore.app",
     "author_email": "contact@memlore.app",
     "repo_title": "Open Source",
-    "license": "Free & open source under AGPL-3.0-or-later — see LICENSE in the <repoLink>repository</repoLink>. Found a problem in the app? Please <issuesLink>open an issue on GitHub</issuesLink>."
+    "license": "Free & open source under the AGPL-3.0 license — see LICENSE in <repoLink>github.com/dinhanhthi/memlore</repoLink>. Found a problem in the app? Please <issuesLink>open an issue on GitHub</issuesLink>."
   },
   "location": {
     "tabs": {
