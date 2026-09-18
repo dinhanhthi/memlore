@@ -82,6 +82,12 @@ summary:focus-visible,
   outline: 2px solid var(--color-focus);
   outline-offset: 4px;
 }
+/* `<main tabindex="-1">` exists only so a route change and the skip link can move focus
+   there; it is never tabbed to, and a ring around the whole content region is noise.
+   Needs the `[tabindex]` to outrank the rule above. */
+main[tabindex]:focus-visible {
+  outline: none;
+}
 h1,
 h2,
 h3,

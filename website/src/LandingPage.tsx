@@ -873,7 +873,7 @@ export default function LandingPage() {
         {nav.skip}
       </a>
       <SiteHeader homeHref="#main" />
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="hero">
           <div className="hero-copy">
             <p className="hero-badges">

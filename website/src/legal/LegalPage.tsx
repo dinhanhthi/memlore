@@ -55,8 +55,8 @@ export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms';
       <a className="skip-link" href="#main">
         {nav.skip}
       </a>
-      <SiteHeader homeHref="index.html" sectionPrefix="index.html" />
-      <main id="main">
+      <SiteHeader homeHref="/" sectionPrefix="/" />
+      <main id="main" tabIndex={-1}>
         <article className="legal-article">
           {heading ? <BlockView block={heading} /> : null}
           <p className="legal-updated">
@@ -68,7 +68,7 @@ export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms';
         </article>
       </main>
       <footer>
-        <SiteFooterBar homeHref="index.html" current={kind} />
+        <SiteFooterBar homeHref="/" current={kind} />
       </footer>
     </>
   )

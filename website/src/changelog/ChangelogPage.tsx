@@ -76,8 +76,8 @@ export default function ChangelogPage() {
       <a className="skip-link" href="#main">
         {nav.skip}
       </a>
-      <SiteHeader homeHref="index.html" sectionPrefix="index.html" current="changelog" />
-      <main id="main">
+      <SiteHeader homeHref="/" sectionPrefix="/" current="changelog" />
+      <main id="main" tabIndex={-1}>
         <div className="changelog-layout" data-toc={showToc ? 'true' : undefined}>
           <article className="changelog-article">
             <h1>{changelog.title}</h1>
@@ -90,7 +90,7 @@ export default function ChangelogPage() {
         </div>
       </main>
       <footer>
-        <SiteFooterBar homeHref="index.html" current="changelog" />
+        <SiteFooterBar homeHref="/" current="changelog" />
       </footer>
     </>
   )

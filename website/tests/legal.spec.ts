@@ -55,19 +55,10 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
     await expect(nav).toBeHidden()
     await toggle.click()
   }
-  await expect(nav.getByRole('link', { name: 'Demo' })).toHaveAttribute('href', 'index.html#demo')
-  await expect(nav.getByRole('link', { name: 'Features' })).toHaveAttribute(
-    'href',
-    'index.html#features',
-  )
-  await expect(nav.getByRole('link', { name: 'Compare' })).toHaveAttribute(
-    'href',
-    'index.html#compare',
-  )
-  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute(
-    'href',
-    'changelog.html',
-  )
+  await expect(nav.getByRole('link', { name: 'Demo' })).toHaveAttribute('href', '/#demo')
+  await expect(nav.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '/#features')
+  await expect(nav.getByRole('link', { name: 'Compare' })).toHaveAttribute('href', '/#compare')
+  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
   await expect(nav.locator('summary')).toHaveText('Doc')
   await expect(header.locator('.header-github')).toBeVisible()
   await expect(header.locator('.header-github')).toHaveAttribute('href', GITHUB)
@@ -103,7 +94,14 @@ test('terms.html loads from production assets', async ({ page }) => {
   expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
 })
 
-for (const path of ['/privacy.html', '/terms.html', '/changelog.html'] as const) {
+for (const path of [
+  '/privacy.html',
+  '/terms.html',
+  '/changelog.html',
+  '/privacy',
+  '/terms',
+  '/changelog',
+] as const) {
   test(`${path} keeps Demo, Features, Compare, Changelog, Doc, GitHub, and Download in the menu bar`, async ({
     page,
   }) => {
@@ -125,33 +123,84 @@ test('homepage footer Privacy and Terms links navigate to the legal pages', asyn
   await page.goto('/')
   const footer = page.getByRole('contentinfo')
   await footer.getByRole('link', { name: 'Privacy' }).click()
-  await expect(page).toHaveURL(/privacy\.html/)
+  await expect(page).toHaveURL(/\/privacy$/)
   await expect(page).toHaveTitle('Memlore — Privacy Policy')
 
   await page.goto('/')
   await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click()
-  await expect(page).toHaveURL(/terms\.html/)
+  await expect(page).toHaveURL(/\/terms$/)
   await expect(page).toHaveTitle('Memlore — Terms of Service')
 })
 
 test('legal page footers link Privacy and Terms', async ({ page }) => {
-  await page.goto('/privacy.html')
+  await page.goto('/privacy')
   const footer = page.getByRole('contentinfo')
   await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
     'aria-current',
     'page',
   )
   await footer.getByRole('link', { name: 'Terms' }).click()
-  await expect(page).toHaveURL(/terms\.html/)
+  await expect(page).toHaveURL(/\/terms$/)
   await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Terms' })).toHaveAttribute(
     'aria-current',
     'page',
   )
 })
 
-test('compact privacy.html has no root overflow', async ({ page }) => {
+test('footer Terms link is a client-side route change, not a page load', async ({ page }) => {
+  await page.goto('/privacy')
+  await page.evaluate(() => {
+    document.documentElement.dataset.spa = '1'
+  })
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Terms' }).click()
+  await expect(page).toHaveURL(/\/terms$/)
+  await expect(page).toHaveTitle('Memlore — Terms of Service')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Terms of Service')
+  expect(await page.evaluate(() => document.documentElement.dataset.spa)).toBe('1')
+  // Privacy and Terms render the same component, so React reconciles in place and focus
+  // would stay on the footer link — a screen reader would never hear the page changed.
+  await expect(page.locator('main')).toBeFocused()
+
+  await page.goBack()
+  await expect(page).toHaveURL(/\/privacy$/)
+  await expect(page).toHaveTitle('Memlore — Privacy Policy')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privacy Policy')
+  expect(await page.evaluate(() => document.documentElement.dataset.spa)).toBe('1')
+
+  await page.goForward()
+  await expect(page).toHaveTitle('Memlore — Terms of Service')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Terms of Service')
+})
+
+test('modifier-click on a nav link is left to the browser', async ({ page }) => {
+  await page.goto('/privacy')
+  const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  await nav.getByRole('link', { name: 'Changelog' }).click({ modifiers: ['ControlOrMeta'] })
+  expect(await page.evaluate(() => window.location.pathname)).toBe('/privacy')
+  await expect(page).toHaveTitle('Memlore — Privacy Policy')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privacy Policy')
+})
+
+test('middle-click on a nav link is left to the browser', async ({ page }) => {
+  await page.goto('/privacy')
+  const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  await nav.getByRole('link', { name: 'Changelog' }).click({ button: 'middle' })
+  expect(await page.evaluate(() => window.location.pathname)).toBe('/privacy')
+  await expect(page).toHaveTitle('Memlore — Privacy Policy')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privacy Policy')
+})
+
+test('a nav link with a hash lands on the section after the route swap', async ({ page }) => {
+  await page.goto('/privacy')
+  const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  await nav.getByRole('link', { name: 'Features' }).click()
+  await expect(page).toHaveURL(/\/#features$/)
+  await expect(page.locator('#features')).toBeInViewport()
+})
+
+test('compact /privacy has no root overflow', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto('/privacy.html')
+  await page.goto('/privacy')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expectNoRootOverflow(page)
 })

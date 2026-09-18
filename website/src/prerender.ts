@@ -18,6 +18,10 @@ export function renderLandingStaticHtml(): string {
     `<p>${escapeHtml(meta.description)}</p>`,
     section(encrypt.title, encrypt.body),
     section(sync.title, sync.body),
+    // These stay on their `.html` form on purpose: only crawlers and JS-off visitors
+    // ever see this nav, and `https://memlore.app/privacy.html` is the exact URL
+    // registered in Memlore's Google OAuth consent screen (docs/gdrive-oauth-setup.md).
+    // React replaces this markup with the clean `/privacy` URLs on mount.
     `<nav aria-label="${escapeHtml(legal.linksAria)}">`,
     `<a href="index.html">${escapeHtml(nav.wordmark)}</a>`,
     `<a href="changelog.html">${escapeHtml(legal.changelogLink)}</a>`,

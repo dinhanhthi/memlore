@@ -121,7 +121,7 @@ export function SiteHeader({
               carries whatever was last bumped, including a prerelease. */}
           <a
             className="version-badge"
-            href="changelog.html"
+            href="/changelog"
             aria-label={`${changelog.badgeLabel} ${latestStableVersion} — ${legal.changelogLink}`}
           >
             v{latestStableVersion}
@@ -138,7 +138,7 @@ export function SiteHeader({
           <a href={`${sectionPrefix}#demo`}>{nav.demo}</a>
           <a href={`${sectionPrefix}#features`}>{nav.features}</a>
           <a href={`${sectionPrefix}#compare`}>{nav.compare}</a>
-          <a href="changelog.html" aria-current={current === 'changelog' ? 'page' : undefined}>
+          <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
             {nav.changelog}
           </a>
           <details ref={docMenuRef} className="doc-menu">

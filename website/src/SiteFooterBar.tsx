@@ -22,13 +22,13 @@ export function SiteFooterBar({
         </p>
       </div>
       <nav className="footer-links" aria-label={legal.linksAria}>
-        <a href="changelog.html" aria-current={current === 'changelog' ? 'page' : undefined}>
+        <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
           {legal.changelogLink}
         </a>
-        <a href="privacy.html" aria-current={current === 'privacy' ? 'page' : undefined}>
+        <a href="/privacy" aria-current={current === 'privacy' ? 'page' : undefined}>
           {legal.privacyLink}
         </a>
-        <a href="terms.html" aria-current={current === 'terms' ? 'page' : undefined}>
+        <a href="/terms" aria-current={current === 'terms' ? 'page' : undefined}>
           {legal.termsLink}
         </a>
         <a href={githubUrl} target="_blank" rel="noreferrer">
