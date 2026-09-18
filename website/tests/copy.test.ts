@@ -167,7 +167,7 @@ const comparisonMarks = parseComparisonMarks()
 type PlatformName = 'macOS' | 'Windows & Linux' | 'iOS & Android'
 
 const PLATFORM_ITEMS: { name: PlatformName; status: string }[] = [
-  { name: 'macOS', status: 'In development · beta' },
+  { name: 'macOS', status: 'Download' },
   { name: 'Windows & Linux', status: 'Coming soon' },
   { name: 'iOS & Android', status: 'Coming soon' },
 ]
@@ -466,12 +466,13 @@ it('ships a favicon from the existing logo assets', () => {
   expect(websiteIndex).toContain('./logo-without-container/256.png')
 })
 
-it('names the current macOS beta without promising other platforms a date', () => {
+it('offers macOS a download without promising other platforms a date', () => {
   const macos = platformItems().find((item) => item.name === 'macOS')
-  expect(macos?.status).toMatch(/in development/i)
-  expect(macos?.status).toMatch(/beta/i)
+  expect(macos?.status).toMatch(/download/i)
+  // The platform link goes through the counting Worker, same as every other
+  // Download button — not straight at the GitHub repo.
   expect(flatten(platformItemsSource)).toContain(
-    `name: 'macOS' as const, status: '${macos?.status}', href: githubUrl`,
+    `name: 'macOS' as const, status: '${macos?.status}', href: downloadUrl`,
   )
 })
 
@@ -568,6 +569,19 @@ it('says the privacy policy includes no Memlore server and no telemetry', () => 
   const copy = privacyMarkdown.toLowerCase()
   expect(copy).toMatch(/no memlore server/)
   expect(copy).toMatch(/no telemetry|no analytics/)
+})
+
+it('discloses what the download redirect records, and what it does not', () => {
+  const copy = privacyMarkdown.toLowerCase()
+  expect(copy).toMatch(/dl\.memlore\.app/)
+  expect(copy).toMatch(/no ip address is stored/)
+  expect(copy).toMatch(/no cookie is set/)
+})
+
+it('keeps the privacy policy free of markdown the legal renderer cannot render', () => {
+  // parseInline in src/legal/markdown.ts only understands [text](href); a
+  // backtick or an asterisk would be painted literally on the public page.
+  expect(privacyMarkdown).not.toMatch(/`/)
 })
 
 it('says AI in the privacy policy is optional and opt-in', () => {

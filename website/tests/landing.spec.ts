@@ -11,6 +11,9 @@ const VIEWPORTS = [
 const COMPACT_MAX_PX = 1088
 
 const GITHUB = 'https://github.com/dinhanhthi/memlore'
+// The Download buttons go through the counting Worker, which then redirects to
+// the GitHub asset — see workers/stats/ and website/src/links.ts.
+const DOWNLOAD = 'https://dl.memlore.app/mac'
 const IFRAME_TITLE = 'Interactive Memlore demo with fictional journal entries'
 
 /**
@@ -621,12 +624,12 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(page.locator('.header-github')).toHaveAttribute('href', GITHUB)
   await expect(page.locator('.header-github .github-mark')).toHaveCount(1)
   const download = page.locator('.hero .download')
-  await expect(download).toHaveAttribute('href', GITHUB)
+  await expect(download).toHaveAttribute('href', DOWNLOAD)
   await expect(download).toHaveAttribute('aria-label', /beta from GitHub/i)
   const macosStatus = page.locator('.platform-list strong a')
-  await expect(macosStatus).toHaveAttribute('href', GITHUB)
+  await expect(macosStatus).toHaveAttribute('href', DOWNLOAD)
   await expect(macosStatus).toHaveAttribute('aria-label', /beta from GitHub/i)
-  await expect(macosStatus).toContainText(/in development/i)
+  await expect(macosStatus).toContainText(/download/i)
   await expect(page.getByRole('link', { name: /app store|play store/i })).toHaveCount(0)
   await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky')
 })

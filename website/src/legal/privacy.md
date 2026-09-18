@@ -1,7 +1,7 @@
 ---
 title: Memlore — Privacy Policy
 description: How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.
-updated: 17 September 2026
+updated: 18 September 2026
 ---
 
 # Privacy Policy
@@ -33,7 +33,7 @@ Entries, media, and settings are encrypted on your device before they are upload
 
 ## Optional Google Drive sync
 
-If you choose Google Drive, you connect your own Google account. Memlore asks only for the [`drive.appdata`](https://www.googleapis.com/auth/drive.appdata) scope.
+If you choose Google Drive, you connect your own Google account. Memlore asks only for the [drive.appdata](https://www.googleapis.com/auth/drive.appdata) scope.
 
 Synced files sit in Google Drive’s hidden Application Data folder. They are not visible in drive.google.com. Memlore cannot read your other Drive files.
 
@@ -84,6 +84,8 @@ The app may request GitHub release metadata so it can tell you when an update is
 ## This website
 
 This marketing website does not set analytics cookies and does not collect journal data. The interactive demo uses sample data only.
+
+The Download button is the one exception, and it is worth being precise about. It goes through dl.memlore.app, which counts the download and then sends you on to the file on GitHub. What gets recorded is the time, the app version, and the country Cloudflare infers from the connection. No IP address is stored and no cookie is set. It happens when you download the app, never while you use it — the app itself still sends nothing, ever.
 
 ## Changes
 
