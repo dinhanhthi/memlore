@@ -73,9 +73,8 @@ export function AboutView() {
           <h1 className="font-title text-fg text-3xl font-extrabold">
             {t('about_section.heading_title')}
           </h1>
-          <p className="text-fg-muted mt-1 text-sm">{t('about_section.heading_description')}</p>
           {version != null && (
-            <p className="text-fg-muted mt-1 font-mono text-xs">
+            <p className="text-fg-muted text-2xs mt-1 font-mono">
               {t('about_section.version', { version })}
             </p>
           )}

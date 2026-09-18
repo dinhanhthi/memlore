@@ -480,9 +480,8 @@
   },
   "about_section": {
     "heading_title": "Memlore",
-    "heading_description": "Một đời bé nhỏ. Một câu chuyện ở lại.",
     "version": "Phiên bản {{version}}",
-    "description": "Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
+    "description": "Một đời bé nhỏ. Một câu chuyện ở lại. Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
     "principles_title": "Nguyên tắc cốt lõi",
     "principles": {
       "local_first": "Ưu tiên cục bộ — hoạt động hoàn toàn ngoại tuyến. Các mục nằm trên thiết bị của bạn.",

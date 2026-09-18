@@ -480,9 +480,8 @@
   },
   "about_section": {
     "heading_title": "Memlore",
-    "heading_description": "A little life. A lasting story.",
     "version": "Version {{version}}",
-    "description": "A cross-platform, privacy-first, local-first journal — with rich, optional AI.",
+    "description": "A little life. A lasting story. A cross-platform, privacy-first, local-first journal — with rich, optional AI.",
     "principles_title": "Core principles",
     "principles": {
       "local_first": "Local-first — works fully offline. Your entries stay on your device.",
