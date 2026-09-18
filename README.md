@@ -5,7 +5,7 @@
 </div>
 
 > [!WARNING]
-> Memlore is **early**, but no longer unreleased: v0.1.0 ships as a signed, notarized macOS build. Because real journals now live in it, database and sync formats change additively only — an update must never make an existing vault unreadable. Current work focuses on the **desktop macOS** app. Windows, Linux, iOS, and Android are planned and coming soon.
+> Memlore is in **beta** and under active development. What is here today is reasonably stable, with a lot more still to come. Current focus is the **desktop macOS** app and the **web** version; Windows, Linux, iOS, and Android are planned.
 
 <img src="public/screenshot.png" width="100%" alt="Screenshot" />
 
