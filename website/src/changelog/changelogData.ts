@@ -25,6 +25,21 @@ export type ChangelogRelease = {
 /** Newest release first. */
 export const releases: ChangelogRelease[] = [
   {
+    version: '0.1.1',
+    date: '2026-09-18',
+    stable: true,
+    items: [
+      {
+        kind: 'fixed',
+        text: 'Updates no longer freeze the app while installing. Memlore downloads and installs in the background, then asks you to restart when it is ready, and shows the release notes properly formatted.',
+      },
+      {
+        kind: 'improved',
+        text: 'Refreshed the About panel with current author, website and license info.',
+      },
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-09-18',
     stable: true,

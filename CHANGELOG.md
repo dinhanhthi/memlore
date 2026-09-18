@@ -8,6 +8,21 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
 `website/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
 
+## v0.1.1 (2026-09-18)
+
+### Fixed
+
+- **Updates install in the background instead of freezing the app.** The updater
+  no longer blocks the UI while downloading; a new `UpdateReadyCard` prompts to
+  restart once the install is ready, and release notes render as markdown
+  instead of raw text. [#d81b365](https://github.com/dinhanhthi/memlore/commit/d81b365)
+
+### Improved
+
+- **About panel.** Author, website, license and GitHub links are current, and
+  the tagline/version layout is tighter.
+  [#c114a03](https://github.com/dinhanhthi/memlore/commit/c114a03) [#828290b](https://github.com/dinhanhthi/memlore/commit/828290b)
+
 ## v0.1.0 (2026-09-18)
 
 First signed public release. There is no previous version to diff against, so
