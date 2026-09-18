@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { legal, nav } from '../content'
 import { preloadHeadSprites } from '../HeadFollowLogo'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
@@ -42,7 +41,13 @@ function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean }) {
   )
 }
 
-export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms'; source: string }) {
+export default function LegalPage({
+  kind,
+  source,
+}: {
+  kind: 'privacy' | 'terms' | 'about'
+  source: string
+}) {
   const { meta, blocks } = parseLegalMarkdown(source)
   const heading = blocks.find((block) => block.type === 'h1')
   const rest = heading ? blocks.filter((block) => block !== heading) : blocks
@@ -53,22 +58,20 @@ export default function LegalPage({ kind, source }: { kind: 'privacy' | 'terms';
   return (
     <>
       <a className="skip-link" href="#main">
-        {nav.skip}
+        Skip to content
       </a>
-      <SiteHeader homeHref="index.html" sectionPrefix="index.html" />
-      <main id="main">
+      <SiteHeader homeHref="/" sectionPrefix="/" />
+      <main id="main" tabIndex={-1}>
         <article className="legal-article">
           {heading ? <BlockView block={heading} /> : null}
-          <p className="legal-updated">
-            {legal.updatedLabel} {meta.updated}
-          </p>
+          <p className="legal-updated">Last updated {meta.updated}</p>
           {rest.map((block, index) => (
             <BlockView key={index} block={block} intro={index === firstParagraph} />
           ))}
         </article>
       </main>
       <footer>
-        <SiteFooterBar homeHref="index.html" current={kind} />
+        <SiteFooterBar homeHref="/" current={kind} />
       </footer>
     </>
   )

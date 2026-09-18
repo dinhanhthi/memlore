@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import changelogHtml from '../changelog.html?raw'
-import { changelog } from '../src/content'
+import changelogPageSource from '../src/changelog/ChangelogPage.tsx?raw'
 import {
   latestStableVersion,
   latestStableVersionOf,
@@ -11,6 +11,23 @@ import {
 } from '../src/changelog/changelogData'
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
+
+/**
+ * `kinds` is a module const inside `ChangelogPage.tsx`, not an export — the
+ * Vite react-refresh lint rule only allows component exports there. Pin the
+ * labels to the rendered source instead of importing them.
+ */
+const KIND_LABELS: Record<ChangelogKind, string> = {
+  new: 'New',
+  improved: 'Improved',
+  fixed: 'Fixed',
+  breaking: 'Breaking',
+}
+
+/** Only the changelog HTML shell carries these; there is no other source for them. */
+const CHANGELOG_META_TITLE = 'Memlore — Changelog'
+const CHANGELOG_META_DESCRIPTION =
+  'What changed in each version of Memlore, written for the people who use it rather than the people who build it.'
 
 function release(version: string, date: string, stable: boolean): ChangelogRelease {
   return { version, date, stable, items: [{ kind: 'new', text: 'Something changed.' }] }
@@ -68,8 +85,8 @@ it('keeps the notes readable for someone who does not read code', () => {
 })
 
 it('keeps the changelog page title and description in sync with the copy source', () => {
-  expect(changelogHtml).toContain(`<title>${changelog.metaTitle}</title>`)
-  expect(changelogHtml).toContain(`content="${changelog.metaDescription}"`)
+  expect(changelogHtml).toContain(`<title>${CHANGELOG_META_TITLE}</title>`)
+  expect(changelogHtml).toContain(`content="${CHANGELOG_META_DESCRIPTION}"`)
 })
 
 it('hides the version table of contents until there are more than four releases', () => {
@@ -79,17 +96,22 @@ it('hides the version table of contents until there are more than four releases'
 })
 
 it('labels kinds with New, Improved, Fixed, and Breaking', () => {
-  const kinds: Record<ChangelogKind, string> = changelog.kinds
-  expect(kinds).toEqual({
+  expect(KIND_LABELS).toEqual({
     new: 'New',
     improved: 'Improved',
     fixed: 'Fixed',
     breaking: 'Breaking',
   })
+  const start = changelogPageSource.indexOf('const kinds = {')
+  expect(start, 'ChangelogPage.tsx must declare the kind labels').toBeGreaterThanOrEqual(0)
+  const rendered = changelogPageSource.slice(start, changelogPageSource.indexOf('}', start))
+  for (const [kind, label] of Object.entries(KIND_LABELS)) {
+    expect(rendered, `${kind} must render as ${label}`).toContain(`${kind}: '${label}',`)
+  }
 })
 
 it('only uses known kinds in live notes', () => {
-  const known = new Set(Object.keys(changelog.kinds))
+  const known = new Set(Object.keys(KIND_LABELS))
   for (const entry of releases) {
     for (const item of entry.items) {
       expect(known.has(item.kind), `${entry.version}: ${item.kind}`).toBe(true)

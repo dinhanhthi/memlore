@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test'
-import { changelog } from '../src/content'
 import { releases } from '../src/changelog/changelogData'
 
 const IGNORED_CONSOLE = [/ResizeObserver loop/i]
@@ -31,8 +30,8 @@ async function cssVarColor(page: Page, token: string) {
 test('changelog.html loads from production assets', async ({ page }) => {
   const errors = attachErrorCollectors(page)
   await page.goto('/changelog.html')
-  await expect(page).toHaveTitle(changelog.metaTitle)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(changelog.title)
+  await expect(page).toHaveTitle('Memlore — Changelog')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What’s new')
   const scripts = await page
     .locator('script[src]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('src') ?? ''))
@@ -43,17 +42,17 @@ test('changelog.html loads from production assets', async ({ page }) => {
 })
 
 test('changelog menubar link is current and points at this page', async ({ page }) => {
-  await page.goto('/changelog.html')
+  await page.goto('/changelog')
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
   const link = nav.getByRole('link', { name: 'Changelog' })
-  await expect(link).toHaveAttribute('href', 'changelog.html')
+  await expect(link).toHaveAttribute('href', '/changelog')
   await expect(link).toHaveAttribute('aria-current', 'page')
 })
 
 test('version table of contents is absent with the live release list', async ({ page }) => {
-  await page.goto('/changelog.html')
+  await page.goto('/changelog')
   expect(releases.length).toBeLessThanOrEqual(4)
-  await expect(page.getByRole('navigation', { name: changelog.tocAria })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'Release versions' })).toHaveCount(0)
   for (const release of releases) {
     await expect(
       page.getByRole('heading', { level: 2, name: `v${release.version}` }),
@@ -69,7 +68,7 @@ test('changelog page paints kind badges without overflowing at desktop and compa
     { width: 375, height: 812, name: 'compact' },
   ] as const) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
-    await page.goto('/changelog.html')
+    await page.goto('/changelog')
     await page.screenshot({ path: testInfo.outputPath(`changelog-${viewport.name}.png`) })
     const overflow = await page.evaluate(() => ({
       htmlScroll: document.documentElement.scrollWidth,
@@ -83,7 +82,7 @@ test('changelog page paints kind badges without overflowing at desktop and compa
 })
 
 test('kind badges use success for New and accent for Improved', async ({ page }) => {
-  await page.goto('/changelog.html')
+  await page.goto('/changelog')
   const success = await cssVarColor(page, '--color-success')
   const accent = await cssVarColor(page, '--color-accent')
   const error = await cssVarColor(page, '--color-error')

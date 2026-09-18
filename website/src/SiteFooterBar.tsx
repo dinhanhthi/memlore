@@ -1,38 +1,35 @@
 import { ArrowUpRight } from 'lucide-react'
-import { authorUrl, footer, githubUrl, legal, nav } from './content'
+import { githubUrl } from './links'
 
 export function SiteFooterBar({
   homeHref,
   current,
 }: {
   homeHref: string
-  current?: 'privacy' | 'terms' | 'changelog'
+  current?: 'privacy' | 'terms' | 'changelog' | 'about'
 }) {
   return (
     <div className="footer-bottom">
       <div className="footer-brand">
         <a className="wordmark" href={homeHref}>
-          {nav.wordmark}
+          Memlore
         </a>
-        <p className="footer-credit">
-          {footer.note}{' '}
-          <a href={authorUrl} target="_blank" rel="noreferrer">
-            {footer.author}
-          </a>
-        </p>
       </div>
-      <nav className="footer-links" aria-label={legal.linksAria}>
-        <a href="changelog.html" aria-current={current === 'changelog' ? 'page' : undefined}>
-          {legal.changelogLink}
+      <nav className="footer-links" aria-label="About, changelog, privacy, terms, and GitHub">
+        <a href="/about" aria-current={current === 'about' ? 'page' : undefined}>
+          About
         </a>
-        <a href="privacy.html" aria-current={current === 'privacy' ? 'page' : undefined}>
-          {legal.privacyLink}
+        <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
+          Changelog
         </a>
-        <a href="terms.html" aria-current={current === 'terms' ? 'page' : undefined}>
-          {legal.termsLink}
+        <a href="/privacy" aria-current={current === 'privacy' ? 'page' : undefined}>
+          Privacy
+        </a>
+        <a href="/terms" aria-current={current === 'terms' ? 'page' : undefined}>
+          Terms
         </a>
         <a href={githubUrl} target="_blank" rel="noreferrer">
-          {footer.github} <ArrowUpRight className="size-4" />
+          GitHub <ArrowUpRight className="size-4" />
         </a>
       </nav>
     </div>

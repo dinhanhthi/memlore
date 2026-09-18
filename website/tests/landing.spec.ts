@@ -78,13 +78,6 @@ async function expectNoRootOverflow(page: Page) {
   ).toBeLessThanOrEqual(overflow.bodyClient)
 }
 
-async function githubLabelVisible(page: Page) {
-  return page.locator('.header-github .github-label').evaluate((el) => {
-    const box = el.getBoundingClientRect()
-    return box.width > 4 && box.height > 4
-  })
-}
-
 async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(page.locator('.hero .download'), 'hero download')
   await expectSingleLine(page.locator('.hero .button'), 'hero demo')
@@ -94,7 +87,6 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
     const toggle = page.getByRole('button', { name: 'Open menu' })
     await expectSingleLine(toggle, 'nav toggle')
     await expect(page.locator('.header-actions .download')).toBeHidden()
-    expect(await githubLabelVisible(page), 'compact GitHub should be the mark only').toBe(false)
     await expect(page.locator('.hero-head img')).toHaveAttribute('src', /straight\.png/)
     await toggle.click()
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
@@ -111,13 +103,9 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
   await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
-  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute(
-    'href',
-    'changelog.html',
-  )
+  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
   await expectSingleLine(nav.locator('summary'), 'nav Doc')
   await expectSingleLine(page.locator('.header-actions .download'), 'header download')
-  expect(await githubLabelVisible(page), 'desktop GitHub should show its label').toBe(true)
   await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
 }
 

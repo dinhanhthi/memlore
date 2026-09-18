@@ -54,30 +54,7 @@ import {
   Video,
   X,
 } from 'lucide-react'
-import {
-  ai,
-  chat,
-  comparison,
-  demo,
-  editor,
-  emotions,
-  encrypt,
-  footer,
-  githubUrl,
-  hero,
-  locations,
-  locks,
-  nav,
-  openSource,
-  persona,
-  platforms,
-  search,
-  sync,
-  transfer,
-  type ComparisonLevel,
-  type ComparisonMark,
-  type ComparisonProductName,
-} from './content'
+import { githubUrl } from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
@@ -119,16 +96,35 @@ const editorMediaFiles = [
   { id: 'audio', Icon: Mic },
 ] as const
 
+type ComparisonProductName = 'Memlore' | 'Day One' | 'Journey' | 'Apple Journal'
+type ComparisonLevel = 1 | 2 | 3 | 4
+type ComparisonMark = 'yes' | 'no' | 'partial' | 'soon' | ComparisonLevel
+
+type ComparisonProduct = {
+  name: ComparisonProductName
+  note: string
+  sourceUrl?: string
+}
+
+type ComparisonRow = {
+  id: string
+  label: string
+  description?: string
+  marks: Record<ComparisonProductName, ComparisonMark>
+}
+
+const comparisonLevels = ['A few', 'About half', 'Most', 'The full set']
+
 function markLabel(mark: ComparisonMark) {
-  if (typeof mark === 'number') return comparison.levels[mark - 1]
-  if (mark === 'yes') return comparison.yes
-  if (mark === 'no') return comparison.no
-  if (mark === 'soon') return comparison.soon
-  return comparison.partial
+  if (typeof mark === 'number') return comparisonLevels[mark - 1]
+  if (mark === 'yes') return 'Yes'
+  if (mark === 'no') return 'No'
+  if (mark === 'soon') return 'Soon'
+  return 'Varies or not documented'
 }
 
 function LevelDial({ mark, product }: { mark: ComparisonLevel; product: ComparisonProductName }) {
-  const explanation = comparison.levels[mark - 1]
+  const explanation = comparisonLevels[mark - 1]
   const label = `${product}: ${explanation}`
   const [open, setOpen] = useState(false)
   const { refs, floatingStyles, context } = useFloating({
@@ -195,7 +191,7 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   if (mark === 'soon') {
     return (
       <span className="mark mark-soon" role="img" aria-label={label}>
-        {comparison.soon}
+        Soon
       </span>
     )
   }
@@ -244,26 +240,26 @@ function EncryptFigure() {
           <div className="encrypt-card-body">
             <FileText className="size-10" />
           </div>
-          <small>{encrypt.figure.content}</small>
+          <small>Your content</small>
         </article>
-        <EncryptArrow label={encrypt.figure.password} />
+        <EncryptArrow label="Your password" />
         <article className="encrypt-card">
           <div className="encrypt-card-body">
             <span className="encrypt-orbit" />
             <Cloud className="size-8" />
           </div>
-          <small>{encrypt.figure.cloud}</small>
+          <small>Your cloud</small>
         </article>
-        <EncryptArrow label={encrypt.figure.blocked} blocked />
+        <EncryptArrow label="No access" blocked />
         <article className="encrypt-card encrypt-card-muted">
           <div className="encrypt-card-body">
             <Users className="size-10" />
           </div>
-          <small>{encrypt.figure.others}</small>
+          <small>Others (even us)</small>
         </article>
         <p className="encrypt-unseen">
           <EyeOff className="size-5" />
-          {encrypt.figure.unseen}
+          Encrypted before it leaves your device
         </p>
       </div>
     </figure>
@@ -324,7 +320,12 @@ function MoreCloudsMark() {
   )
 }
 
-const syncLogos: Record<(typeof sync.providers)[number], () => ReactElement> = {
+// Marks drawn in the cloud card, in order. `more` is the dashed placeholder
+// standing in for the cloud services still to come.
+// TODO(later): only gdrive and icloud ship today — see docs/LATER.md.
+const syncProviders = ['gdrive', 'icloud', 'more'] as const
+
+const syncLogos: Record<(typeof syncProviders)[number], () => ReactElement> = {
   gdrive: GoogleDriveMark,
   icloud: ICloudMark,
   more: MoreCloudsMark,
@@ -350,36 +351,54 @@ function SyncFigure() {
           <div className="encrypt-card-body">
             <Laptop className="size-10" />
           </div>
-          <small>{sync.figure.device}</small>
+          <small>This device</small>
         </article>
-        <SyncLink icon={Lock} label={sync.figure.encrypted} />
+        <SyncLink icon={Lock} label="Encrypted with your password" />
         <article className="encrypt-card">
           <div className="encrypt-card-body sync-providers">
-            {sync.providers.map((provider) => {
+            {syncProviders.map((provider) => {
               const Mark = syncLogos[provider]
               return <Mark key={provider} />
             })}
           </div>
-          <small>{sync.figure.cloud}</small>
+          <small>Your own cloud</small>
         </article>
-        <SyncLink icon={RefreshCw} label={sync.figure.synced} />
+        <SyncLink icon={RefreshCw} label="Synced" />
         <article className="encrypt-card">
           <div className="encrypt-card-body">
             <Smartphone className="size-10" />
           </div>
-          <small>{sync.figure.otherDevice}</small>
+          <small>Your other devices</small>
         </article>
         <p className="encrypt-unseen">
           <ServerOff className="size-5" />
-          {sync.figure.noServer}
+          No Memlore server in between
         </p>
       </div>
     </figure>
   )
 }
 
+const lockItems = [
+  {
+    id: 'app' as const,
+    title: 'App lock',
+    text: 'The journal only opens with the password or Touch ID. This lock is required and protects it from unauthorized access.',
+  },
+  {
+    id: 'second' as const,
+    title: 'Second lock',
+    text: 'To keep some entries private, add a second lock. Others with app access will know private entries exist, but cannot open them.',
+  },
+  {
+    id: 'invisible' as const,
+    title: 'Invisible vault',
+    text: 'If you need entries to stay completely invisible and private, even from people who can unlock the app, they won’t know these entries exist.',
+  },
+]
+
 function LocksFigure() {
-  const [app, second, invisible] = locks.items
+  const [app, second, invisible] = lockItems
   const AppIcon = lockIcons.app
   const SecondIcon = lockIcons.second
   const InvisibleIcon = lockIcons.invisible
@@ -431,12 +450,18 @@ function MediaFiles() {
   )
 }
 
+const editorSlashItems = [
+  { label: 'Heading 1', hint: '#' },
+  { label: 'Image' },
+  { label: 'Today' },
+] satisfies { label: string; hint?: string }[]
+
 function SlashPreview() {
   return (
     <div className="ed-slash-menu">
       <span className="ed-slash-prompt">/</span>
       <div className="ed-slash-list">
-        {editor.slashItems.map((item) => (
+        {editorSlashItems.map((item) => (
           <div key={item.label} className="ed-slash-item">
             <span>{item.label}</span>
             {item.hint ? <span className="ed-slash-hint">{item.hint}</span> : null}
@@ -448,7 +473,7 @@ function SlashPreview() {
 }
 
 function MarkdownPreview() {
-  return <pre className="ed-md">{editor.markdownSample}</pre>
+  return <pre className="ed-md">{'**Tuesday**\n- [x] coffee\n- [ ] the walk'}</pre>
 }
 
 function PluginsPreview({ sample }: { sample: string }) {
@@ -460,7 +485,47 @@ function PluginsPreview({ sample }: { sample: string }) {
   )
 }
 
-function paneSample(pane: (typeof editor.panes)[number]) {
+const editorPanes = [
+  {
+    id: 'text' as const,
+    title: 'Words',
+    sample: 'Tuesday, after the rain. The kitchen still smelled like coffee.',
+  },
+  {
+    id: 'math' as const,
+    title: 'Math',
+    sample: "Euler's identity, written right in the entry.",
+  },
+  { id: 'code' as const, title: 'Code', sample: 'const day = journal.today()' },
+  {
+    id: 'media' as const,
+    title: 'Media',
+    sample: 'Photos, video, and voice memos, kept with the entry.',
+  },
+  {
+    id: 'slash' as const,
+    title: 'Slash command',
+    sample: "Type / for a heading, image, or today's date.",
+  },
+  {
+    id: 'mention' as const,
+    title: 'Mentions',
+    sample: 'Type @ to link another entry by its title.',
+  },
+  {
+    id: 'markdown' as const,
+    title: 'Markdown',
+    tag: 'GFM',
+    sample: 'GitHub Flavored Markdown. Type it, paste it, keep it.',
+  },
+  {
+    id: 'plugins' as const,
+    title: 'More plugins later',
+    sample: 'The page can grow. More editor plugins can land without changing how you write.',
+  },
+]
+
+function paneSample(pane: (typeof editorPanes)[number]) {
   if (pane.id === 'math') return <EulerIdentity />
   if (pane.id === 'media') return <MediaFiles />
   if (pane.id === 'slash') return <SlashPreview />
@@ -472,7 +537,7 @@ function paneSample(pane: (typeof editor.panes)[number]) {
 function EditorFigure() {
   return (
     <figure className="illust illust-editor" aria-hidden="true">
-      {editor.panes.map((pane) => (
+      {editorPanes.map((pane) => (
         <div key={pane.id} className={`ed-pane ed-${pane.id}`}>
           <small>
             {pane.title}
@@ -485,6 +550,15 @@ function EditorFigure() {
   )
 }
 
+const chatMessages = [
+  { from: 'you' as const, text: 'Long day. Walked to the river after dinner.' },
+  {
+    from: 'ai' as const,
+    text: 'That walk keeps coming up. What stayed with you tonight?',
+  },
+  { from: 'you' as const, text: 'I left the headphones at home. It was quiet.' },
+]
+
 function ChatFigure() {
   return (
     <figure className="illust illust-chat" aria-hidden="true">
@@ -492,15 +566,15 @@ function ChatFigure() {
         <div className="chat-chrome">
           <strong>
             <MessageCircle className="size-4" />
-            {chat.figure.title}
+            Daily Chat
           </strong>
           <span className="chat-save">
             <Sparkles className="size-3.5" />
-            {chat.figure.save}
+            Save as entry
           </span>
         </div>
         <div className="chat-thread">
-          {chat.figure.messages.map((message) => (
+          {chatMessages.map((message) => (
             <div
               key={message.text}
               className={message.from === 'you' ? 'chat-row chat-you' : 'chat-row chat-ai'}
@@ -510,7 +584,7 @@ function ChatFigure() {
           ))}
         </div>
         <div className="chat-composer">
-          <span>{chat.figure.placeholder}</span>
+          <span>Tell me about your day…</span>
           <span className="chat-send">
             <ArrowUp className="size-3.5" />
           </span>
@@ -520,25 +594,47 @@ function ChatFigure() {
   )
 }
 
+const emotionOptions = [
+  { key: 'bad' as const, emoji: '\u{1F61E}', label: 'Not good' },
+  { key: 'neutral' as const, emoji: '\u{1F610}', label: 'So-so' },
+  { key: 'good' as const, emoji: '\u{1F60A}', label: 'Good' },
+]
+
+// One mark per day of a sample stretch, oldest first.
+const emotionMarks = [
+  'neutral',
+  'bad',
+  'neutral',
+  'good',
+  'good',
+  'neutral',
+  'good',
+  'bad',
+  'neutral',
+  'good',
+  'good',
+  'good',
+] as const
+
 function EmotionsFigure() {
   return (
     <figure className="illust illust-emotions" aria-hidden="true">
-      <p className="emotion-prompt">{emotions.figure.prompt}</p>
+      <p className="emotion-prompt">How are you feeling?</p>
       <div className="emotion-options">
-        {emotions.figure.options.map((option) => (
+        {emotionOptions.map((option) => (
           <span
             key={option.key}
             data-emotion={option.key}
-            data-selected={option.key === emotions.figure.selected ? '' : undefined}
+            data-selected={option.key === 'good' ? '' : undefined}
           >
             <span>{option.emoji}</span>
             {option.label}
           </span>
         ))}
       </div>
-      <p className="emotion-trend-label">{emotions.figure.trend}</p>
+      <p className="emotion-trend-label">Emotion trend</p>
       <div className="emotion-trend">
-        {emotions.figure.marks.map((mark, index) => (
+        {emotionMarks.map((mark, index) => (
           <span key={index} data-emotion={mark} />
         ))}
       </div>
@@ -559,17 +655,19 @@ function SearchFigure() {
   )
 }
 
+const personaMemories = ['the walk after dinner', 'Tuesday kitchen', 'light on the river']
+
 function PersonaFigure() {
   return (
     <figure className="illust illust-persona" aria-hidden="true">
-      <p className="persona-caption">{persona.figure.fromEntries}</p>
+      <p className="persona-caption">From your entries</p>
       <div className="persona-memories">
-        {persona.figure.memories.map((item) => (
+        {personaMemories.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
-      <div className="chat-row chat-ai">{persona.figure.reply}</div>
-      <p className="persona-write">{persona.figure.write}</p>
+      <div className="chat-row chat-ai">A second you, in your voice.</div>
+      <p className="persona-write">…the light on the water, the same as last October.</p>
     </figure>
   )
 }
@@ -659,19 +757,22 @@ function TransferArrow() {
   )
 }
 
+const transferInbound = ['Day One', 'Journey', 'Apple Journal', 'Markdown', 'Plain text']
+const transferOutbound = ['Backup', 'Markdown', 'Plain text']
+
 function TransferFigure() {
   return (
     <figure className="illust illust-transfer" aria-hidden="true">
       <div className="transfer-col">
-        {transfer.figure.inbound.map((item) => (
+        {transferInbound.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
       <TransferArrow />
-      <strong className="transfer-hub">{transfer.figure.hub}</strong>
+      <strong className="transfer-hub">Memlore</strong>
       <TransferArrow />
       <div className="transfer-col">
-        {transfer.figure.outbound.map((item) => (
+        {transferOutbound.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
@@ -684,8 +785,11 @@ function DemoPlaceholder() {
     <div className="demo-placeholder">
       <figure className="demo-placeholder-stage">
         <HeadFollowLogo alt="" className="demo-placeholder-head" size={112} />
-        <p className="demo-placeholder-title">{demo.placeholderTitle}</p>
-        <p>{demo.placeholderBody}</p>
+        <p className="demo-placeholder-title">This preview needs a wider window.</p>
+        <p>
+          The live journal is a desktop app, so it cannot run here. When the iOS and Android apps
+          arrive, their view will take this place.
+        </p>
       </figure>
     </div>
   )
@@ -742,15 +846,15 @@ function DemoLive() {
       <div className="demo-window">
         <div className="demo-chrome">
           <p className="demo-chrome-label" id="demo-appearance-label">
-            {demo.themeAria}
+            Choose appearance
             <ArrowRight className="size-3" aria-hidden="true" />
           </p>
           <div className="option-row" role="radiogroup" aria-labelledby="demo-appearance-label">
             {(
               [
-                ['clay', demo.themes.clay],
-                ['clean', demo.themes.clean],
-                ['signature', demo.themes.signature],
+                ['clay', 'Clay'],
+                ['clean', 'Clean'],
+                ['signature', 'Signature'],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -768,7 +872,7 @@ function DemoLive() {
           </div>
           <a className="demo-chrome-open" href="./demo.html" target="_blank" rel="noreferrer">
             <Maximize2 className="size-3" />
-            {demo.openSeparately}
+            Open separately
           </a>
         </div>
         <div className="demo-viewport">
@@ -777,7 +881,7 @@ function DemoLive() {
               ref={frame}
               key={attempt}
               src="./demo.html"
-              title={demo.iframeTitle}
+              title="Interactive Memlore demo with fictional journal entries"
               onError={() => setStatus('error')}
             />
           )}
@@ -786,7 +890,9 @@ function DemoLive() {
               <img
                 className="demo-poster"
                 src={demoPoster}
-                alt={started ? '' : demo.posterAlt}
+                alt={
+                  started ? '' : 'Blurred preview of the Memlore journal with a sample entry open'
+                }
                 width={1280}
                 height={700}
                 decoding="async"
@@ -798,15 +904,23 @@ function DemoLive() {
                   data-variant="primary"
                   onClick={() => setStarted(true)}
                 >
-                  <Play className="size-4" /> {demo.start}
+                  <Play className="size-4" /> Start the demo
                 </button>
               )}
               {started && (
                 <>
                   {status === 'loading' && <span className="demo-progress" aria-hidden="true" />}
                   <BookOpen className="size-8" />
-                  <h3>{status === 'loading' ? demo.loadingTitle : demo.errorTitle}</h3>
-                  <p>{status === 'loading' ? demo.loadingText : demo.errorText}</p>
+                  <h3>
+                    {status === 'loading'
+                      ? 'Opening your sample journal…'
+                      : 'The demo is taking a little longer.'}
+                  </h3>
+                  <p>
+                    {status === 'loading'
+                      ? 'There are a few memories to unpack.'
+                      : 'Try loading it again, or open the demo in its own tab.'}
+                  </p>
                 </>
               )}
               {status === 'error' && (
@@ -820,10 +934,10 @@ function DemoLive() {
                       setAttempt((value) => value + 1)
                     }}
                   >
-                    {demo.tryAgain}
+                    Try again
                   </button>
                   <a className="text-link" href="./demo.html" target="_blank" rel="noreferrer">
-                    {demo.openDemo} <ArrowUpRight className="size-4" />
+                    Open demo <ArrowUpRight className="size-4" />
                   </a>
                 </div>
               )}
@@ -831,7 +945,7 @@ function DemoLive() {
           )}
         </div>
       </div>
-      <p className="demo-disclaimer">{demo.disclaimer}</p>
+      <p className="demo-disclaimer">Sample data. Writing, locks, sync, and AI are simulated.</p>
     </div>
   )
 }
@@ -841,12 +955,12 @@ function Demo({ wide }: { wide: boolean }) {
     <section className="demo-section" id="demo" aria-labelledby="demo-title">
       <div className="section-heading demo-heading">
         <div>
-          <h2 id="demo-title">{demo.title}</h2>
-          <p>{demo.subtitle}</p>
+          <h2 id="demo-title">Get a feel for it.</h2>
+          <p>A mockup of the Memlore app with fake data.</p>
         </div>
         {wide ? (
           <p className="demo-cue">
-            {demo.cue}
+            Click around. It works like the real app.
             <svg className="demo-cue-arrow" viewBox="0 0 64 72" aria-hidden="true">
               <path
                 className="demo-cue-shaft"
@@ -862,6 +976,189 @@ function Demo({ wide }: { wide: boolean }) {
   )
 }
 
+const aiItems = [
+  {
+    id: 'titles' as const,
+    title: 'Smart titles',
+    text: 'A short title suggestion from the entry you just wrote.',
+  },
+  {
+    id: 'summaries' as const,
+    title: 'Highlights and summaries',
+    text: 'A collapsible recap of themes, emotions, and moments, saved with the entry.',
+  },
+  {
+    id: 'deeper' as const,
+    title: 'Go Deeper',
+    text: 'Three follow-up reflection prompts, inserted as cards under the editor.',
+  },
+  {
+    id: 'continue' as const,
+    title: 'Continue & Rewrite',
+    text: 'Continue the entry from the footer, or rewrite a selection — in your voice.',
+  },
+  {
+    id: 'chat' as const,
+    title: 'Daily Chat',
+    text: 'A conversation about the day that can become a journal entry when you save it.',
+  },
+  {
+    id: 'ask' as const,
+    title: 'Ask Journal',
+    text: 'You can ask about the memories and entries that Memlore has learned.',
+  },
+  {
+    id: 'memories' as const,
+    title: 'Memories and Persona',
+    text: 'Based on your entries and information you provide, Memlore can build a second you that writes in your voice and style.',
+  },
+  {
+    id: 'reviews' as const,
+    title: 'Reviews and Insights',
+    text: 'You can use AI to get the stats of what you have written in a given time period.',
+  },
+  {
+    id: 'search' as const,
+    title: 'Semantic search',
+    text: 'Not just a keyword search, but a meaning-based search, freely expressed in natural language.',
+  },
+  {
+    id: 'emotion' as const,
+    title: 'Emotion suggestion',
+    text: "If you enable the emotion tracking feature, AI can suggest the emotions you're feeling based on the entries you've written.",
+  },
+  {
+    id: 'time' as const,
+    title: 'Time-machine summary',
+    text: 'The same calendar date across years, folded into one recap.',
+  },
+  {
+    id: 'image' as const,
+    title: 'Image generation',
+    text: 'Using AI to generate cover images and inline illustrations for your entries.',
+  },
+  {
+    id: 'device' as const,
+    title: 'On-device paths',
+    text: 'Memlore comes with integrated, local AI to ensure your data is always 100% private and never leaves your device.',
+  },
+]
+
+const comparisonProducts = [
+  {
+    name: 'Memlore',
+    note: 'Still in beta, and macOS-only today. Other platforms are coming, without a date attached.',
+  },
+  {
+    name: 'Day One',
+    note: 'A polished journaling home with a long-established ecosystem. Some features need a paid plan. The app is closed source.',
+    sourceUrl: 'https://dayoneapp.com/guides/premium-subscription/day-one-pricing-features-guide/',
+  },
+  {
+    name: 'Journey',
+    note: 'A journal across mobile, desktop, and the web. Desktop access and many features depend on a paid plan. The app is closed source.',
+    sourceUrl:
+      'https://support.journey.cloud/en/categories/purchase-payment/articles/journey-license-comparison',
+  },
+  {
+    name: 'Apple Journal',
+    note: 'A simple journal for iPhone, iPad, and Mac, kept close to the rest of Apple’s world.',
+    sourceUrl: 'https://apps.apple.com/us/app/journal/id6447391597?platform=ipad',
+  },
+] satisfies ComparisonProduct[]
+
+const comparisonRows = [
+  {
+    id: 'open-source',
+    label: 'Open source',
+    description: 'Anyone can read the code that holds the journal.',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'password',
+    label: 'Password required before the journal opens',
+    description: 'Not a setting you can switch off. Without it the files stay sealed.',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'your-key-only',
+    label: 'Held by your password alone',
+    description:
+      'All four encrypt. Only Memlore asks for no account, keeps no vendor server, and holds no recovery path back into your journal.',
+    marks: {
+      Memlore: 'yes',
+      'Day One': 'partial',
+      Journey: 'partial',
+      'Apple Journal': 'partial',
+    },
+  },
+  {
+    id: 'local-first',
+    label: 'Local-first — no vendor journal server',
+    description: 'The journal lives on your machine and works with the network off.',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'own-cloud',
+    label: 'Sync through a cloud folder you already own',
+    description: 'Memlore uses your Google Drive or iCloud Drive. Journey offers Google Drive too.',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'yes', 'Apple Journal': 'partial' },
+  },
+  {
+    id: 'extra-locks',
+    label: 'Second lock and invisible vault',
+    description: 'Some entries stay shut, and some leave no trace that they exist.',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'optional-ai',
+    label: 'How much optional AI you get',
+    description:
+      'Titles, summaries, Go Deeper, Continue & Rewrite, Daily Chat, Ask Journal, memories, persona, reviews, insights, semantic search, emotion, time-machine, images — local, on-device, or your own key.',
+    marks: { Memlore: 4, 'Day One': 2, Journey: 1, 'Apple Journal': 'no' },
+  },
+  {
+    id: 'editor',
+    label: 'An editor that holds more than text',
+    description: 'Markdown, math, code blocks, slash commands, and media inside the page.',
+    marks: { Memlore: 'yes', 'Day One': 'partial', Journey: 'partial', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'appearance',
+    label: 'Make it look like yours',
+    description: 'Three design systems, each in light and dark, plus a swappable writing font.',
+    marks: { Memlore: 'yes', 'Day One': 'partial', Journey: 'partial', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'macos',
+    label: 'macOS app',
+    marks: { Memlore: 'yes', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'yes' },
+  },
+  {
+    id: 'ios',
+    label: 'iOS and Android app',
+    marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'partial' },
+  },
+  {
+    id: 'win-linux',
+    label: 'Windows or Linux app',
+    marks: { Memlore: 'soon', 'Day One': 'partial', Journey: 'yes', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'beta-free',
+    label: 'All current features free during beta',
+    marks: { Memlore: 'yes', 'Day One': 'no', Journey: 'no', 'Apple Journal': 'partial' },
+  },
+] satisfies ComparisonRow[]
+
+type PlatformName = 'macOS' | 'Windows & Linux' | 'iOS & Android'
+
+const platformItems = [
+  { name: 'macOS' as const, status: 'In development · beta', href: githubUrl },
+  { name: 'Windows & Linux' as const, status: 'Coming soon' },
+  { name: 'iOS & Android' as const, status: 'Coming soon' },
+] satisfies { name: PlatformName; status: string; href?: string }[]
+
 export default function LandingPage() {
   const wide = useWideViewport()
   useEffect(() => {
@@ -870,84 +1167,96 @@ export default function LandingPage() {
   return (
     <>
       <a className="skip-link" href="#main">
-        {nav.skip}
+        Skip to content
       </a>
       <SiteHeader homeHref="#main" />
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="hero">
           <div className="hero-copy">
             <p className="hero-badges">
               <span className="hero-badge">
                 <Code2 className="size-3.5" />
-                {hero.badgeOpenSource}
+                Open source
               </span>
               <span className="hero-badge" data-tone="free">
                 <Heart className="size-3.5" />
-                {hero.badgeFree}
+                Free
               </span>
             </p>
             <h1>
-              {hero.titleLead}
+              A little life.
               <br />
-              <span>{hero.titleAccent}</span>
+              <span>A lasting story.</span>
             </h1>
             <p className="hero-description">
-              <strong>{hero.descriptionLead}</strong> {hero.description}
+              <strong>Memlore is a private journal.</strong> For the days you want to remember, and
+              the thoughts you need to put somewhere.
             </p>
             <div className="button-row">
               <DownloadLink
                 className="download download-hero"
-                label={hero.download}
-                ariaLabel={hero.downloadAria}
+                label="Download for Mac"
+                ariaLabel="Download the beta from GitHub"
               />
               <a className="button" href="#demo" data-variant="secondary">
-                {hero.tryDemo} <ArrowDown className="size-4" />
+                Try the demo <ArrowDown className="size-4" />
               </a>
             </div>
           </div>
           <div className="hero-portrait">
             <div className="mascot-halo">
               {wide ? (
-                <HeadFollowLogo alt={hero.mascotAlt} className="hero-head" size={280} />
+                <HeadFollowLogo
+                  alt="Memlore’s dog mascot. The head follows your cursor."
+                  className="hero-head"
+                  size={280}
+                />
               ) : (
                 <span className="hero-head">
                   <img
                     src={logoSrc('straight')}
                     width={230}
                     height={230}
-                    alt={hero.mascotAltStill}
+                    alt="Memlore’s dog mascot."
                   />
                 </span>
               )}
             </div>
             <p>
-              {hero.portraitLead}
+              A place to land.
               <br />
-              <span>{hero.portraitAccent}</span>
+              <span>Even on the ordinary days.</span>
             </p>
           </div>
         </section>
         <Demo wide={wide} />
         <section className="split" id="features">
           <div>
-            <h2>{encrypt.title}</h2>
-            <p>{encrypt.body}</p>
+            <h2>No server. No backdoor. We cannot read it.</h2>
+            <p>
+              Everything is encrypted on your device with your password — including what syncs to
+              your own cloud. There is no Memlore server in between, and no way back in without that
+              password.
+            </p>
           </div>
           <EncryptFigure />
         </section>
         <section className="split split-flip" id="sync">
           <SyncFigure />
           <div>
-            <h2>{sync.title}</h2>
-            <p>{sync.body}</p>
+            <h2>Your cloud. Your account. Your key.</h2>
+            <p>
+              Entries are encrypted on your device, then synced through your own Google Drive or
+              iCloud Drive. We never hold your files, your account, or your key.
+            </p>
           </div>
         </section>
         <section className="split split-flip" id="locks">
           <LocksFigure />
           <div className="locks-copy">
-            <h2>{locks.title}</h2>
+            <h2>You can lock entries in 3 different ways.</h2>
             <ul className="lock-list">
-              {locks.items.map((item) => {
+              {lockItems.map((item) => {
                 const Icon = lockIcons[item.id]
                 return (
                   <li key={item.id}>
@@ -964,28 +1273,34 @@ export default function LandingPage() {
         </section>
         <section className="split" id="editor">
           <div>
-            <h2>{editor.title}</h2>
-            <p>{editor.body}</p>
+            <h2>Feature-rich editor</h2>
+            <p>
+              The Editor fully supports Markdown, math, code, media, @-mentions, and optional
+              plugins. It responds quickly, even with very long content.
+            </p>
           </div>
           <EditorFigure />
         </section>
         <section className="split split-flip" id="emotions">
           <EmotionsFigure />
           <div>
-            <h2>{emotions.title}</h2>
-            <p>{emotions.body}</p>
+            <h2>Emotion tracking</h2>
+            <p>Your mood can be tracked and analyzed over time.</p>
           </div>
         </section>
         <section className="ai-section" id="ai">
           <div className="ai-intro">
             <Sparkles className="size-7" />
             <div>
-              <h2>{ai.title}</h2>
-              <p>{ai.body}</p>
+              <h2>Rich set of AI features</h2>
+              <p>
+                AI tools are enabled only if you opt in. Memlore supports 100% local AI, as well as
+                hosted providers using your own key.
+              </p>
             </div>
           </div>
           <div className="ai-grid">
-            {ai.items.map((item) => {
+            {aiItems.map((item) => {
               const Icon = aiIcons[item.id]
               return (
                 <article key={item.id} data-ai={item.id}>
@@ -1002,63 +1317,79 @@ export default function LandingPage() {
         <section className="split split-flip" id="chat">
           <ChatFigure />
           <div>
-            <h2>{chat.title}</h2>
-            <p>{chat.body}</p>
+            <h2>Daily Chat</h2>
+            <p>
+              If you're unsure what to write, chat with your Memlore buddy about your day or
+              anything on your mind. Memlore can help synthesize your thoughts into a complete
+              entry, and you can customize your buddy's persona.
+            </p>
           </div>
         </section>
         <section className="split" id="persona">
           <div>
-            <h2>{persona.title}</h2>
-            <p>{persona.body}</p>
+            <h2>Memories and persona</h2>
+            <p>
+              Memlore distills memories from your entries. Opt in, and it builds a second you that
+              writes in your voice and style.
+            </p>
           </div>
           <PersonaFigure />
         </section>
         <section className="split" id="search">
           <div>
-            <h2>{search.title}</h2>
-            <p>{search.body}</p>
+            <h2>Search your journal</h2>
+            <p>
+              Find a word you wrote, or something you only half-remember. Search stays on your
+              device, next to tags, calendar, and maps.
+            </p>
           </div>
           <SearchFigure />
         </section>
         <section className="split split-flip" id="locations">
           <LocationsFigure />
           <div>
-            <h2>{locations.title}</h2>
-            <p>{locations.body}</p>
+            <h2>Entries on a map</h2>
+            <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
           </div>
         </section>
         <section className="split" id="import-export">
           <div>
-            <h2>{transfer.title}</h2>
-            <p>{transfer.body}</p>
+            <h2>Import and export</h2>
+            <p>
+              You can import entries (including media) from other platforms into Memlore, and vice
+              versa. Make sure the migration is seamless.
+            </p>
           </div>
           <TransferFigure />
         </section>
         <section className="open-section" id="open-source">
           <div className="open-symbol" aria-hidden="true">
             <Code2 className="size-16" strokeWidth={1} />
-            <span>{openSource.symbol}</span>
+            <span>Made in the open.</span>
           </div>
           <div>
-            <h2>{openSource.title}</h2>
-            <p>{openSource.body}</p>
+            <h2>Open source</h2>
+            <p>
+              Open so you can see how a journal is secured and how your data is kept. Memlore stays
+              free. Beta is only for extras that keep the project going.
+            </p>
             <a className="text-link" href={githubUrl} target="_blank" rel="noreferrer">
-              {openSource.github} <ArrowUpRight className="size-4.5" />
+              View on GitHub <ArrowUpRight className="size-4.5" />
             </a>
           </div>
         </section>
         <section className="compare-section" id="compare">
           <div className="section-heading">
             <div>
-              <h2>{comparison.title}</h2>
-              <p>{comparison.intro}</p>
+              <h2>How Memlore compares.</h2>
+              <p>Memlore next to three journals people already keep.</p>
             </div>
           </div>
           <div
             className="comparison-scroll"
             tabIndex={0}
             role="region"
-            aria-label={comparison.tableAria}
+            aria-label="Journal comparison table, one column per journal"
           >
             <table>
               <thead>
@@ -1066,7 +1397,7 @@ export default function LandingPage() {
                   <th scope="col">
                     <span className="sr-only">Compared</span>
                   </th>
-                  {comparison.products.map((product) => (
+                  {comparisonProducts.map((product) => (
                     <th key={product.name} scope="col">
                       {product.name === 'Memlore' ? (
                         <span className="compare-brand">
@@ -1081,13 +1412,13 @@ export default function LandingPage() {
                 </tr>
               </thead>
               <tbody>
-                {comparison.rows.map((row) => (
+                {comparisonRows.map((row) => (
                   <tr key={row.id}>
                     <th scope="row">
                       <strong>{row.label}</strong>
                       {row.description ? <small>{row.description}</small> : null}
                     </th>
-                    {comparison.products.map((product) => (
+                    {comparisonProducts.map((product) => (
                       <td
                         key={product.name}
                         className={product.name === 'Memlore' ? 'memlore-cell' : undefined}
@@ -1101,7 +1432,7 @@ export default function LandingPage() {
             </table>
           </div>
           <div className="comparison-cards">
-            {comparison.products.map((product) => (
+            {comparisonProducts.map((product) => (
               <article
                 key={product.name}
                 className={product.name === 'Memlore' ? 'compare-card-memlore' : undefined}
@@ -1117,7 +1448,7 @@ export default function LandingPage() {
                   )}
                 </h3>
                 <ul>
-                  {comparison.rows.map((row) => (
+                  {comparisonRows.map((row) => (
                     <li key={row.id}>
                       <span>
                         <strong>{row.label}</strong>
@@ -1131,28 +1462,31 @@ export default function LandingPage() {
             ))}
           </div>
           <p className="comparison-sources">
-            {comparison.sourcesLead}{' '}
-            {comparison.products
+            Explore the details:{' '}
+            {comparisonProducts
               .filter((product) => product.sourceUrl)
               .map((product) => (
                 <a key={product.name} href={product.sourceUrl} target="_blank" rel="noreferrer">
                   {product.name} <ArrowUpRight className="size-3" />
                 </a>
               ))}
-            <span>{comparison.sourcesNote}</span>
+            <span>Features and plans can change.</span>
           </p>
         </section>
         <section className="platform-section">
           <div>
             <h2>
-              {platforms.titleLead}
+              A home on your devices.
               <br />
-              {platforms.titleAccent}
+              More doors opening soon.
             </h2>
-            <p>{platforms.intro}</p>
+            <p>
+              We’re starting with macOS and taking the time to make it feel right. Follow along as
+              Memlore grows.
+            </p>
           </div>
           <div className="platform-list">
-            {platforms.items.map((item) => {
+            {platformItems.map((item) => {
               const Icon = platformIcons[item.name]
               return (
                 <div key={item.name}>
@@ -1164,7 +1498,7 @@ export default function LandingPage() {
                         href={githubUrl}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label={nav.downloadAria}
+                        aria-label="Download the beta from GitHub"
                       >
                         <Check className="size-3.5" /> {item.status}
                       </a>
@@ -1182,18 +1516,18 @@ export default function LandingPage() {
         <div className="footer-main">
           <HeadFollowLogo alt="" className="footer-head" size={72} />
           <h2>
-            {footer.titleLead}
+            The ordinary days
             <br />
-            {footer.titleAccent}
+            are worth keeping.
           </h2>
           <div className="button-row footer-actions">
             <DownloadLink
               className="download download-hero"
-              label={footer.download}
-              ariaLabel={footer.downloadAria}
+              label="Download for Mac"
+              ariaLabel="Download the beta from GitHub"
             />
             <a className="button" href="#demo" data-variant="secondary">
-              {footer.tryDemo}
+              Try the demo
             </a>
           </div>
         </div>

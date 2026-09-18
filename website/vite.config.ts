@@ -37,7 +37,7 @@ const ROOT_MARKER = '<div id="root"></div>'
 
 function staticArticleFor(path: string): string | undefined {
   if (/\/index\.html$/.test(path)) return renderLandingStaticHtml()
-  const kind = path.match(/\/(privacy|terms)\.html$/)?.[1]
+  const kind = path.match(/\/(privacy|terms|about)\.html$/)?.[1]
   if (!kind) return
   return renderLegalStaticHtml(
     readFileSync(fileURLToPath(new URL(`./src/legal/${kind}.md`, import.meta.url)), 'utf8'),
@@ -127,6 +127,7 @@ export default defineConfig({
         privacy: fileURLToPath(new URL('./privacy.html', import.meta.url)),
         terms: fileURLToPath(new URL('./terms.html', import.meta.url)),
         changelog: fileURLToPath(new URL('./changelog.html', import.meta.url)),
+        about: fileURLToPath(new URL('./about.html', import.meta.url)),
       },
     },
   },

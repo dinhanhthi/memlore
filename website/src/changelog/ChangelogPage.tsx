@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { changelog, nav } from '../content'
 import { preloadHeadSprites } from '../HeadFollowLogo'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
@@ -7,6 +6,7 @@ import {
   releaseAnchorId,
   releases,
   shouldShowChangelogToc,
+  type ChangelogKind,
   type ChangelogRelease,
 } from './changelogData'
 
@@ -22,23 +22,34 @@ function formatDate(date: string): string {
   return DATE_FORMAT.format(new Date(`${date}T00:00:00Z`))
 }
 
+const kinds = {
+  new: 'New',
+  improved: 'Improved',
+  fixed: 'Fixed',
+  breaking: 'Breaking',
+} satisfies Record<ChangelogKind, string>
+
 function Release({ release }: { release: ChangelogRelease }) {
   const id = releaseAnchorId(release.version)
   return (
     <section className="changelog-release">
       <div className="changelog-release-head">
         <h2 id={id}>v{release.version}</h2>
-        {release.stable ? null : <span className="changelog-beta">{changelog.beta}</span>}
+        {release.stable ? null : <span className="changelog-beta">Beta</span>}
         <p className="changelog-date">
-          {changelog.releasedLabel} <time dateTime={release.date}>{formatDate(release.date)}</time>
+          Released <time dateTime={release.date}>{formatDate(release.date)}</time>
         </p>
       </div>
-      {release.stable ? null : <p className="changelog-beta-note">{changelog.betaNote}</p>}
+      {release.stable ? null : (
+        <p className="changelog-beta-note">
+          A test version. Stable is what most people should run.
+        </p>
+      )}
       <ul className="changelog-items">
         {release.items.map((item) => (
           <li key={item.text}>
             <span className="changelog-kind" data-kind={item.kind}>
-              {changelog.kinds[item.kind]}
+              {kinds[item.kind]}
             </span>
             <span className="changelog-text">{item.text}</span>
           </li>
@@ -50,8 +61,8 @@ function Release({ release }: { release: ChangelogRelease }) {
 
 function ChangelogToc() {
   return (
-    <nav className="changelog-toc" aria-label={changelog.tocAria}>
-      <p className="changelog-toc-title">{changelog.tocTitle}</p>
+    <nav className="changelog-toc" aria-label="Release versions">
+      <p className="changelog-toc-title">Versions</p>
       <ol>
         {releases.map((release) => {
           const id = releaseAnchorId(release.version)
@@ -74,14 +85,14 @@ export default function ChangelogPage() {
   return (
     <>
       <a className="skip-link" href="#main">
-        {nav.skip}
+        Skip to content
       </a>
-      <SiteHeader homeHref="index.html" sectionPrefix="index.html" current="changelog" />
-      <main id="main">
+      <SiteHeader homeHref="/" sectionPrefix="/" current="changelog" />
+      <main id="main" tabIndex={-1}>
         <div className="changelog-layout" data-toc={showToc ? 'true' : undefined}>
           <article className="changelog-article">
-            <h1>{changelog.title}</h1>
-            <p className="changelog-intro">{changelog.intro}</p>
+            <h1>What’s new</h1>
+            <p className="changelog-intro">Every version of Memlore, in plain words.</p>
             {releases.map((release) => (
               <Release key={release.version} release={release} />
             ))}
@@ -90,7 +101,7 @@ export default function ChangelogPage() {
         </div>
       </main>
       <footer>
-        <SiteFooterBar homeHref="index.html" current="changelog" />
+        <SiteFooterBar homeHref="/" current="changelog" />
       </footer>
     </>
   )

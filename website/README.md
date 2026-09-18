@@ -18,7 +18,7 @@ From the repository root, with root dependencies installed:
 pnpm website:dev       # Vite dev server — http://localhost:5176
 pnpm website:build     # typecheck + production bundle → website/dist/
 pnpm website:preview   # serve the built assets — http://localhost:4176
-pnpm website:test      # Vitest (jsdom) — backend, bridge, content, streaming
+pnpm website:test      # Vitest (jsdom) — backend, bridge, copy, streaming
 ```
 
 Playwright against the **built** preview (builds first, then serves port 4176):
@@ -97,7 +97,7 @@ after visible changes to the seeded entry or the app chrome.
 | `src/legal/`                    | Shared LegalPage and privacy/terms Vite entries   |
 | `src/legal/privacy.md`          | Privacy Policy copy (Markdown)                    |
 | `src/legal/terms.md`            | Terms of Service copy (Markdown)                  |
-| `src/content.ts`                | English copy                                      |
+| `src/links.ts`                  | Shared public URLs (GitHub)                       |
 | `src/demoBridge.ts`             | Parent → iframe commands (theme, navigate, reset) |
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |
 | `tokens.css` / `src/styles.css` | Dark-only Hallmark Workbench tokens               |

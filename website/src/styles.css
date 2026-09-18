@@ -82,6 +82,12 @@ summary:focus-visible,
   outline: 2px solid var(--color-focus);
   outline-offset: 4px;
 }
+/* `<main tabindex="-1">` exists only so a route change and the skip link can move focus
+   there; it is never tabbed to, and a ring around the whole content region is noise.
+   Needs the `[tabindex]` to outrank the rule above. */
+main[tabindex]:focus-visible {
+  outline: none;
+}
 h1,
 h2,
 h3,
@@ -207,25 +213,6 @@ footer {
   font-size: 24px;
   letter-spacing: -1px;
   white-space: nowrap;
-}
-/* Sibling of .wordmark, not a child: the wordmark is itself an <a>, and an
-   anchor cannot nest inside another anchor. */
-.version-badge {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border: var(--rule-width) solid var(--color-rule);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  letter-spacing: 0;
-  white-space: nowrap;
-  color: var(--color-muted);
-  transition: color var(--dur-micro) var(--ease-out);
-}
-.version-badge:hover {
-  color: var(--color-ink);
-  border-color: var(--color-muted);
 }
 .wordmark-head,
 .hero-head,
@@ -1980,18 +1967,6 @@ tbody th {
 .footer-bottom .wordmark {
   font-size: 20px;
 }
-.footer-credit {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: var(--text-small);
-  white-space: nowrap;
-}
-.footer-credit a {
-  color: var(--color-ink);
-}
-.footer-credit a:hover {
-  color: var(--color-accent);
-}
 .footer-links {
   display: flex;
   flex-wrap: wrap;
@@ -2039,7 +2014,7 @@ tbody th {
 }
 .legal-article h2 {
   font-family: var(--font-title);
-  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
   letter-spacing: -0.03em;
   line-height: 1.25;
   color: var(--color-ink);
