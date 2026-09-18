@@ -12,12 +12,13 @@ public release counters already report.
 
 ## Routes
 
-| Route    | Behaviour                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------ |
-| `/mac`   | 302 to `Memlore_<version>_universal.dmg`, resolved from `latest.json` (cached 300s). Logs one row.     |
-| `/`      | 302 to `https://memlore.app`.                                                                          |
-| `/stats` | HTML tables. **404** unless `STATS_KEY` is set _and_ `?key=` (or the `X-Stats-Key` header) matches it. |
-| anything | 404. Non-GET on any route: 405.                                                                        |
+| Route    | Behaviour                                                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `/mac`   | 302 to `Memlore_<version>_universal.dmg`, resolved from `latest.json` (cached 300s). Logs one row.                                 |
+| `/`      | 302 to `https://memlore.app`.                                                                                                      |
+| `/mac`   | 302 to the current `.dmg`. `HEAD` gets the same redirect but is not counted — link checkers and bots must not inflate the numbers. |
+| `/stats` | HTML tables. **404** unless `STATS_KEY` is set _and_ `?key=` (or the `X-Stats-Key` header) matches it.                             |
+| anything | 404. Non-GET on any route: 405.                                                                                                    |
 
 If version resolution fails for any reason — GitHub down, non-OK response, bad
 JSON, a hung connection (the `latest.json` fetch carries a 2 s

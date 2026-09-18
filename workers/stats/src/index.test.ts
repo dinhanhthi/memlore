@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { authorized, logDownload } from './index'
+import worker, { authorized, logDownload } from './index'
 import { esc } from './stats'
 
 /** `crypto.subtle.timingSafeEqual` is a Cloudflare extension Node does not have. */
@@ -120,5 +120,74 @@ describe('esc', () => {
     [false, 'false'],
   ])('renders %j as %j', (value, expected) => {
     expect(esc(value)).toBe(expected)
+  })
+})
+
+// A link checker sending HEAD must get the same redirect a browser gets — HTTP
+// requires HEAD wherever GET is supported — but must never land in `downloads`.
+// Without this test, dropping the HEAD branch would let probes silently inflate
+// the exact numbers this Worker exists to report, and nothing would go red.
+describe('default export — HEAD is answered but not counted', () => {
+  const LATEST = { version: '0.1.0' }
+
+  function ctxSpy() {
+    const waited: Promise<unknown>[] = []
+    return {
+      ctx: { waitUntil: (p: Promise<unknown>) => waited.push(p), passThroughOnException: () => {} },
+      waited,
+    }
+  }
+
+  function stubGithub() {
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(LATEST))))
+  }
+
+  it('redirects a HEAD to the same .dmg as a GET', async () => {
+    stubGithub()
+    const { ctx } = ctxSpy()
+    const res = await worker.fetch(
+      new Request('https://dl.memlore.app/mac', { method: 'HEAD' }),
+      { DB: {} as D1Database },
+      ctx as unknown as ExecutionContext,
+    )
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe(
+      'https://github.com/dinhanhthi/memlore/releases/download/v0.1.0/Memlore_0.1.0_universal.dmg',
+    )
+  })
+
+  it('writes nothing for a HEAD', async () => {
+    stubGithub()
+    const { ctx, waited } = ctxSpy()
+    // A bare {} as the DB: any attempt to touch it would throw, so an empty
+    // `waited` is the assertion — nothing was even scheduled.
+    await worker.fetch(
+      new Request('https://dl.memlore.app/mac', { method: 'HEAD' }),
+      { DB: {} as D1Database },
+      ctx as unknown as ExecutionContext,
+    )
+    expect(waited).toHaveLength(0)
+  })
+
+  it('does schedule a write for a GET', async () => {
+    stubGithub()
+    const { ctx, waited } = ctxSpy()
+    const db = { prepare: () => ({ bind: () => ({ run: () => Promise.resolve() }) }) }
+    await worker.fetch(
+      new Request('https://dl.memlore.app/mac'),
+      { DB: db as unknown as D1Database },
+      ctx as unknown as ExecutionContext,
+    )
+    expect(waited).toHaveLength(1)
+  })
+
+  it('still rejects a POST', async () => {
+    const { ctx } = ctxSpy()
+    const res = await worker.fetch(
+      new Request('https://dl.memlore.app/mac', { method: 'POST' }),
+      { DB: {} as D1Database },
+      ctx as unknown as ExecutionContext,
+    )
+    expect(res.status).toBe(405)
   })
 })

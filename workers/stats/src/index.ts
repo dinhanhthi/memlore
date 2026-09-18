@@ -92,6 +92,13 @@ export function authorized(request: Request, url: URL, env: Env): boolean {
 
 async function handleMac(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const version = await resolveVersion()
+  // A HEAD request is a link checker, a preflight or a bot — not someone
+  // downloading the app. It gets the same redirect (HTTP requires HEAD wherever
+  // GET is supported) but is deliberately not counted, so probes cannot inflate
+  // the numbers this Worker exists to report.
+  if (request.method === 'HEAD') {
+    return redirect(version ? dmgUrl(version) : FALLBACK_URL)
+  }
   // Country only, straight off Cloudflare's edge metadata. Nothing else on
   // `request.cf` is read, and the IP is never touched.
   const cfCountry: unknown = request.cf?.country
@@ -113,7 +120,9 @@ interface GhRelease {
 
 export default {
   async fetch(request, env, ctx) {
-    if (request.method !== 'GET') return text('Method not allowed', 405)
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return text('Method not allowed', 405)
+    }
 
     const url = new URL(request.url)
     switch (url.pathname) {
