@@ -2,10 +2,15 @@
   <img src="public/logo-with-container/logo-iOS-Default-256x256@2x.png" width="80" alt="Memlore logo" />
   <h1>Memlore</h1>
   <p>A little life. A lasting story.<br />A cross-platform, privacy-first, local-first journal — with rich, optional AI.</p>
+  <p>
+    <a href="https://memlore.app">Website</a> ·
+    <a href="https://dl.memlore.app/mac">Download for Mac</a> ·
+    <a href="https://memlore.app/#demo">Live demo</a>
+  </p>
 </div>
 
 > [!WARNING]
-> Memlore is  under active development. What is here today is reasonably stable, with a lot more still to come. Current focus is the **desktop macOS** app and the **web** version; Windows, Linux, iOS, and Android are planned.
+> Memlore is under active development. What is here today is reasonably stable, with a lot more still to come. Current focus is the **desktop macOS** app and the **web** version; Windows, Linux, iOS, and Android are planned.
 
 <img src="public/screenshot.png" width="100%" alt="Screenshot" />
 
