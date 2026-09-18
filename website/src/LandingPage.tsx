@@ -54,7 +54,7 @@ import {
   Video,
   X,
 } from 'lucide-react'
-import { githubUrl } from './links'
+import { downloadUrl, githubUrl } from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
@@ -1154,7 +1154,7 @@ const comparisonRows = [
 type PlatformName = 'macOS' | 'Windows & Linux' | 'iOS & Android'
 
 const platformItems = [
-  { name: 'macOS' as const, status: 'In development · beta', href: githubUrl },
+  { name: 'macOS' as const, status: 'Download', href: downloadUrl },
   { name: 'Windows & Linux' as const, status: 'Coming soon' },
   { name: 'iOS & Android' as const, status: 'Coming soon' },
 ] satisfies { name: PlatformName; status: string; href?: string }[]
@@ -1495,7 +1495,7 @@ export default function LandingPage() {
                   {item.name === 'macOS' ? (
                     <strong>
                       <a
-                        href={githubUrl}
+                        href={downloadUrl}
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Download the beta from GitHub"

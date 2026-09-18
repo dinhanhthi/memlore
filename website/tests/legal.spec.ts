@@ -45,6 +45,7 @@ async function expectProductionScripts(page: Page) {
 }
 
 const GITHUB = 'https://github.com/dinhanhthi/memlore'
+const DOWNLOAD = 'https://dl.memlore.app/mac'
 
 async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) {
   const header = page.locator('.site-header')
@@ -67,7 +68,7 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
     return
   }
   await expect(header.locator('.header-actions .download')).toBeVisible()
-  await expect(header.locator('.header-actions .download')).toHaveAttribute('href', GITHUB)
+  await expect(header.locator('.header-actions .download')).toHaveAttribute('href', DOWNLOAD)
 }
 
 test('privacy.html loads from production assets', async ({ page }) => {

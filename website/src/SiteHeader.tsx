@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Menu, X } from 'lucide-react'
-import { githubUrl } from './links'
+import { downloadUrl, githubUrl } from './links'
 import HeadFollowLogo from './HeadFollowLogo'
 import { useWideViewport } from './useWideViewport'
 
@@ -16,7 +16,7 @@ export function DownloadLink({
   return (
     <a
       className={className}
-      href={githubUrl}
+      href={downloadUrl}
       target="_blank"
       rel="noreferrer"
       aria-label={ariaLabel}
