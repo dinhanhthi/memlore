@@ -72,9 +72,11 @@ function GitHubLink({ className }: { className: string }) {
 export function SiteHeader({
   homeHref,
   sectionPrefix = '',
+  current,
 }: {
   homeHref: string
   sectionPrefix?: string
+  current?: 'changelog'
 }) {
   const wide = useWideViewport()
   const [open, setOpen] = useState(false)
@@ -153,6 +155,9 @@ export function SiteHeader({
           <a href={`${sectionPrefix}#demo`}>{nav.demo}</a>
           <a href={`${sectionPrefix}#features`}>{nav.features}</a>
           <a href={`${sectionPrefix}#compare`}>{nav.compare}</a>
+          <a href="changelog.html" aria-current={current === 'changelog' ? 'page' : undefined}>
+            {nav.changelog}
+          </a>
           <details ref={docMenuRef} className="doc-menu">
             <summary>{nav.doc}</summary>
             <p>

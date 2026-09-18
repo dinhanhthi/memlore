@@ -64,6 +64,10 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
     'href',
     'index.html#compare',
   )
+  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute(
+    'href',
+    'changelog.html',
+  )
   await expect(nav.locator('summary')).toHaveText('Doc')
   await expect(header.locator('.header-github')).toBeVisible()
   await expect(header.locator('.header-github')).toHaveAttribute('href', GITHUB)
@@ -99,15 +103,15 @@ test('terms.html loads from production assets', async ({ page }) => {
   expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
 })
 
-for (const path of ['/privacy.html', '/terms.html'] as const) {
-  test(`${path} keeps Demo, Features, Compare, Doc, GitHub, and Download in the menu bar`, async ({
+for (const path of ['/privacy.html', '/terms.html', '/changelog.html'] as const) {
+  test(`${path} keeps Demo, Features, Compare, Changelog, Doc, GitHub, and Download in the menu bar`, async ({
     page,
   }) => {
     await page.goto(path)
     await expectSiteMenuBar(page, { compact: false })
   })
 
-  test(`${path} compact menu still has Demo, Features, Compare, Doc, and GitHub`, async ({
+  test(`${path} compact menu still has Demo, Features, Compare, Changelog, Doc, and GitHub`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 })

@@ -3,7 +3,12 @@ import { changelog, nav } from '../content'
 import { preloadHeadSprites } from '../HeadFollowLogo'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
-import { releases, type ChangelogRelease } from './changelogData'
+import {
+  releaseAnchorId,
+  releases,
+  shouldShowChangelogToc,
+  type ChangelogRelease,
+} from './changelogData'
 
 /** Date-only strings parse as UTC; formatting in UTC keeps the day from sliding. */
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
@@ -18,10 +23,11 @@ function formatDate(date: string): string {
 }
 
 function Release({ release }: { release: ChangelogRelease }) {
+  const id = releaseAnchorId(release.version)
   return (
     <section className="changelog-release">
       <div className="changelog-release-head">
-        <h2>v{release.version}</h2>
+        <h2 id={id}>v{release.version}</h2>
         {release.stable ? null : <span className="changelog-beta">{changelog.beta}</span>}
         <p className="changelog-date">
           {changelog.releasedLabel} <time dateTime={release.date}>{formatDate(release.date)}</time>
@@ -42,7 +48,26 @@ function Release({ release }: { release: ChangelogRelease }) {
   )
 }
 
+function ChangelogToc() {
+  return (
+    <nav className="changelog-toc" aria-label={changelog.tocAria}>
+      <p className="changelog-toc-title">{changelog.tocTitle}</p>
+      <ol>
+        {releases.map((release) => {
+          const id = releaseAnchorId(release.version)
+          return (
+            <li key={release.version}>
+              <a href={`#${id}`}>v{release.version}</a>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
 export default function ChangelogPage() {
+  const showToc = shouldShowChangelogToc(releases.length)
   useEffect(() => {
     preloadHeadSprites()
   }, [])
@@ -51,15 +76,18 @@ export default function ChangelogPage() {
       <a className="skip-link" href="#main">
         {nav.skip}
       </a>
-      <SiteHeader homeHref="index.html" sectionPrefix="index.html" />
+      <SiteHeader homeHref="index.html" sectionPrefix="index.html" current="changelog" />
       <main id="main">
-        <article className="changelog-article">
-          <h1>{changelog.title}</h1>
-          <p className="changelog-intro">{changelog.intro}</p>
-          {releases.map((release) => (
-            <Release key={release.version} release={release} />
-          ))}
-        </article>
+        <div className="changelog-layout" data-toc={showToc ? 'true' : undefined}>
+          <article className="changelog-article">
+            <h1>{changelog.title}</h1>
+            <p className="changelog-intro">{changelog.intro}</p>
+            {releases.map((release) => (
+              <Release key={release.version} release={release} />
+            ))}
+          </article>
+          {showToc ? <ChangelogToc /> : null}
+        </div>
       </main>
       <footer>
         <SiteFooterBar homeHref="index.html" current="changelog" />

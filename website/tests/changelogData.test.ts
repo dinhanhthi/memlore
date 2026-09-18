@@ -5,6 +5,8 @@ import {
   latestStableVersion,
   latestStableVersionOf,
   releases,
+  shouldShowChangelogToc,
+  type ChangelogKind,
   type ChangelogRelease,
 } from '../src/changelog/changelogData'
 
@@ -68,4 +70,29 @@ it('keeps the notes readable for someone who does not read code', () => {
 it('keeps the changelog page title and description in sync with the copy source', () => {
   expect(changelogHtml).toContain(`<title>${changelog.metaTitle}</title>`)
   expect(changelogHtml).toContain(`content="${changelog.metaDescription}"`)
+})
+
+it('hides the version table of contents until there are more than four releases', () => {
+  expect(shouldShowChangelogToc(4)).toBe(false)
+  expect(shouldShowChangelogToc(5)).toBe(true)
+  expect(shouldShowChangelogToc(releases.length)).toBe(releases.length > 4)
+})
+
+it('labels kinds with New, Improved, Fixed, and Breaking', () => {
+  const kinds: Record<ChangelogKind, string> = changelog.kinds
+  expect(kinds).toEqual({
+    new: 'New',
+    improved: 'Improved',
+    fixed: 'Fixed',
+    breaking: 'Breaking',
+  })
+})
+
+it('only uses known kinds in live notes', () => {
+  const known = new Set(Object.keys(changelog.kinds))
+  for (const entry of releases) {
+    for (const item of entry.items) {
+      expect(known.has(item.kind), `${entry.version}: ${item.kind}`).toBe(true)
+    }
+  }
 })

@@ -15,6 +15,7 @@ export const nav = {
   demo: 'Demo',
   features: 'Features',
   compare: 'Compare',
+  changelog: 'Changelog',
   doc: 'Doc',
   docDisclosure: 'Documentation is coming soon. For now, explore the',
   docReadme: 'GitHub README',
@@ -510,9 +511,12 @@ export const changelog = {
   betaNote: 'A test version. Stable is what most people should run.',
   releasedLabel: 'Released',
   badgeLabel: 'Current version',
+  tocTitle: 'Versions',
+  tocAria: 'Release versions',
   kinds: {
     new: 'New',
     improved: 'Improved',
     fixed: 'Fixed',
-  } satisfies Record<'new' | 'improved' | 'fixed', string>,
+    breaking: 'Breaking',
+  } satisfies Record<'new' | 'improved' | 'fixed' | 'breaking', string>,
 }

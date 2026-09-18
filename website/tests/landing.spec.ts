@@ -101,6 +101,7 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
     await expectSingleLine(nav.getByRole('link', { name: 'Demo' }), 'nav Demo')
     await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
     await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
+    await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
     await expectSingleLine(nav.locator('summary'), 'nav Doc')
     await expect(nav.getByRole('link', { name: 'GitHub' })).toHaveCount(0)
     return
@@ -109,6 +110,11 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(nav.getByRole('link', { name: 'Demo' }), 'nav Demo')
   await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
+  await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
+  await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute(
+    'href',
+    'changelog.html',
+  )
   await expectSingleLine(nav.locator('summary'), 'nav Doc')
   await expectSingleLine(page.locator('.header-actions .download'), 'header download')
   expect(await githubLabelVisible(page), 'desktop GitHub should show its label').toBe(true)

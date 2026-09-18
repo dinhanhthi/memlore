@@ -5,7 +5,7 @@
  * hashes, no file paths, no internal identifiers.
  */
 
-export type ChangelogKind = 'new' | 'improved' | 'fixed'
+export type ChangelogKind = 'new' | 'improved' | 'fixed' | 'breaking'
 
 export type ChangelogItem = {
   kind: ChangelogKind
@@ -69,3 +69,12 @@ export function latestStableVersionOf(entries: ChangelogRelease[]): string {
 }
 
 export const latestStableVersion = latestStableVersionOf(releases)
+
+/** Right-rail TOC only earns its keep once the page has several versions to jump between. */
+export function shouldShowChangelogToc(count: number): boolean {
+  return count > 4
+}
+
+export function releaseAnchorId(version: string): string {
+  return `v${version}`
+}
