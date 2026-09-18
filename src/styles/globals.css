@@ -1773,6 +1773,12 @@
   background-color: var(--color-surface-hi);
 }
 
+:root.ds-clay .xj-sidebar-nav button:not(.xj-nav-active):hover {
+  /* Overrides the component's `hover:bg-surface-hi`: the settings-card surface
+     reads as a chip on the rail, where the hover should stay a wash. */
+  background-color: var(--nav-hover-bg);
+}
+
 :root.ds-clay .xj-nav-active {
   /* Light: raised soft chip (same fill as second/third panels). Dark: wash only.
      --shadow-chip, not --elev-1: see the token note (clipped by the strip). */
