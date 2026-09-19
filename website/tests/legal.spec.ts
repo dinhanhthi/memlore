@@ -238,6 +238,39 @@ test('a nav link with a hash lands on the section after the route swap', async (
   await expect(page.locator('#features')).toBeInViewport()
 })
 
+test('privacy sits on the ledger and pins the footer to the page bottom', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/privacy')
+  await expect(page.locator('main.ledger')).toHaveCount(1)
+  await expect(page.locator('.section-label')).toHaveText('Legal')
+  await expect(page.locator('main .ledger-rule').first()).toBeVisible()
+  await expect(page.locator('footer .ledger-rule')).toHaveCount(1)
+  const frame = await page.evaluate(() => {
+    const root = document.getElementById('root')
+    const main = document.querySelector('main')
+    const footer = document.querySelector('footer')
+    const rule = document.querySelector('main .ledger-rule')
+    if (!root || !main || !footer || !rule) return null
+    return {
+      rootMin: getComputedStyle(root).minHeight,
+      mainGrow: getComputedStyle(main).flexGrow,
+      footerBottom: Math.round(footer.getBoundingClientRect().bottom),
+      rootBottom: Math.round(root.getBoundingClientRect().bottom),
+      viewH: window.innerHeight,
+      ordinal: getComputedStyle(rule, '::before').content,
+    }
+  })
+  expect(frame, 'ledger frame should exist').toBeTruthy()
+  expect(parseFloat(frame!.rootMin), 'root should fill the viewport').toBeGreaterThanOrEqual(
+    frame!.viewH - 1,
+  )
+  expect(frame!.mainGrow, 'main should grow so the footer sits at the bottom').toBe('1')
+  expect(frame!.footerBottom, 'footer should sit on the root floor').toBe(frame!.rootBottom)
+  expect(frame!.ordinal === 'none' || frame!.ordinal === '""', 'wide privacy should paint 01 02').toBe(
+    false,
+  )
+})
+
 test('compact /privacy has no root overflow', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto('/privacy')

@@ -90,11 +90,6 @@ export function latestStableVersionOf(entries: ChangelogRelease[]): string {
 export const latestStableRelease = latestStableReleaseOf(releases)
 export const latestStableVersion = latestStableRelease.version
 
-/** Right-rail TOC only earns its keep once the page has several versions to jump between. */
-export function shouldShowChangelogToc(count: number): boolean {
-  return count > 4
-}
-
 export function releaseAnchorId(version: string): string {
   return `v${version}`
 }

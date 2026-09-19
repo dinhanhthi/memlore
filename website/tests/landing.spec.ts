@@ -158,10 +158,9 @@ test('hero-lead sits above the mascot on compact viewports', async ({ page }) =>
   const portraitBox = await page.locator('.hero-portrait').boundingBox()
   expect(leadBox, 'hero-lead should have a box').toBeTruthy()
   expect(portraitBox, 'hero portrait should have a box').toBeTruthy()
-  expect(
-    leadBox!.y + leadBox!.height,
-    'empty row should sit above the dog',
-  ).toBeLessThanOrEqual(portraitBox!.y + 1)
+  expect(leadBox!.y + leadBox!.height, 'empty row should sit above the dog').toBeLessThanOrEqual(
+    portraitBox!.y + 1,
+  )
   const hairlineBetween = await page.evaluate(() => {
     const lead = document.querySelector('.hero-lead')
     const portrait = document.querySelector('.hero-portrait')
@@ -175,12 +174,10 @@ test('hero-lead sits above the mascot on compact viewports', async ({ page }) =>
       return rect.top >= leadRect.bottom - 2 && rect.bottom <= portraitRect.top + 2
     })
   })
-  expect(hairlineBetween, 'a hairline should sit between the empty row and the dog').toBe(
-    true,
-  )
+  expect(hairlineBetween, 'a hairline should sit between the empty row and the dog').toBe(true)
 })
 
-test('hero eyebrow lists the latest release and links open source', async ({ page }) => {
+test('hero eyebrow lists the latest release with Open source as plain text', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
   const eyebrow = page.locator('.hero-eyebrow')
@@ -196,8 +193,37 @@ test('hero eyebrow lists the latest release and links open source', async ({ pag
   await expect(eyebrow).toContainText(formatLedgerDate(latestStableRelease.date), {
     ignoreCase: true,
   })
-  await expect(eyebrow.getByRole('link', { name: 'Open source' })).toHaveAttribute('href', GITHUB)
+  await expect(eyebrow.getByRole('link', { name: 'Open source' })).toHaveCount(0)
+  await expect(eyebrow).toContainText('Open source')
+  await expect(eyebrow.locator('.hero-eyebrow-version')).toHaveText(
+    `v${latestStableRelease.version}`,
+    { ignoreCase: true },
+  )
   await expect(eyebrow.locator('.hero-eyebrow-free')).toHaveText('Free')
+  const colors = await page.evaluate(() => {
+    const token = (name: string) => {
+      const probe = document.createElement('span')
+      probe.style.color = `var(${name})`
+      document.body.append(probe)
+      const color = getComputedStyle(probe).color
+      probe.remove()
+      return color
+    }
+    const eyebrow = document.querySelector('.hero-eyebrow')
+    const version = document.querySelector('.hero-eyebrow-version')
+    const free = document.querySelector('.hero-eyebrow-free')
+    return {
+      muted: token('--color-muted'),
+      accentDeep: token('--color-accent-deep'),
+      success: token('--color-success'),
+      eyebrow: eyebrow ? getComputedStyle(eyebrow).color : '',
+      version: version ? getComputedStyle(version).color : '',
+      free: free ? getComputedStyle(free).color : '',
+    }
+  })
+  expect(colors.eyebrow, 'eyebrow should be muted').toBe(colors.muted)
+  expect(colors.version, 'version should stay gold').toBe(colors.accentDeep)
+  expect(colors.free, 'Free should stay green').toBe(colors.success)
 })
 
 test('landing and demo.html load from production assets', async ({ page }) => {
@@ -272,7 +298,18 @@ for (const viewport of VIEWPORTS) {
       path: testInfo.outputPath(`landing-${viewport.name}.png`),
       fullPage: true,
     })
-    await expect(page.locator('.ai-grid article')).toHaveCount(13)
+    await expect(page.locator('.ai-grid article')).toHaveCount(14)
+    await expect(page.locator('.ai-grid .ai-request')).toHaveText('Need more?')
+    await expect(page.locator('[data-ai="coming"]')).toHaveText('More to come')
+    if (compact) {
+      await expect(page.locator('.ai-empty')).toBeHidden()
+    } else {
+      await expect(page.locator('.ai-empty')).toBeVisible()
+      await expect(page.locator('.ai-grid .ai-request')).toHaveAttribute(
+        'href',
+        'https://github.com/dinhanhthi/memlore/issues/new?title=AI%20feature%20request%3A%20&labels=enhancement',
+      )
+    }
     const aiGrid = await page.locator('.ai-grid').evaluate((el) => {
       const style = getComputedStyle(el)
       const cell = el.querySelector('article')
@@ -315,7 +352,7 @@ for (const viewport of VIEWPORTS) {
         .locator('.comparison-scroll thead th')
         .nth(1)
         .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-        expect(
+      expect(
         titleSize,
         'comparison app titles should read larger than table body',
       ).toBeGreaterThanOrEqual(16)
@@ -349,9 +386,10 @@ test('number gutter and ordinals appear together', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   const wide = await measure()
   expect(wide.gutter, 'wide widths should open the number column').toBe('2.5rem')
-  expect(wide.ordinal === 'none' || wide.ordinal === '""', 'wide widths should paint ordinals').toBe(
-    false,
-  )
+  expect(
+    wide.ordinal === 'none' || wide.ordinal === '""',
+    'wide widths should paint ordinals',
+  ).toBe(false)
 })
 
 const THEME_PICKER = 'Choose appearance'
@@ -579,9 +617,7 @@ for (const id of [
   'locations',
   'import-export',
 ] as const) {
-  test(`compact ${id} illustration sits in its own cell, flush to the floor`, async ({
-    page,
-  }) => {
+  test(`compact ${id} illustration sits in its own cell, flush to the floor`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     const geometry = await page.evaluate((sectionId) => {
@@ -624,7 +660,13 @@ for (const id of [
       geometry!.sectionBottom - geometry!.figureBottom,
       `${id} figure should sit flush to the section floor`,
     ).toBeLessThanOrEqual(2)
-    if (id === 'import-export' || id === 'emotions' || id === 'features' || id === 'sync') {
+    if (
+      id === 'import-export' ||
+      id === 'emotions' ||
+      id === 'features' ||
+      id === 'sync' ||
+      id === 'locks'
+    ) {
       expect(
         Math.abs(geometry!.innerTop - geometry!.innerBottom),
         `${id} figure padding below should match padding above`,
@@ -633,88 +675,31 @@ for (const id of [
   })
 }
 
-test('feature joins insert a short empty row in the main column', async ({ page }) => {
-  const measure = () =>
-    page.evaluate(() => {
-      const probe = document.createElement('div')
-      probe.style.height = 'calc(var(--frame-inset) / 2)'
-      document.body.append(probe)
-      const expected = probe.getBoundingClientRect().height
-      probe.remove()
-      const gaps = [...document.querySelectorAll('.split-gap')].map((gap) => {
-        const box = gap.getBoundingClientRect()
-        return {
-          display: getComputedStyle(gap).display,
-          height: box.height,
-        }
-      })
-      const locks = document.getElementById('locks')
-      const editor = document.getElementById('editor')
-      const emotions = document.getElementById('emotions')
-      const locations = document.getElementById('locations')
-      const gapAfter = (section: HTMLElement | null) => {
-        const node = section?.nextElementSibling?.nextElementSibling
-        return node instanceof HTMLElement && node.classList.contains('split-gap')
-          ? node.getBoundingClientRect()
-          : null
-      }
-      const editorBox = editor?.getBoundingClientRect()
-      const rule = editor?.nextElementSibling
-      const ruleBox = rule instanceof HTMLElement ? rule.getBoundingClientRect() : null
-      const editorGap = gapAfter(editor)
+test('feature sections meet at a hairline with no empty join row', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await page.goto('/')
+  await expect(page.locator('.split-gap')).toHaveCount(0)
+  const join = await page.evaluate(() => {
+    const ids = ['features', 'sync', 'locks', 'editor', 'emotions', 'locations', 'import-export']
+    return ids.slice(0, -1).map((id, index) => {
+      const current = document.getElementById(id)
+      const next = document.getElementById(ids[index + 1])
+      const rule = current?.nextElementSibling
       return {
-        expected,
-        gaps,
-        locksToEditor: gapAfter(locks),
-        editorToEmotions: editorGap,
-        emotionsToMap: gapAfter(emotions),
-        editorTop: editorBox?.top ?? 0,
-        emotionsTop: emotions?.getBoundingClientRect().top ?? 0,
-        locationsTop: locations?.getBoundingClientRect().top ?? 0,
-        editorLeft: editorBox?.left ?? 0,
-        editorRight: editorBox?.right ?? 0,
-        gapLeft: editorGap?.left ?? 0,
-        gapRight: editorGap?.right ?? 0,
-        ruleLeft: ruleBox?.left ?? 0,
-        ruleRight: ruleBox?.right ?? 0,
+        from: id,
+        to: ids[index + 1],
+        rule: rule instanceof HTMLElement && rule.classList.contains('ledger-rule'),
+        gap:
+          next && current
+            ? next.getBoundingClientRect().top - current.getBoundingClientRect().bottom
+            : -1,
       }
     })
-
-  for (const width of [390, 1280] as const) {
-    await page.setViewportSize({ width, height: 844 })
-    await page.goto('/')
-    const join = await measure()
-    expect(join.gaps, `every feature join should have a gap at ${width}px`).toHaveLength(6)
-    expect(
-      join.gaps.every((gap) => gap.display === 'block'),
-      `gaps should show at ${width}px`,
-    ).toBe(true)
-    for (const gap of join.gaps) {
-      expect(
-        Math.abs(gap.height - join.expected),
-        `gap should be half the frame inset at ${width}px`,
-      ).toBeLessThanOrEqual(1)
-    }
-    expect(join.locksToEditor, 'an empty row should sit above Feature-rich editor').toBeTruthy()
-    expect(join.editorToEmotions, 'an empty row should sit above Emotion tracking').toBeTruthy()
-    expect(join.emotionsToMap, 'an empty row should sit above Entries on a map').toBeTruthy()
-    expect(join.editorTop).toBeGreaterThan(join.locksToEditor!.bottom - 1)
-    expect(join.emotionsTop).toBeGreaterThan(join.editorToEmotions!.bottom - 1)
-    expect(join.locationsTop).toBeGreaterThan(join.emotionsToMap!.bottom - 1)
-    expect(
-      Math.abs(join.gapLeft - join.editorLeft),
-      `gap should share the main column left at ${width}px`,
-    ).toBeLessThanOrEqual(1)
-    expect(
-      Math.abs(join.gapRight - join.editorRight),
-      `gap should share the main column right at ${width}px`,
-    ).toBeLessThanOrEqual(1)
-    expect(join.gapLeft, `gap should stay inside the numbered rails at ${width}px`).toBeGreaterThan(
-      join.ruleLeft + 4,
-    )
-    expect(join.gapRight, `gap should stay inside the numbered rails at ${width}px`).toBeLessThan(
-      join.ruleRight - 4,
-    )
+  })
+  expect(join).toHaveLength(6)
+  for (const step of join) {
+    expect(step.rule, `${step.from} should be followed by a hairline`).toBe(true)
+    expect(step.gap, `${step.from} should sit against the next feature`).toBeLessThanOrEqual(2)
   }
 })
 
@@ -841,24 +826,67 @@ test('feature splits alternate illustration side and AI sits above open source',
   })
   expect(insets.locks, 'locks plate should exist').toBeTruthy()
   expect(insets.map, 'map plate should exist').toBeTruthy()
-  for (const [name, gap] of [
-    ['locks', insets.locks],
-    ['map', insets.map],
-  ] as const) {
-    expect(gap!.left, `${name} left inset`).toBeGreaterThan(8)
-    expect(gap!.right, `${name} right inset`).toBeGreaterThan(8)
-    expect(gap!.top, `${name} top inset`).toBeGreaterThan(8)
-    expect(gap!.bottom, `${name} bottom inset`).toBeGreaterThan(8)
-  }
+  expect(insets.locks!.left, 'locks left inset').toBeGreaterThan(16)
+  expect(insets.locks!.right, 'locks right inset').toBeGreaterThan(16)
+  expect(insets.locks!.top, 'locks top inset').toBeGreaterThan(16)
+  expect(insets.locks!.bottom, 'locks bottom inset').toBeGreaterThan(16)
+  expect(
+    Math.abs(insets.locks!.left - insets.locks!.right),
+    'locks plate should be horizontally centered',
+  ).toBeLessThanOrEqual(2)
+  expect(
+    Math.abs(insets.locks!.top - insets.locks!.bottom),
+    'locks plate should be vertically centered',
+  ).toBeLessThanOrEqual(2)
+  expect(insets.map!.left, 'map left inset').toBeLessThanOrEqual(1)
+  expect(insets.map!.right, 'map right inset').toBeLessThanOrEqual(1)
+  expect(insets.map!.top, 'map top inset').toBeLessThanOrEqual(1)
+  expect(insets.map!.bottom, 'map bottom inset').toBeLessThanOrEqual(1)
+  const videoPin = await page.evaluate(() => {
+    const fig = document.querySelector('.illust-map')
+    const badge = document.querySelector('[data-map-pin="video"] .map-photo-frame')
+    const ocean = document.querySelector('.map-ocean')
+    const rule = document.querySelector('#locations')?.previousElementSibling
+    if (
+      !(fig instanceof Element) ||
+      !(badge instanceof Element) ||
+      !(ocean instanceof Element) ||
+      !(rule instanceof HTMLElement)
+    ) {
+      return null
+    }
+    const figBox = fig.getBoundingClientRect()
+    const oceanBox = ocean.getBoundingClientRect()
+    const badgeBox = badge.getBoundingClientRect()
+    const hit = document.elementFromPoint(badgeBox.left + badgeBox.width / 2, badgeBox.top + 2)
+    return {
+      pinAbove: badgeBox.top - figBox.top,
+      oceanLeft: oceanBox.left - figBox.left,
+      oceanRight: figBox.right - oceanBox.right,
+      hitIsRule: hit instanceof Element && hit.classList.contains('ledger-rule'),
+    }
+  })
+  expect(videoPin, 'video map pin should exist').not.toBeNull()
+  expect(videoPin!.pinAbove, 'video badge may poke above the map cell').toBeLessThan(2)
+  expect(videoPin!.oceanLeft, 'map must stay inside the cell on the left').toBeGreaterThanOrEqual(
+    -1,
+  )
+  expect(videoPin!.oceanRight, 'map must stay inside the cell on the right').toBeGreaterThanOrEqual(
+    -1,
+  )
+  expect(videoPin!.hitIsRule, 'video badge must paint above the hairline').toBe(false)
 })
 
-test('editor cards are icon-plus-label tiles with a distinct plugins card', async ({ page }) => {
+test('editor cards are icon-plus-label tiles with a request link and a striped empty slot', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await useLightLanding(page)
   await page.goto('/')
   const section = page.locator('#editor')
   await expect(section.getByRole('heading', { level: 2 })).toContainText(/editor/i)
-  await expect(page.locator('.ed-card')).toHaveCount(8)
+  await expect(page.locator('.ed-card')).toHaveCount(9)
+  expect(await firstRowCount(page, '.illust-editor')).toBe(5)
   const media = page.locator('.ed-media')
   await expect(media).toHaveText('Media')
   await expect(media.locator('svg')).toHaveCount(1)
@@ -870,6 +898,21 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
   await expect(markdown.locator('.ed-tag')).toHaveCount(0)
   const plugins = page.locator('.ed-plugins')
   await expect(plugins).toHaveText('More plugins')
+  const pluginsBg = await plugins.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const mediaBg = await media.evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(pluginsBg, 'More plugins should match the other cards').toBe(mediaBg)
+  const request = page.locator('.ed-request')
+  await expect(request).toHaveText('Need more?')
+  await expect(request).toHaveAttribute(
+    'href',
+    'https://github.com/dinhanhthi/memlore/issues/new?title=Editor%20feature%20request%3A%20&labels=enhancement',
+  )
+  await expect(request).toHaveAttribute('target', '_blank')
+  const empty = page.locator('.ed-empty')
+  await expect(empty).toHaveCount(1)
+  expect(await empty.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain(
+    'repeating-linear-gradient',
+  )
   const wrap = await page
     .locator('.ed-card span:not(.ed-slash-mark)')
     .evaluateAll((nodes) => nodes.map((el) => getComputedStyle(el).whiteSpace))
@@ -879,9 +922,6 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
     'color',
   )
   expect(labelLuminance, 'editor card labels should stay dark on light paper').toBeLessThan(0.35)
-  const pluginsBg = await plugins.evaluate((el) => getComputedStyle(el).backgroundColor)
-  const mediaBg = await media.evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(pluginsBg, 'More plugins should use a distinct fill').not.toBe(mediaBg)
 })
 
 test('demo Settings restyles the iframe only', async ({ page }) => {
@@ -1002,11 +1042,14 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   })
   expect(layout, 'demo stage, window, and disclaimer should exist').toBeTruthy()
   expect(layout!.parent, 'disclaimer should stay a child of the existing stage').toBe(true)
-  expect(layout!.windowLeft, 'demo should sit inset from the left content rail').toBeGreaterThan(8)
+  expect(
+    layout!.windowLeft,
+    'demo should sit flush with the left content rail',
+  ).toBeLessThanOrEqual(1)
   expect(
     layout!.stageWidth - layout!.windowRight,
-    'demo should sit inset from the right content rail',
-  ).toBeGreaterThan(8)
+    'demo should sit flush with the right content rail',
+  ).toBeLessThanOrEqual(1)
   expect(layout!.textLeft, 'disclaimer should share the mockup left edge').toBe(layout!.windowLeft)
   expect(layout!.textTop, 'disclaimer should sit under the mockup').toBeGreaterThanOrEqual(
     layout!.windowBottom,

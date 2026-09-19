@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { releases } from '../src/changelog/changelogData'
+import { releaseAnchorId, releases } from '../src/changelog/changelogData'
 
 const IGNORED_CONSOLE = [/ResizeObserver loop/i]
 
@@ -41,6 +41,14 @@ test('changelog.html loads from production assets', async ({ page }) => {
   expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
 })
 
+test('changelog sits on the ledger with a ruled footer', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/changelog')
+  await expect(page.locator('main.ledger')).toHaveCount(1)
+  await expect(page.locator('.section-label')).toHaveText('Changelog')
+  await expect(page.locator('footer .ledger-rule')).toHaveCount(1)
+})
+
 test('changelog menubar link is current and points at this page', async ({ page }) => {
   await page.goto('/changelog')
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
@@ -49,15 +57,78 @@ test('changelog menubar link is current and points at this page', async ({ page 
   await expect(link).toHaveAttribute('aria-current', 'page')
 })
 
-test('version table of contents is absent with the live release list', async ({ page }) => {
+test('version table of contents sits in the right rail on desktop and hides on compact', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/changelog')
-  expect(releases.length).toBeLessThanOrEqual(4)
-  await expect(page.getByRole('navigation', { name: 'Release versions' })).toHaveCount(0)
+  const toc = page.getByRole('navigation', { name: 'Release versions' })
+  const article = page.locator('.changelog-article')
+  await expect(toc).toBeVisible()
+  const [articleBox, tocBox] = await Promise.all([article.boundingBox(), toc.boundingBox()])
+  expect(articleBox, 'article box').toBeTruthy()
+  expect(tocBox, 'toc box').toBeTruthy()
+  expect(tocBox!.x).toBeGreaterThan(articleBox!.x + articleBox!.width - 2)
+  const rail = await page.evaluate(() => {
+    const articleEl = document.querySelector('.changelog-article')
+    const tocEl = document.querySelector('.changelog-toc')
+    if (!articleEl || !tocEl) return null
+    const articleStyle = getComputedStyle(articleEl)
+    const tocStyle = getComputedStyle(tocEl)
+    const title = document.querySelector('.changelog-toc-title')
+    const titleStyle = title ? getComputedStyle(title) : null
+    return {
+      articleRule: articleStyle.borderInlineEndWidth,
+      articleClip: articleStyle.clipPath,
+      tocGap: tocStyle.rowGap || tocStyle.gap,
+      titlePaddingTop: titleStyle?.paddingTop ?? '',
+      titlePaddingBottom: titleStyle?.paddingBottom ?? '',
+      titleAlign: titleStyle?.alignItems ?? '',
+    }
+  })
+  expect(rail, 'changelog rail styles').toBeTruthy()
+  expect(parseFloat(rail!.articleRule)).toBeGreaterThan(0)
+  expect(rail!.articleClip).toMatch(/inset/i)
+  expect(parseFloat(rail!.tocGap)).toBeGreaterThan(0)
+  expect(rail!.titlePaddingTop).toBe(rail!.titlePaddingBottom)
+  expect(parseFloat(rail!.titlePaddingTop)).toBeLessThan(14)
+  expect(rail!.titleAlign).toBe('center')
   for (const release of releases) {
+    await expect(toc.getByRole('link', { name: `v${release.version}` })).toHaveAttribute(
+      'href',
+      `#v${release.version}`,
+    )
     await expect(
       page.getByRole('heading', { level: 2, name: `v${release.version}` }),
     ).toHaveAttribute('id', `v${release.version}`)
   }
+
+  await page.setViewportSize({ width: 375, height: 812 })
+  await expect(toc).toBeHidden()
+})
+
+test('TOC highlights the version section in view', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/changelog')
+  const toc = page.getByRole('navigation', { name: 'Release versions' })
+  const first = releases[0]
+  const last = releases[releases.length - 1]
+  await expect(toc.getByRole('link', { name: `v${first.version}` })).toHaveAttribute(
+    'aria-current',
+    'true',
+  )
+
+  await page.locator(`[id="${releaseAnchorId(last.version)}"]`).evaluate((el) => {
+    el.scrollIntoView({ block: 'start' })
+  })
+  await expect(toc.getByRole('link', { name: `v${last.version}` })).toHaveAttribute(
+    'aria-current',
+    'true',
+  )
+  await expect(toc.getByRole('link', { name: `v${first.version}` })).not.toHaveAttribute(
+    'aria-current',
+    'true',
+  )
 })
 
 test('changelog page paints kind badges without overflowing at desktop and compact', async ({

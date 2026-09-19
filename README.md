@@ -46,13 +46,18 @@
 
 **Prerequisites:** [Rust](https://rustup.rs/) 1.77+, [Node.js](https://nodejs.org/) 20+, [pnpm](https://pnpm.io/) 9+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. VS Code: install the recommended extensions when prompted (format-on-save + ESLint).
 
+`web/` is the in-browser preview of the Tauri app UI (mocked backend). `website/` is the public marketing site and interactive demo at [memlore.app](https://memlore.app).
+
 ```bash
 pnpm install
 pnpm tauri dev                    # native app
 # MEMLORE_REACT_DEVTOOLS=1 pnpm tauri dev   # optional, after `npx react-devtools`
 
-pnpm web:dev                      # browser UI preview — http://localhost:5175
+pnpm web:dev                      # app UI preview (web/) — http://localhost:5175
 pnpm web:build && pnpm web:preview
+
+pnpm website:dev                  # marketing site (website/) — http://localhost:5176
+pnpm website:build && pnpm website:preview
 
 pnpm test                         # frontend
 cd src-tauri && cargo test        # backend

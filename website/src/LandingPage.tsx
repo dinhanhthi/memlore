@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import {
   autoUpdate,
   flip,
@@ -24,6 +24,7 @@ import {
   Cloud,
   Code2,
   Cpu,
+  Download,
   EyeOff,
   FileText,
   Hash,
@@ -38,6 +39,7 @@ import {
   Lock,
   Maximize2,
   MessageCircle,
+  Minus,
   MessageSquareQuote,
   Monitor,
   MoreHorizontal,
@@ -56,12 +58,19 @@ import {
   X,
 } from 'lucide-react'
 import { latestStableRelease } from './changelog/changelogData'
-import { downloadUrl, githubUrl, licenseUrl } from './links'
+import {
+  aiFeatureRequestUrl,
+  downloadUrl,
+  editorFeatureRequestUrl,
+  githubUrl,
+  licenseUrl,
+} from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
 import { DownloadLink, SiteHeader } from './SiteHeader'
 import { useWideViewport } from './useWideViewport'
+import { LedgerGap, LedgerRule, SectionIndex } from './Ledger'
 import { SiteFooterBar } from './SiteFooterBar'
 import { logoSrc } from './logoDirection'
 import { NATURAL_EARTH_LAND_D } from './naturalEarthLand'
@@ -80,6 +89,8 @@ const aiIcons = {
   emotion: Heart,
   time: CalendarClock,
   image: ImagePlus,
+  coming: Puzzle,
+  request: ArrowUpRight,
   device: Cpu,
 } as const
 const lockIcons = {
@@ -173,14 +184,14 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   if (mark === 'yes') {
     return (
       <span className="mark mark-yes" role="img" aria-label={label}>
-        <Check className="size-3" aria-hidden="true" />
+        <Check className="size-4" strokeWidth={2} aria-hidden="true" />
       </span>
     )
   }
   if (mark === 'no') {
     return (
       <span className="mark mark-no" role="img" aria-label={label}>
-        <X className="size-3" aria-hidden="true" />
+        <X className="size-4" strokeWidth={2} aria-hidden="true" />
       </span>
     )
   }
@@ -193,7 +204,7 @@ function MarkIcon({ mark, product }: { mark: ComparisonMark; product: Comparison
   }
   return (
     <span className="mark mark-partial" role="img" aria-label={label}>
-      —
+      <Minus className="size-4" strokeWidth={2} aria-hidden="true" />
     </span>
   )
 }
@@ -341,7 +352,7 @@ function SyncLink({ icon: Icon, label }: { icon: typeof Lock; label: string }) {
    `.encrypt-*` in styles.css reshapes this figure too. */
 function SyncFigure() {
   return (
-    <figure className="illust illust-encrypt" aria-hidden="true">
+    <figure className="illust illust-encrypt illust-sync" aria-hidden="true">
       <div className="encrypt-scene">
         <article className="encrypt-card">
           <div className="encrypt-card-body">
@@ -399,8 +410,7 @@ function LocksFigure() {
   const SecondIcon = lockIcons.second
   const InvisibleIcon = lockIcons.invisible
   return (
-    <figure className="illust illust-locks cell-inset" aria-hidden="true">
-      <div className="cell-inset-rule" />
+    <figure className="illust illust-locks" aria-hidden="true">
       <article data-lock="app">
         <p>
           <AppIcon className="size-5" />
@@ -419,7 +429,6 @@ function LocksFigure() {
           </article>
         </article>
       </article>
-      <div className="cell-inset-rule" />
     </figure>
   )
 }
@@ -433,21 +442,49 @@ const editorPanes = [
   { id: 'mention' as const, title: 'Mentions', Icon: AtSign },
   { id: 'markdown' as const, title: 'Markdown', Icon: Hash },
   { id: 'plugins' as const, title: 'More plugins', Icon: Puzzle },
+  {
+    id: 'request' as const,
+    title: 'Need more?',
+    Icon: ArrowUpRight,
+    href: editorFeatureRequestUrl,
+  },
 ]
 
 function EditorFigure() {
   return (
-    <figure className="illust illust-editor" aria-hidden="true">
-      {editorPanes.map((pane) => (
-        <div key={pane.id} className={`ed-card ed-${pane.id}`}>
-          {'mark' in pane ? (
-            <span className="ed-slash-mark">{pane.mark}</span>
-          ) : (
-            <pane.Icon className="size-5" strokeWidth={1.75} />
-          )}
-          <span>{pane.title}</span>
-        </div>
-      ))}
+    <figure className="illust illust-editor">
+      {editorPanes.map((pane) => {
+        const inner = (
+          <>
+            {'mark' in pane ? (
+              <span className="ed-slash-mark">{pane.mark}</span>
+            ) : (
+              <pane.Icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            )}
+            <span>{pane.title}</span>
+          </>
+        )
+        const className = `ed-card ed-${pane.id}`
+        if ('href' in pane) {
+          return (
+            <a
+              key={pane.id}
+              className={className}
+              href={pane.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {inner}
+            </a>
+          )
+        }
+        return (
+          <div key={pane.id} className={className} aria-hidden="true">
+            {inner}
+          </div>
+        )
+      })}
+      <div className="ed-empty" aria-hidden="true" />
     </figure>
   )
 }
@@ -492,7 +529,7 @@ function MapPhoto({
   delay: string
 }) {
   return (
-    <g transform={`translate(${x} ${y}) rotate(${rotate})`}>
+    <g data-map-pin={variant} transform={`translate(${x} ${y}) rotate(${rotate})`}>
       <g className="map-pin-bob" style={{ animationDelay: delay }}>
         <rect className="map-photo-frame" x="-26" y="-52" width="52" height="40" rx="5" />
         {/* Lucide glyphs drawn on their native 24x24 grid, then centred in the frame. */}
@@ -541,44 +578,83 @@ function LocationsFigure() {
     )
   })
   return (
-    <figure className="illust illust-map cell-inset" aria-hidden="true">
-      <div className="cell-inset-rule" />
-      <svg className="map-svg" viewBox="0 0 360 180">
-        <rect className="map-ocean" width="360" height="180" rx="10" />
+    <figure className="illust illust-map" aria-hidden="true">
+      <svg className="map-svg" viewBox="0 0 360 180" preserveAspectRatio="none">
+        <rect className="map-ocean" width="360" height="180" />
         <path className="map-land" d={NATURAL_EARTH_LAND_D} />
         <g className="map-grid">{tiles}</g>
         <MapPhoto x={128} y={87} rotate={-6} variant="image" delay="0s" />
         <MapPhoto x={182} y={52} rotate={4} variant="video" delay="0.35s" />
         <MapPhoto x={286} y={74} rotate={-3} variant="audio" delay="0.7s" />
       </svg>
-      <div className="cell-inset-rule" />
     </figure>
-  )
-}
-
-function TransferArrow() {
-  return (
-    <svg className="transfer-arrow" viewBox="0 0 40 24" aria-hidden="true">
-      <path d="M4 12 H28" />
-      <path d="M22 6 L32 12 L22 18" />
-    </svg>
   )
 }
 
 const transferInbound = ['Day One', 'Journey', 'Apple Journal', 'Markdown', 'Plain text']
 const transferOutbound = ['Backup', 'Markdown', 'Plain text']
 
+function transferFlowPaths(root: HTMLElement): { w: number; h: number; paths: string[] } {
+  const w = root.clientWidth
+  const h = root.clientHeight
+  const origin = root.getBoundingClientRect()
+  const hub = root.querySelector('.transfer-hub')
+  if (!(hub instanceof HTMLElement) || w === 0 || h === 0) return { w, h, paths: [] }
+  const hubBox = hub.getBoundingClientRect()
+  const hubLeft = hubBox.left - origin.left
+  const hubRight = hubBox.right - origin.left
+  const hubY = hubBox.top - origin.top + hubBox.height / 2
+  const curve = (x1: number, y1: number, x2: number, y2: number) => {
+    const gap = x2 - x1
+    const c1 = x1 + Math.max(28, gap * 0.72)
+    const c2 = x2 - Math.max(14, gap * 0.22)
+    return `M${x1.toFixed(1)},${y1.toFixed(1)} C${c1.toFixed(1)},${y1.toFixed(1)} ${c2.toFixed(1)},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`
+  }
+  const inbound = [...root.querySelectorAll('.transfer-in span')].map((el) => {
+    const box = el.getBoundingClientRect()
+    return curve(box.right - origin.left, box.top - origin.top + box.height / 2, hubLeft, hubY)
+  })
+  const outbound = [...root.querySelectorAll('.transfer-out span')].map((el) => {
+    const box = el.getBoundingClientRect()
+    return curve(hubRight, hubY, box.left - origin.left, box.top - origin.top + box.height / 2)
+  })
+  return { w, h, paths: [...inbound, ...outbound] }
+}
+
 function TransferFigure() {
+  const rootRef = useRef<HTMLElement>(null)
+  const [flow, setFlow] = useState({ w: 0, h: 0, paths: [] as string[] })
+
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const update = () => setFlow(transferFlowPaths(root))
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <figure className="illust illust-transfer" aria-hidden="true">
+    <figure ref={rootRef} className="illust illust-transfer" aria-hidden="true">
+      {flow.w > 0 ? (
+        <svg
+          className="transfer-flow"
+          viewBox={`0 0 ${flow.w} ${flow.h}`}
+          width={flow.w}
+          height={flow.h}
+        >
+          {flow.paths.map((d) => (
+            <path key={d} d={d} />
+          ))}
+        </svg>
+      ) : null}
       <div className="transfer-col transfer-in">
         {transferInbound.map((item) => (
           <span key={item}>{item}</span>
         ))}
       </div>
-      <TransferArrow />
       <strong className="transfer-hub">Memlore</strong>
-      <TransferArrow />
       <div className="transfer-col transfer-out">
         {transferOutbound.map((item) => (
           <span key={item}>{item}</span>
@@ -591,7 +667,6 @@ function TransferFigure() {
 function DemoPlaceholder() {
   return (
     <div className="demo-placeholder">
-      <LedgerRule />
       <figure className="demo-placeholder-stage">
         <HeadFollowLogo alt="" className="demo-placeholder-head" size={112} />
         <p className="demo-placeholder-title">This preview needs a wider window.</p>
@@ -649,7 +724,6 @@ function DemoLive() {
   }
   return (
     <div className="demo-stage" data-upright={status === 'ready' ? '' : undefined}>
-      <LedgerRule />
       <div className="demo-stack" aria-hidden="true">
         <span />
         <span />
@@ -851,6 +925,15 @@ const aiItems = [
     text: 'Using AI to generate cover images and inline illustrations for your entries.',
   },
   {
+    id: 'coming' as const,
+    title: 'More to come',
+  },
+  {
+    id: 'request' as const,
+    title: 'Need more?',
+    href: aiFeatureRequestUrl,
+  },
+  {
     id: 'device' as const,
     title: 'On-device paths',
     text: 'Memlore comes with integrated, local AI to ensure your data is always 100% private and never leaves your device.',
@@ -981,48 +1064,6 @@ function formatLedgerDate(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00Z`))
 }
 
-function LedgerRule({
-  area,
-  accent,
-}: {
-  area?: 'r0' | 're' | 'r1' | 'r2' | 'r3' | 'r4'
-  accent?: boolean
-}) {
-  return (
-    <div
-      className="ledger-rule"
-      role="separator"
-      data-accent={accent ? '' : undefined}
-      style={area ? { gridArea: area } : undefined}
-    />
-  )
-}
-
-function LedgerGap() {
-  return <div className="ledger-gap" aria-hidden="true" />
-}
-
-function FeatureJoin() {
-  return (
-    <>
-      <LedgerRule />
-      <div className="split-gap" aria-hidden="true" />
-    </>
-  )
-}
-
-function SectionIndex({ children }: { children: string }) {
-  return (
-    <>
-      <LedgerRule />
-      <LedgerGap />
-      <LedgerRule accent />
-      <p className="section-label">{children}</p>
-      <LedgerRule />
-    </>
-  )
-}
-
 export default function LandingPage() {
   const wide = useWideViewport()
   useEffect(() => {
@@ -1066,15 +1107,14 @@ export default function LandingPage() {
           <LedgerRule area="re" accent />
           <p className="hero-eyebrow headline">
             Memlore
-            <span aria-hidden="true"> · </span>v{latestStableRelease.version}
+            <span aria-hidden="true"> · </span>
+            <span className="hero-eyebrow-version">v{latestStableRelease.version}</span>
             <span aria-hidden="true"> · </span>
             <time dateTime={latestStableRelease.date}>
               {formatLedgerDate(latestStableRelease.date)}
             </time>
             <span aria-hidden="true"> · </span>
-            <a href={githubUrl} target="_blank" rel="noreferrer">
-              Open source
-            </a>
+            Open source
             <span aria-hidden="true"> · </span>
             <span className="hero-eyebrow-free">Free</span>
           </p>
@@ -1160,8 +1200,8 @@ export default function LandingPage() {
           </div>
           <EncryptFigure />
         </section>
-        <FeatureJoin />
-        <section className="split split-flip" id="sync" data-tone="raised">
+        <LedgerRule />
+        <section className="split split-flip" id="sync">
           <SyncFigure />
           <div>
             <h2>Your cloud. Your account. Your key.</h2>
@@ -1171,7 +1211,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
-        <FeatureJoin />
+        <LedgerRule />
         <section className="split" id="locks">
           <div className="locks-copy">
             <h2>You can lock entries in 3 different ways.</h2>
@@ -1191,7 +1231,7 @@ export default function LandingPage() {
           </div>
           <LocksFigure />
         </section>
-        <FeatureJoin />
+        <LedgerRule />
         <section className="split split-flip" id="editor">
           <EditorFigure />
           <div>
@@ -1202,7 +1242,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
-        <FeatureJoin />
+        <LedgerRule />
         <section className="split" id="emotions">
           <div>
             <h2>Emotion tracking</h2>
@@ -1210,7 +1250,7 @@ export default function LandingPage() {
           </div>
           <EmotionsFigure />
         </section>
-        <FeatureJoin />
+        <LedgerRule />
         <section className="split split-flip" id="locations">
           <LocationsFigure />
           <div>
@@ -1218,10 +1258,10 @@ export default function LandingPage() {
             <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
           </div>
         </section>
-        <FeatureJoin />
+        <LedgerRule />
         <section className="split" id="import-export">
           <div>
-            <h2>Import and export</h2>
+            <h2>Import and Export</h2>
             <p>
               You can import entries (including media) from other platforms into Memlore, and vice
               versa. Make sure the migration is seamless.
@@ -1245,13 +1285,40 @@ export default function LandingPage() {
           <div className="ai-grid">
             {aiItems.map((item) => {
               const Icon = aiIcons[item.id]
-              return (
-                <article key={item.id} data-ai={item.id}>
+              const inner = (
+                <>
                   <span className="ai-icon" aria-hidden="true">
                     <Icon className="size-5" />
                   </span>
                   <h3>{item.title}</h3>
-                  <p>{item.text}</p>
+                  {'text' in item && item.text ? <p>{item.text}</p> : null}
+                </>
+              )
+              if (item.id === 'device') {
+                return (
+                  <Fragment key={item.id}>
+                    <div className="ai-empty" aria-hidden="true" />
+                    <article data-ai={item.id}>{inner}</article>
+                  </Fragment>
+                )
+              }
+              if ('href' in item) {
+                return (
+                  <a
+                    key={item.id}
+                    className="ai-request"
+                    data-ai={item.id}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {inner}
+                  </a>
+                )
+              }
+              return (
+                <article key={item.id} data-ai={item.id}>
+                  {inner}
                 </article>
               )
             })}
@@ -1379,11 +1446,7 @@ export default function LandingPage() {
         <SectionIndex>Platforms</SectionIndex>
         <section className="platform-section">
           <div>
-            <h2>
-              A home on your devices.
-              <br />
-              More doors opening soon.
-            </h2>
+            <h2>Multiple platforms supported</h2>
             <p>
               We’re starting with macOS and taking the time to make it feel right. Follow along as
               Memlore grows.
@@ -1404,7 +1467,7 @@ export default function LandingPage() {
                         rel="noreferrer"
                         aria-label="Download the beta from GitHub"
                       >
-                        <Check className="size-3.5" /> {item.status}
+                        <Download className="size-3.5" /> {item.status}
                       </a>
                     </strong>
                   ) : (

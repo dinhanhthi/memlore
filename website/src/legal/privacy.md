@@ -1,7 +1,7 @@
 ---
 title: Memlore — Privacy Policy
 description: How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.
-updated: 18 September 2026
+updated: 20 September 2026
 ---
 
 # Privacy Policy
@@ -33,27 +33,19 @@ Entries, media, and settings are encrypted on your device before they are upload
 
 ## Optional Google Drive sync
 
-If you choose Google Drive, you connect your own Google account. Memlore asks only for the [drive.appdata](https://www.googleapis.com/auth/drive.appdata) scope.
+If you choose Google Drive, you connect your own Google account. Memlore asks only for the [drive.appdata](https://www.googleapis.com/auth/drive.appdata) scope. Synced files sit in Google Drive’s hidden Application Data folder — not visible on drive.google.com — and Memlore cannot read your other Drive files.
 
-Synced files sit in Google Drive’s hidden Application Data folder. They are not visible in drive.google.com. Memlore cannot read your other Drive files.
-
-The refresh token is stored only in the encrypted database on your device. The access token stays in memory and is never written to disk.
-
-Memlore reads your Google account email, and your Drive storage quota, so the app can show which account is connected. Both stay only in the encrypted database on your device. They are not sent to a Memlore server.
-
-The refresh token, account email, and quota stay on this device until you disconnect in the app. Then they are deleted from the local database. The access token is never written to disk and is gone when the app closes.
+The refresh token, your Google account email, and your Drive storage quota stay only in the encrypted database on this device, so the app can show which account is connected. They stay until you disconnect, then they are deleted from the local database. The access token stays in memory, is never written to disk, and is gone when the app closes.
 
 Disconnecting in the app does not delete the files already in your hidden Application Data folder. To remove that Google-side copy, open Google Drive → Settings → Manage apps → Memlore → Disconnect from Drive.
 
-Google user data is used for one purpose only: to run the Drive sync you turned on. It is never used for anything else. Specifically, Memlore does not:
+Google user data is used only to run the Drive sync you turned on. No human at Memlore reads your Google user data. There is no Memlore server for it to reach. Memlore does not:
 
 - Sell it, or transfer it to data brokers or information resellers
 - Use it for advertising, including targeted, personalized, or interest-based ads
 - Use it to develop, improve, or train generalized or non-personalized AI or ML models
 - Use it for credit-worthiness, lending, or any other determination unrelated to the app's features
 - Transfer it to third parties, except as needed to operate Drive sync inside your own Google account, or where required by law
-
-No human at Memlore reads your Google user data. There is no Memlore server for it to reach, and the synced payloads are encrypted with a key only your device holds.
 
 Memlore's use and transfer to any other app of information received from Google APIs will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 

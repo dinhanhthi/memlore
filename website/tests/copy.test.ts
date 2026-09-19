@@ -14,7 +14,7 @@ import privacyMarkdown from '../src/legal/privacy.md?raw'
 import termsMarkdown from '../src/legal/terms.md?raw'
 import { parseLegalMarkdown } from '../src/legal/markdown'
 import { prerenderCopy } from '../src/prerender'
-import { githubUrl, licenseUrl } from '../src/links'
+import { aiFeatureRequestUrl, editorFeatureRequestUrl, githubUrl, licenseUrl } from '../src/links'
 
 /**
  * Every site string lives in the component that renders it, so this file reads
@@ -224,6 +224,22 @@ it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
 })
 
+it('points editor feature requests at a prefilled GitHub issue', () => {
+  expect(editorFeatureRequestUrl).toBe(
+    'https://github.com/dinhanhthi/memlore/issues/new?title=Editor%20feature%20request%3A%20&labels=enhancement',
+  )
+  expect(landing).toContain('editorFeatureRequestUrl')
+  expect(landing).toContain('Need more?')
+})
+
+it('points AI feature requests at a prefilled GitHub issue', () => {
+  expect(aiFeatureRequestUrl).toBe(
+    'https://github.com/dinhanhthi/memlore/issues/new?title=AI%20feature%20request%3A%20&labels=enhancement',
+  )
+  expect(landing).toContain('aiFeatureRequestUrl')
+  expect(landing).toContain('More to come')
+})
+
 it('points the spec-strip license at the AGPL file on GitHub', () => {
   expect(licenseUrl).toBe(`${githubUrl}?tab=AGPL-3.0-1-ov-file`)
   expect(landing).toContain('AGPLv3')
@@ -251,13 +267,25 @@ it('uses yellow group labels only for Demo, Features, AI, and Platforms', () => 
   expect(labels).toEqual(['Demo', 'Features', 'AI', 'Platforms'])
 })
 
-it('builds the hero eyebrow from the latest stable release and GitHub', () => {
+it('builds the hero eyebrow from the latest stable release without an Open source link', () => {
   expect(landing).toContain('hero-eyebrow')
   expect(landing).toContain('latestStableRelease')
-  expect(landing).toContain('href={githubUrl}')
+  expect(landing).toContain('hero-eyebrow-version')
   expect(landing).toContain('Open source')
+  expect(landing).not.toMatch(/<a href=\{githubUrl\}[^>]*>\s*Open source/)
   expect(landing).toContain('hero-eyebrow-free')
   expect(landing).toContain('hero-lead')
+})
+
+it('lays legal and changelog pages on the homepage ledger with a pinned footer', () => {
+  expect(legalPageSource).toContain('className="ledger"')
+  expect(legalPageSource).toContain('SectionIndex')
+  expect(legalPageSource).toContain('LedgerRule')
+  expect(legalPageSource).toMatch(/<footer>[\s\S]*LedgerRule/)
+  expect(changelogPageSource).toContain('className="ledger"')
+  expect(changelogPageSource).toContain('SectionIndex')
+  expect(changelogPageSource).toContain('LedgerRule')
+  expect(changelogPageSource).toMatch(/<footer>[\s\S]*LedgerRule/)
 })
 
 it('credits the author on the About page', () => {
@@ -413,6 +441,7 @@ it('names the editor and lists slash, mentions, markdown, and more plugins', () 
   expect(copy).toMatch(/slash command/)
   expect(copy).toMatch(/markdown/)
   expect(copy).toMatch(/more plugins/)
+  expect(copy).toMatch(/need more/)
   expect(editorPanesSource).not.toMatch(/tag: 'GFM'/)
 })
 

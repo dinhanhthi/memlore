@@ -7,7 +7,6 @@ import {
   latestStableVersion,
   latestStableVersionOf,
   releases,
-  shouldShowChangelogToc,
   type ChangelogKind,
   type ChangelogRelease,
 } from '../src/changelog/changelogData'
@@ -102,10 +101,9 @@ it('keeps the changelog page title and description in sync with the copy source'
   expect(changelogHtml).toContain(`content="${CHANGELOG_META_DESCRIPTION}"`)
 })
 
-it('hides the version table of contents until there are more than four releases', () => {
-  expect(shouldShowChangelogToc(4)).toBe(false)
-  expect(shouldShowChangelogToc(5)).toBe(true)
-  expect(shouldShowChangelogToc(releases.length)).toBe(releases.length > 4)
+it('always renders the version table of contents', () => {
+  expect(changelogPageSource).toContain('<ChangelogToc />')
+  expect(changelogPageSource).not.toMatch(/shouldShowChangelogToc|showToc|data-toc/)
 })
 
 it('labels kinds with New, Improved, Fixed, and Breaking', () => {

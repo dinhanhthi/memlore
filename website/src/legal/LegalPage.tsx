@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { preloadHeadSprites } from '../HeadFollowLogo'
+import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
 import { isExternalHref, parseInline, parseLegalMarkdown, type LegalBlock } from './markdown'
@@ -61,16 +62,21 @@ export default function LegalPage({
         Skip to content
       </a>
       <SiteHeader homeHref="/" sectionPrefix="/" />
-      <main id="main" tabIndex={-1}>
+      <main id="main" className="ledger" tabIndex={-1}>
         <article className="legal-article">
+          <SectionIndex>{kind === 'about' ? 'About' : 'Legal'}</SectionIndex>
           {heading ? <BlockView block={heading} /> : null}
+          <LedgerRule />
           <p className="legal-updated">Last updated {meta.updated}</p>
+          <LedgerRule />
+          <LedgerGap />
           {rest.map((block, index) => (
             <BlockView key={index} block={block} intro={index === firstParagraph} />
           ))}
         </article>
       </main>
       <footer>
+        <LedgerRule />
         <SiteFooterBar homeHref="/" current={kind} />
       </footer>
     </>

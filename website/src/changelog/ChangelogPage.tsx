@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { preloadHeadSprites } from '../HeadFollowLogo'
+import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
+import { useActiveChangelogAnchor } from './activeChangelogAnchor'
 import {
   releaseAnchorId,
   releases,
-  shouldShowChangelogToc,
   type ChangelogKind,
   type ChangelogRelease,
 } from './changelogData'
@@ -60,6 +61,7 @@ function Release({ release }: { release: ChangelogRelease }) {
 }
 
 function ChangelogToc() {
+  const active = useActiveChangelogAnchor()
   return (
     <nav className="changelog-toc" aria-label="Release versions">
       <p className="changelog-toc-title">Versions</p>
@@ -68,7 +70,9 @@ function ChangelogToc() {
           const id = releaseAnchorId(release.version)
           return (
             <li key={release.version}>
-              <a href={`#${id}`}>v{release.version}</a>
+              <a href={`#${id}`} aria-current={active === id ? 'true' : undefined}>
+                v{release.version}
+              </a>
             </li>
           )
         })}
@@ -78,7 +82,6 @@ function ChangelogToc() {
 }
 
 export default function ChangelogPage() {
-  const showToc = shouldShowChangelogToc(releases.length)
   useEffect(() => {
     preloadHeadSprites()
   }, [])
@@ -88,19 +91,27 @@ export default function ChangelogPage() {
         Skip to content
       </a>
       <SiteHeader homeHref="/" sectionPrefix="/" current="changelog" />
-      <main id="main" tabIndex={-1}>
-        <div className="changelog-layout" data-toc={showToc ? 'true' : undefined}>
+      <main id="main" className="ledger" tabIndex={-1}>
+        <div className="changelog-layout">
           <article className="changelog-article">
+            <SectionIndex>Changelog</SectionIndex>
             <h1>What’s new</h1>
+            <LedgerRule />
             <p className="changelog-intro">Every version of Memlore, in plain words.</p>
+            <LedgerRule />
+            <LedgerGap />
             {releases.map((release) => (
-              <Release key={release.version} release={release} />
+              <div key={release.version}>
+                <LedgerRule />
+                <Release release={release} />
+              </div>
             ))}
           </article>
-          {showToc ? <ChangelogToc /> : null}
+          <ChangelogToc />
         </div>
       </main>
       <footer>
+        <LedgerRule />
         <SiteFooterBar homeHref="/" current="changelog" />
       </footer>
     </>
