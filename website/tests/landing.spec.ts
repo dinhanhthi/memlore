@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { latestStableRelease } from '../src/changelog/changelogData'
 
 const VIEWPORTS = [
   { name: '320', width: 320, height: 720 },
@@ -11,6 +12,7 @@ const VIEWPORTS = [
 const COMPACT_MAX_PX = 1088
 
 const GITHUB = 'https://github.com/dinhanhthi/memlore'
+const LICENSE = `${GITHUB}?tab=AGPL-3.0-1-ov-file`
 // The Download buttons go through the counting Worker, which then redirects to
 // the GitHub asset — see workers/stats/ and website/src/links.ts.
 const DOWNLOAD = 'https://dl.memlore.app/mac'
@@ -38,6 +40,10 @@ function attachErrorCollectors(page: Page) {
 
 function demoFrame(page: Page) {
   return page.frameLocator(`iframe[title="${IFRAME_TITLE}"]`)
+}
+
+async function useLightLanding(page: Page) {
+  await page.emulateMedia({ colorScheme: 'light' })
 }
 
 async function startDemo(page: Page) {
@@ -98,7 +104,11 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
     await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
     await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
     await expectSingleLine(nav.locator('summary'), 'nav Doc')
-    await expect(nav.getByRole('link', { name: 'GitHub' })).toHaveCount(0)
+    await expectSingleLine(
+      nav.getByRole('link', { name: 'Download the beta from GitHub' }),
+      'nav download',
+    )
+    await expect(nav.getByRole('link', { name: 'GitHub', exact: true })).toHaveCount(0)
     return
   }
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
@@ -111,6 +121,84 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(page.locator('.header-actions .download'), 'header download')
   await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
 }
+
+function formatLedgerDate(isoDate: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${isoDate}T00:00:00Z`))
+}
+
+test('spec strip sits above the demo and links the AGPL license', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const following = await page.evaluate(() => {
+    const spec = document.querySelector('.spec-strip')
+    const demo = document.querySelector('#demo')
+    if (!spec || !demo) return false
+    return Boolean(spec.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+  expect(following, 'spec strip should come before the demo').toBe(true)
+  await expect(
+    page.locator('.spec-strip').getByRole('link', { name: /read the source/i }),
+  ).toHaveAttribute('href', LICENSE)
+  await expect(page.locator('.spec-item', { hasText: 'version' })).toContainText(
+    `v${latestStableRelease.version}`,
+    { ignoreCase: true },
+  )
+  await expect(page.locator('.spec-item', { hasText: 'size' })).toContainText('180 MB')
+})
+
+test('hero-lead sits above the mascot on compact viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const leadBox = await page.locator('.hero-lead').boundingBox()
+  const portraitBox = await page.locator('.hero-portrait').boundingBox()
+  expect(leadBox, 'hero-lead should have a box').toBeTruthy()
+  expect(portraitBox, 'hero portrait should have a box').toBeTruthy()
+  expect(
+    leadBox!.y + leadBox!.height,
+    'empty row should sit above the dog',
+  ).toBeLessThanOrEqual(portraitBox!.y + 1)
+  const hairlineBetween = await page.evaluate(() => {
+    const lead = document.querySelector('.hero-lead')
+    const portrait = document.querySelector('.hero-portrait')
+    if (!(lead instanceof HTMLElement) || !(portrait instanceof HTMLElement)) {
+      return false
+    }
+    const leadRect = lead.getBoundingClientRect()
+    const portraitRect = portrait.getBoundingClientRect()
+    return [...document.querySelectorAll('.hero .ledger-rule')].some((rule) => {
+      const rect = rule.getBoundingClientRect()
+      return rect.top >= leadRect.bottom - 2 && rect.bottom <= portraitRect.top + 2
+    })
+  })
+  expect(hairlineBetween, 'a hairline should sit between the empty row and the dog').toBe(
+    true,
+  )
+})
+
+test('hero eyebrow lists the latest release and links open source', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  const eyebrow = page.locator('.hero-eyebrow')
+  await expect(page.locator('.hero-lead')).toHaveCount(1)
+  const accentOnEyebrowRule = await page.evaluate(() => {
+    const eyebrow = document.querySelector('.hero-eyebrow')
+    const rule = eyebrow?.previousElementSibling
+    return rule instanceof HTMLElement && rule.hasAttribute('data-accent')
+  })
+  expect(accentOnEyebrowRule, 'gold dash should sit on the rule above the release line').toBe(true)
+  await expect(eyebrow).toContainText('Memlore')
+  await expect(eyebrow).toContainText(`v${latestStableRelease.version}`, { ignoreCase: true })
+  await expect(eyebrow).toContainText(formatLedgerDate(latestStableRelease.date), {
+    ignoreCase: true,
+  })
+  await expect(eyebrow.getByRole('link', { name: 'Open source' })).toHaveAttribute('href', GITHUB)
+  await expect(eyebrow.locator('.hero-eyebrow-free')).toHaveText('Free')
+})
 
 test('landing and demo.html load from production assets', async ({ page }) => {
   const landing = attachErrorCollectors(page)
@@ -174,8 +262,8 @@ for (const viewport of VIEWPORTS) {
         }
       })
       expect(lockOrder, 'locks section should exist').toBeTruthy()
-      expect(lockOrder!.title).toBeLessThan(lockOrder!.figure)
-      expect(lockOrder!.figure).toBeLessThan(lockOrder!.list)
+      expect(lockOrder!.title).toBeLessThan(lockOrder!.list)
+      expect(lockOrder!.list).toBeLessThan(lockOrder!.figure)
     } else {
       await expect(page.locator('.demo-poster')).toBeVisible()
       await expect(page.locator('.demo-placeholder')).toHaveCount(0)
@@ -202,7 +290,7 @@ for (const viewport of VIEWPORTS) {
       `AI lattice should be ${expectedAiColumns}-col at ${viewport.name}`,
     ).toBe(expectedAiColumns)
     expect(aiGrid.cellRadius, 'AI cells should share edges, not card radii').toBe('0px')
-    expect(aiGrid.frameRadius, 'AI lattice should round the outer frame').not.toBe('0px')
+    expect(aiGrid.frameRadius, 'AI lattice sits flush to the ledger, no floating card').toBe('0px')
     expect(aiGrid.deviceColumnEnd, 'On-device cell should span the row').toBe('-1')
     const titleBoxes = await page.locator('.ai-grid h3').evaluateAll((nodes) =>
       nodes.map((el) => ({
@@ -227,10 +315,10 @@ for (const viewport of VIEWPORTS) {
         .locator('.comparison-scroll thead th')
         .nth(1)
         .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-      expect(
+        expect(
         titleSize,
         'comparison app titles should read larger than table body',
-      ).toBeGreaterThanOrEqual(18)
+      ).toBeGreaterThanOrEqual(16)
     }
     await expectChromeSingleLine(page, compact)
     await expectNoRootOverflow(page)
@@ -238,6 +326,33 @@ for (const viewport of VIEWPORTS) {
     expect(errors.consoleErrors, errors.consoleErrors.join('\n')).toEqual([])
   })
 }
+
+test('number gutter and ordinals appear together', async ({ page }) => {
+  const measure = () =>
+    page.evaluate(() => {
+      const gutter = getComputedStyle(document.documentElement)
+        .getPropertyValue('--page-gutter')
+        .trim()
+      const rule = document.querySelector('.ledger-rule')
+      const ordinal = rule ? getComputedStyle(rule, '::before').content : 'none'
+      return { gutter, ordinal }
+    })
+
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  const mid = await measure()
+  expect(mid.gutter, 'mid widths should not reserve the number column').toMatch(/^0(px)?$/)
+  expect(mid.ordinal === 'none' || mid.ordinal === '""', 'mid widths should hide 01 02 03').toBe(
+    true,
+  )
+
+  await page.setViewportSize({ width: 1280, height: 800 })
+  const wide = await measure()
+  expect(wide.gutter, 'wide widths should open the number column').toBe('2.5rem')
+  expect(wide.ordinal === 'none' || wide.ordinal === '""', 'wide widths should paint ordinals').toBe(
+    false,
+  )
+})
 
 const THEME_PICKER = 'Choose appearance'
 
@@ -251,8 +366,8 @@ type LandingChrome = {
   buttonPrimaryShadow: string
   headingFont: string
   bodyFont: string
-  balooLoaded: boolean
-  frauncesLoaded: boolean
+  interLoaded: boolean
+  plexMonoLoaded: boolean
   designSystem: string
 }
 
@@ -271,34 +386,37 @@ async function readLandingChrome(page: Page): Promise<LandingChrome> {
       buttonPrimaryShadow: root.getPropertyValue('--button-primary-shadow').trim(),
       headingFont: heading ? getComputedStyle(heading).fontFamily : '',
       bodyFont: getComputedStyle(document.body).fontFamily,
-      balooLoaded: document.fonts.check('16px "Baloo 2 Variable"'),
-      frauncesLoaded: document.fonts.check('16px "Fraunces Variable"'),
+      interLoaded: document.fonts.check('16px "Inter Variable"'),
+      plexMonoLoaded: document.fonts.check('16px "IBM Plex Mono"'),
       designSystem: document.documentElement.getAttribute('data-design-system') ?? '',
     }
   })
 }
 
 function cssOklch(value: string) {
-  return value.replace(/(\s)0\./g, '$1.')
+  return value
+    .replace(/(\d+(?:\.\d+)?)%/g, (_, n: string) => String(Number(n) / 100).replace(/^0\./, '.'))
+    .replace(/(^|[^\d.])0\./g, '$1.')
 }
 
 function expectHybridLandingChrome(chrome: LandingChrome) {
-  expect(cssOklch(chrome.paper), 'Clean paper').toBe('oklch(13% .012 35)')
-  expect(cssOklch(chrome.panel), 'Clean panel').toBe('oklch(18% .012 35)')
-  expect(cssOklch(chrome.raised), 'Clean raised').toBe('oklch(22% .012 35)')
-  expect(chrome.radiusPanel, 'Clay panel radius').toBe('28px')
-  expect(chrome.radiusControl, 'Clay control radius').toBe('18px')
-  expect(chrome.buttonRise, 'Clay button rise').toBe('4px')
-  expect(chrome.buttonPrimaryShadow, 'Clay button shadow').not.toBe('none')
-  expect(chrome.headingFont, 'Clay heading font').toMatch(/Fraunces/i)
-  expect(chrome.bodyFont, 'Clay body font').toMatch(/Baloo 2/i)
-  expect(chrome.balooLoaded, 'Baloo 2 face must be loaded').toBe(true)
-  expect(chrome.frauncesLoaded, 'Fraunces face must be loaded').toBe(true)
+  expect(cssOklch(chrome.paper), 'paper').toBe('oklch(.995 .003 55)')
+  expect(cssOklch(chrome.panel), 'panel').toBe('oklch(.975 .004 55)')
+  expect(cssOklch(chrome.raised), 'raised').toBe('oklch(.985 .003 55)')
+  expect(cssOklch(chrome.radiusPanel), 'panel radius').toBe('.625rem')
+  expect(cssOklch(chrome.radiusControl), 'control radius').toBe('.625rem')
+  expect(chrome.buttonRise, 'no clay rise').toBe('0px')
+  expect(chrome.buttonPrimaryShadow, 'flat primary').toBe('none')
+  expect(chrome.headingFont, 'Inter heading').toMatch(/Inter/i)
+  expect(chrome.bodyFont, 'Inter body').toMatch(/Inter/i)
+  expect(chrome.interLoaded, 'Inter face must be loaded').toBe(true)
+  expect(chrome.plexMonoLoaded, 'IBM Plex Mono face must be loaded').toBe(true)
   expect(chrome.designSystem, 'landing html must not switch skins').toBe('')
 }
 
 test('CTA buttons stay fully rounded while the picker restyles only the demo', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const download = page.locator('.hero .download')
@@ -317,14 +435,17 @@ test('CTA buttons stay fully rounded while the picker restyles only the demo', a
     const secondaryPx = await secondary.evaluate((el) =>
       parseFloat(getComputedStyle(el).borderRadius),
     )
-    expect(downloadPx, `${name} primary radius`).toBe(9999)
-    expect(secondaryPx, `${name} secondary radius`).toBe(9999)
+    expect(downloadPx, `${name} primary radius`).toBeGreaterThanOrEqual(8)
+    expect(downloadPx, `${name} primary radius`).toBeLessThanOrEqual(12)
+    expect(secondaryPx, `${name} secondary radius`).toBeGreaterThanOrEqual(8)
+    expect(secondaryPx, `${name} secondary radius`).toBeLessThanOrEqual(12)
   }
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
-test('download CTAs have a dark face, light label, and traveling border glow', async ({ page }) => {
+test('download CTAs have a dark face, white label, and traveling glow', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   const hero = page.locator('.hero .download')
   await expect(hero.locator('.download-glow')).toHaveCount(1)
@@ -349,7 +470,7 @@ test('download CTAs have a dark face, light label, and traveling border glow', a
     return color
   })
   const bg = await hero.evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(bg, 'download face must not match the honey accent fill').not.toBe(accentFace)
+  expect(bg, 'download face must not match the amber accent fill').not.toBe(accentFace)
 })
 
 async function relativeLuminance(locator: Locator, property: 'color' | 'backgroundColor') {
@@ -373,6 +494,7 @@ async function relativeLuminance(locator: Locator, property: 'color' | 'backgrou
 
 test('demo option badges stay bright and unclipped at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const picker = page.getByRole('radiogroup', { name: THEME_PICKER })
@@ -385,10 +507,13 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   const idleFill = await relativeLuminance(idle, 'backgroundColor')
   const mutedText = await relativeLuminance(muted, 'color')
   const paperFill = await relativeLuminance(paper, 'backgroundColor')
-  expect(idleText, 'idle badge text should be near-white').toBeGreaterThan(0.9)
-  expect(idleText, 'idle badge text should beat muted copy').toBeGreaterThan(mutedText)
-  expect(selectedText, 'selected badge text should be near-white').toBeGreaterThan(0.9)
-  expect(idleFill, 'idle badge fill should lift off the page').toBeGreaterThan(paperFill * 2)
+  expect(idleText, 'idle badge text should stay dark on light paper').toBeLessThan(0.35)
+  expect(
+    idleText,
+    'idle badge text should stay at least as dark as muted copy',
+  ).toBeLessThanOrEqual(mutedText + 0.05)
+  expect(selectedText, 'selected badge text should stay dark').toBeLessThan(0.35)
+  expect(idleFill, 'idle badge fill should sit off white paper').toBeLessThan(paperFill)
   expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   const rowBox = await page.locator('.demo-chrome').boundingBox()
@@ -445,6 +570,154 @@ for (const width of [320, 375, 414] as const) {
   })
 }
 
+for (const id of [
+  'features',
+  'sync',
+  'locks',
+  'editor',
+  'emotions',
+  'locations',
+  'import-export',
+] as const) {
+  test(`compact ${id} illustration sits in its own cell, flush to the floor`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    const geometry = await page.evaluate((sectionId) => {
+      const section = document.getElementById(sectionId)
+      const figure = section?.querySelector(':scope > .illust')
+      const copy = [...(section?.children ?? [])].find((node) => node !== figure)
+      if (
+        !(section instanceof HTMLElement) ||
+        !(copy instanceof HTMLElement) ||
+        !(figure instanceof HTMLElement)
+      ) {
+        return null
+      }
+      const sectionBox = section.getBoundingClientRect()
+      const copyBox = copy.getBoundingClientRect()
+      const figureBox = figure.getBoundingClientRect()
+      const first = figure.firstElementChild
+      const last = figure.lastElementChild
+      const firstBox = first?.getBoundingClientRect()
+      const lastBox = last?.getBoundingClientRect()
+      return {
+        copyBottom: copyBox.bottom,
+        figureTop: figureBox.top,
+        figureBottom: figureBox.bottom,
+        sectionBottom: sectionBox.bottom,
+        borderTop: getComputedStyle(figure).borderTopWidth,
+        innerTop: firstBox ? firstBox.top - figureBox.top : 0,
+        innerBottom: lastBox ? figureBox.bottom - lastBox.bottom : 0,
+      }
+    }, id)
+    expect(geometry, `${id} copy and figure should exist`).toBeTruthy()
+    expect(geometry!.figureTop, `${id} figure should sit below the copy`).toBeGreaterThan(
+      geometry!.copyBottom - 1,
+    )
+    expect(
+      Number.parseFloat(geometry!.borderTop),
+      `${id} should have a hairline above the figure`,
+    ).toBeGreaterThan(0)
+    expect(
+      geometry!.sectionBottom - geometry!.figureBottom,
+      `${id} figure should sit flush to the section floor`,
+    ).toBeLessThanOrEqual(2)
+    if (id === 'import-export' || id === 'emotions' || id === 'features' || id === 'sync') {
+      expect(
+        Math.abs(geometry!.innerTop - geometry!.innerBottom),
+        `${id} figure padding below should match padding above`,
+      ).toBeLessThanOrEqual(1)
+    }
+  })
+}
+
+test('feature joins insert a short empty row in the main column', async ({ page }) => {
+  const measure = () =>
+    page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.height = 'calc(var(--frame-inset) / 2)'
+      document.body.append(probe)
+      const expected = probe.getBoundingClientRect().height
+      probe.remove()
+      const gaps = [...document.querySelectorAll('.split-gap')].map((gap) => {
+        const box = gap.getBoundingClientRect()
+        return {
+          display: getComputedStyle(gap).display,
+          height: box.height,
+        }
+      })
+      const locks = document.getElementById('locks')
+      const editor = document.getElementById('editor')
+      const emotions = document.getElementById('emotions')
+      const locations = document.getElementById('locations')
+      const gapAfter = (section: HTMLElement | null) => {
+        const node = section?.nextElementSibling?.nextElementSibling
+        return node instanceof HTMLElement && node.classList.contains('split-gap')
+          ? node.getBoundingClientRect()
+          : null
+      }
+      const editorBox = editor?.getBoundingClientRect()
+      const rule = editor?.nextElementSibling
+      const ruleBox = rule instanceof HTMLElement ? rule.getBoundingClientRect() : null
+      const editorGap = gapAfter(editor)
+      return {
+        expected,
+        gaps,
+        locksToEditor: gapAfter(locks),
+        editorToEmotions: editorGap,
+        emotionsToMap: gapAfter(emotions),
+        editorTop: editorBox?.top ?? 0,
+        emotionsTop: emotions?.getBoundingClientRect().top ?? 0,
+        locationsTop: locations?.getBoundingClientRect().top ?? 0,
+        editorLeft: editorBox?.left ?? 0,
+        editorRight: editorBox?.right ?? 0,
+        gapLeft: editorGap?.left ?? 0,
+        gapRight: editorGap?.right ?? 0,
+        ruleLeft: ruleBox?.left ?? 0,
+        ruleRight: ruleBox?.right ?? 0,
+      }
+    })
+
+  for (const width of [390, 1280] as const) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto('/')
+    const join = await measure()
+    expect(join.gaps, `every feature join should have a gap at ${width}px`).toHaveLength(6)
+    expect(
+      join.gaps.every((gap) => gap.display === 'block'),
+      `gaps should show at ${width}px`,
+    ).toBe(true)
+    for (const gap of join.gaps) {
+      expect(
+        Math.abs(gap.height - join.expected),
+        `gap should be half the frame inset at ${width}px`,
+      ).toBeLessThanOrEqual(1)
+    }
+    expect(join.locksToEditor, 'an empty row should sit above Feature-rich editor').toBeTruthy()
+    expect(join.editorToEmotions, 'an empty row should sit above Emotion tracking').toBeTruthy()
+    expect(join.emotionsToMap, 'an empty row should sit above Entries on a map').toBeTruthy()
+    expect(join.editorTop).toBeGreaterThan(join.locksToEditor!.bottom - 1)
+    expect(join.emotionsTop).toBeGreaterThan(join.editorToEmotions!.bottom - 1)
+    expect(join.locationsTop).toBeGreaterThan(join.emotionsToMap!.bottom - 1)
+    expect(
+      Math.abs(join.gapLeft - join.editorLeft),
+      `gap should share the main column left at ${width}px`,
+    ).toBeLessThanOrEqual(1)
+    expect(
+      Math.abs(join.gapRight - join.editorRight),
+      `gap should share the main column right at ${width}px`,
+    ).toBeLessThanOrEqual(1)
+    expect(join.gapLeft, `gap should stay inside the numbered rails at ${width}px`).toBeGreaterThan(
+      join.ruleLeft + 4,
+    )
+    expect(join.gapRight, `gap should stay inside the numbered rails at ${width}px`).toBeLessThan(
+      join.ruleRight - 4,
+    )
+  }
+})
+
 for (const width of [320, 375, 414] as const) {
   test(`import/export chips wrap 2 then 3 per row at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 812 })
@@ -458,6 +731,45 @@ for (const width of [320, 375, 414] as const) {
     await expectNoRootOverflow(page)
   })
 }
+
+test('compact emotion illustration keeps padding from the rails', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const inset = await page.evaluate(() => {
+    const section = document.getElementById('emotions')
+    const figure = section?.querySelector('.illust-emotions')
+    const prompt = figure?.querySelector('.emotion-prompt')
+    const pills = figure?.querySelector('.emotion-options')
+    if (
+      !(section instanceof HTMLElement) ||
+      !(figure instanceof HTMLElement) ||
+      !(prompt instanceof HTMLElement) ||
+      !(pills instanceof HTMLElement)
+    ) {
+      return null
+    }
+    const sectionBox = section.getBoundingClientRect()
+    const figureBox = figure.getBoundingClientRect()
+    const promptBox = prompt.getBoundingClientRect()
+    const pillsBox = pills.getBoundingClientRect()
+    return {
+      promptLeft: promptBox.left - sectionBox.left,
+      pillsLeft: pillsBox.left - sectionBox.left,
+      pillsRight: sectionBox.right - pillsBox.right,
+      promptTop: promptBox.top - figureBox.top,
+      pillsBottom: figureBox.bottom - pillsBox.bottom,
+    }
+  })
+  expect(inset, 'emotion prompt and pills should exist').toBeTruthy()
+  expect(inset!.promptLeft, 'prompt should not sit on the left rail').toBeGreaterThanOrEqual(16)
+  expect(inset!.pillsLeft, 'pills should not sit on the left rail').toBeGreaterThanOrEqual(16)
+  expect(inset!.pillsRight, 'pills should not sit on the right rail').toBeGreaterThanOrEqual(16)
+  expect(inset!.promptTop, 'prompt should have padding above').toBeGreaterThanOrEqual(16)
+  expect(
+    Math.abs(inset!.promptTop - inset!.pillsBottom),
+    'emotion figure padding below should match padding above',
+  ).toBeLessThanOrEqual(1)
+})
 
 test('feature splits alternate illustration side and AI sits above open source', async ({
   page,
@@ -508,10 +820,41 @@ test('feature splits alternate illustration side and AI sits above open source',
     locations: 'left',
     importExport: 'right',
   })
+  const insets = await page.evaluate(() => {
+    const gap = (figure: string, inner: string) => {
+      const fig = document.querySelector(figure)
+      const plate = document.querySelector(inner)
+      if (!(fig instanceof Element) || !(plate instanceof Element)) return null
+      const outer = fig.getBoundingClientRect()
+      const box = plate.getBoundingClientRect()
+      return {
+        left: box.left - outer.left,
+        right: outer.right - box.right,
+        top: box.top - outer.top,
+        bottom: outer.bottom - box.bottom,
+      }
+    }
+    return {
+      locks: gap('.illust-locks', '.illust-locks > article'),
+      map: gap('.illust-map', '.illust-map > .map-svg'),
+    }
+  })
+  expect(insets.locks, 'locks plate should exist').toBeTruthy()
+  expect(insets.map, 'map plate should exist').toBeTruthy()
+  for (const [name, gap] of [
+    ['locks', insets.locks],
+    ['map', insets.map],
+  ] as const) {
+    expect(gap!.left, `${name} left inset`).toBeGreaterThan(8)
+    expect(gap!.right, `${name} right inset`).toBeGreaterThan(8)
+    expect(gap!.top, `${name} top inset`).toBeGreaterThan(8)
+    expect(gap!.bottom, `${name} bottom inset`).toBeGreaterThan(8)
+  }
 })
 
 test('editor cards are icon-plus-label tiles with a distinct plugins card', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   const section = page.locator('#editor')
   await expect(section.getByRole('heading', { level: 2 })).toContainText(/editor/i)
@@ -535,7 +878,7 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
     page.locator('.ed-card span:not(.ed-slash-mark)').first(),
     'color',
   )
-  expect(labelLuminance, 'editor card labels should be near-white').toBeGreaterThan(0.9)
+  expect(labelLuminance, 'editor card labels should stay dark on light paper').toBeLessThan(0.35)
   const pluginsBg = await plugins.evaluate((el) => getComputedStyle(el).backgroundColor)
   const mediaBg = await media.evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(pluginsBg, 'More plugins should use a distinct fill').not.toBe(mediaBg)
@@ -543,6 +886,7 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
 
 test('demo Settings restyles the iframe only', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const frame = demoFrame(page)
@@ -568,7 +912,7 @@ test('demo Settings restyles the iframe only', async ({ page }) => {
     expectHybridLandingChrome(await readLandingChrome(page))
     await expect
       .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
-      .toBe('dark')
+      .toBe('light')
   }
   expect(await readLandingChrome(page)).toEqual(before)
 })
@@ -611,9 +955,13 @@ test('demo skins sit at the mockup top-left with Open separately', async ({ page
   )
   expect(chromeBox!.y - mockupBox!.y, 'chrome should be at the top').toBeLessThan(16)
   expect(chromeBox!.x - mockupBox!.x, 'chrome should be at the left').toBeLessThan(16)
-  expect(openBox!.x, 'Open separately should sit beside the skins').toBeGreaterThan(
+  expect(openBox!.x, 'Open separately should sit right of the skins').toBeGreaterThan(
     clayBox!.x + clayBox!.width,
   )
+  expect(
+    chromeBox!.x + chromeBox!.width - (openBox!.x + openBox!.width),
+    'Open separately should sit at the right edge',
+  ).toBeLessThan(16)
   expect(
     Math.abs(openBox!.y - clayBox!.y),
     'Open separately should share the skins row',
@@ -645,6 +993,8 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
     return {
       windowLeft: windowEl.offsetLeft,
       textLeft: text.offsetLeft,
+      windowRight: windowEl.offsetLeft + windowEl.offsetWidth,
+      stageWidth: stage.clientWidth,
       windowBottom: windowEl.offsetTop + windowEl.offsetHeight,
       textTop: text.offsetTop,
       parent: text.parentElement === stage,
@@ -652,6 +1002,11 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   })
   expect(layout, 'demo stage, window, and disclaimer should exist').toBeTruthy()
   expect(layout!.parent, 'disclaimer should stay a child of the existing stage').toBe(true)
+  expect(layout!.windowLeft, 'demo should sit inset from the left content rail').toBeGreaterThan(8)
+  expect(
+    layout!.stageWidth - layout!.windowRight,
+    'demo should sit inset from the right content rail',
+  ).toBeGreaterThan(8)
   expect(layout!.textLeft, 'disclaimer should share the mockup left edge').toBe(layout!.windowLeft)
   expect(layout!.textTop, 'disclaimer should sit under the mockup').toBeGreaterThanOrEqual(
     layout!.windowBottom,
@@ -680,24 +1035,26 @@ test('demo disclaimer tracks the mockup bottom edge', async ({ page }) => {
   )
 })
 
-test('compact nav opens as a sheet and closes on Escape or backdrop', async ({
-  page,
-}, testInfo) => {
+test('compact nav opens fullscreen and closes on Escape', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto('/')
   const toggle = page.getByRole('button', { name: 'Open menu' })
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  const header = page.locator('.site-header')
   await expect(nav).toBeHidden()
   await toggle.click()
   await expect(nav).toBeVisible()
   await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible()
+  const headerBox = await header.boundingBox()
+  expect(headerBox, 'open header should have a box').toBeTruthy()
+  expect(headerBox!.height, 'open menu should fill the viewport').toBeGreaterThanOrEqual(811)
+  expect(headerBox!.width, 'open menu should span the viewport').toBeGreaterThanOrEqual(374)
+  await expect(nav.locator('.nav-rule')).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Download the beta from GitHub' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('nav-open.png') })
   await page.keyboard.press('Escape')
   await expect(nav).toBeHidden()
   await expect(toggle).toBeFocused()
-  await toggle.click()
-  await page.locator('.nav-backdrop').click({ position: { x: 24, y: 640 } })
-  await expect(nav).toBeHidden()
   await toggle.click()
   await page.getByRole('link', { name: 'Memlore home' }).click()
   await expect(nav).toBeHidden()

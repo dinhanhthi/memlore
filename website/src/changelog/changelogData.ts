@@ -77,13 +77,18 @@ export const releases: ChangelogRelease[] = [
  * a beta bump sitting at the top of `releases`, the public site must still show
  * the last stable version.
  */
-export function latestStableVersionOf(entries: ChangelogRelease[]): string {
+export function latestStableReleaseOf(entries: ChangelogRelease[]): ChangelogRelease {
   const stable = entries.find((entry) => entry.stable)
   if (!stable) throw new Error('changelogData: no stable release to show')
-  return stable.version
+  return stable
 }
 
-export const latestStableVersion = latestStableVersionOf(releases)
+export function latestStableVersionOf(entries: ChangelogRelease[]): string {
+  return latestStableReleaseOf(entries).version
+}
+
+export const latestStableRelease = latestStableReleaseOf(releases)
+export const latestStableVersion = latestStableRelease.version
 
 /** Right-rail TOC only earns its keep once the page has several versions to jump between. */
 export function shouldShowChangelogToc(count: number): boolean {

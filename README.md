@@ -102,6 +102,10 @@ Need demo data: Settings → Data → **Import** → **Seed demo data**.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## 🙏 Credits
+
+The [`website/`](website/) landing page visual style is adapted from [TablePro Web](https://github.com/TableProApp/web).
+
 ## 📄 License
 
 Memlore is licensed under [AGPL-3.0-or-later](LICENSE).
