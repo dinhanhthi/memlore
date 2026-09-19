@@ -748,6 +748,7 @@ function DemoLive() {
           )}
         </div>
       </div>
+      <LedgerRule />
       <p className="demo-disclaimer">Sample data. Writing, locks, sync, and AI are simulated.</p>
     </div>
   )
@@ -774,6 +775,7 @@ function Demo({ wide }: { wide: boolean }) {
           </p>
         ) : null}
       </div>
+      <LedgerRule />
       {wide ? <DemoLive /> : <DemoPlaceholder />}
     </section>
   )
@@ -962,6 +964,12 @@ const platformItems = [
   { name: 'iOS & Android' as const, status: 'Coming soon' },
 ] satisfies { name: PlatformName; status: string; href?: string }[]
 
+function LedgerRule({ area }: { area?: 'r1' | 'r2' | 'r3' | 'r4' }) {
+  return (
+    <div className="ledger-rule" role="separator" style={area ? { gridArea: area } : undefined} />
+  )
+}
+
 export default function LandingPage() {
   const wide = useWideViewport()
   useEffect(() => {
@@ -973,46 +981,15 @@ export default function LandingPage() {
         Skip to content
       </a>
       <SiteHeader homeHref="#main" />
-      <main id="main" tabIndex={-1}>
+      <main id="main" className="ledger" tabIndex={-1}>
         <section className="hero">
-          <div className="hero-copy">
-            <p className="hero-badges">
-              <span className="hero-badge">
-                <Code2 className="size-3.5" />
-                Open source
-              </span>
-              <span className="hero-badge" data-tone="free">
-                <Heart className="size-3.5" />
-                Free
-              </span>
-            </p>
-            <h1>
-              A little life.
-              <br />
-              <span>A lasting story.</span>
-            </h1>
-            <p className="hero-description">
-              <strong>Memlore is a private journal.</strong> For the days you want to remember, and
-              the thoughts you need to put somewhere.
-            </p>
-            <div className="button-row">
-              <DownloadLink
-                className="download download-hero"
-                label="Download for Mac"
-                ariaLabel="Download the beta from GitHub"
-              />
-              <a className="button" href="#demo" data-variant="secondary">
-                Try the demo <ArrowDown className="size-4" />
-              </a>
-            </div>
-          </div>
           <div className="hero-portrait">
             <div className="mascot-halo">
               {wide ? (
                 <HeadFollowLogo
                   alt="Memlore’s dog mascot. The head follows your cursor."
                   className="hero-head"
-                  size={280}
+                  size={168}
                 />
               ) : (
                 <span className="hero-head">
@@ -1031,10 +1008,73 @@ export default function LandingPage() {
               <span>Even on the ordinary days.</span>
             </p>
           </div>
+          <p className="hero-eyebrow">Memlore · Open source · Free</p>
+          <LedgerRule area="r1" />
+          <h1 className="hero-title">
+            A little life.
+            <br />
+            <span>A lasting story.</span>
+          </h1>
+          <LedgerRule area="r2" />
+          <p className="hero-description">
+            <strong>Memlore is a private journal.</strong> For the days you want to remember, and
+            the thoughts you need to put somewhere.
+          </p>
+          <LedgerRule area="r3" />
+          <div className="button-row">
+            <DownloadLink
+              className="download download-hero"
+              label="Download for Mac"
+              ariaLabel="Download the beta from GitHub"
+            />
+            <a className="button" href="#demo" data-variant="secondary">
+              Try the demo <ArrowDown className="size-4" />
+            </a>
+          </div>
+          <LedgerRule area="r4" />
+          <p className="hero-meta">No account · Encrypted on your device · macOS today</p>
         </section>
+        <LedgerRule />
         <Demo wide={wide} />
+        <LedgerRule />
+        <section className="spec-strip" aria-label="What Memlore is">
+          <dl>
+            <div className="spec-item">
+              <dt>license</dt>
+              <dd>Open source</dd>
+              <small>Read the code that holds the journal.</small>
+            </div>
+            <div className="spec-item">
+              <dt>server</dt>
+              <dd>None</dd>
+              <small>The journal lives on your machine.</small>
+            </div>
+            <div className="spec-item">
+              <dt>sync</dt>
+              <dd>Your cloud</dd>
+              <small>Google Drive or iCloud Drive.</small>
+            </div>
+            <div className="spec-item">
+              <dt>locks</dt>
+              <dd>Three ways</dd>
+              <small>App, second lock, invisible vault.</small>
+            </div>
+            <div className="spec-item">
+              <dt>ai</dt>
+              <dd>Optional</dd>
+              <small>Local, on-device, or your own key.</small>
+            </div>
+            <div className="spec-item">
+              <dt>today</dt>
+              <dd>macOS</dd>
+              <small>Windows, Linux, iOS, and Android later.</small>
+            </div>
+          </dl>
+        </section>
+        <LedgerRule />
         <section className="split" id="features">
           <div>
+            <p className="section-label">Privacy</p>
             <h2>No server. No backdoor. We cannot read it.</h2>
             <p>
               Everything is encrypted on your device with your password — including what syncs to
@@ -1044,9 +1084,11 @@ export default function LandingPage() {
           </div>
           <EncryptFigure />
         </section>
-        <section className="split split-flip" id="sync">
+        <LedgerRule />
+        <section className="split split-flip" id="sync" data-tone="raised">
           <SyncFigure />
           <div>
+            <p className="section-label">Sync</p>
             <h2>Your cloud. Your account. Your key.</h2>
             <p>
               Entries are encrypted on your device, then synced through your own Google Drive or
@@ -1054,6 +1096,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+        <LedgerRule />
         <section className="split" id="locks">
           <div className="locks-copy">
             <h2>You can lock entries in 3 different ways.</h2>
@@ -1073,6 +1116,7 @@ export default function LandingPage() {
           </div>
           <LocksFigure />
         </section>
+        <LedgerRule />
         <section className="split split-flip" id="editor">
           <EditorFigure />
           <div>
@@ -1083,6 +1127,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+        <LedgerRule />
         <section className="split" id="emotions">
           <div>
             <h2>Emotion tracking</h2>
@@ -1090,6 +1135,7 @@ export default function LandingPage() {
           </div>
           <EmotionsFigure />
         </section>
+        <LedgerRule />
         <section className="split split-flip" id="locations">
           <LocationsFigure />
           <div>
@@ -1097,6 +1143,7 @@ export default function LandingPage() {
             <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
           </div>
         </section>
+        <LedgerRule />
         <section className="split" id="import-export">
           <div>
             <h2>Import and export</h2>
@@ -1107,10 +1154,12 @@ export default function LandingPage() {
           </div>
           <TransferFigure />
         </section>
+        <LedgerRule />
         <section className="ai-section" id="ai">
           <div className="ai-intro">
             <Sparkles className="size-7" />
             <div>
+              <p className="section-label">Optional AI</p>
               <h2>Rich set of AI features</h2>
               <p>
                 AI tools are enabled only if you opt in. Memlore supports 100% local AI, as well as
@@ -1118,6 +1167,7 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
+          <LedgerRule />
           <div className="ai-grid">
             {aiItems.map((item) => {
               const Icon = aiIcons[item.id]
@@ -1133,6 +1183,7 @@ export default function LandingPage() {
             })}
           </div>
         </section>
+        <LedgerRule />
         <section className="open-section" id="open-source">
           <div className="open-symbol" aria-hidden="true">
             <Code2 className="size-16" strokeWidth={1} />
@@ -1149,13 +1200,16 @@ export default function LandingPage() {
             </a>
           </div>
         </section>
-        <section className="compare-section" id="compare">
+        <LedgerRule />
+        <section className="compare-section" id="compare" data-tone="raised">
           <div className="section-heading">
             <div>
+              <p className="section-label">Compare</p>
               <h2>How Memlore compares.</h2>
               <p>Memlore next to three journals people already keep.</p>
             </div>
           </div>
+          <LedgerRule />
           <div
             className="comparison-scroll"
             tabIndex={0}
@@ -1232,6 +1286,7 @@ export default function LandingPage() {
               </article>
             ))}
           </div>
+          <LedgerRule />
           <p className="comparison-sources">
             Explore the details:{' '}
             {comparisonProducts
@@ -1244,6 +1299,7 @@ export default function LandingPage() {
             <span>Features and plans can change.</span>
           </p>
         </section>
+        <LedgerRule />
         <section className="platform-section">
           <div>
             <h2>
@@ -1284,8 +1340,9 @@ export default function LandingPage() {
         </section>
       </main>
       <footer>
+        <LedgerRule />
         <div className="footer-main">
-          <HeadFollowLogo alt="" className="footer-head" size={72} />
+          <p className="section-label">Memlore</p>
           <h2>
             The ordinary days
             <br />
@@ -1302,6 +1359,7 @@ export default function LandingPage() {
             </a>
           </div>
         </div>
+        <LedgerRule />
         <SiteFooterBar homeHref="#main" />
       </footer>
     </>

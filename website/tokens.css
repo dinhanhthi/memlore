@@ -1,51 +1,52 @@
-/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4
- * genre: atmospheric · macrostructure: Split Studio · tone: intimate atmospheric
- * theme: studied-DNA (source: https://superx.so) + Memlore Espresso
- * paper oklch(13% 0.012 35) Clean · accent oklch(76% 0.093 73) honey
- * display: Fraunces · body: Baloo 2 · wordmark: Fraunces · buttons/radius: Clay
- * theme_axes: dark / geometric-sans / warm
- * nav: N5 sticky-pill · footer: Ft1 · enrichment: E4 live iframe 3D window
- * studied: yes · DNA-source: url · source-url: https://superx.so
- * observed: dark product-theater, stacked mockups, per-feature split, sticky nav
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4
+ * genre: modern-minimal · macrostructure: Workbench · tone: utilitarian
+ * theme: studied-DNA (source: https://tablepro.app/)
+ * paper oklch(99.5% 0.003 55) light / oklch(14.5% 0.004 55) dark
+ * accent oklch(72% 0.178 55) amber
+ * display: Inter Variable · body: Inter Variable · label: Geist Mono Variable
+ * theme_axes: light / grotesk-sans / warm
+ * nav: N1b frost bar · footer: Ft5 · enrichment: E4 live iframe plate
+ * studied: yes · DNA-source: url · source-url: https://tablepro.app/
+ * observed: Inter + IBM Plex Mono, hairline grid, spec strip, product plate
  * rhythm: unknown (URL mode)
- * H8/E4 knobs: frame=floating-no-chrome, tilt=6deg, stack-of-3, shadow=layered
- * F-split knobs: alternate=ltr/rtl · proof=css-art
+ * H8 knobs: frame=floating-no-chrome, tilt=0°, plate=demo-iframe
  */
 :root {
-  color-scheme: dark;
-  --color-paper: oklch(13% 0.012 35);
-  --color-panel: oklch(18% 0.012 35);
-  --color-raised: oklch(22% 0.012 35);
-  --color-rule: oklch(32% 0.02 35);
-  --color-ink: oklch(1 0 0);
-  --color-muted: oklch(76% 0.028 65);
-  --color-accent: oklch(0.89 0.11 73);
-  --color-accent-deep: oklch(66% 0.095 66);
-  --color-accent-ink: oklch(18% 0.03 50);
-  --color-focus: oklch(85% 0.105 80);
-  --color-shadow: oklch(6% 0.02 30 / 0.62);
-  --color-clear: oklch(12% 0.02 30 / 0);
-  --color-success: oklch(0.9 0.16 144.83);
-  --color-error: oklch(68% 0.16 25);
-  --color-warning: oklch(85% 0.14 95);
-  --color-compare-surface: var(--color-panel);
-  --color-compare-head: var(--color-raised);
-  --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-panel));
+  color-scheme: light;
+  --color-paper: oklch(0.995 0.003 55);
+  --color-panel: oklch(0.975 0.004 55);
+  --color-raised: oklch(0.985 0.003 55);
+  --color-rule: oklch(0.145 0.004 55 / 0.1);
+  --color-rule-strong: oklch(0.145 0.004 55 / 0.16);
+  --color-ink: oklch(0.145 0.004 55);
+  --color-muted: oklch(0.42 0.01 55);
+  --color-accent: oklch(0.72 0.178 55);
+  --color-accent-deep: oklch(0.52 0.148 45);
+  --color-accent-ink: oklch(0.16 0.04 55);
+  --color-focus: oklch(0.52 0.148 45);
+  --color-shadow: oklch(0.145 0.004 55 / 0.08);
+  --color-clear: oklch(0.145 0.004 55 / 0);
+  --color-success: oklch(0.42 0.12 145);
+  --color-error: oklch(0.5 0.18 27);
+  --color-warning: oklch(0.55 0.14 75);
+  --color-compare-surface: var(--color-paper);
+  --color-compare-head: var(--color-panel);
+  --color-compare-stripe: color-mix(in oklch, var(--color-ink) 3%, var(--color-paper));
   --color-compare-rule: var(--color-rule);
-  --color-bloom: oklch(56% 0.09 70 / 0.28);
-  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
-  --font-title: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
-  --font-body: 'Baloo 2 Variable', 'Geist Variable', sans-serif;
-  --font-wordmark: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --color-bloom: oklch(0.72 0.178 55 / 0);
+  --font-display: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-title: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-wordmark: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
-  --text-xs: 0.75rem;
-  --text-small: 0.875rem;
-  --text-md: 0.9375rem;
-  --text-base: 1rem;
-  --text-lead: 1.1rem;
-  --text-heading: clamp(1.35rem, 2vw, 1.85rem);
-  --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
-  --text-display-s: clamp(2rem, 4vw + 0.6rem, 3.4rem);
+  --text-xs: 0.6875rem;
+  --text-small: 0.75rem;
+  --text-md: 0.875rem;
+  --text-base: 0.875rem;
+  --text-lead: 1.125rem;
+  --text-heading: clamp(1.5rem, 2vw, 1.875rem);
+  --text-display: clamp(2.25rem, 5vw + 0.5rem, 3.75rem);
+  --text-display-s: clamp(1.875rem, 4vw + 0.4rem, 2.75rem);
   --space-3xs: 0.125rem;
   --space-2xs: 0.25rem;
   --space-xs: 0.5rem;
@@ -55,52 +56,80 @@
   --space-xl: 2.5rem;
   --space-2xl: 4rem;
   --space-3xl: 6rem;
-  --space-section: 7rem;
-  --radius-control: 18px;
-  --radius-panel: 28px;
-  --radius-pill: 999px;
-  --button-radius: 9999px;
+  --space-section: 4.5rem;
+  --radius-control: 0.625rem;
+  --radius-panel: 0.625rem;
+  --radius-pill: 0.625rem;
+  --button-radius: 0.625rem;
   --button-height-md: 2.25rem;
   --button-height-lg: 2.75rem;
   --button-font-weight: 600;
-  --button-letter-spacing: 0.01em;
-  --button-motion: 280ms cubic-bezier(0.2, 0, 0, 1);
-  --button-rise: 4px;
-  --button-primary-bg: oklch(from var(--color-accent) 0.52 c h);
-  --button-primary-fg: oklch(100% 0 0);
-  --button-primary-lip: oklch(from var(--color-accent) 0.34 c h);
-  --button-primary-shadow:
-    0 var(--button-rise) 0 0 var(--button-primary-lip),
-    0 calc(var(--button-rise) + 8px) 18px var(--color-shadow);
-  --button-secondary-bg: var(--color-raised);
-  --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 8%, var(--color-raised));
+  --button-letter-spacing: -0.011em;
+  --button-motion: 200ms var(--ease-out);
+  --button-rise: 0px;
+  --button-primary-bg: var(--color-accent);
+  --button-primary-fg: var(--color-accent-ink);
+  --button-primary-lip: transparent;
+  --button-primary-shadow: none;
+  --button-secondary-bg: var(--color-paper);
+  --button-secondary-bg-hover: var(--color-panel);
   --button-secondary-fg: var(--color-ink);
-  --button-secondary-shadow:
-    0 var(--button-rise) 0 0 color-mix(in oklch, var(--color-ink) 16%, var(--color-panel)),
-    0 calc(var(--button-rise) + 8px) 18px var(--color-shadow);
-  --button-selected-bg: var(--button-primary-bg);
-  --button-selected-fg: var(--button-primary-fg);
-  --button-selected-border: transparent;
-  --download-face: oklch(26% 0.055 52);
-  --download-face-ink: oklch(99% 0.01 80);
-  --download-glow-hot: oklch(93% 0.09 85);
-  --download-glow-mid: oklch(72% 0.17 48);
-  --download-glow-deep: oklch(52% 0.16 32);
-  --download-halo: color-mix(in oklch, var(--download-glow-mid) 42%, transparent);
-  --badge-idle-bg: color-mix(in oklch, var(--color-ink) 32%, var(--color-raised));
-  --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 42%, var(--color-raised));
-  --badge-idle-fg: oklch(99% 0.004 80);
-  --badge-idle-border: color-mix(in oklch, var(--color-ink) 52%, transparent);
+  --button-secondary-shadow: none;
+  --button-selected-bg: color-mix(in oklch, var(--color-accent) 12%, var(--color-paper));
+  --button-selected-fg: var(--color-ink);
+  --button-selected-border: var(--color-accent);
+  --download-face: var(--color-accent);
+  --download-face-ink: var(--color-accent-ink);
+  --download-glow-hot: transparent;
+  --download-glow-mid: transparent;
+  --download-glow-deep: transparent;
+  --download-halo: transparent;
+  --badge-idle-bg: var(--color-panel);
+  --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 6%, var(--color-panel));
+  --badge-idle-fg: var(--color-ink);
+  --badge-idle-border: var(--color-rule-strong);
   --rule-width: 1px;
+  --page-gutter: 0px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-feedback: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-panel: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-micro: 120ms;
   --dur-short: 220ms;
-  --dur-long: 420ms;
+  --dur-long: 320ms;
   --z-base: 1;
   --z-raised: 10;
   --z-dropdown: 100;
   --z-sticky: 200;
   --z-sticky-nav: 300;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-paper: oklch(0.145 0.004 55);
+    --color-panel: oklch(0.185 0.004 55);
+    --color-raised: oklch(0.205 0.004 55);
+    --color-rule: oklch(1 0 0 / 0.08);
+    --color-rule-strong: oklch(1 0 0 / 0.16);
+    --color-ink: oklch(0.985 0.002 55);
+    --color-muted: oklch(0.708 0.01 55);
+    --color-accent: oklch(0.72 0.178 55);
+    --color-accent-deep: oklch(0.8 0.137 58);
+    --color-accent-ink: oklch(0.16 0.04 55);
+    --color-focus: oklch(0.8 0.137 58);
+    --color-shadow: oklch(0 0 0 / 0.35);
+    --color-clear: oklch(0.145 0.004 55 / 0);
+    --color-success: oklch(0.78 0.14 145);
+    --color-error: oklch(0.7 0.19 22);
+    --color-warning: oklch(0.8 0.12 85);
+    --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-paper));
+    --button-secondary-bg: var(--color-raised);
+    --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 8%, var(--color-raised));
+    --button-selected-bg: color-mix(in oklch, var(--color-accent) 16%, var(--color-raised));
+    --badge-idle-bg: var(--color-raised);
+    --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 10%, var(--color-raised));
+    --badge-idle-fg: var(--color-ink);
+  }
 }

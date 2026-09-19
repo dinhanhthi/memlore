@@ -22,10 +22,6 @@ export function DownloadLink({
       aria-label={ariaLabel}
       data-variant="primary"
     >
-      <span className="download-glow" aria-hidden="true">
-        <span className="download-glow-h" />
-        <span className="download-glow-v" />
-      </span>
       <Download className="size-4" />
       <span className="download-label">{label}</span>
     </a>
@@ -47,6 +43,7 @@ function GitHubLink({ className }: { className: string }) {
   return (
     <a className={`github-link ${className}`} href={githubUrl} target="_blank" rel="noreferrer">
       <GitHubMark />
+      <span className="github-label">GitHub</span>
     </a>
   )
 }
@@ -101,69 +98,71 @@ export function SiteHeader({
     <>
       {open ? <div className="nav-backdrop" aria-hidden="true" onClick={close} /> : null}
       <header className="site-header" data-nav-open={open ? 'true' : undefined}>
-        <div className="header-brand">
-          <a
-            className="wordmark"
-            href={homeHref}
-            aria-label="Memlore home"
-            onClick={() => {
-              if (!open) return
-              setOpen(false)
-              document.getElementById('main')?.removeAttribute('inert')
-              document.querySelector('footer')?.removeAttribute('inert')
+        <div className="site-header-bar">
+          <div className="header-brand">
+            <a
+              className="wordmark"
+              href={homeHref}
+              aria-label="Memlore home"
+              onClick={() => {
+                if (!open) return
+                setOpen(false)
+                document.getElementById('main')?.removeAttribute('inert')
+                document.querySelector('footer')?.removeAttribute('inert')
+              }}
+            >
+              <HeadFollowLogo alt="" className="wordmark-head" size={36} />
+              Memlore
+            </a>
+          </div>
+          <nav
+            id="site-nav"
+            aria-label="Main navigation"
+            onClick={(event) => {
+              const target = event.target
+              if (target instanceof Element && target.closest('a')) close()
             }}
           >
-            <HeadFollowLogo alt="" className="wordmark-head" size={36} />
-            Memlore
-          </a>
-        </div>
-        <nav
-          id="site-nav"
-          aria-label="Main navigation"
-          onClick={(event) => {
-            const target = event.target
-            if (target instanceof Element && target.closest('a')) close()
-          }}
-        >
-          <a href={`${sectionPrefix}#demo`}>Demo</a>
-          <a href={`${sectionPrefix}#features`}>Features</a>
-          <a href={`${sectionPrefix}#compare`}>Compare</a>
-          <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
-            Changelog
-          </a>
-          <details ref={docMenuRef} className="doc-menu">
-            <summary>Doc</summary>
-            <p>
-              Documentation is coming soon. For now, explore the{' '}
-              <a href={githubUrl} target="_blank" rel="noreferrer">
-                GitHub README
-              </a>
-              .
-            </p>
-          </details>
-        </nav>
-        <div className="header-actions">
-          <GitHubLink className="header-github" />
-          <DownloadLink
-            className="download"
-            label="Download"
-            ariaLabel="Download the beta from GitHub"
-          />
-          <button
-            ref={toggleRef}
-            type="button"
-            className="nav-toggle"
-            aria-expanded={open}
-            aria-controls="site-nav"
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            onClick={() => setOpen((value) => !value)}
-          >
-            {open ? (
-              <X className="size-5" aria-hidden="true" />
-            ) : (
-              <Menu className="size-5" aria-hidden="true" />
-            )}
-          </button>
+            <a href={`${sectionPrefix}#demo`}>Demo</a>
+            <a href={`${sectionPrefix}#features`}>Features</a>
+            <a href={`${sectionPrefix}#compare`}>Compare</a>
+            <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
+              Changelog
+            </a>
+            <details ref={docMenuRef} className="doc-menu">
+              <summary>Doc</summary>
+              <p>
+                Documentation is coming soon. For now, explore the{' '}
+                <a href={githubUrl} target="_blank" rel="noreferrer">
+                  GitHub README
+                </a>
+                .
+              </p>
+            </details>
+          </nav>
+          <div className="header-actions">
+            <GitHubLink className="header-github" />
+            <DownloadLink
+              className="download"
+              label="Download"
+              ariaLabel="Download the beta from GitHub"
+            />
+            <button
+              ref={toggleRef}
+              type="button"
+              className="nav-toggle"
+              aria-expanded={open}
+              aria-controls="site-nav"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              onClick={() => setOpen((value) => !value)}
+            >
+              {open ? (
+                <X className="size-5" aria-hidden="true" />
+              ) : (
+                <Menu className="size-5" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
     </>

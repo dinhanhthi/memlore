@@ -40,6 +40,10 @@ function demoFrame(page: Page) {
   return page.frameLocator(`iframe[title="${IFRAME_TITLE}"]`)
 }
 
+async function useLightLanding(page: Page) {
+  await page.emulateMedia({ colorScheme: 'light' })
+}
+
 async function startDemo(page: Page) {
   const start = page.getByRole('button', { name: 'Start the demo' })
   await expect(start).toBeVisible()
@@ -202,7 +206,7 @@ for (const viewport of VIEWPORTS) {
       `AI lattice should be ${expectedAiColumns}-col at ${viewport.name}`,
     ).toBe(expectedAiColumns)
     expect(aiGrid.cellRadius, 'AI cells should share edges, not card radii').toBe('0px')
-    expect(aiGrid.frameRadius, 'AI lattice should round the outer frame').not.toBe('0px')
+    expect(aiGrid.frameRadius, 'AI lattice sits flush to the ledger, no floating card').toBe('0px')
     expect(aiGrid.deviceColumnEnd, 'On-device cell should span the row').toBe('-1')
     const titleBoxes = await page.locator('.ai-grid h3').evaluateAll((nodes) =>
       nodes.map((el) => ({
@@ -251,8 +255,7 @@ type LandingChrome = {
   buttonPrimaryShadow: string
   headingFont: string
   bodyFont: string
-  balooLoaded: boolean
-  frauncesLoaded: boolean
+  interLoaded: boolean
   designSystem: string
 }
 
@@ -271,34 +274,35 @@ async function readLandingChrome(page: Page): Promise<LandingChrome> {
       buttonPrimaryShadow: root.getPropertyValue('--button-primary-shadow').trim(),
       headingFont: heading ? getComputedStyle(heading).fontFamily : '',
       bodyFont: getComputedStyle(document.body).fontFamily,
-      balooLoaded: document.fonts.check('16px "Baloo 2 Variable"'),
-      frauncesLoaded: document.fonts.check('16px "Fraunces Variable"'),
+      interLoaded: document.fonts.check('16px "Inter Variable"'),
       designSystem: document.documentElement.getAttribute('data-design-system') ?? '',
     }
   })
 }
 
 function cssOklch(value: string) {
-  return value.replace(/(\s)0\./g, '$1.')
+  return value
+    .replace(/(\d+(?:\.\d+)?)%/g, (_, n: string) => String(Number(n) / 100).replace(/^0\./, '.'))
+    .replace(/(^|[^\d.])0\./g, '$1.')
 }
 
 function expectHybridLandingChrome(chrome: LandingChrome) {
-  expect(cssOklch(chrome.paper), 'Clean paper').toBe('oklch(13% .012 35)')
-  expect(cssOklch(chrome.panel), 'Clean panel').toBe('oklch(18% .012 35)')
-  expect(cssOklch(chrome.raised), 'Clean raised').toBe('oklch(22% .012 35)')
-  expect(chrome.radiusPanel, 'Clay panel radius').toBe('28px')
-  expect(chrome.radiusControl, 'Clay control radius').toBe('18px')
-  expect(chrome.buttonRise, 'Clay button rise').toBe('4px')
-  expect(chrome.buttonPrimaryShadow, 'Clay button shadow').not.toBe('none')
-  expect(chrome.headingFont, 'Clay heading font').toMatch(/Fraunces/i)
-  expect(chrome.bodyFont, 'Clay body font').toMatch(/Baloo 2/i)
-  expect(chrome.balooLoaded, 'Baloo 2 face must be loaded').toBe(true)
-  expect(chrome.frauncesLoaded, 'Fraunces face must be loaded').toBe(true)
+  expect(cssOklch(chrome.paper), 'paper').toBe('oklch(.995 .003 55)')
+  expect(cssOklch(chrome.panel), 'panel').toBe('oklch(.975 .004 55)')
+  expect(cssOklch(chrome.raised), 'raised').toBe('oklch(.985 .003 55)')
+  expect(cssOklch(chrome.radiusPanel), 'panel radius').toBe('.625rem')
+  expect(cssOklch(chrome.radiusControl), 'control radius').toBe('.625rem')
+  expect(chrome.buttonRise, 'no clay rise').toBe('0px')
+  expect(chrome.buttonPrimaryShadow, 'flat primary').toBe('none')
+  expect(chrome.headingFont, 'Inter heading').toMatch(/Inter/i)
+  expect(chrome.bodyFont, 'Inter body').toMatch(/Inter/i)
+  expect(chrome.interLoaded, 'Inter face must be loaded').toBe(true)
   expect(chrome.designSystem, 'landing html must not switch skins').toBe('')
 }
 
 test('CTA buttons stay fully rounded while the picker restyles only the demo', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const download = page.locator('.hero .download')
@@ -317,29 +321,26 @@ test('CTA buttons stay fully rounded while the picker restyles only the demo', a
     const secondaryPx = await secondary.evaluate((el) =>
       parseFloat(getComputedStyle(el).borderRadius),
     )
-    expect(downloadPx, `${name} primary radius`).toBe(9999)
-    expect(secondaryPx, `${name} secondary radius`).toBe(9999)
+    expect(downloadPx, `${name} primary radius`).toBeGreaterThanOrEqual(8)
+    expect(downloadPx, `${name} primary radius`).toBeLessThanOrEqual(12)
+    expect(secondaryPx, `${name} secondary radius`).toBeGreaterThanOrEqual(8)
+    expect(secondaryPx, `${name} secondary radius`).toBeLessThanOrEqual(12)
   }
   expect(await readLandingChrome(page)).toEqual(before)
 })
 
-test('download CTAs have a dark face, light label, and traveling border glow', async ({ page }) => {
+test('download CTAs use the amber fill without a traveling glow', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   const hero = page.locator('.hero .download')
-  await expect(hero.locator('.download-glow')).toHaveCount(1)
-  await expect(hero.locator('.download-glow-h')).toHaveCount(1)
-  await expect(hero.locator('.download-glow-v')).toHaveCount(1)
-  await expect(page.locator('.header-actions .download .download-glow')).toHaveCount(1)
-  await expect(page.locator('.footer-main .download .download-glow')).toHaveCount(1)
-  const animation = await hero
-    .locator('.download-glow-h')
-    .evaluate((el) => getComputedStyle(el).animationName)
-  expect(animation).toMatch(/download-glow-orbit/)
+  await expect(hero.locator('.download-glow')).toHaveCount(0)
+  await expect(page.locator('.header-actions .download .download-glow')).toHaveCount(0)
+  await expect(page.locator('.footer-main .download .download-glow')).toHaveCount(0)
   const face = await relativeLuminance(hero, 'backgroundColor')
   const label = await relativeLuminance(hero, 'color')
-  expect(face, 'download face should stay dark so the glow reads').toBeLessThan(0.12)
-  expect(label, 'download label should be near-white').toBeGreaterThan(0.9)
+  expect(face, 'download face should be the amber fill').toBeGreaterThan(0.35)
+  expect(label, 'download label should stay dark on amber').toBeLessThan(0.2)
   const accentFace = await page.evaluate(() => {
     const probe = document.createElement('span')
     probe.style.backgroundColor = 'var(--color-accent)'
@@ -349,7 +350,7 @@ test('download CTAs have a dark face, light label, and traveling border glow', a
     return color
   })
   const bg = await hero.evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(bg, 'download face must not match the honey accent fill').not.toBe(accentFace)
+  expect(bg, 'download face should be the accent fill').toBe(accentFace)
 })
 
 async function relativeLuminance(locator: Locator, property: 'color' | 'backgroundColor') {
@@ -373,6 +374,7 @@ async function relativeLuminance(locator: Locator, property: 'color' | 'backgrou
 
 test('demo option badges stay bright and unclipped at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const picker = page.getByRole('radiogroup', { name: THEME_PICKER })
@@ -385,10 +387,13 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   const idleFill = await relativeLuminance(idle, 'backgroundColor')
   const mutedText = await relativeLuminance(muted, 'color')
   const paperFill = await relativeLuminance(paper, 'backgroundColor')
-  expect(idleText, 'idle badge text should be near-white').toBeGreaterThan(0.9)
-  expect(idleText, 'idle badge text should beat muted copy').toBeGreaterThan(mutedText)
-  expect(selectedText, 'selected badge text should be near-white').toBeGreaterThan(0.9)
-  expect(idleFill, 'idle badge fill should lift off the page').toBeGreaterThan(paperFill * 2)
+  expect(idleText, 'idle badge text should stay dark on light paper').toBeLessThan(0.35)
+  expect(
+    idleText,
+    'idle badge text should stay at least as dark as muted copy',
+  ).toBeLessThanOrEqual(mutedText + 0.05)
+  expect(selectedText, 'selected badge text should stay dark').toBeLessThan(0.35)
+  expect(idleFill, 'idle badge fill should sit off white paper').toBeLessThan(paperFill)
   expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   const rowBox = await page.locator('.demo-chrome').boundingBox()
@@ -512,6 +517,7 @@ test('feature splits alternate illustration side and AI sits above open source',
 
 test('editor cards are icon-plus-label tiles with a distinct plugins card', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   const section = page.locator('#editor')
   await expect(section.getByRole('heading', { level: 2 })).toContainText(/editor/i)
@@ -535,7 +541,7 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
     page.locator('.ed-card span:not(.ed-slash-mark)').first(),
     'color',
   )
-  expect(labelLuminance, 'editor card labels should be near-white').toBeGreaterThan(0.9)
+  expect(labelLuminance, 'editor card labels should stay dark on light paper').toBeLessThan(0.35)
   const pluginsBg = await plugins.evaluate((el) => getComputedStyle(el).backgroundColor)
   const mediaBg = await media.evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(pluginsBg, 'More plugins should use a distinct fill').not.toBe(mediaBg)
@@ -543,6 +549,7 @@ test('editor cards are icon-plus-label tiles with a distinct plugins card', asyn
 
 test('demo Settings restyles the iframe only', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await useLightLanding(page)
   await page.goto('/')
   await waitForDemoReady(page)
   const frame = demoFrame(page)
@@ -568,7 +575,7 @@ test('demo Settings restyles the iframe only', async ({ page }) => {
     expectHybridLandingChrome(await readLandingChrome(page))
     await expect
       .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
-      .toBe('dark')
+      .toBe('light')
   }
   expect(await readLandingChrome(page)).toEqual(before)
 })
