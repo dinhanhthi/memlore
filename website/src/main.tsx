@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter/opsz.css'
 import '@fontsource/ibm-plex-mono/400.css'
@@ -27,8 +27,19 @@ function Site() {
   }
 }
 
+function BootGate({ children }: { children: ReactNode }) {
+  // render() is async — flipping this class here would show the crawler twin
+  // before React replaces it. Wait for the first commit.
+  useEffect(() => {
+    document.documentElement.classList.add('site-ready')
+  }, [])
+  return children
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Site />
+    <BootGate>
+      <Site />
+    </BootGate>
   </StrictMode>,
 )

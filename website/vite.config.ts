@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { applyMarketingShell } from './src/bootShell'
 import { renderLegalStaticHtml } from './src/legal/markdown'
 import { renderLandingStaticHtml } from './src/prerender'
 
@@ -32,9 +33,8 @@ function tauriAliasGuard() {
 // Google's OAuth verification reviewer fetches raw HTML and does not run JS, so a
 // client-rendered page reads as blank — "insufficient content" on the policy, and
 // no app description or privacy link on the homepage. Both block publishing. Bake
-// the copy into the shell; React replaces it on mount.
-const ROOT_MARKER = '<div id="root"></div>'
-
+// the copy into the shell; React replaces it on mount. The boot splash hides that
+// twin from sighted JS users until the first React commit (see bootShell.ts).
 function staticArticleFor(path: string): string | undefined {
   if (/\/index\.html$/.test(path)) return renderLandingStaticHtml()
   const kind = path.match(/\/(privacy|terms|about)\.html$/)?.[1]
@@ -48,13 +48,9 @@ function prerenderStaticShells() {
   return {
     name: 'prerender-static-shells',
     transformIndexHtml(html: string, ctx: { path: string }) {
-      const article = staticArticleFor(ctx.path)
-      if (!article) return
-      if (!html.includes(ROOT_MARKER)) {
-        throw new Error(`prerender-static-shells: ${ROOT_MARKER} not found in ${ctx.path}`)
-      }
-      // Function replacement: `$&` and friends in the copy are literal, not patterns.
-      return html.replace(ROOT_MARKER, () => `<div id="root">${article}</div>`)
+      // Function replacement lives in applyMarketingShell so `$&` in the copy
+      // stays literal. Splash is injected as a sibling; the twin stays in #root.
+      return applyMarketingShell(html, ctx.path, staticArticleFor(ctx.path))
     },
   }
 }

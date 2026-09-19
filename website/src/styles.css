@@ -384,8 +384,8 @@ footer {
 .nav-toggle:active {
   transform: scale(0.98);
 }
-.nav-rule,
-.nav-download {
+.site-header .nav-rule,
+.site-header .download.nav-download {
   display: none;
 }
 .site-header nav > a[aria-current='page'] {
@@ -2379,6 +2379,7 @@ tbody th {
   }
   .site-header[data-nav-open] .nav-download {
     display: inline-flex;
+    padding-inline: 2rem;
   }
   .site-header nav > a,
   .doc-menu summary {
