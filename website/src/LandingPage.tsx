@@ -15,8 +15,8 @@ import {
 import {
   ArrowDown,
   ArrowRight,
-  ArrowUp,
   ArrowUpRight,
+  AtSign,
   BarChart3,
   BookOpen,
   CalendarClock,
@@ -26,6 +26,7 @@ import {
   Cpu,
   EyeOff,
   FileText,
+  Hash,
   Heading,
   Heart,
   Highlighter,
@@ -38,20 +39,20 @@ import {
   Maximize2,
   MessageCircle,
   MessageSquareQuote,
-  Mic,
   Monitor,
   MoreHorizontal,
   PenLine,
   Play,
-  Plus,
+  Puzzle,
   RefreshCw,
   ScanSearch,
   ServerOff,
+  Sigma,
   Smartphone,
   Sparkles,
+  Type,
   UserRound,
   Users,
-  Video,
   X,
 } from 'lucide-react'
 import { downloadUrl, githubUrl } from './links'
@@ -90,12 +91,6 @@ const platformIcons = {
   'Windows & Linux': Monitor,
   'iOS & Android': Smartphone,
 } as const
-const editorMediaFiles = [
-  { id: 'image', Icon: ImageIcon },
-  { id: 'video', Icon: Video },
-  { id: 'audio', Icon: Mic },
-] as const
-
 type ComparisonProductName = 'Memlore' | 'Day One' | 'Journey' | 'Apple Journal'
 type ComparisonLevel = 1 | 2 | 3 | 4
 type ComparisonMark = 'yes' | 'no' | 'partial' | 'soon' | ComparisonLevel
@@ -426,170 +421,30 @@ function LocksFigure() {
   )
 }
 
-function EulerIdentity() {
-  return (
-    <p className="ed-math-eq">
-      <i>e</i>
-      <sup>
-        <i>i</i>π
-      </sup>{' '}
-      + 1 = 0
-    </p>
-  )
-}
-
-function MediaFiles() {
-  return (
-    <div className="ed-files">
-      {editorMediaFiles.map(({ id, Icon }) => (
-        <span key={id} className={`ed-file ed-file-${id}`}>
-          <Icon className="size-5" strokeWidth={1.75} />
-        </span>
-      ))}
-    </div>
-  )
-}
-
-const editorSlashItems = [
-  { label: 'Heading 1', hint: '#' },
-  { label: 'Image' },
-  { label: 'Today' },
-] satisfies { label: string; hint?: string }[]
-
-function SlashPreview() {
-  return (
-    <div className="ed-slash-menu">
-      <span className="ed-slash-prompt">/</span>
-      <div className="ed-slash-list">
-        {editorSlashItems.map((item) => (
-          <div key={item.label} className="ed-slash-item">
-            <span>{item.label}</span>
-            {item.hint ? <span className="ed-slash-hint">{item.hint}</span> : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function MarkdownPreview() {
-  return <pre className="ed-md">{'**Tuesday**\n- [x] coffee\n- [ ] the walk'}</pre>
-}
-
-function PluginsPreview({ sample }: { sample: string }) {
-  return (
-    <div className="ed-plugins-row">
-      <Plus className="size-5" strokeWidth={1.75} />
-      <p>{sample}</p>
-    </div>
-  )
-}
-
 const editorPanes = [
-  {
-    id: 'text' as const,
-    title: 'Words',
-    sample: 'Tuesday, after the rain. The kitchen still smelled like coffee.',
-  },
-  {
-    id: 'math' as const,
-    title: 'Math',
-    sample: "Euler's identity, written right in the entry.",
-  },
-  { id: 'code' as const, title: 'Code', sample: 'const day = journal.today()' },
-  {
-    id: 'media' as const,
-    title: 'Media',
-    sample: 'Photos, video, and voice memos, kept with the entry.',
-  },
-  {
-    id: 'slash' as const,
-    title: 'Slash command',
-    sample: "Type / for a heading, image, or today's date.",
-  },
-  {
-    id: 'mention' as const,
-    title: 'Mentions',
-    sample: 'Type @ to link another entry by its title.',
-  },
-  {
-    id: 'markdown' as const,
-    title: 'Markdown',
-    tag: 'GFM',
-    sample: 'GitHub Flavored Markdown. Type it, paste it, keep it.',
-  },
-  {
-    id: 'plugins' as const,
-    title: 'More plugins later',
-    sample: 'The page can grow. More editor plugins can land without changing how you write.',
-  },
+  { id: 'text' as const, title: 'Words', Icon: Type },
+  { id: 'math' as const, title: 'Math', Icon: Sigma },
+  { id: 'code' as const, title: 'Code', Icon: Code2 },
+  { id: 'media' as const, title: 'Media', Icon: ImageIcon },
+  { id: 'slash' as const, title: 'Slash command', mark: '/' },
+  { id: 'mention' as const, title: 'Mentions', Icon: AtSign },
+  { id: 'markdown' as const, title: 'Markdown', Icon: Hash },
+  { id: 'plugins' as const, title: 'More plugins', Icon: Puzzle },
 ]
-
-function paneSample(pane: (typeof editorPanes)[number]) {
-  if (pane.id === 'math') return <EulerIdentity />
-  if (pane.id === 'media') return <MediaFiles />
-  if (pane.id === 'slash') return <SlashPreview />
-  if (pane.id === 'markdown') return <MarkdownPreview />
-  if (pane.id === 'plugins') return <PluginsPreview sample={pane.sample} />
-  return <p>{pane.sample}</p>
-}
 
 function EditorFigure() {
   return (
     <figure className="illust illust-editor" aria-hidden="true">
       {editorPanes.map((pane) => (
-        <div key={pane.id} className={`ed-pane ed-${pane.id}`}>
-          <small>
-            {pane.title}
-            {'tag' in pane ? <span className="ed-tag">{pane.tag}</span> : null}
-          </small>
-          {paneSample(pane)}
+        <div key={pane.id} className={`ed-card ed-${pane.id}`}>
+          {'mark' in pane ? (
+            <span className="ed-slash-mark">{pane.mark}</span>
+          ) : (
+            <pane.Icon className="size-5" strokeWidth={1.75} />
+          )}
+          <span>{pane.title}</span>
         </div>
       ))}
-    </figure>
-  )
-}
-
-const chatMessages = [
-  { from: 'you' as const, text: 'Long day. Walked to the river after dinner.' },
-  {
-    from: 'ai' as const,
-    text: 'That walk keeps coming up. What stayed with you tonight?',
-  },
-  { from: 'you' as const, text: 'I left the headphones at home. It was quiet.' },
-]
-
-function ChatFigure() {
-  return (
-    <figure className="illust illust-chat" aria-hidden="true">
-      <div className="chat-window">
-        <div className="chat-chrome">
-          <strong>
-            <MessageCircle className="size-4" />
-            Daily Chat
-          </strong>
-          <span className="chat-save">
-            <Sparkles className="size-3.5" />
-            Save as entry
-          </span>
-        </div>
-        <div className="chat-thread">
-          {chatMessages.map((message) => (
-            <div
-              key={message.text}
-              className={message.from === 'you' ? 'chat-row chat-you' : 'chat-row chat-ai'}
-            >
-              {message.text}
-            </div>
-          ))}
-        </div>
-        <div className="chat-composer">
-          <span>Tell me about your day…</span>
-          <span className="chat-send">
-            <ArrowUp className="size-3.5" />
-          </span>
-        </div>
-      </div>
     </figure>
   )
 }
@@ -599,22 +454,6 @@ const emotionOptions = [
   { key: 'neutral' as const, emoji: '\u{1F610}', label: 'So-so' },
   { key: 'good' as const, emoji: '\u{1F60A}', label: 'Good' },
 ]
-
-// One mark per day of a sample stretch, oldest first.
-const emotionMarks = [
-  'neutral',
-  'bad',
-  'neutral',
-  'good',
-  'good',
-  'neutral',
-  'good',
-  'bad',
-  'neutral',
-  'good',
-  'good',
-  'good',
-] as const
 
 function EmotionsFigure() {
   return (
@@ -632,42 +471,6 @@ function EmotionsFigure() {
           </span>
         ))}
       </div>
-      <p className="emotion-trend-label">Emotion trend</p>
-      <div className="emotion-trend">
-        {emotionMarks.map((mark, index) => (
-          <span key={index} data-emotion={mark} />
-        ))}
-      </div>
-    </figure>
-  )
-}
-
-function SearchFigure() {
-  return (
-    <figure className="illust illust-search" aria-hidden="true">
-      <div className="search-query">the kitchen after rain</div>
-      <div className="search-hits">
-        <span />
-        <span />
-        <span />
-      </div>
-    </figure>
-  )
-}
-
-const personaMemories = ['the walk after dinner', 'Tuesday kitchen', 'light on the river']
-
-function PersonaFigure() {
-  return (
-    <figure className="illust illust-persona" aria-hidden="true">
-      <p className="persona-caption">From your entries</p>
-      <div className="persona-memories">
-        {personaMemories.map((item) => (
-          <span key={item}>{item}</span>
-        ))}
-      </div>
-      <div className="chat-row chat-ai">A second you, in your voice.</div>
-      <p className="persona-write">…the light on the water, the same as last October.</p>
     </figure>
   )
 }
@@ -763,7 +566,7 @@ const transferOutbound = ['Backup', 'Markdown', 'Plain text']
 function TransferFigure() {
   return (
     <figure className="illust illust-transfer" aria-hidden="true">
-      <div className="transfer-col">
+      <div className="transfer-col transfer-in">
         {transferInbound.map((item) => (
           <span key={item}>{item}</span>
         ))}
@@ -771,7 +574,7 @@ function TransferFigure() {
       <TransferArrow />
       <strong className="transfer-hub">Memlore</strong>
       <TransferArrow />
-      <div className="transfer-col">
+      <div className="transfer-col transfer-out">
         {transferOutbound.map((item) => (
           <span key={item}>{item}</span>
         ))}
@@ -1251,8 +1054,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
-        <section className="split split-flip" id="locks">
-          <LocksFigure />
+        <section className="split" id="locks">
           <div className="locks-copy">
             <h2>You can lock entries in 3 different ways.</h2>
             <ul className="lock-list">
@@ -1261,17 +1063,18 @@ export default function LandingPage() {
                 return (
                   <li key={item.id}>
                     <Icon className="size-4" />
-                    <div>
-                      <h3>{item.title}</h3>
-                      <p>{item.text}</p>
-                    </div>
+                    <p>
+                      <strong>{item.title}.</strong> {item.text}
+                    </p>
                   </li>
                 )
               })}
             </ul>
           </div>
+          <LocksFigure />
         </section>
-        <section className="split" id="editor">
+        <section className="split split-flip" id="editor">
+          <EditorFigure />
           <div>
             <h2>Feature-rich editor</h2>
             <p>
@@ -1279,14 +1082,30 @@ export default function LandingPage() {
               plugins. It responds quickly, even with very long content.
             </p>
           </div>
-          <EditorFigure />
         </section>
-        <section className="split split-flip" id="emotions">
-          <EmotionsFigure />
+        <section className="split" id="emotions">
           <div>
             <h2>Emotion tracking</h2>
             <p>Your mood can be tracked and analyzed over time.</p>
           </div>
+          <EmotionsFigure />
+        </section>
+        <section className="split split-flip" id="locations">
+          <LocationsFigure />
+          <div>
+            <h2>Entries on a map</h2>
+            <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
+          </div>
+        </section>
+        <section className="split" id="import-export">
+          <div>
+            <h2>Import and export</h2>
+            <p>
+              You can import entries (including media) from other platforms into Memlore, and vice
+              versa. Make sure the migration is seamless.
+            </p>
+          </div>
+          <TransferFigure />
         </section>
         <section className="ai-section" id="ai">
           <div className="ai-intro">
@@ -1313,54 +1132,6 @@ export default function LandingPage() {
               )
             })}
           </div>
-        </section>
-        <section className="split split-flip" id="chat">
-          <ChatFigure />
-          <div>
-            <h2>Daily Chat</h2>
-            <p>
-              If you're unsure what to write, chat with your Memlore buddy about your day or
-              anything on your mind. Memlore can help synthesize your thoughts into a complete
-              entry, and you can customize your buddy's persona.
-            </p>
-          </div>
-        </section>
-        <section className="split" id="persona">
-          <div>
-            <h2>Memories and persona</h2>
-            <p>
-              Memlore distills memories from your entries. Opt in, and it builds a second you that
-              writes in your voice and style.
-            </p>
-          </div>
-          <PersonaFigure />
-        </section>
-        <section className="split" id="search">
-          <div>
-            <h2>Search your journal</h2>
-            <p>
-              Find a word you wrote, or something you only half-remember. Search stays on your
-              device, next to tags, calendar, and maps.
-            </p>
-          </div>
-          <SearchFigure />
-        </section>
-        <section className="split split-flip" id="locations">
-          <LocationsFigure />
-          <div>
-            <h2>Entries on a map</h2>
-            <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
-          </div>
-        </section>
-        <section className="split" id="import-export">
-          <div>
-            <h2>Import and export</h2>
-            <p>
-              You can import entries (including media) from other platforms into Memlore, and vice
-              versa. Make sure the migration is seamless.
-            </p>
-          </div>
-          <TransferFigure />
         </section>
         <section className="open-section" id="open-source">
           <div className="open-symbol" aria-hidden="true">

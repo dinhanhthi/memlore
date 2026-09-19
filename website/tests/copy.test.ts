@@ -114,9 +114,8 @@ const comparisonProductsSource = sourceBlock(
 )
 const comparisonRowsSource = sourceBlock('const comparisonRows = [', '] satisfies ComparisonRow[]')
 const platformItemsSource = sourceBlock('const platformItems = [', '] satisfies {')
-const editorPanesSource = sourceBlock('const editorPanes = [', 'function paneSample')
+const editorPanesSource = sourceBlock('const editorPanes = [', 'function EditorFigure')
 const emotionOptionsSource = sourceBlock('const emotionOptions = [', '\n]')
-const emotionMarksSource = sourceBlock('const emotionMarks = [', '] as const')
 const demoSource = sourceBlock('function DemoPlaceholder()', 'const aiItems = [')
 
 type ComparisonProductName = 'Memlore' | 'Day One' | 'Journey' | 'Apple Journal'
@@ -367,7 +366,7 @@ it('explains encryption for a non-technical reader', () => {
   expect(copy).not.toMatch(/argon2|aes-256|sqlcipher|ciphertext|zeroize/)
 })
 
-it('names the editor and lists slash commands, mentions, GFM, and later plugins', () => {
+it('names the editor and lists slash, mentions, markdown, and more plugins', () => {
   expect(landing).toContain(EDITOR_TITLE)
   expect(landing).toContain(EDITOR_BODY)
   expect(EDITOR_TITLE.toLowerCase()).toMatch(/editor/)
@@ -375,9 +374,10 @@ it('names the editor and lists slash commands, mentions, GFM, and later plugins'
   expect(paneIds).toEqual(expect.arrayContaining(['slash', 'mention', 'markdown', 'plugins']))
   expect(EDITOR_BODY.toLowerCase()).toMatch(/mention/)
   const copy = [EDITOR_TITLE, EDITOR_BODY, editorPanesSource].join('\n').toLowerCase()
-  expect(copy).toMatch(/slash/)
-  expect(copy).toMatch(/github flavored markdown|\bgfm\b/)
-  expect(copy).toMatch(/plugin/)
+  expect(copy).toMatch(/slash command/)
+  expect(copy).toMatch(/markdown/)
+  expect(copy).toMatch(/more plugins/)
+  expect(editorPanesSource).not.toMatch(/tag: 'GFM'/)
 })
 
 it('covers the required feature themes from real product capabilities', () => {
@@ -387,7 +387,6 @@ it('covers the required feature themes from real product capabilities', () => {
   expect(copy).toMatch(/writ|words|editor/)
   expect(copy).toMatch(/photo|media/)
   expect(copy).toMatch(/search/)
-  expect(copy).toMatch(/tag/)
   expect(copy).toMatch(/calendar/)
   expect(copy).toMatch(/memor/)
   expect(copy).toMatch(/optional/)
@@ -504,9 +503,8 @@ it('explains sync as the user’s own cloud, encrypted before it leaves the devi
 it('keeps emotions at exactly bad, neutral, and good', () => {
   const keys = [...emotionOptionsSource.matchAll(/key: '(\w+)' as const/g)].map((match) => match[1])
   expect(keys).toEqual(['bad', 'neutral', 'good'])
-  const marks = [...emotionMarksSource.matchAll(/'(\w+)'/g)].map((match) => match[1])
-  expect(marks.length).toBeGreaterThan(0)
-  expect(new Set(marks)).toEqual(new Set(keys))
+  expect(landingSource).not.toContain('emotionMarks')
+  expect(landingSource).not.toContain('Emotion trend')
   // The figure marks the selected option inline rather than through a const.
   expect(landingSource).toContain("option.key === 'good'")
   expect(keys).toContain('good')
