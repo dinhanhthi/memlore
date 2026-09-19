@@ -160,16 +160,9 @@ for (const viewport of VIEWPORTS) {
       expect(featuresTop, 'encrypt section should sit closer to the preview').toBeLessThanOrEqual(
         32,
       )
-      const chatPadding = await page.locator('.illust-chat').evaluate((el) => {
-        const style = getComputedStyle(el)
-        return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft]
-      })
-      expect(chatPadding, 'Daily Chat mockup should not pick up .illust padding').toEqual([
-        '0px',
-        '0px',
-        '0px',
-        '0px',
-      ])
+      await expect(page.locator('#chat')).toHaveCount(0)
+      await expect(page.locator('#persona')).toHaveCount(0)
+      await expect(page.locator('#search')).toHaveCount(0)
       const lockOrder = await page.evaluate(() => {
         const section = document.querySelector('#locks')
         if (!(section instanceof HTMLElement)) return null
@@ -413,37 +406,139 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   ).toBeLessThanOrEqual(rowBox!.y + rowBox!.height + 1)
 })
 
-test('editor media pane shows file-type icons instead of body copy', async ({ page }) => {
+test('lock titles and descriptions share one paragraph', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
-  const pane = page.locator('.ed-media')
-  await expect(pane).toBeVisible()
-  await expect(pane.locator('small')).toHaveText('Media')
-  await expect(pane.locator('p')).toHaveCount(0)
-  await expect(pane.locator('.ed-files svg')).toHaveCount(3)
-  await expect(pane).not.toContainText('Photos, video, and voice memos')
+  const items = page.locator('.lock-list li')
+  await expect(items).toHaveCount(3)
+  await expect(items.locator('h3')).toHaveCount(0)
+  await expect(items.first().locator('p')).toHaveCount(1)
+  await expect(items.first().locator('p')).toContainText(/App lock/)
+  await expect(items.first().locator('p')).toContainText(/password or Touch ID/)
 })
 
-test('editor section names the editor and shows slash, markdown, and later plugins', async ({
+function firstRowCount(page: Page, selector: string) {
+  return page.locator(selector).evaluate((el) => {
+    const items = [...el.children] as HTMLElement[]
+    if (items.length === 0) return 0
+    const firstTop = items[0].getBoundingClientRect().top
+    return items.filter((item) => Math.abs(item.getBoundingClientRect().top - firstTop) < 2).length
+  })
+}
+
+for (const width of [320, 375, 414] as const) {
+  test(`editor illustration fits 3 cards per row at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 812 })
+    await page.goto('/')
+    const perRow = await page.locator('.illust-editor').evaluate((el) => {
+      const cards = [...el.querySelectorAll('.ed-card')]
+      if (cards.length === 0) return 0
+      const firstTop = cards[0].getBoundingClientRect().top
+      return cards.filter((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 2)
+        .length
+    })
+    expect(
+      perRow,
+      `expected at least 3 editor cards on the first row at ${width}`,
+    ).toBeGreaterThanOrEqual(3)
+    await expectNoRootOverflow(page)
+  })
+}
+
+for (const width of [320, 375, 414] as const) {
+  test(`import/export chips wrap 2 then 3 per row at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 812 })
+    await page.goto('/')
+    await expect(firstRowCount(page, '.transfer-in')).resolves.toBe(2)
+    await expect(firstRowCount(page, '.transfer-out')).resolves.toBe(3)
+    const wrap = await page
+      .locator('.transfer-col span, .transfer-hub')
+      .evaluateAll((nodes) => nodes.map((el) => getComputedStyle(el).whiteSpace))
+    expect(wrap.every((value) => value === 'nowrap')).toBe(true)
+    await expectNoRootOverflow(page)
+  })
+}
+
+test('feature splits alternate illustration side and AI sits above open source', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/')
+  const ids = await page.evaluate(() =>
+    [...document.querySelectorAll('main section[id]')].map((section) => section.id),
+  )
+  const fromFeatures = ids.slice(ids.indexOf('features'))
+  expect(fromFeatures.slice(0, 9)).toEqual([
+    'features',
+    'sync',
+    'locks',
+    'editor',
+    'emotions',
+    'locations',
+    'import-export',
+    'ai',
+    'open-source',
+  ])
+  const sides = await page.evaluate(() => {
+    const of = (id: string, figure: string) => {
+      const section = document.getElementById(id)
+      const fig = section?.querySelector(figure)
+      const title = section?.querySelector('h2')
+      if (!fig || !title) return null
+      return fig.getBoundingClientRect().left < title.getBoundingClientRect().left
+        ? 'left'
+        : 'right'
+    }
+    return {
+      features: of('features', '.illust-encrypt'),
+      sync: of('sync', '.illust-encrypt'),
+      locks: of('locks', '.illust-locks'),
+      editor: of('editor', '.illust-editor'),
+      emotions: of('emotions', '.illust-emotions'),
+      locations: of('locations', '.illust-map'),
+      importExport: of('import-export', '.illust-transfer'),
+    }
+  })
+  expect(sides).toEqual({
+    features: 'right',
+    sync: 'left',
+    locks: 'right',
+    editor: 'left',
+    emotions: 'right',
+    locations: 'left',
+    importExport: 'right',
+  })
+})
+
+test('editor cards are icon-plus-label tiles with a distinct plugins card', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
   const section = page.locator('#editor')
   await expect(section.getByRole('heading', { level: 2 })).toContainText(/editor/i)
+  await expect(page.locator('.ed-card')).toHaveCount(8)
+  const media = page.locator('.ed-media')
+  await expect(media).toHaveText('Media')
+  await expect(media.locator('svg')).toHaveCount(1)
   const slash = page.locator('.ed-slash')
-  await expect(slash).toBeVisible()
-  await expect(slash.locator('.ed-slash-prompt')).toHaveText('/')
-  await expect(slash).toContainText('Heading 1')
+  await expect(slash.locator('.ed-slash-mark')).toHaveText('/')
+  await expect(slash).toHaveText(/Slash command/)
   const markdown = page.locator('.ed-markdown')
-  await expect(markdown).toBeVisible()
-  await expect(markdown.locator('.ed-tag')).toHaveText('GFM')
-  await expect(markdown.locator('.ed-md')).toContainText('**Tuesday**')
-  await expect(markdown.locator('.ed-md')).toContainText('- [x] coffee')
+  await expect(markdown).toHaveText(/^Markdown$/)
+  await expect(markdown.locator('.ed-tag')).toHaveCount(0)
   const plugins = page.locator('.ed-plugins')
-  await expect(plugins).toBeVisible()
-  await expect(plugins).toContainText(/plugin/i)
-  await expect(plugins).toContainText(/later/i)
+  await expect(plugins).toHaveText('More plugins')
+  const wrap = await page
+    .locator('.ed-card span:not(.ed-slash-mark)')
+    .evaluateAll((nodes) => nodes.map((el) => getComputedStyle(el).whiteSpace))
+  expect(wrap.every((value) => value === 'nowrap')).toBe(true)
+  const labelLuminance = await relativeLuminance(
+    page.locator('.ed-card span:not(.ed-slash-mark)').first(),
+    'color',
+  )
+  expect(labelLuminance, 'editor card labels should be near-white').toBeGreaterThan(0.9)
+  const pluginsBg = await plugins.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const mediaBg = await media.evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(pluginsBg, 'More plugins should use a distinct fill').not.toBe(mediaBg)
 })
 
 test('demo Settings restyles the iframe only', async ({ page }) => {

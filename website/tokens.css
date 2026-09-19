@@ -43,7 +43,7 @@
   --text-md: 0.9375rem;
   --text-base: 1rem;
   --text-lead: 1.1rem;
-  --text-heading: clamp(1.75rem, 2.6vw, 2.5rem);
+  --text-heading: clamp(1.35rem, 2vw, 1.85rem);
   --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
   --text-display-s: clamp(2rem, 4vw + 0.6rem, 3.4rem);
   --space-3xs: 0.125rem;
