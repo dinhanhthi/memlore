@@ -516,6 +516,20 @@ footer {
   text-transform: uppercase;
   color: var(--color-muted);
 }
+.hero-eyebrow,
+.hero-title,
+.hero-description,
+.hero .button-row,
+.hero-meta,
+.demo-heading,
+.demo-disclaimer,
+.ai-intro,
+.compare-section .section-heading,
+.comparison-sources,
+.footer-main,
+.footer-bottom {
+  padding-inline: var(--cell-inline);
+}
 .hero-eyebrow {
   padding-block: 0.85rem;
 }
@@ -525,7 +539,7 @@ footer {
 .hero-title {
   align-self: center;
   padding-block: 1.25rem;
-  padding-inline: 0 1.5rem;
+  padding-inline: var(--cell-inline);
   font-size: var(--text-display);
   line-height: 1.05;
 }
@@ -537,7 +551,6 @@ footer {
   font-weight: 600;
 }
 .hero-description {
-  max-width: 58ch;
   margin: 0;
   padding-block: 1.25rem;
   font-size: var(--text-lead);
@@ -585,7 +598,6 @@ footer {
   align-items: start;
   font-size: var(--text-small);
   margin-top: 22px;
-  max-width: 52ch;
 }
 .availability svg {
   margin-top: 3px;
@@ -624,7 +636,6 @@ footer {
 }
 .section-heading p {
   margin-top: 10px;
-  max-width: 46ch;
 }
 .demo-heading {
   align-items: start;
@@ -875,7 +886,7 @@ footer {
 }
 .spec-item {
   min-width: 0;
-  padding: 20px 16px;
+  padding: 20px var(--cell-inline);
   border-inline-end: var(--rule-width) solid var(--color-rule);
 }
 .spec-item:last-child {
@@ -922,14 +933,13 @@ footer {
   min-width: 0;
 }
 .split > div:not(.illust) {
-  padding: var(--space-section) 2rem;
+  padding: var(--space-section) var(--cell-inline);
 }
 .split h2 {
   margin-bottom: 16px;
 }
 .split p,
 .split li {
-  max-width: 48ch;
   overflow-wrap: anywhere;
 }
 .split ul {
@@ -941,7 +951,6 @@ footer {
 }
 .split li {
   font-size: var(--text-base);
-  max-width: 48ch;
 }
 .lock-list li {
   display: flex;
@@ -1221,7 +1230,7 @@ footer {
   gap: 18px;
   align-items: start;
   margin: 0;
-  padding: var(--space-section) 0;
+  padding-block: var(--space-section);
   min-width: 0;
 }
 .ai-intro > div {
@@ -1232,7 +1241,6 @@ footer {
   margin-top: 6px;
 }
 .ai-intro p {
-  max-width: 58ch;
   margin-top: 12px;
 }
 .ai-grid {
@@ -1445,11 +1453,11 @@ footer {
   background: var(--color-panel);
 }
 .open-section > :first-child {
-  padding: var(--space-section) 2rem var(--space-section) 0;
+  padding: var(--space-section) var(--cell-inline);
   border-inline-end: var(--rule-width) solid var(--color-rule);
 }
 .open-section > :last-child {
-  padding: var(--space-section) 2rem;
+  padding: var(--space-section) var(--cell-inline);
 }
 .open-symbol {
   display: flex;
@@ -1464,7 +1472,6 @@ footer {
 }
 .open-section p {
   margin-top: 20px;
-  max-width: 520px;
 }
 .open-section .text-link {
   margin-top: 24px;
@@ -1475,7 +1482,7 @@ footer {
 }
 .compare-section .section-heading {
   margin: 0;
-  padding: var(--space-section) 0 1.25rem;
+  padding-block: var(--space-section) 1.25rem;
 }
 .comparison-scroll {
   position: relative;
@@ -1707,14 +1714,13 @@ tbody th {
   padding: 0;
 }
 .platform-section > :first-child {
-  padding: var(--space-section) 2rem var(--space-section) 0;
+  padding: var(--space-section) var(--cell-inline);
   border-inline-end: var(--rule-width) solid var(--color-rule);
 }
 .platform-section > :last-child {
-  padding: var(--space-section) 2rem;
+  padding: var(--space-section) var(--cell-inline);
 }
 .platform-section p {
-  max-width: 440px;
   margin-top: 24px;
 }
 .platform-list > div {
@@ -1748,7 +1754,7 @@ tbody th {
   text-decoration: underline;
 }
 .footer-main {
-  padding: 72px 0 48px;
+  padding-block: 72px 48px;
   text-align: left;
   border: 0;
 }
@@ -1772,7 +1778,7 @@ tbody th {
   gap: 20px 48px;
   flex-wrap: wrap;
   border: 0;
-  padding: 28px 0 32px;
+  padding-block: 28px 32px;
   font-size: var(--text-small);
 }
 .footer-brand {
@@ -2160,7 +2166,12 @@ tbody th {
   .open-section > :last-child,
   .platform-section > :first-child,
   .platform-section > :last-child {
-    padding: 0;
+    padding-block: 0;
+    padding-inline: var(--cell-inline);
+  }
+  #locks h2,
+  #locks .lock-list {
+    padding-inline: var(--cell-inline);
   }
   .split,
   .open-section,
@@ -2238,7 +2249,7 @@ tbody th {
     margin: 0;
   }
   .footer-main {
-    padding: 48px 0;
+    padding-block: 48px;
   }
 }
 @media (max-width: 40rem) {
@@ -2275,19 +2286,15 @@ tbody th {
       'cta'
       'r4'
       'meta';
-    justify-items: center;
+    justify-items: stretch;
     text-align: center;
   }
   .hero-title {
-    padding-inline-end: 0;
     font-size: var(--text-display-s);
   }
   .hero-eyebrow,
   .hero-meta {
     text-align: center;
-  }
-  .hero-description {
-    max-width: 36ch;
   }
   .hero-portrait {
     order: -1;
@@ -2308,7 +2315,6 @@ tbody th {
   .hero .availability {
     display: flex;
     justify-content: center;
-    max-width: 36ch;
     text-align: center;
   }
   .illust-editor {
