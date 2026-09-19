@@ -2,6 +2,8 @@ import { expect, it } from 'vitest'
 import changelogHtml from '../changelog.html?raw'
 import changelogPageSource from '../src/changelog/ChangelogPage.tsx?raw'
 import {
+  latestStableRelease,
+  latestStableReleaseOf,
   latestStableVersion,
   latestStableVersionOf,
   releases,
@@ -61,6 +63,17 @@ it('exposes a stable, non-prerelease version from the real data', () => {
   const shown = releases.find((entry) => entry.version === latestStableVersion)
   expect(shown?.stable).toBe(true)
   expect(latestStableVersion).not.toContain('-')
+})
+
+it('exposes the latest stable release date for the landing eyebrow', () => {
+  const entries = [
+    release('0.2.0-beta.1', '2026-10-01', false),
+    release('0.1.0', '2026-09-17', true),
+  ]
+  expect(latestStableReleaseOf(entries)).toEqual(entries[1])
+  expect(latestStableRelease.version).toBe(latestStableVersion)
+  expect(latestStableRelease.stable).toBe(true)
+  expect(latestStableRelease.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 
 it('lists releases newest first', () => {

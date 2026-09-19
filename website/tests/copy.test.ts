@@ -14,7 +14,7 @@ import privacyMarkdown from '../src/legal/privacy.md?raw'
 import termsMarkdown from '../src/legal/terms.md?raw'
 import { parseLegalMarkdown } from '../src/legal/markdown'
 import { prerenderCopy } from '../src/prerender'
-import { githubUrl } from '../src/links'
+import { githubUrl, licenseUrl } from '../src/links'
 
 /**
  * Every site string lives in the component that renders it, so this file reads
@@ -222,6 +222,42 @@ const EDITOR_BODY =
 
 it('uses the exact public GitHub URL', () => {
   expect(githubUrl).toBe('https://github.com/dinhanhthi/memlore')
+})
+
+it('points the spec-strip license at the AGPL file on GitHub', () => {
+  expect(licenseUrl).toBe(`${githubUrl}?tab=AGPL-3.0-1-ov-file`)
+  expect(landing).toContain('AGPLv3')
+  expect(landing).toContain('licenseUrl')
+  expect(landing).toContain('Read the source')
+  expect(landing).toContain('<dt>version</dt>')
+  expect(landing).toContain('<dt>size</dt>')
+  expect(landing).toContain('180 MB')
+  expect(landing).toContain('After install')
+})
+
+it('puts empty ledger rows above and below Made in the open', () => {
+  expect(landing).toMatch(
+    /<LedgerRule \/> <LedgerGap \/> <LedgerRule \/> <section className="open-section"/,
+  )
+  expect(landing).toMatch(
+    /id="open-source">[\s\S]*?<\/section> <LedgerRule \/> <LedgerGap \/> <LedgerRule \/> <section className="compare-section"/,
+  )
+})
+
+it('uses yellow group labels only for Demo, Features, AI, and Platforms', () => {
+  const labels = [...landingSource.matchAll(/<SectionIndex>([^<]+)<\/SectionIndex>/g)].map(
+    (match) => match[1],
+  )
+  expect(labels).toEqual(['Demo', 'Features', 'AI', 'Platforms'])
+})
+
+it('builds the hero eyebrow from the latest stable release and GitHub', () => {
+  expect(landing).toContain('hero-eyebrow')
+  expect(landing).toContain('latestStableRelease')
+  expect(landing).toContain('href={githubUrl}')
+  expect(landing).toContain('Open source')
+  expect(landing).toContain('hero-eyebrow-free')
+  expect(landing).toContain('hero-lead')
 })
 
 it('credits the author on the About page', () => {

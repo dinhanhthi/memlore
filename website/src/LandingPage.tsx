@@ -55,7 +55,8 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { downloadUrl, githubUrl } from './links'
+import { latestStableRelease } from './changelog/changelogData'
+import { downloadUrl, githubUrl, licenseUrl } from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
 import HeadFollowLogo, { preloadHeadSprites } from './HeadFollowLogo'
@@ -398,7 +399,8 @@ function LocksFigure() {
   const SecondIcon = lockIcons.second
   const InvisibleIcon = lockIcons.invisible
   return (
-    <figure className="illust illust-locks" aria-hidden="true">
+    <figure className="illust illust-locks cell-inset" aria-hidden="true">
+      <div className="cell-inset-rule" />
       <article data-lock="app">
         <p>
           <AppIcon className="size-5" />
@@ -417,6 +419,7 @@ function LocksFigure() {
           </article>
         </article>
       </article>
+      <div className="cell-inset-rule" />
     </figure>
   )
 }
@@ -538,7 +541,8 @@ function LocationsFigure() {
     )
   })
   return (
-    <figure className="illust illust-map" aria-hidden="true">
+    <figure className="illust illust-map cell-inset" aria-hidden="true">
+      <div className="cell-inset-rule" />
       <svg className="map-svg" viewBox="0 0 360 180">
         <rect className="map-ocean" width="360" height="180" rx="10" />
         <path className="map-land" d={NATURAL_EARTH_LAND_D} />
@@ -547,6 +551,7 @@ function LocationsFigure() {
         <MapPhoto x={182} y={52} rotate={4} variant="video" delay="0.35s" />
         <MapPhoto x={286} y={74} rotate={-3} variant="audio" delay="0.7s" />
       </svg>
+      <div className="cell-inset-rule" />
     </figure>
   )
 }
@@ -586,6 +591,7 @@ function TransferFigure() {
 function DemoPlaceholder() {
   return (
     <div className="demo-placeholder">
+      <LedgerRule />
       <figure className="demo-placeholder-stage">
         <HeadFollowLogo alt="" className="demo-placeholder-head" size={112} />
         <p className="demo-placeholder-title">This preview needs a wider window.</p>
@@ -594,6 +600,7 @@ function DemoPlaceholder() {
           arrive, their view will take this place.
         </p>
       </figure>
+      <LedgerRule />
     </div>
   )
 }
@@ -642,6 +649,7 @@ function DemoLive() {
   }
   return (
     <div className="demo-stage" data-upright={status === 'ready' ? '' : undefined}>
+      <LedgerRule />
       <div className="demo-stack" aria-hidden="true">
         <span />
         <span />
@@ -748,6 +756,7 @@ function DemoLive() {
           )}
         </div>
       </div>
+      <LedgerRule />
       <p className="demo-disclaimer">Sample data. Writing, locks, sync, and AI are simulated.</p>
     </div>
   )
@@ -774,6 +783,7 @@ function Demo({ wide }: { wide: boolean }) {
           </p>
         ) : null}
       </div>
+      <LedgerRule />
       {wide ? <DemoLive /> : <DemoPlaceholder />}
     </section>
   )
@@ -962,6 +972,57 @@ const platformItems = [
   { name: 'iOS & Android' as const, status: 'Coming soon' },
 ] satisfies { name: PlatformName; status: string; href?: string }[]
 
+function formatLedgerDate(isoDate: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${isoDate}T00:00:00Z`))
+}
+
+function LedgerRule({
+  area,
+  accent,
+}: {
+  area?: 'r0' | 're' | 'r1' | 'r2' | 'r3' | 'r4'
+  accent?: boolean
+}) {
+  return (
+    <div
+      className="ledger-rule"
+      role="separator"
+      data-accent={accent ? '' : undefined}
+      style={area ? { gridArea: area } : undefined}
+    />
+  )
+}
+
+function LedgerGap() {
+  return <div className="ledger-gap" aria-hidden="true" />
+}
+
+function FeatureJoin() {
+  return (
+    <>
+      <LedgerRule />
+      <div className="split-gap" aria-hidden="true" />
+    </>
+  )
+}
+
+function SectionIndex({ children }: { children: string }) {
+  return (
+    <>
+      <LedgerRule />
+      <LedgerGap />
+      <LedgerRule accent />
+      <p className="section-label">{children}</p>
+      <LedgerRule />
+    </>
+  )
+}
+
 export default function LandingPage() {
   const wide = useWideViewport()
   useEffect(() => {
@@ -973,53 +1034,22 @@ export default function LandingPage() {
         Skip to content
       </a>
       <SiteHeader homeHref="#main" />
-      <main id="main" tabIndex={-1}>
+      <main id="main" className="ledger" tabIndex={-1}>
         <section className="hero">
-          <div className="hero-copy">
-            <p className="hero-badges">
-              <span className="hero-badge">
-                <Code2 className="size-3.5" />
-                Open source
-              </span>
-              <span className="hero-badge" data-tone="free">
-                <Heart className="size-3.5" />
-                Free
-              </span>
-            </p>
-            <h1>
-              A little life.
-              <br />
-              <span>A lasting story.</span>
-            </h1>
-            <p className="hero-description">
-              <strong>Memlore is a private journal.</strong> For the days you want to remember, and
-              the thoughts you need to put somewhere.
-            </p>
-            <div className="button-row">
-              <DownloadLink
-                className="download download-hero"
-                label="Download for Mac"
-                ariaLabel="Download the beta from GitHub"
-              />
-              <a className="button" href="#demo" data-variant="secondary">
-                Try the demo <ArrowDown className="size-4" />
-              </a>
-            </div>
-          </div>
           <div className="hero-portrait">
             <div className="mascot-halo">
               {wide ? (
                 <HeadFollowLogo
                   alt="Memlore’s dog mascot. The head follows your cursor."
                   className="hero-head"
-                  size={280}
+                  size={168}
                 />
               ) : (
                 <span className="hero-head">
                   <img
                     src={logoSrc('straight')}
-                    width={230}
-                    height={230}
+                    width={200}
+                    height={200}
                     alt="Memlore’s dog mascot."
                   />
                 </span>
@@ -1031,8 +1061,94 @@ export default function LandingPage() {
               <span>Even on the ordinary days.</span>
             </p>
           </div>
+          <LedgerRule area="r0" />
+          <div className="hero-lead" aria-hidden="true" />
+          <LedgerRule area="re" accent />
+          <p className="hero-eyebrow headline">
+            Memlore
+            <span aria-hidden="true"> · </span>v{latestStableRelease.version}
+            <span aria-hidden="true"> · </span>
+            <time dateTime={latestStableRelease.date}>
+              {formatLedgerDate(latestStableRelease.date)}
+            </time>
+            <span aria-hidden="true"> · </span>
+            <a href={githubUrl} target="_blank" rel="noreferrer">
+              Open source
+            </a>
+            <span aria-hidden="true"> · </span>
+            <span className="hero-eyebrow-free">Free</span>
+          </p>
+          <LedgerRule area="r1" />
+          <h1 className="hero-title">
+            A little life.
+            <br />
+            <span>A lasting story.</span>
+          </h1>
+          <LedgerRule area="r2" />
+          <p className="hero-description">
+            <strong>Memlore is a private journal.</strong> For the days you want to remember, and
+            the thoughts you need to put somewhere.
+          </p>
+          <LedgerRule area="r3" />
+          <div className="button-row">
+            <DownloadLink
+              className="download download-hero"
+              label="Download for Mac"
+              ariaLabel="Download the beta from GitHub"
+            />
+            <a className="button" href="#demo" data-variant="secondary">
+              Try the demo <ArrowDown className="size-4" />
+            </a>
+          </div>
+          <LedgerRule area="r4" />
+          <p className="hero-meta">No account · Encrypted on your device · macOS today</p>
         </section>
+        <LedgerRule />
+        <section className="spec-strip" aria-label="What Memlore is">
+          <dl>
+            <div className="spec-item">
+              <dt>license</dt>
+              <dd>AGPLv3</dd>
+              <small>
+                <a href={licenseUrl} target="_blank" rel="noreferrer">
+                  Read the source <ArrowRight className="size-3" />
+                </a>
+              </small>
+            </div>
+            <div className="spec-item">
+              <dt>version</dt>
+              <dd>v{latestStableRelease.version}</dd>
+              <small>
+                <time dateTime={latestStableRelease.date}>
+                  {formatLedgerDate(latestStableRelease.date)}
+                </time>
+              </small>
+            </div>
+            <div className="spec-item">
+              <dt>sync</dt>
+              <dd>Your cloud</dd>
+              <small>Google Drive or iCloud Drive.</small>
+            </div>
+            <div className="spec-item">
+              <dt>size</dt>
+              <dd>180 MB</dd>
+              <small>After install</small>
+            </div>
+            <div className="spec-item">
+              <dt>ai</dt>
+              <dd>Optional</dd>
+              <small>Local, on-device, or your own key.</small>
+            </div>
+            <div className="spec-item">
+              <dt>today</dt>
+              <dd>macOS</dd>
+              <small>Windows, Linux, iOS, and Android later.</small>
+            </div>
+          </dl>
+        </section>
+        <SectionIndex>Demo</SectionIndex>
         <Demo wide={wide} />
+        <SectionIndex>Features</SectionIndex>
         <section className="split" id="features">
           <div>
             <h2>No server. No backdoor. We cannot read it.</h2>
@@ -1044,7 +1160,8 @@ export default function LandingPage() {
           </div>
           <EncryptFigure />
         </section>
-        <section className="split split-flip" id="sync">
+        <FeatureJoin />
+        <section className="split split-flip" id="sync" data-tone="raised">
           <SyncFigure />
           <div>
             <h2>Your cloud. Your account. Your key.</h2>
@@ -1054,6 +1171,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+        <FeatureJoin />
         <section className="split" id="locks">
           <div className="locks-copy">
             <h2>You can lock entries in 3 different ways.</h2>
@@ -1073,6 +1191,7 @@ export default function LandingPage() {
           </div>
           <LocksFigure />
         </section>
+        <FeatureJoin />
         <section className="split split-flip" id="editor">
           <EditorFigure />
           <div>
@@ -1083,6 +1202,7 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+        <FeatureJoin />
         <section className="split" id="emotions">
           <div>
             <h2>Emotion tracking</h2>
@@ -1090,6 +1210,7 @@ export default function LandingPage() {
           </div>
           <EmotionsFigure />
         </section>
+        <FeatureJoin />
         <section className="split split-flip" id="locations">
           <LocationsFigure />
           <div>
@@ -1097,6 +1218,7 @@ export default function LandingPage() {
             <p>Entries and photos sit where they happened. Open a pin to go back to that page.</p>
           </div>
         </section>
+        <FeatureJoin />
         <section className="split" id="import-export">
           <div>
             <h2>Import and export</h2>
@@ -1107,6 +1229,7 @@ export default function LandingPage() {
           </div>
           <TransferFigure />
         </section>
+        <SectionIndex>AI</SectionIndex>
         <section className="ai-section" id="ai">
           <div className="ai-intro">
             <Sparkles className="size-7" />
@@ -1118,6 +1241,7 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
+          <LedgerRule />
           <div className="ai-grid">
             {aiItems.map((item) => {
               const Icon = aiIcons[item.id]
@@ -1133,6 +1257,9 @@ export default function LandingPage() {
             })}
           </div>
         </section>
+        <LedgerRule />
+        <LedgerGap />
+        <LedgerRule />
         <section className="open-section" id="open-source">
           <div className="open-symbol" aria-hidden="true">
             <Code2 className="size-16" strokeWidth={1} />
@@ -1149,13 +1276,17 @@ export default function LandingPage() {
             </a>
           </div>
         </section>
-        <section className="compare-section" id="compare">
+        <LedgerRule />
+        <LedgerGap />
+        <LedgerRule />
+        <section className="compare-section" id="compare" data-tone="raised">
           <div className="section-heading">
             <div>
               <h2>How Memlore compares.</h2>
               <p>Memlore next to three journals people already keep.</p>
             </div>
           </div>
+          <LedgerRule />
           <div
             className="comparison-scroll"
             tabIndex={0}
@@ -1232,6 +1363,7 @@ export default function LandingPage() {
               </article>
             ))}
           </div>
+          <LedgerRule />
           <p className="comparison-sources">
             Explore the details:{' '}
             {comparisonProducts
@@ -1244,6 +1376,7 @@ export default function LandingPage() {
             <span>Features and plans can change.</span>
           </p>
         </section>
+        <SectionIndex>Platforms</SectionIndex>
         <section className="platform-section">
           <div>
             <h2>
@@ -1284,8 +1417,8 @@ export default function LandingPage() {
         </section>
       </main>
       <footer>
+        <LedgerRule />
         <div className="footer-main">
-          <HeadFollowLogo alt="" className="footer-head" size={72} />
           <h2>
             The ordinary days
             <br />
@@ -1302,6 +1435,7 @@ export default function LandingPage() {
             </a>
           </div>
         </div>
+        <LedgerRule />
         <SiteFooterBar homeHref="#main" />
       </footer>
     </>

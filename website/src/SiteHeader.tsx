@@ -47,6 +47,7 @@ function GitHubLink({ className }: { className: string }) {
   return (
     <a className={`github-link ${className}`} href={githubUrl} target="_blank" rel="noreferrer">
       <GitHubMark />
+      <span className="github-label">GitHub</span>
     </a>
   )
 }
@@ -98,9 +99,8 @@ export function SiteHeader({
   }, [open])
   const close = () => setOpen(false)
   return (
-    <>
-      {open ? <div className="nav-backdrop" aria-hidden="true" onClick={close} /> : null}
-      <header className="site-header" data-nav-open={open ? 'true' : undefined}>
+    <header className="site-header" data-nav-open={open ? 'true' : undefined}>
+      <div className="site-header-bar">
         <div className="header-brand">
           <a
             className="wordmark"
@@ -141,6 +141,12 @@ export function SiteHeader({
               .
             </p>
           </details>
+          <div className="nav-rule" aria-hidden="true" />
+          <DownloadLink
+            className="download nav-download"
+            label="Download for Mac"
+            ariaLabel="Download the beta from GitHub"
+          />
         </nav>
         <div className="header-actions">
           <GitHubLink className="header-github" />
@@ -165,7 +171,7 @@ export function SiteHeader({
             )}
           </button>
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   )
 }

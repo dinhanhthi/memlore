@@ -1,5 +1,7 @@
 export const githubUrl = 'https://github.com/dinhanhthi/memlore'
 
+export const licenseUrl = `${githubUrl}?tab=AGPL-3.0-1-ov-file`
+
 // The Download button points here, not straight at the .dmg: the Worker at
 // dl.memlore.app records the download (time, version, Cloudflare-inferred
 // country — never an IP, never a cookie) and then redirects to the GitHub

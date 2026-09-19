@@ -54,6 +54,7 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
     const toggle = page.getByRole('button', { name: 'Open menu' })
     await expect(toggle).toBeVisible()
     await expect(nav).toBeHidden()
+    await expect(header.locator('.header-github')).toBeVisible()
     await toggle.click()
   }
   await expect(nav.getByRole('link', { name: 'Demo' })).toHaveAttribute('href', '/#demo')
@@ -61,12 +62,13 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
   await expect(nav.getByRole('link', { name: 'Compare' })).toHaveAttribute('href', '/#compare')
   await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
   await expect(nav.locator('summary')).toHaveText('Doc')
-  await expect(header.locator('.header-github')).toBeVisible()
   await expect(header.locator('.header-github')).toHaveAttribute('href', GITHUB)
   if (compact) {
+    await expect(header.locator('.header-github')).toBeHidden()
     await expect(header.locator('.header-actions .download')).toBeHidden()
     return
   }
+  await expect(header.locator('.header-github')).toBeVisible()
   await expect(header.locator('.header-actions .download')).toBeVisible()
   await expect(header.locator('.header-actions .download')).toHaveAttribute('href', DOWNLOAD)
 }

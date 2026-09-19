@@ -41,6 +41,9 @@ importers:
       '@fontsource/fuzzy-bubbles':
         specifier: ^5.2.7
         version: 5.2.7
+      '@fontsource/ibm-plex-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/open-sans':
         specifier: ^5.2.7
         version: 5.2.7
@@ -735,6 +738,9 @@ packages:
 
   '@fontsource/fuzzy-bubbles@5.2.7':
     resolution: {integrity: sha512-mMOAcxXM3OmFmXVFuDgYdd4zAkvpew69Y6kTbDMKR528LXAyug0JeOrRjLV5DjqjzNoUzP3xHmApG+FMHQ4MYg==}
+
+  '@fontsource/ibm-plex-mono@5.3.0':
+    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
   '@fontsource/open-sans@5.2.7':
     resolution: {integrity: sha512-8yfgDYjE5O0vmTPdrcjV35y4yMnctsokmi9gN49Gcsr0sjzkMkR97AnKDe6OqZh2SFkYlR28fxOvi21bYEgMSw==}
@@ -3789,6 +3795,8 @@ snapshots:
   '@fontsource-variable/nunito@5.2.7': {}
 
   '@fontsource/fuzzy-bubbles@5.2.7': {}
+
+  '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@fontsource/open-sans@5.2.7': {}
 
