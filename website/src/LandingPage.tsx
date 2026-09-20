@@ -18,6 +18,7 @@ import {
   ArrowUpRight,
   AtSign,
   BarChart3,
+  Blocks,
   BookOpen,
   CalendarClock,
   Check,
@@ -41,6 +42,7 @@ import {
   Lock,
   Maximize2,
   MessageCircle,
+  Mic,
   Minus,
   MessageSquareQuote,
   Monitor,
@@ -763,6 +765,78 @@ const lookItems = [
   },
 ]
 
+const talkItems = [
+  {
+    id: 'daily' as const,
+    Icon: MessageCircle,
+    title: 'Daily Chat',
+    text: 'Type inside Memlore. When you’re ready, save the thread as an entry.',
+  },
+  {
+    id: 'voice' as const,
+    Icon: Mic,
+    title: 'Voice mode',
+    text: 'Speak the day instead of typing.',
+  },
+  {
+    id: 'mcp' as const,
+    Icon: Blocks,
+    title: 'MCP',
+    // TODO(later): journal MCP server — docs/LATER.md
+    text: 'Chat in ChatGPT, Claude, Gemini, Ollama, or another AI you already use. Coming soon.',
+  },
+]
+
+function TalkFigure() {
+  return (
+    <figure className="illust illust-talk" aria-hidden="true">
+      <article className="talk-way" data-talk="daily">
+        <p>
+          <MessageCircle className="size-4" />
+          <strong>Daily Chat</strong>
+        </p>
+        <div className="talk-bubbles">
+          <span data-who="you">The walk helped.</span>
+          <span data-who="ai">What stayed with you?</span>
+        </div>
+      </article>
+      <article className="talk-way" data-talk="voice">
+        <p>
+          <Mic className="size-4" />
+          <strong>Voice</strong>
+        </p>
+        <div className="talk-wave">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      </article>
+      <article className="talk-way" data-talk="mcp">
+        <p>
+          <Blocks className="size-4" />
+          <strong>MCP</strong>
+          <small>Soon</small>
+        </p>
+        <div className="talk-mcp">
+          <span>ChatGPT</span>
+          <span>Claude</span>
+          <span>Gemini</span>
+          <span>Ollama</span>
+          <span>More</span>
+        </div>
+      </article>
+      <p className="talk-into">
+        <FileText className="size-4" />
+        Then save it as an entry
+      </p>
+    </figure>
+  )
+}
+
 function DemoPlaceholder() {
   return (
     <div className="demo-placeholder">
@@ -1389,6 +1463,24 @@ export default function LandingPage() {
               ))}
             </ul>
           </div>
+        </section>
+        <LedgerRule />
+        <section className="split" id="talk">
+          <div>
+            <h2>Talk it through. Then keep the page.</h2>
+            <p>A conversation about the day can become a journal entry when you save it.</p>
+            <ul className="lock-list">
+              {talkItems.map((item) => (
+                <li key={item.id}>
+                  <item.Icon className="size-4" />
+                  <p>
+                    <strong>{item.title}.</strong> {item.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <TalkFigure />
         </section>
         <SectionIndex>AI</SectionIndex>
         <section className="ai-section" id="ai">
