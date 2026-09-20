@@ -61,6 +61,8 @@ const SETTINGS_OFF: AIFullSettings = {
   responseLanguage: 'auto',
   emotionSuggestionLanguage: 'auto',
   userMemoryEnabled: false,
+  mcpServerEnabled: false,
+  mcpDefaultJournalId: null,
   personaEnabled: false,
   memoryGenProvider: null,
   memoryGenEndpoint: null,

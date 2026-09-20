@@ -40,6 +40,7 @@ export type AIFeature =
   | 'tag_suggestions'
   | 'chat_rag'
   | 'user_memory'
+  | 'mcp_server'
 
 /** Features that cannot function without a configured embedding provider —
  *  they read from the chunk vector store (query embedding + `entry_embedding_chunks`
@@ -195,6 +196,11 @@ export const AI_FEATURE_USAGE_META: Record<AIFeature, AIFeatureUsageMeta> = {
     callPattern:
       'One scan-driven extraction call per changed source, plus small on-machine embedding calls.',
     scalesWith: 'entry_length',
+  },
+  mcp_server: {
+    usageRisk: 'low',
+    callPattern: 'No model calls — a local Unix-socket server for desktop MCP clients.',
+    scalesWith: 'none',
   },
 }
 
@@ -445,6 +451,12 @@ export interface AIFullSettings {
    *  configured — check `memoryGenProvider` / `memoryEmbedProvider` (or the
    *  store's assembled `memoryGen` / `memoryEmbed`) for slot readiness. */
   userMemoryEnabled: boolean
+  /** Local MCP server (`ai_mcp_server_enabled`). Fail-closed: default `false`.
+   *  No model calls — desktop MCP clients reach the journal over a Unix socket. */
+  mcpServerEnabled: boolean
+  /** Default journal for MCP `create_entry` when the tool call omits one.
+   *  Mirrors `mcp_default_journal_id`. */
+  mcpDefaultJournalId: string | null
   /** "Use persona" — mirrors the `user_persona.enabled` column, not a settings
    *  key. Independent of `userMemoryEnabled`: persona can be on while memory is
    *  off. Defaults ON (the persona row is seeded enabled); an empty persona is

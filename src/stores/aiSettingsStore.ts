@@ -54,6 +54,9 @@ interface AiSettingsState {
    *  skips scan/extract/chat memory RAG. Slot readiness is separate —
    *  see `memoryGen` / `memoryEmbed`. */
   userMemoryEnabled: boolean
+  /** Local MCP server (`ai_mcp_server_enabled`). Fail-closed default `false`.
+   *  No model provider required — desktop clients reach a Unix socket. */
+  mcpServerEnabled: boolean
   /** "Use persona" (`user_persona.enabled`). Tracked here so persona-gated UI
    *  — the editor's Continue & Rewrite affordances and the Features row —
    *  re-render the moment Settings flips it. Independent of
@@ -150,6 +153,7 @@ export const useAiSettingsStore = create<AiSettingsState>()((set, get) => ({
   chatRagEnabled: false,
   imageGenerationEnabled: false,
   userMemoryEnabled: false,
+  mcpServerEnabled: false,
   personaEnabled: false,
   dailyChatAiTitle: false,
   memoryGen: null,
@@ -250,6 +254,7 @@ export const useAiSettingsStore = create<AiSettingsState>()((set, get) => ({
       chatRagEnabled: s.chatRagEnabled,
       imageGenerationEnabled: s.imageGenerationEnabled,
       userMemoryEnabled: s.userMemoryEnabled,
+      mcpServerEnabled: s.mcpServerEnabled,
       personaEnabled: s.personaEnabled,
       dailyChatAiTitle: s.dailyChatAiTitle,
       memoryGen: s.memoryGenProvider
@@ -291,6 +296,7 @@ export const useAiSettingsStore = create<AiSettingsState>()((set, get) => ({
     else if (feature === 'chat_rag') set({ chatRagEnabled: enabled })
     else if (feature === 'image_generation') set({ imageGenerationEnabled: enabled })
     else if (feature === 'user_memory') set({ userMemoryEnabled: enabled })
+    else if (feature === 'mcp_server') set({ mcpServerEnabled: enabled })
     // Other features are not (yet) tracked here — ignore.
   },
 

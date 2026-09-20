@@ -594,6 +594,19 @@ pub mod settings_keys {
     /// this gate the wipe would re-fire on every launch, re-clearing any
     /// new config the user re-entered after a previous run.
     pub const AI_V12_CREDENTIAL_REGISTRY_MIGRATED: &str = "ai_v12_credential_registry_migrated";
+    /// Master on/off for the in-app MCP server. FAIL-CLOSED: default OFF
+    /// when missing — granting a desktop MCP client read/write access to
+    /// the journal is opt-in, not something a first run turns on. Enabling
+    /// does not require a provider or privacy receipt (MCP serves the local
+    /// vault over a Unix socket). Handled as a second early-return bypass
+    /// in `set_ai_feature`, same as [`USER_MEMORY_ENABLED`]. Device-local
+    /// (not in `SYNCABLE_SETTING_KEYS`).
+    pub const MCP_SERVER_ENABLED: &str = "ai_mcp_server_enabled";
+    /// Journal id used when an MCP `create_entry` call omits a journal.
+    /// Missing/`None` means the tool must be given an explicit journal.
+    /// Accept `None` via `set_mcp_default_journal` to clear. Device-local
+    /// (not in `SYNCABLE_SETTING_KEYS`).
+    pub const MCP_DEFAULT_JOURNAL_ID: &str = "ai_mcp_default_journal_id";
 }
 
 #[cfg(test)]

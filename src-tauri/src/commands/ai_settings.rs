@@ -163,6 +163,13 @@ pub struct AIFullSettings {
     /// here so persona-gated UI can react without a separate probe. Persona is
     /// independent of `user_memory_enabled`: it can be on while memory is off.
     pub persona_enabled: bool,
+    /// Master on/off for the in-app MCP server. FAIL-CLOSED: default OFF
+    /// when missing — see `settings_keys::MCP_SERVER_ENABLED`. Enabling
+    /// does not require a provider or privacy receipt.
+    pub mcp_server_enabled: bool,
+    /// Journal id used when an MCP `create_entry` call omits a journal.
+    /// `None` when unset — the tool must then be given an explicit journal.
+    pub mcp_default_journal_id: Option<String>,
 }
 
 // ─── Feature key registry ───────────────────────────────────────────────────
@@ -756,6 +763,8 @@ pub(crate) fn read_full_settings(conn: &rusqlite::Connection) -> AIFullSettings 
         persona_enabled: db::persona::read_persona(conn)
             .map(|p| p.enabled)
             .unwrap_or(false),
+        mcp_server_enabled: read_bool_setting(conn, settings_keys::MCP_SERVER_ENABLED),
+        mcp_default_journal_id: read_string_setting(conn, settings_keys::MCP_DEFAULT_JOURNAL_ID),
         memory_gen_provider,
         memory_gen_endpoint,
         memory_gen_endpoint_class,
@@ -852,23 +861,44 @@ pub fn set_ai_feature(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let conn = state.lock()?;
-    // User Memory uses its own slot pair (not app gen/embed), so it bypasses
-    // `feature_requirement`. Enabling is always allowed — the user can turn
-    // the feature on before configuring models; runtime gates still require
-    // both slots via `is_user_memory_active`.
-    if feature == "user_memory" {
-        db::set_setting(
-            &conn,
-            settings_keys::USER_MEMORY_ENABLED,
-            if enabled { "true" } else { "false" },
-        )
-        .map_err(|e| e.to_string())?;
-        return Ok(());
+    let setting_key = set_ai_feature_inner(&conn, &feature, enabled)?;
+    drop(conn);
+
+    if enabled && is_embedding_consuming_feature_key(setting_key) {
+        crate::commands::ai::start_indexing_worker(app);
     }
-    let req = feature_requirement(&feature).map_err(String::from)?;
+    Ok(())
+}
+
+/// Testable core of [`set_ai_feature`] — provider/privacy gate plus the
+/// settings write. Returns the persisted settings key so the Tauri wrapper
+/// can decide whether to nudge the indexing worker.
+///
+/// `user_memory` and `mcp_server` bypass `feature_requirement` entirely:
+/// neither uses an app-wide gen/embed slot. Enabling is always allowed.
+pub(crate) fn set_ai_feature_inner(
+    conn: &rusqlite::Connection,
+    feature: &str,
+    enabled: bool,
+) -> Result<&'static str, String> {
+    // Features that need no app-wide gen/embed slot bypass `feature_requirement`.
+    // Enabling is always allowed. Runtime gates still apply:
+    // `user_memory` → both memory slots via `is_user_memory_active`;
+    // `mcp_server` → the MCP server process (no provider, no privacy receipt).
+    let bypass_key = match feature {
+        "user_memory" => Some(settings_keys::USER_MEMORY_ENABLED),
+        "mcp_server" => Some(settings_keys::MCP_SERVER_ENABLED),
+        _ => None,
+    };
+    if let Some(key) = bypass_key {
+        db::set_setting(conn, key, if enabled { "true" } else { "false" })
+            .map_err(|e| e.to_string())?;
+        return Ok(key);
+    }
+    let req = feature_requirement(feature).map_err(String::from)?;
     if enabled {
         let (provider_key, image_model_key) = slot_keys(req.slot);
-        if read_string_setting(&conn, provider_key).is_none() {
+        if read_string_setting(conn, provider_key).is_none() {
             return Err(AiError::ProviderNotConfigured.into());
         }
         // `slot_provider_privacy_accepted` fails closed: a slot with no
@@ -877,10 +907,10 @@ pub fn set_ai_feature(
         // have accepted *some* class. Centralising the fallback policy in
         // one helper (`ai_provider.rs`) means the gate here and the gates in
         // `commands/ai.rs` + `search.rs` share one rule.
-        if !slot_provider_privacy_accepted(&conn, provider_key).map_err(String::from)? {
+        if !slot_provider_privacy_accepted(conn, provider_key).map_err(String::from)? {
             return Err(AiError::PrivacyNotAccepted.into());
         }
-        if req.extra_image_model && read_string_setting(&conn, image_model_key).is_none() {
+        if req.extra_image_model && read_string_setting(conn, image_model_key).is_none() {
             return Err(AiError::ProviderError(
                 "image_generation requires a configured image model".into(),
             )
@@ -890,26 +920,21 @@ pub fn set_ai_feature(
         // + privacy receipt — check it with the same rules as `req.slot`.
         if let Some(extra_slot) = req.extra_slot {
             let (extra_provider_key, _) = slot_keys(extra_slot);
-            if read_string_setting(&conn, extra_provider_key).is_none() {
+            if read_string_setting(conn, extra_provider_key).is_none() {
                 return Err(AiError::ProviderNotConfigured.into());
             }
-            if !slot_provider_privacy_accepted(&conn, extra_provider_key).map_err(String::from)? {
+            if !slot_provider_privacy_accepted(conn, extra_provider_key).map_err(String::from)? {
                 return Err(AiError::PrivacyNotAccepted.into());
             }
         }
     }
     db::set_setting(
-        &conn,
+        conn,
         req.setting_key,
         if enabled { "true" } else { "false" },
     )
     .map_err(|e| e.to_string())?;
-    drop(conn);
-
-    if enabled && is_embedding_consuming_feature_key(req.setting_key) {
-        crate::commands::ai::start_indexing_worker(app);
-    }
-    Ok(())
+    Ok(req.setting_key)
 }
 
 /// `true` for the settings key of a feature that consumes the chunk
@@ -1909,6 +1934,31 @@ pub fn set_emotion_suggestion_language(
         .map_err(|e| e.to_string())
 }
 
+/// Persist the journal id used when an MCP `create_entry` call omits a
+/// journal. `None` (or an empty string) clears the stored default so the
+/// tool must be given an explicit journal.
+#[tauri::command]
+pub fn set_mcp_default_journal(
+    journal_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let conn = state.lock()?;
+    set_mcp_default_journal_inner(&conn, journal_id.as_deref())
+}
+
+/// Testable core of [`set_mcp_default_journal`] — no `State<'_>` wrapper.
+pub(crate) fn set_mcp_default_journal_inner(
+    conn: &rusqlite::Connection,
+    journal_id: Option<&str>,
+) -> Result<(), String> {
+    match journal_id.filter(|id| !id.is_empty()) {
+        Some(id) => db::set_setting(conn, settings_keys::MCP_DEFAULT_JOURNAL_ID, id)
+            .map_err(|e| e.to_string()),
+        None => db::delete_setting(conn, settings_keys::MCP_DEFAULT_JOURNAL_ID)
+            .map_err(|e| e.to_string()),
+    }
+}
+
 /// Persist the global AI response language applied to every generation
 /// feature. Accepts the presets `"auto"`, `"en"`, `"vi"`, or a custom
 /// English-language name (e.g. `"French"`) — see
@@ -2734,6 +2784,70 @@ mod tests {
             feature_requirement("user_memory"),
             Err(AiError::ProviderError(_))
         ));
+    }
+
+    #[test]
+    fn set_ai_feature_mcp_server_succeeds_without_provider_or_privacy() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        assert!(
+            read_string_setting(&conn, settings_keys::gen::PROVIDER).is_none()
+                && read_string_setting(&conn, settings_keys::embed::PROVIDER).is_none(),
+            "fixture must start with no provider configured"
+        );
+        assert!(
+            read_privacy_accepted_at(&conn).unwrap_or(None).is_none(),
+            "fixture must start with no privacy receipt"
+        );
+
+        set_ai_feature_inner(&conn, "mcp_server", true)
+            .expect("enabling mcp_server must succeed with no provider and no privacy receipt");
+        assert!(
+            read_full_settings(&conn).mcp_server_enabled,
+            "mcp_server must persist as enabled"
+        );
+    }
+
+    #[test]
+    fn get_ai_settings_defaults_mcp_server_off_and_default_journal_none() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let s = read_full_settings(&conn);
+        assert!(!s.mcp_server_enabled, "mcp_server_enabled must default off");
+        assert!(
+            s.mcp_default_journal_id.is_none(),
+            "mcp_default_journal_id must default to None"
+        );
+    }
+
+    #[test]
+    fn feature_requirement_mcp_server_is_unknown() {
+        // MCP needs no provider slot — it must stay unknown to
+        // `feature_requirement` and be handled only via the set_ai_feature
+        // early-return bypass (same pattern as `user_memory`).
+        assert!(
+            matches!(
+                feature_requirement("mcp_server"),
+                Err(AiError::ProviderError(_))
+            ),
+            "mcp_server must stay unknown to feature_requirement"
+        );
+    }
+
+    #[test]
+    fn set_mcp_default_journal_round_trips_and_clears() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        set_mcp_default_journal_inner(&conn, Some("journal-abc")).unwrap();
+        assert_eq!(
+            read_full_settings(&conn).mcp_default_journal_id.as_deref(),
+            Some("journal-abc")
+        );
+        set_mcp_default_journal_inner(&conn, None).unwrap();
+        assert!(
+            read_full_settings(&conn).mcp_default_journal_id.is_none(),
+            "None must clear the stored default journal"
+        );
     }
 
     #[test]

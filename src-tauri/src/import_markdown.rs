@@ -56,101 +56,13 @@ pub fn split_leading_heading(markdown: &str) -> (Option<String>, &str) {
 /// are plain (Markdown syntax stripped) so search and previews stay readable.
 pub fn build_entry_yjs_from_markdown<F>(
     markdown: &str,
-    mut resolve_image: F,
+    resolve_image: F,
 ) -> (Vec<u8>, String, String)
 where
     F: FnMut(&str) -> Option<String>,
 {
     let doc = Doc::new();
-    let fragment = doc.get_or_insert_xml_fragment("default");
-    let plain = {
-        let mut builder = Builder::new(doc.transact_mut(), fragment.clone());
-
-        let mut options = Options::empty();
-        options.insert(Options::ENABLE_STRIKETHROUGH);
-        options.insert(Options::ENABLE_TASKLISTS);
-
-        for event in Parser::new_ext(markdown, options) {
-            match event {
-                Event::Start(Tag::Paragraph) => builder.open("paragraph", Vec::new(), true),
-                Event::Start(Tag::Heading { level, .. }) => builder.open(
-                    "heading",
-                    vec![("level", Any::Number(heading_level(level) as f64))],
-                    true,
-                ),
-                Event::Start(Tag::CodeBlock(kind)) => {
-                    let attrs = match &kind {
-                        CodeBlockKind::Fenced(info) if !info.trim().is_empty() => {
-                            let lang = info.split_whitespace().next().unwrap_or("").to_string();
-                            vec![("language", Any::String(lang.into()))]
-                        }
-                        _ => Vec::new(),
-                    };
-                    builder.open("codeBlock", attrs, true);
-                }
-                Event::Start(Tag::BlockQuote(_)) => builder.open("blockquote", Vec::new(), false),
-                Event::Start(Tag::List(Some(start))) => builder.open(
-                    "orderedList",
-                    vec![("start", Any::Number(start as f64))],
-                    false,
-                ),
-                Event::Start(Tag::List(None)) => builder.open("bulletList", Vec::new(), false),
-                Event::Start(Tag::Item) => builder.open("listItem", Vec::new(), false),
-                Event::Start(Tag::Emphasis) => builder.push_mark("italic", empty_map()),
-                Event::Start(Tag::Strong) => builder.push_mark("bold", empty_map()),
-                Event::Start(Tag::Strikethrough) => builder.push_mark("strike", empty_map()),
-                Event::Start(Tag::Link { dest_url, .. }) => {
-                    let mut attrs = HashMap::new();
-                    attrs.insert(
-                        String::from("href"),
-                        Any::String(dest_url.to_string().into()),
-                    );
-                    builder.push_mark("link", Any::Map(Arc::new(attrs)));
-                }
-                Event::Start(Tag::Image { dest_url, .. }) => {
-                    if let Some(media_id) = resolve_image(dest_url.as_ref()) {
-                        builder.enqueue_media("image", media_id);
-                    }
-                    // Alt text is carried by the image node, not the body.
-                    builder.skip_text += 1;
-                }
-                Event::End(TagEnd::Image) => {
-                    builder.skip_text = builder.skip_text.saturating_sub(1)
-                }
-                Event::End(TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock) => {
-                    builder.close_leaf()
-                }
-                Event::End(TagEnd::BlockQuote(_) | TagEnd::List(_) | TagEnd::Item) => {
-                    builder.close_container()
-                }
-                Event::End(
-                    TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link,
-                ) => {
-                    builder.marks.pop();
-                }
-                Event::Text(text) => builder.insert_text(text.as_ref(), None),
-                Event::Code(text) => builder.insert_text(text.as_ref(), Some("code")),
-                // Raw HTML has no schema mapping here — keep the source visible
-                // rather than silently dropping content.
-                Event::Html(text) | Event::InlineHtml(text) => {
-                    builder.insert_text(text.as_ref(), None)
-                }
-                // Day One writes one line per visual line; CommonMark would fold
-                // a single newline into a space, so keep it as a hard break.
-                Event::SoftBreak | Event::HardBreak => builder.hard_break(),
-                Event::Rule => {
-                    builder.open("horizontalRule", Vec::new(), false);
-                    builder.materialize();
-                    builder.close_container();
-                }
-                Event::TaskListMarker(checked) => builder.mark_task_item(checked),
-                _ => {}
-            }
-        }
-
-        builder.finish()
-    };
-
+    let plain = append_markdown_to_doc(&doc, markdown, resolve_image);
     let content_text = plain.trim().to_string();
     let preview_text: String = content_text.chars().take(PREVIEW_MAX_CHARS).collect();
     let update = doc
@@ -158,6 +70,101 @@ where
         .encode_state_as_update_v1(&StateVector::default());
 
     (update, content_text, preview_text)
+}
+
+/// Parse `markdown` and push the resulting TipTap blocks onto `doc`'s
+/// `"default"` fragment. Returns the plain text of what was appended (Markdown
+/// syntax stripped, trailing newline from the last leaf still present).
+///
+/// Later MCP `append_to_entry` loads a stored blob, captures
+/// `doc.transact().state_vector()`, calls this helper, persists the full state,
+/// and ships `encode_diff_v1(sv_before)` to the open editor.
+pub(crate) fn append_markdown_to_doc<F>(doc: &Doc, markdown: &str, mut resolve_image: F) -> String
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    let fragment = doc.get_or_insert_xml_fragment("default");
+    let mut builder = Builder::new(doc.transact_mut(), fragment);
+
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+
+    for event in Parser::new_ext(markdown, options) {
+        match event {
+            Event::Start(Tag::Paragraph) => builder.open("paragraph", Vec::new(), true),
+            Event::Start(Tag::Heading { level, .. }) => builder.open(
+                "heading",
+                vec![("level", Any::Number(heading_level(level) as f64))],
+                true,
+            ),
+            Event::Start(Tag::CodeBlock(kind)) => {
+                let attrs = match &kind {
+                    CodeBlockKind::Fenced(info) if !info.trim().is_empty() => {
+                        let lang = info.split_whitespace().next().unwrap_or("").to_string();
+                        vec![("language", Any::String(lang.into()))]
+                    }
+                    _ => Vec::new(),
+                };
+                builder.open("codeBlock", attrs, true);
+            }
+            Event::Start(Tag::BlockQuote(_)) => builder.open("blockquote", Vec::new(), false),
+            Event::Start(Tag::List(Some(start))) => builder.open(
+                "orderedList",
+                vec![("start", Any::Number(start as f64))],
+                false,
+            ),
+            Event::Start(Tag::List(None)) => builder.open("bulletList", Vec::new(), false),
+            Event::Start(Tag::Item) => builder.open("listItem", Vec::new(), false),
+            Event::Start(Tag::Emphasis) => builder.push_mark("italic", empty_map()),
+            Event::Start(Tag::Strong) => builder.push_mark("bold", empty_map()),
+            Event::Start(Tag::Strikethrough) => builder.push_mark("strike", empty_map()),
+            Event::Start(Tag::Link { dest_url, .. }) => {
+                let mut attrs = HashMap::new();
+                attrs.insert(
+                    String::from("href"),
+                    Any::String(dest_url.to_string().into()),
+                );
+                builder.push_mark("link", Any::Map(Arc::new(attrs)));
+            }
+            Event::Start(Tag::Image { dest_url, .. }) => {
+                if let Some(media_id) = resolve_image(dest_url.as_ref()) {
+                    builder.enqueue_media("image", media_id);
+                }
+                // Alt text is carried by the image node, not the body.
+                builder.skip_text += 1;
+            }
+            Event::End(TagEnd::Image) => builder.skip_text = builder.skip_text.saturating_sub(1),
+            Event::End(TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock) => {
+                builder.close_leaf()
+            }
+            Event::End(TagEnd::BlockQuote(_) | TagEnd::List(_) | TagEnd::Item) => {
+                builder.close_container()
+            }
+            Event::End(
+                TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link,
+            ) => {
+                builder.marks.pop();
+            }
+            Event::Text(text) => builder.insert_text(text.as_ref(), None),
+            Event::Code(text) => builder.insert_text(text.as_ref(), Some("code")),
+            // Raw HTML has no schema mapping here — keep the source visible
+            // rather than silently dropping content.
+            Event::Html(text) | Event::InlineHtml(text) => builder.insert_text(text.as_ref(), None),
+            // Day One writes one line per visual line; CommonMark would fold
+            // a single newline into a space, so keep it as a hard break.
+            Event::SoftBreak | Event::HardBreak => builder.hard_break(),
+            Event::Rule => {
+                builder.open("horizontalRule", Vec::new(), false);
+                builder.materialize();
+                builder.close_container();
+            }
+            Event::TaskListMarker(checked) => builder.mark_task_item(checked),
+            _ => {}
+        }
+    }
+
+    builder.finish()
 }
 
 /// Max grapheme-ish length for `preview_text` (char count, not bytes).
@@ -811,5 +818,51 @@ mod tests {
         // Day One escapes punctuation and may mark up the title line.
         let (title, _) = split_leading_heading("# Ngày 1\\. Thử **nghiệm**\n\nbody");
         assert_eq!(title.as_deref(), Some("Ngày 1. Thử nghiệm"));
+    }
+
+    #[test]
+    fn append_markdown_to_doc_yields_a_diff_of_only_the_new_block() {
+        let doc = Doc::new();
+        let first = append_markdown_to_doc(&doc, "A", |_| None);
+        assert_eq!(first.trim(), "A");
+
+        // Full blob at `sv_before` so a replica can stand in for the open editor.
+        let update_before = doc
+            .transact()
+            .encode_state_as_update_v1(&StateVector::default());
+        let sv_before = doc.transact().state_vector();
+        let appended = append_markdown_to_doc(&doc, "B", |_| None);
+        assert_eq!(appended.trim(), "B");
+
+        assert_eq!(
+            top_level(&doc),
+            vec![
+                (String::from("paragraph"), String::from("A")),
+                (String::from("paragraph"), String::from("B")),
+            ]
+        );
+
+        // `encode_diff_v1` is parent-relative: applied to empty it integrates
+        // nothing (the `"default"` fragment already lived in `sv_before`).
+        // Applied to a replica that stopped at `sv_before` it must add only B —
+        // the open-editor MCP contract.
+        let replica = decode(&update_before);
+        let before_nodes = top_level(&replica);
+        assert_eq!(
+            before_nodes,
+            vec![(String::from("paragraph"), String::from("A"))]
+        );
+        let diff = doc.transact().encode_diff_v1(&sv_before);
+        {
+            let mut txn = replica.transact_mut();
+            txn.apply_update(Update::decode_v1(&diff).expect("decode diff"))
+                .expect("apply diff");
+        }
+        let after_nodes = top_level(&replica);
+        assert_eq!(
+            &after_nodes[before_nodes.len()..],
+            [(String::from("paragraph"), String::from("B"))].as_slice(),
+            "diff must decode to only the appended block"
+        );
     }
 }

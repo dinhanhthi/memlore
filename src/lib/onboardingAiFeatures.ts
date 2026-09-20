@@ -59,6 +59,8 @@ export function isFeatureEnabled(settings: AIFullSettings | null, feature: AIFea
       return settings.chatRagEnabled
     case 'user_memory':
       return settings.userMemoryEnabled
+    case 'mcp_server':
+      return settings.mcpServerEnabled
   }
 }
 

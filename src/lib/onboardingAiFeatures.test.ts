@@ -52,6 +52,11 @@ describe('isFeatureUnavailable', () => {
     expect(isFeatureUnavailable('title_suggestions', false)).toBe(false)
     expect(isFeatureUnavailable('daily_chat', false)).toBe(false)
   })
+
+  it('never marks mcp_server unavailable — it does not need a provider', () => {
+    expect(isFeatureUnavailable('mcp_server', false)).toBe(false)
+    expect(isFeatureUnavailable('mcp_server', true)).toBe(false)
+  })
 })
 
 describe('masterToggleTargets', () => {
@@ -78,6 +83,14 @@ describe('masterToggleTargets', () => {
     expect(targets.sort()).toEqual(
       ['image_generation', 'semantic_search', 'title_suggestions'].sort(),
     )
+  })
+
+  it('never targets mcp_server — enable-everything must not grant third-party read access', () => {
+    expect(ONBOARDING_FEATURES).not.toContain('mcp_server')
+    const enableTargets = masterToggleTargets(ONBOARDING_FEATURES, true, true, () => false)
+    expect(enableTargets).not.toContain('mcp_server')
+    const disableTargets = masterToggleTargets(ONBOARDING_FEATURES, false, true, () => true)
+    expect(disableTargets).not.toContain('mcp_server')
   })
 })
 
@@ -112,11 +125,20 @@ describe('isFeatureEnabled', () => {
       isFeatureEnabled(settingsWith({ dashboardInsightsEnabled: false }), 'dashboard_insights'),
     ).toBe(false)
   })
+
+  it('reads the mcp_server flag', () => {
+    expect(isFeatureEnabled(settingsWith({ mcpServerEnabled: true }), 'mcp_server')).toBe(true)
+    expect(isFeatureEnabled(settingsWith({ mcpServerEnabled: false }), 'mcp_server')).toBe(false)
+  })
 })
 
 describe('ONBOARDING_FEATURES', () => {
   it('does not include dashboard_insights', () => {
     expect(ONBOARDING_FEATURES).not.toContain('dashboard_insights')
+  })
+
+  it('does not include mcp_server', () => {
+    expect(ONBOARDING_FEATURES).not.toContain('mcp_server')
   })
 })
 

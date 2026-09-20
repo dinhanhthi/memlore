@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AIProvidersConfig, ProviderCredential } from '../types/ai'
 import { resetAiSettingsStore, useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useUiStore } from '../stores/uiStore'
-import { cacheAiCredentials, cacheReadyOnDevice, isAiFeatureActionable } from './aiFeatureAccessors'
+import {
+  cacheAiCredentials,
+  cacheReadyOnDevice,
+  getAiFeatureEnabled,
+  isAiFeatureActionable,
+} from './aiFeatureAccessors'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('./tauri', () => ({
@@ -113,6 +118,21 @@ describe('cacheReadyOnDevice / isAiFeatureActionable', () => {
     seedProviders(HOSTED_GEN, 1)
     cacheAiCredentials([OPENAI_CRED])
     expect(isAiFeatureActionable('go_deeper')).toBe(true)
+  })
+
+  it('treats mcp_server as actionable with an empty provider config', () => {
+    seedProviders({ generation: null, image: null, embedding: null })
+    expect(isAiFeatureActionable('mcp_server')).toBe(true)
+    expect(isAiFeatureActionable('go_deeper')).toBe(false)
+  })
+})
+
+describe('getAiFeatureEnabled mcp_server', () => {
+  it('reads mcpServerEnabled from the store', () => {
+    useAiSettingsStore.setState({ mcpServerEnabled: true })
+    expect(getAiFeatureEnabled('mcp_server')).toBe(true)
+    useAiSettingsStore.setState({ mcpServerEnabled: false })
+    expect(getAiFeatureEnabled('mcp_server')).toBe(false)
   })
 })
 

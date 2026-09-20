@@ -6,7 +6,7 @@ authors = []
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/dinhanhthi/memlore"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -115,6 +115,17 @@ pulldown-cmark = { version = "0.13.4", default-features = false }
 dom_query = "0.27"
 # UAX #15 NFC for Apple Journal resource stem matching (NFC/NFD twins).
 unicode-normalization = "0.1"
+# Local MCP server (plan 2026-09-20-mcp-server). Minimum feature set:
+# `server` — ServerHandler + the tool system (handlers land in later tasks).
+# `macros` — #[tool] / #[tool_router] / #[tool_handler] (used by those handlers).
+# `transport-io` — stdio transport; also the plumbing for an (AsyncRead,
+# AsyncWrite) Unix-socket pair. `transport-async-rw` and a direct `schemars`
+# dep are left off until the compiler demands them.
+rmcp = { version = "3.4", default-features = false, features = [
+    "server",
+    "macros",
+    "transport-io",
+] }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2"

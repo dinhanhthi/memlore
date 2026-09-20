@@ -46,6 +46,8 @@ const FULL: AIFullSettings = {
   responseLanguage: 'auto',
   emotionSuggestionLanguage: 'auto',
   userMemoryEnabled: false,
+  mcpServerEnabled: false,
+  mcpDefaultJournalId: null,
   personaEnabled: false,
   memoryGenProvider: null,
   memoryGenEndpoint: null,
@@ -126,6 +128,11 @@ describe('aiSettingsStore', () => {
       expect(s.entryHighlightsEnabled).toBe(false)
       expect(s.goDeeperEnabled).toBe(false)
       expect(s.dailyChatEnabled).toBe(false)
+      expect(s.mcpServerEnabled).toBe(false)
+    })
+
+    it('defaults mcpServerEnabled to false', () => {
+      expect(useAiSettingsStore.getInitialState().mcpServerEnabled).toBe(false)
     })
 
     it('starts with both provider slots unconfigured and un-hydrated', () => {
@@ -229,6 +236,14 @@ describe('aiSettingsStore', () => {
 
       useAiSettingsStore.getState().applySnapshot({ ...FULL, dailyChatEnabled: false })
       expect(useAiSettingsStore.getState().dailyChatEnabled).toBe(false)
+    })
+
+    it('copies mcpServerEnabled from the snapshot', () => {
+      useAiSettingsStore.getState().applySnapshot({ ...FULL, mcpServerEnabled: true })
+      expect(useAiSettingsStore.getState().mcpServerEnabled).toBe(true)
+
+      useAiSettingsStore.getState().applySnapshot({ ...FULL, mcpServerEnabled: false })
+      expect(useAiSettingsStore.getState().mcpServerEnabled).toBe(false)
     })
 
     it('leaves store state untouched when the snapshot is null', () => {
@@ -477,6 +492,16 @@ describe('aiSettingsStore', () => {
       expect(useAiSettingsStore.getState().userMemoryEnabled).toBe(true)
       useAiSettingsStore.getState().setFlag('user_memory', false)
       expect(useAiSettingsStore.getState().userMemoryEnabled).toBe(false)
+    })
+
+    it('flips mcp_server flag in the store without touching user_memory', () => {
+      useAiSettingsStore.getState().setFlag('user_memory', true)
+      useAiSettingsStore.getState().setFlag('mcp_server', true)
+      expect(useAiSettingsStore.getState().mcpServerEnabled).toBe(true)
+
+      useAiSettingsStore.getState().setFlag('mcp_server', false)
+      expect(useAiSettingsStore.getState().mcpServerEnabled).toBe(false)
+      expect(useAiSettingsStore.getState().userMemoryEnabled).toBe(true)
     })
 
     it('ignores unknown features instead of throwing (forward-compat with new flags)', () => {

@@ -2243,6 +2243,7 @@ pub fn run() {
             commands::ai_settings::set_daily_chat_preferences,
             commands::ai_settings::set_daily_chat_ai_title,
             commands::ai_settings::set_emotion_suggestion_language,
+            commands::ai_settings::set_mcp_default_journal,
             commands::ai_settings::set_ai_response_language,
             commands::ai_settings::set_ai_feature_prompt,
             commands::ai_settings::get_background_indexing_settings,
