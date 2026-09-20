@@ -22,6 +22,7 @@ import {
   CalendarClock,
   Check,
   Cloud,
+  Columns3,
   Code2,
   Cpu,
   Download,
@@ -35,6 +36,7 @@ import {
   ImagePlus,
   KeyRound,
   Laptop,
+  Layers,
   Lightbulb,
   Lock,
   Maximize2,
@@ -43,6 +45,7 @@ import {
   MessageSquareQuote,
   Monitor,
   MoreHorizontal,
+  Palette,
   PenLine,
   Play,
   Puzzle,
@@ -664,6 +667,102 @@ function TransferFigure() {
   )
 }
 
+const lookCards = [
+  { id: 'clay', skin: 'Clay', layout: 'left' as const, title: 'Tuesday', line: 'A quiet morning' },
+  {
+    id: 'signature',
+    skin: 'Signature',
+    layout: 'right' as const,
+    title: 'Monday',
+    line: 'After dark',
+  },
+  {
+    id: 'clean',
+    skin: 'Clean',
+    layout: 'center' as const,
+    title: 'Notes',
+    line: 'Plain and clear',
+  },
+  { id: 'lumen', skin: 'Lumen', layout: 'left' as const, title: 'Night', line: 'Foundry dark' },
+  {
+    id: 'clay-dark',
+    skin: 'Clay',
+    layout: 'right' as const,
+    title: 'Evening',
+    line: 'Warm paper',
+  },
+]
+
+function LooksFigure() {
+  return (
+    <figure className="illust illust-looks" aria-hidden="true">
+      {lookCards.map((card) => (
+        <article key={card.id} className="look-card" data-look={card.id} data-layout={card.layout}>
+          <header>
+            <span className="look-dots">
+              <span />
+              <span />
+              <span />
+            </span>
+            <strong>{card.skin}</strong>
+          </header>
+          <div className="look-body">
+            <aside className="look-nav">
+              <span />
+              <span />
+              <span />
+            </aside>
+            <aside className="look-list">
+              <span />
+              <span />
+              <span />
+            </aside>
+            <section className="look-page">
+              <p>{card.title}</p>
+              <small>{card.line}</small>
+              <span className="look-rule" />
+              <span className="look-rule" />
+              <span className="look-rule" />
+            </section>
+          </div>
+        </article>
+      ))}
+      <article className="look-card" data-look="editor">
+        <p>A lasting story.</p>
+        <small>The type you write in.</small>
+        <span>Google Font · contrast</span>
+      </article>
+    </figure>
+  )
+}
+
+const lookItems = [
+  {
+    id: 'skins' as const,
+    Icon: Layers,
+    title: 'Three design systems',
+    text: 'Signature, Clean, and Clay. Switch them live in the demo above.',
+  },
+  {
+    id: 'knobs' as const,
+    Icon: Palette,
+    title: 'Then the knobs',
+    text: 'Accent color, corner radius, light or dark, and the dark surface — Deep, Soft, or Lumen.',
+  },
+  {
+    id: 'layout' as const,
+    Icon: Columns3,
+    title: 'Panel layout',
+    text: 'Sidebar and list on the left, the right, or with the page in the middle.',
+  },
+  {
+    id: 'type' as const,
+    Icon: Type,
+    title: 'Type',
+    text: 'The app typeface follows the skin. The editor has its own font — a built-in face or a custom Google Font, plus size and contrast.',
+  },
+]
+
 function DemoPlaceholder() {
   return (
     <div className="demo-placeholder">
@@ -1022,7 +1121,8 @@ const comparisonRows = [
   {
     id: 'appearance',
     label: 'Make it look like yours',
-    description: 'Three design systems, each in light and dark, plus a swappable writing font.',
+    description:
+      'Three design systems, each with color, corners, light or dark, and surface — plus panel layout and a writing font you choose.',
     marks: { Memlore: 'yes', 'Day One': 'partial', Journey: 'partial', 'Apple Journal': 'no' },
   },
   {
@@ -1268,6 +1368,27 @@ export default function LandingPage() {
             </p>
           </div>
           <TransferFigure />
+        </section>
+        <LedgerRule />
+        <section className="split split-flip" id="looks">
+          <LooksFigure />
+          <div>
+            <h2>Make it look like yours.</h2>
+            <p>
+              Signature, Clean, and Clay — try them in the <a href="#demo">demo</a> above. Then keep
+              going.
+            </p>
+            <ul className="lock-list">
+              {lookItems.map((item) => (
+                <li key={item.id}>
+                  <item.Icon className="size-4" />
+                  <p>
+                    <strong>{item.title}.</strong> {item.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
         <SectionIndex>AI</SectionIndex>
         <section className="ai-section" id="ai">
