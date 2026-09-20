@@ -45,8 +45,10 @@ import {
   isFeatureUnavailable,
   masterToggleTargets,
   ONBOARDING_FEATURES,
+  ONBOARDING_MCP_STAGE,
   parsePartialFeatureUpdateError,
   shouldKickOnDeviceDownload,
+  shouldShowOnboardingMcpRow,
 } from '../../../lib/onboardingAiFeatures'
 import {
   adoptedAiSetupFingerprint,
@@ -116,6 +118,8 @@ const REMOTE_IMAGE_PRESETS = IMAGE_PRESETS.filter((p) => classifyGenGroup(p) ===
 // never silently hidden, plus `chat_memory` (fail-closed default OFF).
 // `chat_rag` and `user_memory` stay excluded. `image_generation` is always
 // rendered disabled here (needs image model; this flow doesn't collect one).
+// `mcp_server` is a separate row on the `enable` stage (`ONBOARDING_MCP_STAGE`),
+// not this list — a user who declines AI must still see it.
 
 /** Compact specs row under the onboarding integrated-model Select. */
 function ModelSpecRow({
@@ -374,6 +378,9 @@ export function AIStep({
   // ── Feature flags ────────────────────────────────────────────────────────
   const [featureError, setFeatureError] = useState<string | null>(null)
   const [featureBusy, setFeatureBusy] = useState(false)
+  // MCP confirm — same privacy modal as Settings. Shown on every OFF→ON
+  // flip; the toggle itself is the acknowledgement (no extra settings key).
+  const [mcpConfirmOpen, setMcpConfirmOpen] = useState(false)
   const toggleableFeatures = useMemo(
     () => ONBOARDING_FEATURES.filter((f) => !isFeatureUnavailable(f, embeddingConfigured)),
     [embeddingConfigured],
@@ -1010,6 +1017,14 @@ export function AIStep({
     }
   }
 
+  function handleToggleMcp(next: boolean) {
+    if (next) {
+      setMcpConfirmOpen(true)
+      return
+    }
+    void handleToggleFeature('mcp_server', false)
+  }
+
   /** Master toggle: turn every available onboarding feature on or off in one
    *  gesture. Unavailable rows (need embedding / image model) are skipped
    *  when enabling; when disabling, every currently-on listed feature is
@@ -1297,11 +1312,35 @@ export function AIStep({
         // The shell renders no header for the AI step, so the first sub-stage
         // supplies its own title + explanation. Action buttons live in
         // ActionBar below (inline under the form, or Modal.Footer).
-        <div className="flex flex-col">
+        // MCP sits here — not on `features` — so a user who clicks No still
+        // sees it. `ONBOARDING_MCP_STAGE` / `shouldShowOnboardingMcpRow` pin
+        // that placement; keep `mcp_server` out of ONBOARDING_FEATURES.
+        <div className="flex flex-col gap-4">
           <div className="text-center">
             <h1 className="font-title text-fg text-2xl font-bold">{t('onboarding.ai.title')}</h1>
             <p className="text-fg-muted mt-2 text-sm">{t('onboarding.ai.explanation')}</p>
           </div>
+          {shouldShowOnboardingMcpRow(stage, isAdopt) && stage === ONBOARDING_MCP_STAGE && (
+            <div className="flex flex-col gap-2">
+              <p className="text-fg-muted text-center text-xs">{t('ai:mcp.onboarding_note')}</p>
+              {featureError && (
+                <p role="alert" className="text-danger-text text-center text-xs">
+                  {featureError}
+                </p>
+              )}
+              <div className="border-border-default bg-elevated flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-fg text-sm font-medium">{t('ai:feature.mcp_server.title')}</p>
+                  <p className="text-fg-muted text-xs">{t('ai:feature.mcp_server.description')}</p>
+                </div>
+                <Toggle
+                  checked={isFeatureEnabled(settings, 'mcp_server')}
+                  onChange={handleToggleMcp}
+                  ariaLabel={t('ai:feature.mcp_server.title')}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1748,6 +1787,30 @@ export function AIStep({
           onAccept={() => void handleAcceptPrivacy()}
           onClose={handleClosePrivacyPanel}
         />
+      )}
+
+      {mcpConfirmOpen && (
+        <Modal onClose={() => setMcpConfirmOpen(false)}>
+          <Modal.Header>{t('ai:mcp.privacy_title')}</Modal.Header>
+          <Modal.Body fitContent>
+            <p className="text-fg-secondary text-sm leading-relaxed">{t('ai:mcp.privacy_body')}</p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="ghost" size="sm" onClick={() => setMcpConfirmOpen(false)}>
+              {t('ai:mcp.privacy_cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setMcpConfirmOpen(false)
+                void handleToggleFeature('mcp_server', true)
+              }}
+            >
+              {t('ai:mcp.privacy_confirm')}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       {llmTermsModalEntry && (

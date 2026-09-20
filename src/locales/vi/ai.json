@@ -225,7 +225,30 @@
     "chat_memory": {
       "title": "Ký ức trong Trò chuyện",
       "description": "Truy xuất ký ức đã lưu và thêm vào câu trả lời của Trò chuyện hằng ngày."
+    },
+    "mcp_server": {
+      "title": "Máy chủ MCP",
+      "description": "Cho phép ứng dụng MCP trên máy đọc và ghi nhật ký của bạn trên máy Mac này."
     }
+  },
+  "mcp": {
+    "privacy_title": "Cho phép ứng dụng khác đọc nhật ký của bạn?",
+    "privacy_body": "Bật tính năng này cho phép bất kỳ ứng dụng nào đang chạy với quyền của bạn trên máy Mac này đọc và ghi nhật ký đã giải mã qua một kết nối cục bộ. Không có mật khẩu thêm. Công tắc chính là sự xác nhận của bạn.",
+    "privacy_confirm": "Bật",
+    "privacy_cancel": "Hủy",
+    "onboarding_note": "Không cần nhà cung cấp AI. Bạn vẫn có thể bật tính năng này dù bỏ qua phần còn lại của thiết lập AI.",
+    "status_label": "Trạng thái",
+    "status_running": "Đang chạy",
+    "status_stopped": "Đã dừng",
+    "binary_path": "Đường dẫn Memlore",
+    "binary_path_hint": "Lấy từ bản dựng đang chạy — không phải một đường dẫn cố định.",
+    "default_journal": "Nhật ký mặc định",
+    "default_journal_hint": "Dùng khi ứng dụng MCP tạo mục mà không chỉ định nhật ký.",
+    "default_journal_none": "Hỏi mỗi lần",
+    "config_snippet": "Cấu hình Claude Desktop",
+    "config_snippet_hint": "Dán vào claude_desktop_config.json.",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép"
   },
   "usage_warning": {
     "daily_chat": "Chat dài gửi lại toàn bộ lịch sử mỗi lượt — chi phí tăng theo độ dài.",

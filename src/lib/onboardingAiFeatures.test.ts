@@ -6,8 +6,10 @@ import {
   isFeatureUnavailable,
   masterToggleTargets,
   ONBOARDING_FEATURES,
+  ONBOARDING_MCP_STAGE,
   parsePartialFeatureUpdateError,
   shouldKickOnDeviceDownload,
+  shouldShowOnboardingMcpRow,
 } from './onboardingAiFeatures'
 
 function settingsWith(overrides: Partial<AIFullSettings>): AIFullSettings {
@@ -85,12 +87,30 @@ describe('masterToggleTargets', () => {
     )
   })
 
+  // Risk 3: mcp_server stays off ONBOARDING_FEATURES so "enable all" on the
+  // features stage cannot silently grant third-party journal access. The MCP
+  // row itself lives on the enable stage — see ONBOARDING_MCP_STAGE.
   it('never targets mcp_server — enable-everything must not grant third-party read access', () => {
     expect(ONBOARDING_FEATURES).not.toContain('mcp_server')
     const enableTargets = masterToggleTargets(ONBOARDING_FEATURES, true, true, () => false)
     expect(enableTargets).not.toContain('mcp_server')
     const disableTargets = masterToggleTargets(ONBOARDING_FEATURES, false, true, () => true)
     expect(disableTargets).not.toContain('mcp_server')
+  })
+})
+
+describe('onboarding MCP row placement', () => {
+  it('lives on the enable stage so a user who declines AI still sees it', () => {
+    expect(ONBOARDING_MCP_STAGE).toBe('enable')
+    expect(ONBOARDING_MCP_STAGE).not.toBe('features')
+  })
+
+  it('shows only on enable for the regular wizard — not features, not adopt', () => {
+    expect(shouldShowOnboardingMcpRow('enable', false)).toBe(true)
+    expect(shouldShowOnboardingMcpRow('features', false)).toBe(false)
+    expect(shouldShowOnboardingMcpRow('provider', false)).toBe(false)
+    expect(shouldShowOnboardingMcpRow('embedding', false)).toBe(false)
+    expect(shouldShowOnboardingMcpRow('enable', true)).toBe(false)
   })
 })
 

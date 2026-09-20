@@ -47,6 +47,71 @@ impl McpTools {
     }
 }
 
+impl AppCtx {
+    fn create_entry(
+        &self,
+        state: &AppState,
+        key_state: &EncryptionKeyState,
+        indexer: &EntryIndexer,
+        journal_id: Option<&str>,
+        title: Option<&str>,
+        markdown: &str,
+        date: Option<i64>,
+        tags: Option<&[String]>,
+        emotion: Option<&str>,
+    ) -> Result<mcp_impl::McpCreatedEntry, String> {
+        match self {
+            AppCtx::Wry(app) => mcp_impl::mcp_create_entry(
+                app, state, key_state, indexer, journal_id, title, markdown, date, tags, emotion,
+            ),
+            #[cfg(test)]
+            AppCtx::Mock(app) => mcp_impl::mcp_create_entry(
+                app, state, key_state, indexer, journal_id, title, markdown, date, tags, emotion,
+            ),
+        }
+    }
+
+    fn append_to_entry(
+        &self,
+        state: &AppState,
+        key_state: &EncryptionKeyState,
+        indexer: &EntryIndexer,
+        id: &str,
+        markdown: &str,
+    ) -> Result<mcp_impl::McpAppendResult, String> {
+        match self {
+            AppCtx::Wry(app) => {
+                mcp_impl::mcp_append_to_entry(app, state, key_state, indexer, id, markdown)
+            }
+            #[cfg(test)]
+            AppCtx::Mock(app) => {
+                mcp_impl::mcp_append_to_entry(app, state, key_state, indexer, id, markdown)
+            }
+        }
+    }
+
+    fn set_entry_metadata(
+        &self,
+        state: &AppState,
+        key_state: &EncryptionKeyState,
+        indexer: &EntryIndexer,
+        id: &str,
+        title: Option<&str>,
+        tags: Option<&[String]>,
+        emotion: Option<&str>,
+    ) -> Result<mcp_impl::McpMetadataResult, String> {
+        match self {
+            AppCtx::Wry(app) => mcp_impl::mcp_set_entry_metadata(
+                app, state, key_state, indexer, id, title, tags, emotion,
+            ),
+            #[cfg(test)]
+            AppCtx::Mock(app) => mcp_impl::mcp_set_entry_metadata(
+                app, state, key_state, indexer, id, title, tags, emotion,
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct SearchEntriesParams {
     query: String,
@@ -144,21 +209,23 @@ where
 async fn spawn_write<T, F>(app: AppCtx, f: F) -> Result<T, String>
 where
     T: Send + 'static,
-    F: FnOnce(&AppState, &EncryptionKeyState, &EntryIndexer) -> Result<T, String> + Send + 'static,
+    F: FnOnce(&AppState, &EncryptionKeyState, &EntryIndexer, &AppCtx) -> Result<T, String>
+        + Send
+        + 'static,
 {
-    tokio::task::spawn_blocking(move || match app {
-        AppCtx::Wry(app) => {
-            let state = app.state::<AppState>();
-            let key_state = app.state::<EncryptionKeyState>();
-            let indexer = app.state::<EntryIndexer>();
-            f(&state, &key_state, &indexer)
+    tokio::task::spawn_blocking(move || match &app {
+        AppCtx::Wry(handle) => {
+            let state = handle.state::<AppState>();
+            let key_state = handle.state::<EncryptionKeyState>();
+            let indexer = handle.state::<EntryIndexer>();
+            f(&state, &key_state, &indexer, &app)
         }
         #[cfg(test)]
-        AppCtx::Mock(app) => {
-            let state = app.state::<AppState>();
-            let key_state = app.state::<EncryptionKeyState>();
-            let indexer = app.state::<EntryIndexer>();
-            f(&state, &key_state, &indexer)
+        AppCtx::Mock(handle) => {
+            let state = handle.state::<AppState>();
+            let key_state = handle.state::<EncryptionKeyState>();
+            let indexer = handle.state::<EntryIndexer>();
+            f(&state, &key_state, &indexer, &app)
         }
     })
     .await
@@ -239,8 +306,8 @@ impl McpTools {
         Parameters(params): Parameters<CreateEntryParams>,
     ) -> Result<Json<CreatedOut>, String> {
         let app = self.app.clone();
-        let created = spawn_write(app, move |state, key_state, indexer| {
-            mcp_impl::mcp_create_entry(
+        let created = spawn_write(app, move |state, key_state, indexer, app| {
+            app.create_entry(
                 state,
                 key_state,
                 indexer,
@@ -268,8 +335,8 @@ impl McpTools {
         Parameters(params): Parameters<AppendToEntryParams>,
     ) -> Result<Json<IdOut>, String> {
         let app = self.app.clone();
-        let appended = spawn_write(app, move |state, key_state, indexer| {
-            mcp_impl::mcp_append_to_entry(state, key_state, indexer, &params.id, &params.markdown)
+        let appended = spawn_write(app, move |state, key_state, indexer, app| {
+            app.append_to_entry(state, key_state, indexer, &params.id, &params.markdown)
         })
         .await?;
         Ok(Json(IdOut { id: appended.id }))
@@ -283,8 +350,8 @@ impl McpTools {
         Parameters(params): Parameters<SetEntryMetadataParams>,
     ) -> Result<Json<IdOut>, String> {
         let app = self.app.clone();
-        let updated = spawn_write(app, move |state, key_state, indexer| {
-            mcp_impl::mcp_set_entry_metadata(
+        let updated = spawn_write(app, move |state, key_state, indexer, app| {
+            app.set_entry_metadata(
                 state,
                 key_state,
                 indexer,

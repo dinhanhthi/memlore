@@ -1,13 +1,30 @@
 /**
- * Pure helpers for the onboarding AI features stage (master toggle +
- * integrated-model background download kickoff). Kept out of the `.tsx`
- * so Vitest can cover them without component tests.
+ * Pure helpers for the onboarding AI wizard (master toggle, MCP row
+ * placement, integrated-model background download kickoff). Kept out of
+ * the `.tsx` so Vitest can cover them without component tests.
  */
 import { EMBEDDING_DEPENDENT_FEATURES, type AIFeature, type AIFullSettings } from '../types/ai'
 
 /** Features offered during onboarding — mirrored from `AIStep` so tests and
  *  the UI share one list. Keep in sync with `ONBOARDING_FEATURES` in AIStep
  *  if that constant is re-exported later; for now AIStep imports this. */
+/**
+ * Wizard stage that hosts the MCP onboarding row.
+ *
+ * Must stay `'enable'`. `STAGE_ORDER` is enable → provider → embedding →
+ * features; the wizard only reaches `features` after Yes to AI. MCP needs
+ * no provider, so a user who clicks No must still see this row.
+ * Keep `mcp_server` out of `ONBOARDING_FEATURES` (Risk 3: master toggle
+ * must not silently grant third-party read access).
+ */
+export const ONBOARDING_MCP_STAGE = 'enable' as const
+
+/** Whether the MCP row belongs on this onboarding sub-stage.
+ *  Adopt skips enable entirely; `features` is the wrong surface. */
+export function shouldShowOnboardingMcpRow(stage: string, isAdopt: boolean): boolean {
+  return !isAdopt && stage === ONBOARDING_MCP_STAGE
+}
+
 export const ONBOARDING_FEATURES: readonly AIFeature[] = [
   'semantic_search',
   'emotion_suggestions',

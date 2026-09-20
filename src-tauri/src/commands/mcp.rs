@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use rusqlite::Connection;
-use tauri::State;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Runtime, State};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, ReadTxn, StateVector, Transact, Update};
 
@@ -78,13 +79,96 @@ pub(crate) struct McpCreatedEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct McpAppendResult {
     pub id: String,
+    pub journal_id: String,
     pub yjs_update: Vec<u8>,
+    pub preview_text: String,
+    pub updated_at: i64,
+}
+
+/// Fields the list/editor can merge without a refetch. Snake_case keys
+/// match the frontend `Entry` type so the hook can pass this to `emitEntryPatched`.
+#[derive(Debug, Clone, Serialize, Default, PartialEq, Eq)]
+pub(crate) struct McpEntryPatch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emotion: Option<String>,
 }
 
 /// Result of [`set_entry_metadata_impl`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct McpMetadataResult {
     pub id: String,
+    pub journal_id: String,
+    pub patch: McpEntryPatch,
+}
+
+/// Frontend event fired after a successful MCP write. Camel-case keys
+/// match the hook payload in `useMcpEntryEvents`.
+pub(crate) const MCP_ENTRY_CHANGED_EVENT: &str = "mcp:entry-changed";
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum McpEntryChangedKind {
+    Created,
+    Appended,
+    Metadata,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct McpEntryChanged {
+    pub kind: McpEntryChangedKind,
+    pub entry_id: String,
+    pub journal_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yjs_update: Option<Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub patch: Option<McpEntryPatch>,
+}
+
+impl McpEntryChanged {
+    pub(crate) fn created(entry_id: impl Into<String>, journal_id: impl Into<String>) -> Self {
+        Self {
+            kind: McpEntryChangedKind::Created,
+            entry_id: entry_id.into(),
+            journal_id: journal_id.into(),
+            yjs_update: None,
+            patch: None,
+        }
+    }
+
+    pub(crate) fn appended(result: &McpAppendResult) -> Self {
+        Self {
+            kind: McpEntryChangedKind::Appended,
+            entry_id: result.id.clone(),
+            journal_id: result.journal_id.clone(),
+            yjs_update: Some(result.yjs_update.clone()),
+            patch: Some(McpEntryPatch {
+                preview_text: Some(result.preview_text.clone()),
+                updated_at: Some(result.updated_at),
+                ..Default::default()
+            }),
+        }
+    }
+
+    pub(crate) fn metadata(result: &McpMetadataResult) -> Self {
+        Self {
+            kind: McpEntryChangedKind::Metadata,
+            entry_id: result.id.clone(),
+            journal_id: result.journal_id.clone(),
+            yjs_update: None,
+            patch: Some(result.patch.clone()),
+        }
+    }
+}
+
+pub(crate) fn emit_entry_changed<R: Runtime>(app: &AppHandle<R>, payload: &McpEntryChanged) {
+    let _ = app.emit(MCP_ENTRY_CHANGED_EVENT, payload);
 }
 
 pub(crate) fn list_journals_impl(conn: &Connection) -> Result<Vec<McpJournal>, String> {
@@ -220,9 +304,13 @@ pub(crate) fn append_to_entry_impl(
     save_entry_content_impl(conn, id, &full_state, &content_text, &preview_text)?;
 
     let yjs_update = doc.transact().encode_diff_v1(&sv_before);
+    let stored = reload_entry(conn, id)?;
     Ok(McpAppendResult {
         id: entry.id,
+        journal_id: entry.journal_id,
         yjs_update,
+        preview_text,
+        updated_at: stored.updated_at,
     })
 }
 
@@ -245,7 +333,23 @@ pub(crate) fn set_entry_metadata_impl(
     }
     attach_tags(conn, &entry.id, &tag_ids)?;
 
-    Ok(McpMetadataResult { id: entry.id })
+    let stored = reload_entry(conn, &entry.id)?;
+    Ok(McpMetadataResult {
+        id: entry.id,
+        journal_id: entry.journal_id,
+        patch: McpEntryPatch {
+            title: title.is_some().then_some(stored.title).flatten(),
+            emotion: emotion.is_some().then_some(stored.emotion).flatten(),
+            updated_at: Some(stored.updated_at),
+            ..Default::default()
+        },
+    })
+}
+
+fn reload_entry(conn: &Connection, id: &str) -> Result<db::Entry, String> {
+    db::get_entry(conn, id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| ENTRY_NOT_FOUND.to_string())
 }
 
 /// Same gate as the read path: invisible/deleted → not-found; locked →
@@ -422,7 +526,8 @@ pub(crate) fn mcp_get_entry(
     mcp_gated(state, key_state, |conn| get_entry_impl(conn, id))
 }
 
-pub(crate) fn mcp_create_entry(
+pub(crate) fn mcp_create_entry<R: Runtime>(
+    app: &AppHandle<R>,
     state: &AppState,
     key_state: &EncryptionKeyState,
     indexer: &EntryIndexer,
@@ -437,10 +542,15 @@ pub(crate) fn mcp_create_entry(
         create_entry_impl_mcp(conn, journal_id, title, markdown, date, tags, emotion)
     })?;
     run_post_save_hooks(state, indexer, &created.id)?;
+    emit_entry_changed(
+        app,
+        &McpEntryChanged::created(&created.id, &created.journal_id),
+    );
     Ok(created)
 }
 
-pub(crate) fn mcp_append_to_entry(
+pub(crate) fn mcp_append_to_entry<R: Runtime>(
+    app: &AppHandle<R>,
     state: &AppState,
     key_state: &EncryptionKeyState,
     indexer: &EntryIndexer,
@@ -451,10 +561,12 @@ pub(crate) fn mcp_append_to_entry(
         append_to_entry_impl(conn, id, markdown)
     })?;
     run_post_save_hooks(state, indexer, &appended.id)?;
+    emit_entry_changed(app, &McpEntryChanged::appended(&appended));
     Ok(appended)
 }
 
-pub(crate) fn mcp_set_entry_metadata(
+pub(crate) fn mcp_set_entry_metadata<R: Runtime>(
+    app: &AppHandle<R>,
     state: &AppState,
     key_state: &EncryptionKeyState,
     indexer: &EntryIndexer,
@@ -467,6 +579,7 @@ pub(crate) fn mcp_set_entry_metadata(
         set_entry_metadata_impl(conn, id, title, tags, emotion)
     })?;
     run_post_save_hooks(state, indexer, &updated.id)?;
+    emit_entry_changed(app, &McpEntryChanged::metadata(&updated));
     Ok(updated)
 }
 
@@ -994,6 +1107,10 @@ mod tests {
         AppState::new(setup())
     }
 
+    fn emit_app() -> tauri::App<tauri::test::MockRuntime> {
+        crate::test_support::mock_app::mock_app()
+    }
+
     fn unlocked_key() -> EncryptionKeyState {
         let ks = EncryptionKeyState::new();
         let key = derive_encryption_key("test-password-1234", &[9u8; SALT_SIZE]).unwrap();
@@ -1029,6 +1146,7 @@ mod tests {
     }
 
     fn invoke_all_gated(
+        app: &tauri::AppHandle<tauri::test::MockRuntime>,
         state: &AppState,
         key_state: &EncryptionKeyState,
         indexer: &EntryIndexer,
@@ -1051,6 +1169,7 @@ mod tests {
             (
                 "create_entry",
                 mcp_create_entry(
+                    app,
                     state,
                     key_state,
                     indexer,
@@ -1065,12 +1184,13 @@ mod tests {
             ),
             (
                 "append_to_entry",
-                mcp_append_to_entry(state, key_state, indexer, seed_id, "must not append")
+                mcp_append_to_entry(app, state, key_state, indexer, seed_id, "must not append")
                     .map(|_| ()),
             ),
             (
                 "set_entry_metadata",
                 mcp_set_entry_metadata(
+                    app,
                     state,
                     key_state,
                     indexer,
@@ -1117,7 +1237,8 @@ mod tests {
         let locked = EncryptionKeyState::new();
         let indexer = EntryIndexer::with_stub();
 
-        for (name, result) in invoke_all_gated(&state, &locked, &indexer, &seed_id) {
+        let app = emit_app();
+        for (name, result) in invoke_all_gated(app.handle(), &state, &locked, &indexer, &seed_id) {
             let err = result.expect_err(name);
             assert_eq!(
                 err, MCP_LOCKED,
@@ -1149,7 +1270,8 @@ mod tests {
         let key = unlocked_key();
         let indexer = EntryIndexer::with_stub();
 
-        for (name, result) in invoke_all_gated(&state, &key, &indexer, &seed_id) {
+        let app = emit_app();
+        for (name, result) in invoke_all_gated(app.handle(), &state, &key, &indexer, &seed_id) {
             let err = result.expect_err(name);
             assert_eq!(
                 err, MCP_DISABLED,
@@ -1179,7 +1301,8 @@ mod tests {
         let key = unlocked_key();
         let indexer = EntryIndexer::with_stub();
 
-        for (name, result) in invoke_all_gated(&state, &key, &indexer, &seed_id) {
+        let app = emit_app();
+        for (name, result) in invoke_all_gated(app.handle(), &state, &key, &indexer, &seed_id) {
             let err = result.expect_err(name);
             assert_eq!(
                 err, MCP_DISABLED,
@@ -1209,8 +1332,10 @@ mod tests {
         };
         let key = unlocked_key();
         let indexer = EntryIndexer::with_stub();
+        let app = emit_app();
 
         let created = mcp_create_entry(
+            app.handle(),
             &state,
             &key,
             &indexer,

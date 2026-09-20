@@ -60,6 +60,7 @@ import { useMenuEvents } from './hooks/useMenuEvents'
 import { runStartupUpdateCheck } from './hooks/useUpdater'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { useMediaCompressionEvents } from './hooks/useMediaCompressionEvents'
+import { useMcpEntryEvents } from './hooks/useMcpEntryEvents'
 import { useAIProviderLifecycle } from './hooks/useAIProviderLifecycle'
 import { useTitleStreamController } from './hooks/useTitleStreamController'
 import { useInvisibleLock } from './hooks/useInvisibleLock'
@@ -219,6 +220,8 @@ function App() {
   useMenuEvents()
   // Refresh media viewers after the background worker compresses a video.
   useMediaCompressionEvents()
+  // Bridge MCP writes onto the existing entries window bus.
+  useMcpEntryEvents()
   // Listen for reminder:fire events and send OS notifications.
   useReminderNotifications()
   // Phase 6 v2 R3: keep the in-memory `AIProvider` registry in sync with
