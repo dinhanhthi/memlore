@@ -1107,6 +1107,10 @@ pub async fn initialize_encryption(app: AppHandle, password: String) -> Result<(
         log::warn!("emit app:unlocked failed (non-fatal): {e}");
     }
 
+    // MCP starts on unlock when the toggle is on (never in setup — the
+    // setting lives in the encrypted DB). Lock must not stop the socket.
+    crate::mcp::lifecycle::spawn_maybe_start_mcp_on_unlock(&app_clone);
+
     // C1: Detect an in-progress rotation job that was interrupted by a crash.
     // If one exists, emit `xj://rotation-resume-required` so the frontend can
     // prompt the user for their password (and mnemonic) and call `resume_rotation`.
@@ -1271,6 +1275,9 @@ pub fn lock_encryption(
     if let Err(e) = app.emit("app:locked", ()) {
         log::warn!("emit app:locked failed (non-fatal): {e}");
     }
+    // Do not stop the MCP socket here. Tools fail closed via with_key
+    // (Decision 3); tearing the socket down would make a client see
+    // ECONNREFUSED instead of "Memlore is locked".
     Ok(())
 }
 
@@ -3482,6 +3489,8 @@ pub async fn recover_with_passphrase<R: tauri::Runtime>(
     if let Err(e) = app.emit("app:unlocked", ()) {
         log::warn!("emit app:unlocked failed (non-fatal): {e}");
     }
+
+    crate::mcp::lifecycle::spawn_maybe_start_mcp_on_unlock(&app);
 
     Ok(())
 }

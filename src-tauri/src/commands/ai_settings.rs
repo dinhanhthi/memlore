@@ -854,18 +854,22 @@ pub fn accept_ai_bulk_context(state: State<'_, AppState>) -> Result<i64, String>
 /// this a no-op when the worker is already running. Never fires when
 /// `enabled == false` — turning a feature off must not spawn anything.
 #[tauri::command]
-pub fn set_ai_feature(
+pub async fn set_ai_feature(
     feature: String,
     enabled: bool,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let conn = state.lock()?;
-    let setting_key = set_ai_feature_inner(&conn, &feature, enabled)?;
-    drop(conn);
+    let setting_key = {
+        let conn = state.lock()?;
+        set_ai_feature_inner(&conn, &feature, enabled)?
+    };
 
     if enabled && is_embedding_consuming_feature_key(setting_key) {
-        crate::commands::ai::start_indexing_worker(app);
+        crate::commands::ai::start_indexing_worker(app.clone());
+    }
+    if setting_key == settings_keys::MCP_SERVER_ENABLED {
+        crate::mcp::lifecycle::apply_mcp_feature_toggled(&app, enabled).await?;
     }
     Ok(())
 }

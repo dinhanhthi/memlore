@@ -15,6 +15,7 @@ mod import_html;
 mod import_markdown;
 #[cfg(target_os = "macos")]
 pub mod macos;
+mod mcp;
 pub mod reminders;
 pub mod yjs_doc;
 // Demo seed (Wikipedia/catalog/Picsum) — never linked into release binaries.
@@ -1646,6 +1647,15 @@ pub fn run() {
                 watcher_manager.spawn_idle_watcher();
             });
             app.manage(llama_server_manager);
+            // MCP Unix-socket server. Managed here so toggle / unlock / status
+            // commands can reach it. NOT started in setup: `MCP_SERVER_ENABLED`
+            // lives in the SQLCipher DB and is unreadable before unlock —
+            // binding here would give opted-out users a live socket. Started
+            // on toggle-ON and on first unlock (`mcp::lifecycle`). Never
+            // stopped on lock (Decision 3). Stopped on toggle-OFF and exit.
+            app.manage(std::sync::Arc::new(mcp::server::McpServerManager::new(
+                app.handle().clone(),
+            )));
             // Stub embedder backs the indexer until the user configures an
             // AI provider. With no provider, all AI commands return
             // `AI_NOT_CONFIGURED`; the stub keeps the trait wiring alive so
@@ -1701,6 +1711,8 @@ pub fn run() {
                 indexer
                     .swappable()
                     .swap(ai::embedder::stub_embedder_for_indexer());
+                // Do not stop the MCP server here. The socket must stay up
+                // so a client gets "Memlore is locked" instead of ECONNREFUSED.
             });
 
             // Resume the background-indexing worker on unlock (mirrors the
@@ -2244,6 +2256,7 @@ pub fn run() {
             commands::ai_settings::set_daily_chat_ai_title,
             commands::ai_settings::set_emotion_suggestion_language,
             commands::ai_settings::set_mcp_default_journal,
+            commands::mcp::mcp_status,
             commands::ai_settings::set_ai_response_language,
             commands::ai_settings::set_ai_feature_prompt,
             commands::ai_settings::get_background_indexing_settings,
@@ -2313,6 +2326,10 @@ pub fn run() {
                     app.try_state::<std::sync::Arc<ai::on_device::server::LlamaServerManager>>()
                 {
                     mgr.kill_sync();
+                }
+                if let Some(mgr) = app.try_state::<std::sync::Arc<mcp::server::McpServerManager>>()
+                {
+                    mgr.stop_sync();
                 }
             }
         });

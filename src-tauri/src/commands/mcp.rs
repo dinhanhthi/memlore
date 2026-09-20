@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use rusqlite::Connection;
+use tauri::State;
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, ReadTxn, StateVector, Transact, Update};
 
@@ -12,6 +15,8 @@ use crate::commands::entries::{
 use crate::commands::tags::add_tag_to_entry_impl;
 use crate::db::{self, LockedView, SearchFilters, TimeRangeFilter};
 use crate::import_markdown::{append_markdown_to_doc, build_entry_yjs_from_markdown};
+use crate::mcp::lifecycle::{mcp_status_snapshot, McpStatus};
+use crate::mcp::server::McpServerManager;
 use crate::{AppState, EncryptionKeyState};
 
 /// Static not-found. Never interpolate entry body into the message (Risk 7).
@@ -463,6 +468,13 @@ pub(crate) fn mcp_set_entry_metadata(
     })?;
     run_post_save_hooks(state, indexer, &updated.id)?;
     Ok(updated)
+}
+
+/// `{ running, socketPath, binaryPath }`. `binaryPath` is
+/// `std::env::current_exe()` — never a hardcoded `/Applications/…` path.
+#[tauri::command]
+pub fn mcp_status(manager: State<'_, Arc<McpServerManager>>) -> Result<McpStatus, String> {
+    Ok(mcp_status_snapshot(&manager))
 }
 
 #[cfg(test)]
