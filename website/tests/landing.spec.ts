@@ -1103,6 +1103,54 @@ test('compact nav opens fullscreen and closes on Escape', async ({ page }, testI
   await expect(nav).toBeHidden()
 })
 
+test('compact nav keeps the header bar still and only swaps burger for close', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/')
+  const wordmark = page.getByRole('link', { name: 'Memlore home' })
+  const github = page.locator('.header-github')
+  const toggle = page.getByRole('button', { name: 'Open menu' })
+  const closedWordmark = await wordmark.boundingBox()
+  const closedGithub = await github.boundingBox()
+  const closedToggle = await toggle.boundingBox()
+  expect(closedWordmark, 'closed logo should have a box').toBeTruthy()
+  expect(closedGithub, 'closed GitHub should have a box').toBeTruthy()
+  expect(closedToggle, 'burger should have a box').toBeTruthy()
+
+  await toggle.click()
+  const openWordmark = await wordmark.boundingBox()
+  const openGithub = await github.boundingBox()
+  const close = page.getByRole('button', { name: 'Close menu' })
+  const openClose = await close.boundingBox()
+  expect(openWordmark, 'open logo should have a box').toBeTruthy()
+  expect(openGithub, 'GitHub must stay in the header when the menu is open').toBeTruthy()
+  expect(openClose, 'close should have a box').toBeTruthy()
+  await expect(github).toBeVisible()
+  expect(
+    Math.abs(openWordmark!.x - closedWordmark!.x),
+    'logo x should not move when the menu opens',
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(openWordmark!.y - closedWordmark!.y),
+    'logo y should not move when the menu opens',
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(openGithub!.x - closedGithub!.x),
+    'GitHub x should not move when the menu opens',
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(openGithub!.y - closedGithub!.y),
+    'GitHub y should not move when the menu opens',
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(openClose!.x - closedToggle!.x),
+    'close should sit where the burger was (x)',
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(openClose!.y - closedToggle!.y),
+    'close should sit where the burger was (y)',
+  ).toBeLessThanOrEqual(1)
+})
+
 test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.demo-disclaimer')).toContainText(/sample data/i)

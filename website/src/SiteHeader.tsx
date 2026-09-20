@@ -47,7 +47,6 @@ function GitHubLink({ className }: { className: string }) {
   return (
     <a className={`github-link ${className}`} href={githubUrl} target="_blank" rel="noreferrer">
       <GitHubMark />
-      <span className="github-label">GitHub</span>
     </a>
   )
 }

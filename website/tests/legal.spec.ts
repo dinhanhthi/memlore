@@ -64,7 +64,7 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
   await expect(nav.locator('summary')).toHaveText('Doc')
   await expect(header.locator('.header-github')).toHaveAttribute('href', GITHUB)
   if (compact) {
-    await expect(header.locator('.header-github')).toBeHidden()
+    await expect(header.locator('.header-github')).toBeVisible()
     await expect(header.locator('.header-actions .download')).toBeHidden()
     return
   }
