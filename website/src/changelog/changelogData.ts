@@ -25,6 +25,21 @@ export type ChangelogRelease = {
 /** Newest release first. */
 export const releases: ChangelogRelease[] = [
   {
+    version: '0.2.0',
+    date: '2026-09-21',
+    stable: true,
+    items: [
+      {
+        kind: 'new',
+        text: 'Let other apps on your Mac read and write your journal through MCP. Turn it on in Settings → AI, paste the config into Claude Desktop or another MCP client, and they can list journals, search and open entries, and create or update them. It stays off until you say yes, and it works even if you have not set up an AI provider.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Clay’s sidebar navigation highlights again when you hover an item.',
+      },
+    ],
+  },
+  {
     version: '0.1.1',
     date: '2026-09-18',
     stable: true,

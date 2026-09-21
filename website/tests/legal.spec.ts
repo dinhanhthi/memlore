@@ -266,9 +266,10 @@ test('privacy sits on the ledger and pins the footer to the page bottom', async 
   )
   expect(frame!.mainGrow, 'main should grow so the footer sits at the bottom').toBe('1')
   expect(frame!.footerBottom, 'footer should sit on the root floor').toBe(frame!.rootBottom)
-  expect(frame!.ordinal === 'none' || frame!.ordinal === '""', 'wide privacy should paint 01 02').toBe(
-    false,
-  )
+  expect(
+    frame!.ordinal === 'none' || frame!.ordinal === '""',
+    'wide privacy should paint 01 02',
+  ).toBe(false)
 })
 
 test('compact /privacy has no root overflow', async ({ page }) => {

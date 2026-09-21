@@ -8,6 +8,30 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
 `website/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
 
+## v0.2.0 (2026-09-21)
+
+### Added
+
+- **Local MCP server.** Opt-in under Settings → AI (off by default; a confirmation
+  acknowledges that any app running as you on this Mac can read and write the
+  decrypted journal). Desktop MCP clients reach six journal tools
+  (`list_journals`, `search_entries`, `get_entry`, `create_entry`,
+  `append_to_entry`, `set_entry_metadata`) over a local Unix socket via a stdio
+  bridge. Settings shows a copy-paste Claude Desktop snippet from the running
+  binary path, a default-journal picker, and a running status; the editor
+  refreshes when a client writes the open entry. Works without an AI provider.
+  [#025980f](https://github.com/dinhanhthi/memlore/commit/025980f)
+  [#8b79a17](https://github.com/dinhanhthi/memlore/commit/8b79a17)
+  [#b31390c](https://github.com/dinhanhthi/memlore/commit/b31390c)
+  [#2dbee85](https://github.com/dinhanhthi/memlore/commit/2dbee85)
+  [#639cc27](https://github.com/dinhanhthi/memlore/commit/639cc27)
+  [#8b129e5](https://github.com/dinhanhthi/memlore/commit/8b129e5)
+
+### Fixed
+
+- **Clay sidebar nav hover.** Restored the hover rule dropped in `5955fad`.
+  [#54a8c0d](https://github.com/dinhanhthi/memlore/commit/54a8c0d)
+
 ## v0.1.1 (2026-09-18)
 
 ### Fixed
