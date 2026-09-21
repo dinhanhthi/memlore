@@ -22,6 +22,7 @@ import { useEmbeddingStatus } from '../../hooks/useEmbeddingStatus'
 import { useOllamaInstalledModels } from '../../hooks/useOllamaInstalledModels'
 import { getReadyLlmModels, useOnDeviceLlmModels } from '../../hooks/useOnDeviceLlmModels'
 import { getReadyModels, useOnDeviceModels } from '../../hooks/useOnDeviceModels'
+import { useMcpStatus } from '../../hooks/useMcpStatus'
 import { useShowMessageMeta } from '../../hooks/useShowMessageMeta'
 import {
   buildConnectedProviderOptions,
@@ -70,6 +71,7 @@ import {
 } from '../../types/ai'
 import { Button } from '../common/Button'
 import { Callout } from '../common/Callout'
+import { Modal } from '../common/Modal'
 import { ComboBox, type ComboBoxOption } from '../common/ComboBox'
 import { Select, type SelectOption } from '../common/Select'
 import { TextInput } from '../common/TextInput'
@@ -81,6 +83,7 @@ import { CliProviderHealthStatus } from './CliProviderHealthStatus'
 import { DailyChatPersonaPicker } from './DailyChatPersonaPicker'
 import { EmotionSuggestionLanguagePicker } from './EmotionSuggestionLanguagePicker'
 import { FeaturePromptEditor } from './FeaturePromptEditor'
+import { McpConnectCard } from './McpConnectCard'
 import { MemoriesSettings } from './MemoriesSettings'
 import { PersonaSettings, type GenerationSlotStatus } from './PersonaSettings'
 import { ProvidersTab } from './ProvidersTab'
@@ -1254,6 +1257,8 @@ function FeaturesTab({
     loading: showMessageMetaLoading,
     setShowMessageMeta,
   } = useShowMessageMeta()
+  const [mcpConfirmOpen, setMcpConfirmOpen] = useState(false)
+  const { status: mcpStatus, refresh: refreshMcpStatus } = useMcpStatus()
 
   const privacyAcceptedAt = settings?.privacyAcceptedAt ?? null
   // "Configured" means the slot is genuinely usable HERE, not merely that a
@@ -1384,6 +1389,12 @@ function FeaturesTab({
           }
         return { disabled: false, hint: undefined }
 
+      case 'mcp_server':
+        // Local Unix-socket server — no model provider and no privacy
+        // receipt. A 0600 socket is still readable by any process running
+        // as this user; the confirm modal is the acknowledgement.
+        return { disabled: false, hint: undefined }
+
       default:
         // All other features require generation slot
         if (!genConfigured)
@@ -1426,6 +1437,7 @@ function FeaturesTab({
   const themeInsightsState = makeToggle('theme_insights')
   const dashboardInsightsState = makeToggle('dashboard_insights')
   const chatRagState = makeToggle('chat_rag')
+  const mcpState = makeToggle('mcp_server')
 
   // `needs_provider` outranks everything: with no usable embedding provider on
   // this device the indexer cannot run at all, so `ragStatus` sits at 'idle'
@@ -1661,6 +1673,58 @@ function FeaturesTab({
             </SettingsRow>
           </div>
         </FeatureToggle>
+
+        <FeatureToggle
+          feature="mcp_server"
+          enabled={!!settings?.mcpServerEnabled}
+          disabled={mcpState.disabled}
+          hint={mcpState.hint}
+          titleBadge={
+            settings?.mcpServerEnabled && mcpStatus?.running ? (
+              <span className="bg-success/15 text-success-text text-2xs shrink-0 rounded-full px-2 py-0.5 font-medium">
+                {t('mcp.status_running')}
+              </span>
+            ) : undefined
+          }
+          onToggle={(v) => {
+            if (v) {
+              setMcpConfirmOpen(true)
+              return
+            }
+            void onToggle('mcp_server', false).then(() => refreshMcpStatus())
+          }}
+        >
+          <McpConnectCard
+            defaultJournalId={settings?.mcpDefaultJournalId ?? null}
+            status={mcpStatus}
+            onJournalSaved={refresh}
+            onError={onError}
+          />
+        </FeatureToggle>
+
+        {mcpConfirmOpen && (
+          <Modal onClose={() => setMcpConfirmOpen(false)}>
+            <Modal.Header>{t('mcp.privacy_title')}</Modal.Header>
+            <Modal.Body fitContent>
+              <p className="text-fg-secondary text-sm leading-relaxed">{t('mcp.privacy_body')}</p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="ghost" size="sm" onClick={() => setMcpConfirmOpen(false)}>
+                {t('mcp.privacy_cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setMcpConfirmOpen(false)
+                  void onToggle('mcp_server', true).then(() => refreshMcpStatus())
+                }}
+              >
+                {t('mcp.privacy_confirm')}
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        )}
 
         {genSupportsImage && (
           <FeatureToggle
@@ -2069,6 +2133,8 @@ interface FeatureToggleProps {
   disabled: boolean
   /** Optional note under the row — typically *why* the toggle is disabled. */
   hint?: string
+  /** Compact marker next to the feature title (e.g. MCP "Running"). */
+  titleBadge?: ReactNode
   onToggle: (v: boolean) => void
   /** Sub-settings. When present the row becomes an accordion (collapsed by
    *  default). Features with no children never expand. */
@@ -2091,6 +2157,7 @@ function FeatureToggle({
   enabled,
   disabled,
   hint,
+  titleBadge,
   onToggle,
   children,
 }: FeatureToggleProps) {
@@ -2111,7 +2178,10 @@ function FeatureToggle({
 
   const titleAndDescription = (
     <span className="min-w-0 flex-1">
-      <span className="text-fg block text-sm font-medium">{title}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="text-fg text-sm font-medium">{title}</span>
+        {titleBadge}
+      </span>
       {fullDescription !== '' && (
         <span className="text-fg-muted mt-0.5 block text-xs leading-snug">{fullDescription}</span>
       )}

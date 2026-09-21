@@ -705,6 +705,8 @@ pub fn unlock_with_biometric(
         if let Err(e) = app.emit("app:unlocked", ()) {
             log::warn!("emit app:unlocked failed (non-fatal): {e}");
         }
+
+        crate::mcp::lifecycle::spawn_maybe_start_mcp_on_unlock(&app);
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]

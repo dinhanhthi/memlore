@@ -26,6 +26,7 @@ const LOW_RISK_FEATURES: AIFeature[] = [
   'tag_suggestions',
   'continue_writing',
   'chat_memory',
+  'mcp_server',
 ]
 
 describe('AI_FEATURE_USAGE_META', () => {
@@ -39,6 +40,12 @@ describe('AI_FEATURE_USAGE_META', () => {
     for (const feature of LOW_RISK_FEATURES) {
       expect(isHighUsageRisk(feature)).toBe(false)
     }
+  })
+
+  it('marks mcp_server as low usage — the local server makes no model calls', () => {
+    expect(getFeatureUsageMeta('mcp_server').usageRisk).toBe('low')
+    expect(isHighUsageRisk('mcp_server')).toBe(false)
+    expect(getFeatureUsageMeta('mcp_server').scalesWith).toBe('none')
   })
 
   it('marks go_deeper and user_memory as medium risk (single entry/work, not fanning out)', () => {

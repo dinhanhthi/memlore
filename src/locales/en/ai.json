@@ -218,7 +218,28 @@
     "chat_memory": {
       "title": "Memory in Chat",
       "description": "Retrieve your saved memories and add them to Daily Chat replies."
+    },
+    "mcp_server": {
+      "title": "MCP Server",
+      "description": "Let desktop MCP clients read and write your journal on this Mac."
     }
+  },
+  "mcp": {
+    "privacy_title": "Allow other apps to read your journal?",
+    "privacy_body": "Turning this on lets any app running as you on this Mac read and write your decrypted journal through a local connection. There is no extra password. The toggle is your acknowledgement.",
+    "privacy_confirm": "Turn on",
+    "privacy_cancel": "Cancel",
+    "onboarding_note": "Works without an AI provider. You can turn this on even if you skip the rest of AI setup.",
+    "status_running": "Running",
+    "binary_path": "Memlore binary",
+    "binary_path_hint": "From the running build — never a hardcoded path.",
+    "default_journal": "Default journal",
+    "default_journal_hint": "Used when an MCP client creates an entry without naming a journal.",
+    "default_journal_none": "Ask each time",
+    "config_snippet": "MCP config",
+    "config_snippet_hint": "Paste this into your MCP client.",
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "usage_warning": {
     "daily_chat": "Long chats resend full history each turn — cost grows with length.",

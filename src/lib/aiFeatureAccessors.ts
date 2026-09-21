@@ -55,6 +55,8 @@ export function getAiFeatureEnabled(feature: AIFeature): boolean {
       return s.imageGenerationEnabled
     case 'user_memory':
       return s.userMemoryEnabled
+    case 'mcp_server':
+      return s.mcpServerEnabled
   }
 }
 
@@ -140,10 +142,13 @@ function imperativeSlotConnected(
  * - `chat_rag` needs both generation + embedding.
  * - `image_generation` needs the image slot + image model set.
  * - `continue_writing` additionally needs persona enabled.
+ * - `mcp_server` is actionable with no provider configured.
  */
 export function isAiFeatureActionable(feature: AIFeature): boolean {
   const s = useAiSettingsStore.getState()
-  if (!s.hydrated || !s.providersHydrated) return false
+  if (!s.hydrated) return false
+  if (feature === 'mcp_server') return true
+  if (!s.providersHydrated) return false
 
   const { providers, privacyAcceptedAt } = s
   const gen = providers.generation

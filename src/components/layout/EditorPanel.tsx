@@ -580,11 +580,27 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       if (!detail || detail.id !== entryId) return
       setEntry((prev) => (prev ? { ...prev, ...detail.patch } : prev))
     }
+    const onDocUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<{ entryId?: string; update?: number[] }>).detail
+      if (!docRef.current || !detail?.entryId || detail.entryId !== entryId || !detail.update)
+        return
+      // Re-applying a Yjs update is a no-op, so a raced autosave is
+      // harmless rather than a conflict.
+      Y.applyUpdate(docRef.current, new Uint8Array(detail.update))
+      // Belt-and-braces save kick: handleEditorUpdate (~605-612) skips
+      // only when both plain text AND Yjs state vector are unchanged,
+      // and Y.applyUpdate moves the state vector, so Collaboration
+      // onUpdate would arm the debounce anyway. Keep the kick — autosave
+      // only arms on a keystroke (~654-658).
+      triggerAutoSaveRef.current?.(docRef.current, entryId)
+    }
     window.addEventListener('memlore:entries-changed', handler)
     window.addEventListener('memlore:entry-patched', onPatched)
+    window.addEventListener('memlore:entry-doc-update', onDocUpdate)
     return () => {
       window.removeEventListener('memlore:entries-changed', handler)
       window.removeEventListener('memlore:entry-patched', onPatched)
+      window.removeEventListener('memlore:entry-doc-update', onDocUpdate)
     }
   }, [entryId, activeVaultId])
 

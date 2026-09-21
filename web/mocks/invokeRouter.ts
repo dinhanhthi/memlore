@@ -456,6 +456,8 @@ const SAFE_DEFAULTS: Record<string, unknown | ((args: Record<string, unknown>) =
     chatRagEnabled: false,
     userMemoryEnabled: false,
     personaEnabled: false,
+    mcpServerEnabled: false,
+    mcpDefaultJournalId: null,
     memoryGenProvider: null,
     memoryGenEndpoint: null,
     memoryGenEndpointClass: null,

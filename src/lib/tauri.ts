@@ -2519,6 +2519,22 @@ export const setDailyChatAiTitle = (enabled: boolean): Promise<void> =>
 export const setEmotionSuggestionLanguage = (language: string): Promise<void> =>
   invoke('set_emotion_suggestion_language', { language })
 
+/** Persist the journal id used when an MCP `create_entry` call omits a
+ *  journal. Pass `null` to clear so the tool must be given an explicit
+ *  journal. Feature toggle is `setAiFeature('mcp_server', enabled)`. */
+export const setMcpDefaultJournal = (journalId: string | null): Promise<void> =>
+  invoke('set_mcp_default_journal', { journalId })
+
+/** MCP Unix-socket snapshot. `binaryPath` is `std::env::current_exe()`
+ *  on the backend — never a hardcoded `/Applications/…` path. */
+export interface McpStatus {
+  running: boolean
+  socketPath: string
+  binaryPath: string
+}
+
+export const getMcpStatus = (): Promise<McpStatus> => invoke('mcp_status')
+
 /** Persist the global AI response language applied to every generation
  *  feature (title suggestions, highlights, go deeper, summaries, periodic
  *  review, theme insights, ask journal, daily chat). Accepts the presets

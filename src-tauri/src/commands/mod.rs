@@ -19,6 +19,7 @@ pub mod invisible_lock;
 pub mod journals;
 pub mod keychain;
 pub mod location;
+pub mod mcp;
 pub mod media;
 pub mod on_device_llm;
 pub(crate) mod pending_drive_session;

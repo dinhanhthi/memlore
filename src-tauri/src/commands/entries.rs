@@ -135,7 +135,7 @@ pub(crate) fn maybe_mark_entry_embedding_dirty_after_save(
 /// Errors (DB read failures, column unexpectedly missing) are logged
 /// and swallowed: a flaky language detection MUST NOT break the save
 /// path. Same contract as `maybe_mark_entry_embedding_dirty_after_save`.
-fn maybe_detect_language_after_save(conn: &Connection, entry_id: &str) {
+pub(crate) fn maybe_detect_language_after_save(conn: &Connection, entry_id: &str) {
     // Read the language column first to honour first-detect-wins
     // without paying the n-gram cost when the entry is already tagged.
     let current = match db::queries::get_entry_language(conn, entry_id) {
