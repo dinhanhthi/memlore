@@ -61,27 +61,7 @@ export const releases: ChangelogRelease[] = [
     items: [
       {
         kind: 'new',
-        text: 'Memlore is out for Mac. Apple checks the download before it reaches you, so macOS opens the app without warning you about an unknown developer. It runs on macOS 13 and later, on both Apple silicon and Intel Macs.',
-      },
-      {
-        kind: 'new',
-        text: 'Memlore now tells you when a new version is available. Pick "Check For Updates…" from the Memlore menu whenever you like, and the app also checks quietly each time you open it.',
-      },
-      {
-        kind: 'new',
-        text: 'Every update is checked against Memlore’s own signature before it installs, so a download that has been tampered with is refused instead of installed.',
-      },
-      {
-        kind: 'new',
-        text: 'Want new features early? Switch to the Beta channel in Settings and updates will include test versions. Stay on Stable for the polished ones.',
-      },
-      {
-        kind: 'new',
-        text: 'Unlock your journal with Touch ID instead of typing your password every time.',
-      },
-      {
-        kind: 'improved',
-        text: 'The automatic update check can be turned off in Settings → General if you would rather look for updates yourself.',
+        text: 'First public release. A private journal on your Mac, with signed updates, a Beta channel, and Touch ID unlock. Requires macOS 13 or later.',
       },
     ],
   },
