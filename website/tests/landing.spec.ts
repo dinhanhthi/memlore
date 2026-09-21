@@ -275,7 +275,6 @@ for (const viewport of VIEWPORTS) {
         32,
       )
       await expect(page.locator('#chat')).toHaveCount(0)
-      await expect(page.locator('#persona')).toHaveCount(0)
       await expect(page.locator('#search')).toHaveCount(0)
       const lockOrder = await page.evaluate(() => {
         const section = document.querySelector('#locks')
@@ -616,6 +615,7 @@ for (const id of [
   'emotions',
   'locations',
   'import-export',
+  'persona',
 ] as const) {
   test(`compact ${id} illustration sits in its own cell, flush to the floor`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -665,7 +665,8 @@ for (const id of [
       id === 'emotions' ||
       id === 'features' ||
       id === 'sync' ||
-      id === 'locks'
+      id === 'locks' ||
+      id === 'persona'
     ) {
       expect(
         Math.abs(geometry!.innerTop - geometry!.innerBottom),
@@ -680,7 +681,18 @@ test('feature sections meet at a hairline with no empty join row', async ({ page
   await page.goto('/')
   await expect(page.locator('.split-gap')).toHaveCount(0)
   const join = await page.evaluate(() => {
-    const ids = ['features', 'sync', 'locks', 'editor', 'emotions', 'locations', 'import-export']
+    const ids = [
+      'features',
+      'sync',
+      'locks',
+      'editor',
+      'emotions',
+      'locations',
+      'import-export',
+      'looks',
+      'talk',
+      'persona',
+    ]
     return ids.slice(0, -1).map((id, index) => {
       const current = document.getElementById(id)
       const next = document.getElementById(ids[index + 1])
@@ -696,7 +708,7 @@ test('feature sections meet at a hairline with no empty join row', async ({ page
       }
     })
   })
-  expect(join).toHaveLength(6)
+  expect(join).toHaveLength(9)
   for (const step of join) {
     expect(step.rule, `${step.from} should be followed by a hairline`).toBe(true)
     expect(step.gap, `${step.from} should sit against the next feature`).toBeLessThanOrEqual(2)
@@ -765,7 +777,7 @@ test('feature splits alternate illustration side and AI sits above open source',
     [...document.querySelectorAll('main section[id]')].map((section) => section.id),
   )
   const fromFeatures = ids.slice(ids.indexOf('features'))
-  expect(fromFeatures.slice(0, 9)).toEqual([
+  expect(fromFeatures.slice(0, 12)).toEqual([
     'features',
     'sync',
     'locks',
@@ -773,6 +785,9 @@ test('feature splits alternate illustration side and AI sits above open source',
     'emotions',
     'locations',
     'import-export',
+    'looks',
+    'talk',
+    'persona',
     'ai',
     'open-source',
   ])
@@ -794,6 +809,9 @@ test('feature splits alternate illustration side and AI sits above open source',
       emotions: of('emotions', '.illust-emotions'),
       locations: of('locations', '.illust-map'),
       importExport: of('import-export', '.illust-transfer'),
+      looks: of('looks', '.illust-looks'),
+      talk: of('talk', '.illust-talk'),
+      persona: of('persona', '.illust-persona'),
     }
   })
   expect(sides).toEqual({
@@ -804,6 +822,9 @@ test('feature splits alternate illustration side and AI sits above open source',
     emotions: 'right',
     locations: 'left',
     importExport: 'right',
+    looks: 'left',
+    talk: 'right',
+    persona: 'left',
   })
   const insets = await page.evaluate(() => {
     const gap = (figure: string, inner: string) => {

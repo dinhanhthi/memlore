@@ -835,6 +835,50 @@ function TalkFigure() {
   )
 }
 
+function PersonaFigure() {
+  return (
+    <figure className="illust illust-persona" aria-hidden="true">
+      <svg
+        className="persona-scene"
+        viewBox="0 0 24 32"
+        fill="none"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <g className="persona-echo" strokeWidth={1} strokeDasharray="3 2.4">
+          <path d="M22 29 V20 c0-3.37-2-6.5-4-8 a5 5 0 0 0-.45-8.3" />
+        </g>
+        <g className="persona-self">
+          <circle cx="10" cy="8" r="5" />
+          <path d="M18 30 V21 a8 8 0 0 0-16 0 V30" />
+        </g>
+      </svg>
+    </figure>
+  )
+}
+
+const personaItems = [
+  {
+    id: 'style' as const,
+    Icon: PenLine,
+    title: 'Your writing style',
+    text: 'Sampled from the pages you already keep.',
+  },
+  {
+    id: 'memories' as const,
+    Icon: UserRound,
+    title: 'Your memories',
+    text: 'The people, places, and facts Memlore has learned.',
+  },
+  {
+    id: 'words' as const,
+    Icon: MessageCircle,
+    title: 'Your own words',
+    text: 'A few answers about how you want to sound — and who you are.',
+  },
+]
+
 function DemoPlaceholder() {
   return (
     <div className="demo-placeholder">
@@ -1466,7 +1510,10 @@ export default function LandingPage() {
         <section className="split" id="talk">
           <div>
             <h2>Talk it through. Then keep the page.</h2>
-            <p>A conversation about the day can become a journal entry when you save it.</p>
+            <p>
+              A conversation about the day can become a journal entry when you save it. Stays off
+              until you opt in.
+            </p>
             <ul className="lock-list">
               {talkItems.map((item) => (
                 <li key={item.id}>
@@ -1479,6 +1526,28 @@ export default function LandingPage() {
             </ul>
           </div>
           <TalkFigure />
+        </section>
+        <LedgerRule />
+        <section className="split split-flip" id="persona">
+          <PersonaFigure />
+          <div>
+            <h2>Build a second you.</h2>
+            <p>
+              From your writing style, your memories, and how you describe yourself, Memlore builds
+              a persona that writes like you — to continue a page in your voice, or sit down and
+              talk to it. Stays off until you opt in.
+            </p>
+            <ul className="lock-list">
+              {personaItems.map((item) => (
+                <li key={item.id}>
+                  <item.Icon className="size-4" />
+                  <p>
+                    <strong>{item.title}.</strong> {item.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
         <SectionIndex>AI</SectionIndex>
         <section className="ai-section" id="ai">

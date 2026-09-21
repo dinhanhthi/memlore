@@ -461,6 +461,7 @@ it('covers the required feature themes from real product capabilities', () => {
   expect(copy).toMatch(/own cloud|your own cloud|cloud folder/)
   expect(copy).toMatch(/sync/)
   expect(copy).toMatch(/persona/)
+  expect(copy).toMatch(/build a second you/)
   expect(copy).toMatch(/voice/)
   expect(copy).toMatch(/opt in/)
   expect(copy).toMatch(/map/)

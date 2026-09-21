@@ -2115,6 +2115,36 @@ main {
 .talk-into svg {
   color: var(--color-accent);
 }
+.illust-persona {
+  display: grid;
+  place-items: center;
+  min-height: 18rem;
+}
+.persona-scene {
+  width: min(100%, 11rem);
+  height: auto;
+  overflow: visible;
+}
+.persona-echo,
+.persona-self {
+  fill: none;
+}
+.persona-echo {
+  stroke: color-mix(in oklch, var(--color-ink) 55%, var(--color-paper));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .persona-echo {
+    animation: persona-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+@keyframes persona-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.persona-self {
+  stroke: var(--color-ink);
+}
 .open-section {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr);
@@ -3041,6 +3071,9 @@ tbody th {
   }
   .illust-looks {
     min-height: 20rem;
+  }
+  .illust-persona {
+    min-height: 16rem;
   }
   .comparison-cards {
     gap: var(--rule-width);
