@@ -21,6 +21,7 @@
 - **Find anything** — instant search, tags, favorites, calendar, and On This Day lookback.
 - **Media & places** — photos, video, voice memos, a media gallery, and a locations map.
 - **AI, when you want it** — a rich set of optional AI tools over your journal. Bring your own provider or run models on-device. Off until you opt in.
+- **MCP server** — opt in to let desktop MCP clients search, read, create and append entries on your machine, so you can journal from the AI app you already use. Local only, off by default, and no AI provider required.
 - **Sync you control** — encrypted sync over your own Google Drive or iCloud Drive, with more services coming. Recover across devices, see who is connected, and revoke any of them.
 - **Locks** — lock the app with a password or Touch ID. Second lock hides chosen entries behind an extra password. Invisible lock keeps separate vaults that vanish until you enter the right password.
 - **Import & export** — import from Day One, Journey, Apple Journal, markdown, and more; export to files.

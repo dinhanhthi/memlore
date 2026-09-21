@@ -782,8 +782,7 @@ const talkItems = [
     id: 'mcp' as const,
     Icon: Blocks,
     title: 'MCP',
-    // TODO(later): journal MCP server — docs/LATER.md
-    text: 'Chat in ChatGPT, Claude, Gemini, Ollama, or another AI you already use. Coming soon.',
+    text: 'Chat in ChatGPT, Claude, Gemini, Ollama, or another AI you already use.',
   },
 ]
 
@@ -819,7 +818,6 @@ function TalkFigure() {
         <p>
           <Blocks className="size-4" />
           <strong>MCP</strong>
-          <small>Soon</small>
         </p>
         <div className="talk-mcp">
           <span>ChatGPT</span>

@@ -2018,17 +2018,6 @@ main {
   color: var(--color-ink);
   white-space: nowrap;
 }
-.talk-way small {
-  margin-left: auto;
-  padding: 1px 7px;
-  border: var(--rule-width) solid var(--color-rule-strong);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
 .talk-bubbles {
   display: grid;
   gap: 6px;
