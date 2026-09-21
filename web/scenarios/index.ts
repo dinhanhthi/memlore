@@ -514,6 +514,8 @@ const AI_PREVIEW_INVOKE: NonNullable<Scenario['invoke']> = {
     // Master User Memory preference off in this fixture; slots also empty.
     userMemoryEnabled: false,
     personaEnabled: false,
+    mcpServerEnabled: false,
+    mcpDefaultJournalId: null,
     memoryGenProvider: null,
     memoryGenEndpoint: null,
     memoryGenEndpointClass: null,
@@ -594,6 +596,11 @@ function aiConnectedSettings(): AIFullSettings {
     // feature in this scenario.
     userMemoryEnabled: true,
     personaEnabled: true,
+    // Stays off even in the everything-on fixture: the MCP server is a local
+    // socket surface for external clients, not an AI capability the harness
+    // renders, and it is fail-closed by design.
+    mcpServerEnabled: false,
+    mcpDefaultJournalId: null,
     memoryGenProvider: 'ollama',
     memoryGenEndpoint: 'http://127.0.0.1:11434/v1',
     memoryGenEndpointClass: 'local',
