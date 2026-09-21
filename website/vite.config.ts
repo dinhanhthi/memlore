@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { applyMarketingShell } from './src/bootShell'
 import { renderLegalStaticHtml } from './src/legal/markdown'
 import { renderLandingStaticHtml } from './src/prerender'
+import { buildRobots, buildSitemap } from './src/seo'
 
 const ALIASED_TAURI = new Set([
   '@tauri-apps/api/core',
@@ -55,6 +56,19 @@ function prerenderStaticShells() {
   }
 }
 
+// Emitted from the bundle rather than dropped in `publicDir`, which points at the
+// repo-root `public/` the Tauri app also bundles — crawler files have no business
+// inside the desktop binary.
+function emitSeoFiles(): Plugin {
+  return {
+    name: 'emit-seo-files',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'robots.txt', source: buildRobots() })
+      this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: buildSitemap() })
+    },
+  }
+}
+
 const TAURI_MOCK_IDS = [...ALIASED_TAURI]
 
 export default defineConfig({
@@ -70,7 +84,7 @@ export default defineConfig({
   cacheDir: fileURLToPath(new URL('./.cache/vite', import.meta.url)),
   base: './',
   publicDir: fileURLToPath(new URL('../public', import.meta.url)),
-  plugins: [tailwindcss(), react(), tauriAliasGuard(), prerenderStaticShells()],
+  plugins: [tailwindcss(), react(), tauriAliasGuard(), prerenderStaticShells(), emitSeoFiles()],
   optimizeDeps: {
     exclude: TAURI_MOCK_IDS,
     // These heavy deps are reached only through dynamic imports (the lazy stats
