@@ -22,6 +22,7 @@ import { useEmbeddingStatus } from '../../hooks/useEmbeddingStatus'
 import { useOllamaInstalledModels } from '../../hooks/useOllamaInstalledModels'
 import { getReadyLlmModels, useOnDeviceLlmModels } from '../../hooks/useOnDeviceLlmModels'
 import { getReadyModels, useOnDeviceModels } from '../../hooks/useOnDeviceModels'
+import { useMcpStatus } from '../../hooks/useMcpStatus'
 import { useShowMessageMeta } from '../../hooks/useShowMessageMeta'
 import {
   buildConnectedProviderOptions,
@@ -1257,6 +1258,7 @@ function FeaturesTab({
     setShowMessageMeta,
   } = useShowMessageMeta()
   const [mcpConfirmOpen, setMcpConfirmOpen] = useState(false)
+  const { status: mcpStatus, refresh: refreshMcpStatus } = useMcpStatus()
 
   const privacyAcceptedAt = settings?.privacyAcceptedAt ?? null
   // "Configured" means the slot is genuinely usable HERE, not merely that a
@@ -1677,16 +1679,24 @@ function FeaturesTab({
           enabled={!!settings?.mcpServerEnabled}
           disabled={mcpState.disabled}
           hint={mcpState.hint}
+          titleBadge={
+            settings?.mcpServerEnabled && mcpStatus?.running ? (
+              <span className="bg-success/15 text-success-text text-2xs shrink-0 rounded-full px-2 py-0.5 font-medium">
+                {t('mcp.status_running')}
+              </span>
+            ) : undefined
+          }
           onToggle={(v) => {
             if (v) {
               setMcpConfirmOpen(true)
               return
             }
-            void onToggle('mcp_server', false)
+            void onToggle('mcp_server', false).then(() => refreshMcpStatus())
           }}
         >
           <McpConnectCard
             defaultJournalId={settings?.mcpDefaultJournalId ?? null}
+            status={mcpStatus}
             onJournalSaved={refresh}
             onError={onError}
           />
@@ -1707,7 +1717,7 @@ function FeaturesTab({
                 size="sm"
                 onClick={() => {
                   setMcpConfirmOpen(false)
-                  void onToggle('mcp_server', true)
+                  void onToggle('mcp_server', true).then(() => refreshMcpStatus())
                 }}
               >
                 {t('mcp.privacy_confirm')}
@@ -2123,6 +2133,8 @@ interface FeatureToggleProps {
   disabled: boolean
   /** Optional note under the row — typically *why* the toggle is disabled. */
   hint?: string
+  /** Compact marker next to the feature title (e.g. MCP "Running"). */
+  titleBadge?: ReactNode
   onToggle: (v: boolean) => void
   /** Sub-settings. When present the row becomes an accordion (collapsed by
    *  default). Features with no children never expand. */
@@ -2145,6 +2157,7 @@ function FeatureToggle({
   enabled,
   disabled,
   hint,
+  titleBadge,
   onToggle,
   children,
 }: FeatureToggleProps) {
@@ -2165,7 +2178,10 @@ function FeatureToggle({
 
   const titleAndDescription = (
     <span className="min-w-0 flex-1">
-      <span className="text-fg block text-sm font-medium">{title}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="text-fg text-sm font-medium">{title}</span>
+        {titleBadge}
+      </span>
       {fullDescription !== '' && (
         <span className="text-fg-muted mt-0.5 block text-xs leading-snug">{fullDescription}</span>
       )}

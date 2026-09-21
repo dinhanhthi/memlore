@@ -1,5 +1,6 @@
 /**
- * `claude_desktop_config.json` fragment for a desktop MCP client.
+ * Stdio MCP client fragment. Any desktop client that accepts a
+ * `mcpServers` map can paste this — not Claude-specific.
  * `binaryPath` must come from `mcp_status` (`std::env::current_exe()`),
  * never a hardcoded `/Applications` path.
  */

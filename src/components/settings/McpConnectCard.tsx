@@ -2,10 +2,9 @@ import { Check, Copy } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useJournals } from '../../hooks/useJournals'
-import { useMcpStatus } from '../../hooks/useMcpStatus'
 import { errMsg } from '../../lib/errMsg'
 import { buildClaudeDesktopMcpConfig } from '../../lib/mcpConnectSnippet'
-import { setMcpDefaultJournal } from '../../lib/tauri'
+import { setMcpDefaultJournal, type McpStatus } from '../../lib/tauri'
 import { Button } from '../common/Button'
 import { Select } from '../common/Select'
 import { Tooltip } from '../common/Tooltip'
@@ -15,13 +14,18 @@ const JOURNAL_NONE = ''
 
 interface McpConnectCardProps {
   defaultJournalId: string | null
+  status: McpStatus | null
   onJournalSaved: () => Promise<void>
   onError: (msg: string | null) => void
 }
 
-export function McpConnectCard({ defaultJournalId, onJournalSaved, onError }: McpConnectCardProps) {
+export function McpConnectCard({
+  defaultJournalId,
+  status,
+  onJournalSaved,
+  onError,
+}: McpConnectCardProps) {
   const { t } = useTranslation('ai')
-  const { status } = useMcpStatus()
   const { journals } = useJournals()
   const [copied, setCopied] = useState(false)
 
@@ -30,7 +34,6 @@ export function McpConnectCard({ defaultJournalId, onJournalSaved, onError }: Mc
     () => (binaryPath === '' ? '' : buildClaudeDesktopMcpConfig(binaryPath)),
     [binaryPath],
   )
-  const running = status?.running === true
 
   const journalOptions = useMemo(
     () => [
@@ -63,16 +66,6 @@ export function McpConnectCard({ defaultJournalId, onJournalSaved, onError }: Mc
 
   return (
     <div className="space-y-3">
-      <SettingsRow title={t('mcp.status_label')} divider={false} className="py-2">
-        <span
-          className={
-            running ? 'text-success-text text-xs font-medium' : 'text-fg-muted text-xs font-medium'
-          }
-        >
-          {running ? t('mcp.status_running') : t('mcp.status_stopped')}
-        </span>
-      </SettingsRow>
-
       {binaryPath !== '' && (
         <SettingsRow
           title={t('mcp.binary_path')}
@@ -94,13 +87,14 @@ export function McpConnectCard({ defaultJournalId, onJournalSaved, onError }: Mc
         hint={t('mcp.default_journal_hint')}
         divider={false}
         className="py-2"
+        direction="col"
       >
         <Select
           value={defaultJournalId ?? JOURNAL_NONE}
           onChange={handleJournalChange}
           options={journalOptions}
           aria-label={t('mcp.default_journal')}
-          className="h-8 w-full max-w-62.5 shrink-0 basis-62.5 px-3 py-1.5"
+          className="h-8 w-full min-w-0 px-3 py-1.5"
         />
       </SettingsRow>
 

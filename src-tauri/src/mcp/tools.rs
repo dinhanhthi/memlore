@@ -154,6 +154,18 @@ struct JournalOut {
     name: String,
 }
 
+/// Claude Desktop requires `outputSchema.type` to be the string `"object"`.
+/// A bare `Vec<_>` advertises `"array"` and fails `tools/list`.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+struct JournalListOut {
+    journals: Vec<JournalOut>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+struct SearchHitsOut {
+    entries: Vec<SearchHitOut>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 struct SearchHitOut {
     id: String,
@@ -234,38 +246,41 @@ where
 
 #[tool_router(server_handler)]
 impl McpTools {
-    #[tool(description = "List visible journals. Returns id and name for each.")]
-    async fn list_journals(&self) -> Result<Json<Vec<JournalOut>>, String> {
+    #[tool(
+        description = "List visible journals. Returns an object with a journals array of id and name."
+    )]
+    async fn list_journals(&self) -> Result<Json<JournalListOut>, String> {
         let app = self.app.clone();
         let journals = spawn_read(app, |state, key_state| {
             mcp_impl::mcp_list_journals(state, key_state)
         })
         .await?;
-        Ok(Json(
-            journals
+        Ok(Json(JournalListOut {
+            journals: journals
                 .into_iter()
                 .map(|j| JournalOut {
                     id: j.id,
                     name: j.name,
                 })
                 .collect(),
-        ))
+        }))
     }
 
     #[tool(
-        description = "Search visible unlocked journal entries. query is required. Optional from and to are unix seconds. Returns id, title, date, and preview."
+        description = "Search visible unlocked journal entries. query is required. Optional from and to are unix seconds. Returns an object with an entries array of id, title, date, and preview."
     )]
     async fn search_entries(
         &self,
         Parameters(params): Parameters<SearchEntriesParams>,
-    ) -> Result<Json<Vec<SearchHitOut>>, String> {
+    ) -> Result<Json<SearchHitsOut>, String> {
         let app = self.app.clone();
         let hits = spawn_read(app, move |state, key_state| {
             mcp_impl::mcp_search_entries(state, key_state, &params.query, params.from, params.to)
         })
         .await?;
-        Ok(Json(
-            hits.into_iter()
+        Ok(Json(SearchHitsOut {
+            entries: hits
+                .into_iter()
                 .map(|hit| SearchHitOut {
                     id: hit.id,
                     title: hit.title,
@@ -273,7 +288,7 @@ impl McpTools {
                     preview: hit.preview,
                 })
                 .collect(),
-        ))
+        }))
     }
 
     #[tool(
@@ -438,6 +453,25 @@ mod tests {
         let schema_json = schema_json_round_trips(tool_name, &tool.input_schema);
         assert_eq!(schema_json["type"], "object");
         assert_eq!(schema_json["properties"], serde_json::json!({}));
+    }
+
+    #[test]
+    fn every_tool_output_schema_is_a_json_object() {
+        // Claude Desktop / Cowork reject tools/list unless outputSchema.type
+        // is the string "object". A bare array (list_journals / search_entries)
+        // fails as tools[n].outputSchema.type.
+        for tool in listed_tools() {
+            let schema = tool
+                .output_schema
+                .as_deref()
+                .unwrap_or_else(|| panic!("{} must advertise an outputSchema", tool.name));
+            let schema_json = serde_json::to_value(schema).expect("serialize output schema");
+            assert_eq!(
+                schema_json["type"], "object",
+                "{} outputSchema.type must be the string \"object\", got {schema_json}",
+                tool.name
+            );
+        }
     }
 
     #[test]
