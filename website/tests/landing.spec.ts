@@ -214,7 +214,7 @@ test('hero eyebrow lists the latest release with Open source as plain text', asy
     const free = document.querySelector('.hero-eyebrow-free')
     return {
       muted: token('--color-muted'),
-      accentDeep: token('--color-accent-deep'),
+      accent: token('--color-accent'),
       success: token('--color-success'),
       eyebrow: eyebrow ? getComputedStyle(eyebrow).color : '',
       version: version ? getComputedStyle(version).color : '',
@@ -222,7 +222,7 @@ test('hero eyebrow lists the latest release with Open source as plain text', asy
     }
   })
   expect(colors.eyebrow, 'eyebrow should be muted').toBe(colors.muted)
-  expect(colors.version, 'version should stay gold').toBe(colors.accentDeep)
+  expect(colors.version, 'version should stay gold').toBe(colors.accent)
   expect(colors.free, 'Free should stay green').toBe(colors.success)
 })
 
@@ -437,9 +437,9 @@ function cssOklch(value: string) {
 }
 
 function expectHybridLandingChrome(chrome: LandingChrome) {
-  expect(cssOklch(chrome.paper), 'paper').toBe('oklch(.995 .003 55)')
-  expect(cssOklch(chrome.panel), 'panel').toBe('oklch(.975 .004 55)')
-  expect(cssOklch(chrome.raised), 'raised').toBe('oklch(.985 .003 55)')
+  expect(cssOklch(chrome.paper), 'paper').toBe('oklch(.145 .004 55)')
+  expect(cssOklch(chrome.panel), 'panel').toBe('oklch(.185 .004 55)')
+  expect(cssOklch(chrome.raised), 'raised').toBe('oklch(.205 .004 55)')
   expect(cssOklch(chrome.radiusPanel), 'panel radius').toBe('.625rem')
   expect(cssOklch(chrome.radiusControl), 'control radius').toBe('.625rem')
   expect(chrome.buttonRise, 'no clay rise').toBe('0px')
@@ -544,13 +544,13 @@ test('demo option badges stay bright and unclipped at the bottom', async ({ page
   const idleFill = await relativeLuminance(idle, 'backgroundColor')
   const mutedText = await relativeLuminance(muted, 'color')
   const paperFill = await relativeLuminance(paper, 'backgroundColor')
-  expect(idleText, 'idle badge text should stay dark on light paper').toBeLessThan(0.35)
+  expect(idleText, 'idle badge text should stay light on dark paper').toBeGreaterThan(0.35)
   expect(
     idleText,
-    'idle badge text should stay at least as dark as muted copy',
-  ).toBeLessThanOrEqual(mutedText + 0.05)
-  expect(selectedText, 'selected badge text should stay dark').toBeLessThan(0.35)
-  expect(idleFill, 'idle badge fill should sit off white paper').toBeLessThan(paperFill)
+    'idle badge text should stay at least as light as muted copy',
+  ).toBeGreaterThanOrEqual(mutedText - 0.05)
+  expect(selectedText, 'selected badge text should stay light').toBeGreaterThan(0.35)
+  expect(idleFill, 'idle badge fill should sit off dark paper').toBeGreaterThan(paperFill)
   expect(await idle.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
   const rowBox = await page.locator('.demo-chrome').boundingBox()
@@ -942,7 +942,7 @@ test('editor cards are icon-plus-label tiles with a request link and a striped e
     page.locator('.ed-card span:not(.ed-slash-mark)').first(),
     'color',
   )
-  expect(labelLuminance, 'editor card labels should stay dark on light paper').toBeLessThan(0.35)
+  expect(labelLuminance, 'editor card labels should stay light on dark paper').toBeGreaterThan(0.35)
 })
 
 test('demo Settings restyles the iframe only', async ({ page }) => {
@@ -973,7 +973,7 @@ test('demo Settings restyles the iframe only', async ({ page }) => {
     expectHybridLandingChrome(await readLandingChrome(page))
     await expect
       .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
-      .toBe('light')
+      .toBe('dark')
   }
   expect(await readLandingChrome(page)).toEqual(before)
 })

@@ -51,12 +51,12 @@ it('reveals #root and hides the splash when JavaScript is off', () => {
   expect(noscript).toMatch(/\.site-boot[^}]*display\s*:\s*none/)
 })
 
-it('inlines the light and dark paper colors and kills motion when asked', () => {
+it('always paints the dark paper splash and never follows OS color scheme', () => {
   const css = renderBootStyle()
-  expect(css).toContain('oklch(0.995 0.003 55)')
   expect(css).toContain('oklch(0.145 0.004 55)')
   expect(css).toContain('oklch(0.985 0.002 55)')
-  expect(css).toContain('prefers-color-scheme: dark')
+  expect(css).not.toContain('oklch(0.995 0.003 55)')
+  expect(css).not.toContain('prefers-color-scheme')
   expect(css).toContain('prefers-reduced-motion')
 })
 

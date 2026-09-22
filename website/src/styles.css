@@ -623,21 +623,15 @@ main {
   color: var(--color-muted);
 }
 .hero-eyebrow-version {
-  color: var(--color-accent-deep);
+  color: var(--color-accent);
 }
 .hero-eyebrow-free {
   color: var(--color-success);
 }
 .section-label {
-  color: var(--color-accent-deep);
+  color: var(--color-accent);
   padding-block: 0.85rem;
   padding-inline: var(--cell-inline);
-}
-@media (prefers-color-scheme: dark) {
-  .hero-eyebrow-version,
-  .section-label {
-    color: var(--color-accent);
-  }
 }
 .hero-eyebrow,
 .hero-title,
@@ -2537,7 +2531,7 @@ tbody th {
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1;
-  color: var(--color-accent-deep);
+  color: var(--color-accent);
   text-decoration: none;
   white-space: nowrap;
   background-image:
@@ -2548,11 +2542,6 @@ tbody th {
   background-position:
     0 26%,
     0 54%;
-}
-@media (prefers-color-scheme: dark) {
-  .footer-wordmark {
-    color: var(--color-accent);
-  }
 }
 .footer-wordmark-letter {
   display: flex;

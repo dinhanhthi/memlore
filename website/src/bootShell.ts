@@ -3,9 +3,7 @@ export const ROOT_MARKER = '<div id="root"></div>'
 
 const LOGO_SRC = './logo-without-container/256.png'
 
-const PAPER_LIGHT = 'oklch(0.995 0.003 55)'
 const PAPER_DARK = 'oklch(0.145 0.004 55)'
-const INK_LIGHT = 'oklch(0.145 0.004 55)'
 const INK_DARK = 'oklch(0.985 0.002 55)'
 
 /**
@@ -16,7 +14,7 @@ export function renderBootStyle(): string {
   return `<style id="site-boot-style">
 html:not(.site-ready),
 html:not(.site-ready) body {
-  background: ${PAPER_LIGHT};
+  background: ${PAPER_DARK};
 }
 html:not(.site-ready) #root {
   position: absolute;
@@ -37,8 +35,8 @@ html:not(.site-ready) #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${PAPER_LIGHT};
-  color: ${INK_LIGHT};
+  background: ${PAPER_DARK};
+  color: ${INK_DARK};
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 .site-boot-brand {
@@ -59,14 +57,6 @@ html:not(.site-ready) #root {
 }
 @keyframes site-boot-breathe {
   50% { opacity: 0.72; }
-}
-@media (prefers-color-scheme: dark) {
-  html:not(.site-ready),
-  html:not(.site-ready) body,
-  .site-boot {
-    background: ${PAPER_DARK};
-    color: ${INK_DARK};
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .site-boot-brand {

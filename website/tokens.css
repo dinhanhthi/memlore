@@ -1,10 +1,10 @@
 /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4
  * genre: modern-minimal · macrostructure: Workbench · tone: utilitarian
  * theme: studied-DNA (source: https://tablepro.app/)
- * paper oklch(99.5% 0.003 55) light / oklch(14.5% 0.004 55) dark
+ * paper oklch(14.5% 0.004 55) dark-only
  * accent oklch(72% 0.178 55) amber
  * display: Inter Variable · body: Inter Variable · label: IBM Plex Mono
- * theme_axes: light / grotesk-sans / warm
+ * theme_axes: dark / grotesk-sans / warm
  * nav: N1b frost bar · footer: Ft5 · enrichment: E4 live iframe plate
  * studied: yes · DNA-source: url · source-url: https://tablepro.app/
  * observed: Inter + IBM Plex Mono, hairline grid, spec strip, product plate
@@ -12,26 +12,26 @@
  * H8 knobs: frame=floating-no-chrome, tilt=0°, plate=demo-iframe
  */
 :root {
-  color-scheme: light;
-  --color-paper: oklch(0.995 0.003 55);
-  --color-panel: oklch(0.975 0.004 55);
-  --color-raised: oklch(0.985 0.003 55);
-  --color-rule: oklch(0.145 0.004 55 / 0.1);
-  --color-rule-strong: oklch(0.145 0.004 55 / 0.16);
-  --color-ink: oklch(0.145 0.004 55);
-  --color-muted: oklch(0.42 0.01 55);
+  color-scheme: dark;
+  --color-paper: oklch(0.145 0.004 55);
+  --color-panel: oklch(0.185 0.004 55);
+  --color-raised: oklch(0.205 0.004 55);
+  --color-rule: oklch(1 0 0 / 0.08);
+  --color-rule-strong: oklch(1 0 0 / 0.16);
+  --color-ink: oklch(0.985 0.002 55);
+  --color-muted: oklch(0.708 0.01 55);
   --color-accent: oklch(89% 0.11 73);
-  --color-accent-deep: oklch(0.52 0.148 45);
+  --color-accent-deep: oklch(0.8 0.137 58);
   --color-accent-ink: oklch(0.16 0.04 55);
-  --color-focus: oklch(0.52 0.148 45);
-  --color-shadow: oklch(0.145 0.004 55 / 0.08);
+  --color-focus: oklch(0.8 0.137 58);
+  --color-shadow: oklch(0 0 0 / 0.35);
   --color-clear: oklch(0.145 0.004 55 / 0);
   --color-success: oklch(0.88 0.19 144.88);
-  --color-error: oklch(0.5 0.18 27);
-  --color-warning: oklch(0.55 0.14 75);
+  --color-error: oklch(0.7 0.19 22);
+  --color-warning: oklch(0.8 0.12 85);
   --color-compare-surface: var(--color-paper);
   --color-compare-head: var(--color-panel);
-  --color-compare-stripe: color-mix(in oklch, var(--color-ink) 3%, var(--color-paper));
+  --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-paper));
   --color-compare-rule: var(--color-rule);
   --color-bloom: oklch(0.72 0.178 55 / 0);
   --font-display: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
@@ -71,11 +71,11 @@
   --button-primary-fg: var(--color-accent-ink);
   --button-primary-lip: transparent;
   --button-primary-shadow: none;
-  --button-secondary-bg: var(--color-paper);
-  --button-secondary-bg-hover: var(--color-panel);
+  --button-secondary-bg: var(--color-raised);
+  --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 8%, var(--color-raised));
   --button-secondary-fg: var(--color-ink);
   --button-secondary-shadow: none;
-  --button-selected-bg: color-mix(in oklch, var(--color-accent) 12%, var(--color-paper));
+  --button-selected-bg: color-mix(in oklch, var(--color-accent) 16%, var(--color-raised));
   --button-selected-fg: var(--color-ink);
   --button-selected-border: var(--color-accent);
   --download-face: oklch(0.26 0.055 52);
@@ -83,8 +83,8 @@
   --download-glow-hot: oklch(0.93 0.09 85);
   --download-glow-mid: oklch(0.72 0.17 48);
   --download-glow-deep: oklch(0.52 0.16 32);
-  --badge-idle-bg: var(--color-panel);
-  --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 6%, var(--color-panel));
+  --badge-idle-bg: var(--color-raised);
+  --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 10%, var(--color-raised));
   --badge-idle-fg: var(--color-ink);
   --badge-idle-border: var(--color-rule-strong);
   --rule-width: 1px;
@@ -104,33 +104,4 @@
   --z-dropdown: 100;
   --z-sticky: 200;
   --z-sticky-nav: 300;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --color-paper: oklch(0.145 0.004 55);
-    --color-panel: oklch(0.185 0.004 55);
-    --color-raised: oklch(0.205 0.004 55);
-    --color-rule: oklch(1 0 0 / 0.08);
-    --color-rule-strong: oklch(1 0 0 / 0.16);
-    --color-ink: oklch(0.985 0.002 55);
-    --color-muted: oklch(0.708 0.01 55);
-    --color-accent: oklch(89% 0.11 73);
-    --color-accent-deep: oklch(0.8 0.137 58);
-    --color-accent-ink: oklch(0.16 0.04 55);
-    --color-focus: oklch(0.8 0.137 58);
-    --color-shadow: oklch(0 0 0 / 0.35);
-    --color-clear: oklch(0.145 0.004 55 / 0);
-    --color-success: oklch(0.88 0.19 144.88);
-    --color-error: oklch(0.7 0.19 22);
-    --color-warning: oklch(0.8 0.12 85);
-    --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-paper));
-    --button-secondary-bg: var(--color-raised);
-    --button-secondary-bg-hover: color-mix(in oklch, var(--color-ink) 8%, var(--color-raised));
-    --button-selected-bg: color-mix(in oklch, var(--color-accent) 16%, var(--color-raised));
-    --badge-idle-bg: var(--color-raised);
-    --badge-idle-bg-hover: color-mix(in oklch, var(--color-ink) 10%, var(--color-raised));
-    --badge-idle-fg: var(--color-ink);
-  }
 }
