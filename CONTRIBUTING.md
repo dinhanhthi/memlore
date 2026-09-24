@@ -39,6 +39,50 @@ Touch ID unlock — `pnpm tauri dev` never can, because the
 `keychain-access-groups` entitlement it needs is provisioning-profile
 restricted. Read that script's header before touching anything signing-related.
 
+## Cargo build cache
+
+`pnpm tauri dev` and `cargo test` write the `dev` profile to `debug/`. `pnpm tauri build` writes `release/`. On macOS that dev profile defaults to `split-debuginfo = "unpacked"` while debug info is enabled, and each codegen unit drops a `.o` into `target/debug/deps`. That is the bulk of a debug target past 10 GB. `src-tauri/Cargo.toml` sets:
+
+```toml
+[profile.dev]
+opt-level = 1
+split-debuginfo = "off"
+
+[profile.dev.package."*"]
+debug = "line-tables-only"
+incremental = false
+```
+
+`split-debuginfo = "off"` stops those object files. Dependency crates keep line tables, enough for a backtrace to name a file and a line. The `memlore` package keeps full debug info, and incremental compilation stays on for it. `incremental = false` under `package."*"` applies only to dependencies. Changing the profile does not shrink a target that already exists.
+
+Share one cache across Rust projects by creating `~/.cargo/config.toml` once per machine. The file is outside git. Cargo does not expand `~`. A relative path in that file is resolved from `$HOME`, so the value below is `~/.cargo/shared-target`:
+
+```toml
+[build]
+target-dir = ".cargo/shared-target"
+
+[profile.dev]
+opt-level = 1
+split-debuginfo = "off"
+
+[profile.dev.package."*"]
+debug = "line-tables-only"
+incremental = false
+```
+
+Copy the profile from `src-tauri/Cargo.toml` and keep the two identical. Profile keys in Cargo's config override the same keys in every `Cargo.toml`. You set this once. A project that leaves `opt-level` at the default `0` compiles a second copy of every dependency next to Memlore's `opt-level = 1` copies. The build still succeeds. The disk holds both.
+
+What lands in the shared directory:
+
+- Dependency artifacts in `debug/deps` when the crate version, features, `rustc`, these profile flags, and the target triple match. Two apps then reuse the same `tauri`, `tokio`, `serde`, and `objc2` builds.
+- Each app's own binary, side by side (`debug/memlore` next to another app's binary).
+
+A different feature set stores another copy of that one crate. `cargo clean` (and `pnpm cargo:clean`) deletes the whole shared directory, every project included. Cargo locks the directory, so build one project at a time.
+
+`scripts/dev.sh` does not set `CARGO_TARGET_DIR`. Neither does `pnpm tauri dev` or `cargo test`, so they follow this config. With no config and no environment variable they still use `src-tauri/target`. `scripts/tauri.sh` exports `CARGO_TARGET_DIR` to `src-tauri/target` when the subcommand is `build`, which is what `pnpm tauri build` runs. Leave that pin. It keeps the release bundle at `src-tauri/target/release/bundle/macos/Memlore.app` (and the `.dmg` next to it). `scripts/build-signed-app.sh` exports the same variable so its debug bundle stays at `src-tauri/target/debug/bundle/macos/Memlore.app`. Leave that pin too. An exported `CARGO_TARGET_DIR` still overrides `~/.cargo/config.toml` for dev commands, because the environment outranks the config.
+
+After writing the config on a machine that already has a per-project `target/`, delete those directories. They are no longer on Cargo's path, and `cargo clean` will not see them. The next `pnpm tauri dev` fills `~/.cargo/shared-target`.
+
 ## UI playground (`web/`)
 
 `web/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.

@@ -67,6 +67,25 @@ pnpm lint && pnpm format:check
 pnpm tauri build --no-sign        # current platform (see CONTRIBUTING.md)
 ```
 
+### Cargo build cache
+
+A debug target on macOS grows past 10 GB. The `dev` profile in `src-tauri/Cargo.toml` keeps a fresh build small. To share that cache, `~/.cargo/config.toml` is created once per machine and stays outside git. Cargo does not expand `~`; the path below is `~/.cargo/shared-target`:
+
+```toml
+[build]
+target-dir = ".cargo/shared-target"
+
+[profile.dev]
+opt-level = 1
+split-debuginfo = "off"
+
+[profile.dev.package."*"]
+debug = "line-tables-only"
+incremental = false
+```
+
+Keep that profile identical to `src-tauri/Cargo.toml`. After the config is in place, delete this repo's old `src-tauri/target` — `cargo clean` no longer sees it. `pnpm tauri dev` and `cargo test` use the shared directory. `pnpm tauri build` still writes `src-tauri/target`. Why these flags are set is in [CONTRIBUTING.md](CONTRIBUTING.md#cargo-build-cache).
+
 Optional `.env` (copy `.env.example`): [Google Drive OAuth](docs/gdrive-oauth-setup.md) and [MapKit JS](docs/mapkit-js-setup.md).
 
 ### 📦 Releasing

@@ -165,3 +165,14 @@ wiremock = "0.6"
 # from another test can't perturb eviction-count assertions. See
 # `docs/LATER.md` "Testing" entry.
 serial_test = "3"
+
+[profile.dev]
+opt-level = 1
+# macOS defaults to split-debuginfo = "unpacked", which writes one .o per
+# codegen unit into target/debug/deps. Keep this block identical to
+# ~/.cargo/config.toml.
+split-debuginfo = "off"
+
+[profile.dev.package."*"]
+debug = "line-tables-only"
+incremental = false

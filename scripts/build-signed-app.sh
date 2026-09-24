@@ -170,6 +170,10 @@ fi
 # ─── Build ────────────────────────────────────────────────────────────────────
 
 echo "Building the app bundle (this takes a few minutes)…"
+# Pin the Cargo target so ~/.cargo/config.toml cannot move this bundle.
+# The path below is src-tauri/target/debug/bundle/macos/Memlore.app.
+# Leave this pin. pnpm tauri dev does not set it.
+export CARGO_TARGET_DIR="${REPO_ROOT}/src-tauri/target"
 # --no-sign is required, not optional: tauri.conf.json sets
 # bundle.createUpdaterArtifacts, and the CLI hard-errors ("A public key has been
 # found, but no private key") whenever it produces an updater artifact without

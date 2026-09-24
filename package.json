@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "bash scripts/tauri.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write . && cd src-tauri && cargo fmt",
