@@ -512,7 +512,7 @@ function EmotionsFigure() {
             data-selected={option.key === 'good' ? '' : undefined}
           >
             <span>{option.emoji}</span>
-            {option.label}
+            <span className="emotion-label">{option.label}</span>
           </span>
         ))}
       </div>

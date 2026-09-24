@@ -3237,7 +3237,23 @@ tbody th {
     column-gap: 0;
   }
   .transfer-flow {
+    display: block;
+  }
+  .transfer-flow path {
     display: none;
+  }
+  /* Add downward arrows for mobile */
+  .transfer-in::after,
+  .transfer-out::before {
+    content: '';
+    display: block;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 12px solid color-mix(in oklch, var(--color-ink) 28%, transparent);
+    margin: 8px auto;
+    justify-self: center;
   }
   .transfer-in {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -3258,6 +3274,10 @@ tbody th {
   }
   .footer-links {
     padding-block: 8px;
+  }
+  /* Hide emotion labels in mobile view */
+  .emotion-label {
+    display: none;
   }
 }
 @media (max-width: 26rem) {
