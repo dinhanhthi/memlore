@@ -338,6 +338,53 @@ it('does not pin marketing copy to a single platform', () => {
   expect(allCopy()).not.toMatch(/\byour Mac\b|\bthis Mac\b|for your Mac/i)
 })
 
+it('splits phone and desktop apps into their own comparison rows', () => {
+  expect(comparisonMarks.ios).toEqual({
+    Memlore: 'soon',
+    'Day One': 'yes',
+    Journey: 'yes',
+    'Apple Journal': 'yes',
+  })
+  expect(comparisonMarks.android).toEqual({
+    Memlore: 'soon',
+    'Day One': 'yes',
+    Journey: 'yes',
+    'Apple Journal': 'no',
+  })
+  expect(comparisonMarks.windows).toEqual({
+    Memlore: 'soon',
+    'Day One': 'yes',
+    Journey: 'yes',
+    'Apple Journal': 'no',
+  })
+  expect(comparisonMarks.linux).toEqual({
+    Memlore: 'soon',
+    'Day One': 'no',
+    Journey: 'yes',
+    'Apple Journal': 'no',
+  })
+  expect(comparisonRowsSource).not.toMatch(/iOS and Android app|Windows or Linux app/)
+})
+
+it('draws second lock and the invisible vault as separate blocks', () => {
+  const figure = sourceBlock('function LocksFigure()', 'const editorPanes')
+  const second = figure.indexOf('data-lock="second"')
+  const invisible = figure.indexOf('data-lock="invisible"')
+  expect(second).toBeGreaterThan(0)
+  expect(invisible).toBeGreaterThan(figure.indexOf('</article>', second))
+})
+
+it('introduces plugins as optional and not shipped yet', () => {
+  expect(landing).toContain('Plugins, only when you want them.')
+  expect(landing).toContain('Extra tools arrive as plugins.')
+  expect(landing).not.toContain('The journal stays')
+  expect(landing).toContain('Coming soon')
+  expect(landing).toContain('Install only what you need.')
+  expect(landing).toContain('<dt>plugins</dt>')
+  expect(landing).not.toContain('<dt>today</dt>')
+  expect(landing).toContain('id="plugins"')
+})
+
 it('compares Memlore, Day One, Journey, and Apple Journal in columns', () => {
   const rowIds = Object.keys(comparisonMarks)
   expect(rowIds.length).toBeGreaterThan(5)

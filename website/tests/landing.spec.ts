@@ -777,7 +777,7 @@ test('feature splits alternate illustration side and AI sits above open source',
     [...document.querySelectorAll('main section[id]')].map((section) => section.id),
   )
   const fromFeatures = ids.slice(ids.indexOf('features'))
-  expect(fromFeatures.slice(0, 12)).toEqual([
+  expect(fromFeatures.slice(0, 13)).toEqual([
     'features',
     'sync',
     'locks',
@@ -788,6 +788,7 @@ test('feature splits alternate illustration side and AI sits above open source',
     'looks',
     'talk',
     'persona',
+    'plugins',
     'ai',
     'open-source',
   ])
@@ -812,6 +813,7 @@ test('feature splits alternate illustration side and AI sits above open source',
       looks: of('looks', '.illust-looks'),
       talk: of('talk', '.illust-talk'),
       persona: of('persona', '.illust-persona'),
+      plugins: of('plugins', '.illust-plugins'),
     }
   })
   expect(sides).toEqual({
@@ -825,6 +827,7 @@ test('feature splits alternate illustration side and AI sits above open source',
     looks: 'left',
     talk: 'right',
     persona: 'left',
+    plugins: 'right',
   })
   const insets = await page.evaluate(() => {
     const gap = (figure: string, inner: string) => {

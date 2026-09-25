@@ -1076,6 +1076,23 @@ main {
 .split h2 {
   margin-bottom: 16px;
 }
+.soon-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border: var(--rule-width) solid color-mix(in oklch, var(--color-muted) 40%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-muted) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  vertical-align: middle;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
 .split p,
 .split li {
   overflow-wrap: anywhere;
@@ -1335,6 +1352,10 @@ main {
   border-style: dashed;
   border-width: 3px;
   background: color-mix(in oklch, oklch(0.83 0.18 71.76 / 0.64) 15%, transparent);
+}
+.lock-peers {
+  display: grid;
+  gap: 12px;
 }
 .illust-editor {
   display: grid;
@@ -1980,6 +2001,7 @@ main {
 .illust-talk {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--rule-width);
   align-content: stretch;
   padding: 0;
@@ -1994,6 +2016,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
   padding: 16px 12px 14px;
 }
 .talk-way p {
@@ -2013,9 +2036,10 @@ main {
   white-space: nowrap;
 }
 .talk-bubbles {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 .talk-bubbles span {
   max-width: 100%;
@@ -2028,7 +2052,7 @@ main {
   color: var(--color-ink);
 }
 .talk-bubbles [data-who='you'] {
-  justify-self: end;
+  align-self: flex-end;
   border-radius: 8px 8px 2px 8px;
   background: color-mix(in oklch, var(--color-accent) 22%, var(--color-raised));
   border-color: color-mix(in oklch, var(--color-accent) 40%, var(--color-rule));
@@ -2080,17 +2104,89 @@ main {
     transform: scaleY(0.45);
   }
 }
+.talk-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.talk-transcript {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.talk-transcript span {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: color-mix(in oklch, var(--color-ink) 18%, transparent);
+  animation: talk-pulse 1.6s var(--ease-in-out) infinite;
+}
+.talk-transcript span:nth-child(1) {
+  width: 96%;
+}
+.talk-transcript span:nth-child(2) {
+  width: 78%;
+  animation-delay: 0.12s;
+}
+.talk-transcript span:nth-child(3) {
+  width: 88%;
+  animation-delay: 0.24s;
+}
+.talk-transcript span:nth-child(4) {
+  width: 64%;
+  animation-delay: 0.36s;
+}
+.talk-transcript span:nth-child(5) {
+  width: 84%;
+  animation-delay: 0.18s;
+}
+.talk-transcript span:nth-child(6) {
+  width: 52%;
+  animation-delay: 0.3s;
+}
+@keyframes talk-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
 .talk-mcp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.talk-clients {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
 }
-.talk-mcp span {
+.talk-clients span {
   padding: 3px 7px;
   border: var(--rule-width) dashed var(--color-rule-strong);
   border-radius: var(--radius-pill);
   font-size: 10px;
   color: var(--color-muted);
+}
+.talk-tools {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.talk-mcp .talk-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 6px 8px;
+  border: var(--rule-width) solid var(--color-rule);
+  border-radius: 6px;
+  background: var(--color-raised);
+  color: var(--color-ink);
+  font-size: 10px;
+}
+.talk-mcp .talk-tool svg {
+  color: var(--color-accent);
 }
 .talk-way[data-talk='mcp'] {
   background: color-mix(in oklch, var(--color-ink) 3%, var(--color-panel));
@@ -2138,6 +2234,14 @@ main {
 }
 .persona-self {
   stroke: var(--color-ink);
+}
+.illust-plugins {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  align-content: center;
+  justify-content: center;
+  gap: 2.75rem 3.5rem;
+  color: var(--color-accent);
 }
 .open-section {
   display: grid;
@@ -3171,10 +3275,11 @@ tbody th {
   }
   .illust-talk {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
   }
   .talk-way {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
     gap: 14px;
     padding: 12px 14px;
   }
@@ -3182,7 +3287,7 @@ tbody th {
     min-width: 7.5rem;
   }
   .talk-bubbles,
-  .talk-wave,
+  .talk-voice,
   .talk-mcp {
     flex: 1;
     min-width: 0;

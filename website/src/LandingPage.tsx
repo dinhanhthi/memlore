@@ -421,18 +421,20 @@ function LocksFigure() {
           <AppIcon className="size-5" />
           <strong>{app.title}</strong>
         </p>
-        <article data-lock="second">
-          <p>
-            <SecondIcon className="size-5" />
-            <strong>{second.title}</strong>
-          </p>
+        <div className="lock-peers">
+          <article data-lock="second">
+            <p>
+              <SecondIcon className="size-5" />
+              <strong>{second.title}</strong>
+            </p>
+          </article>
           <article data-lock="invisible">
             <p>
               <InvisibleIcon className="size-5" />
               <strong>{invisible.title}</strong>
             </p>
           </article>
-        </article>
+        </div>
       </article>
     </figure>
   )
@@ -797,6 +799,8 @@ function TalkFigure() {
         <div className="talk-bubbles">
           <span data-who="you">The walk helped.</span>
           <span data-who="ai">What stayed with you?</span>
+          <span data-who="you">How quiet the street was.</span>
+          <span data-who="ai">I’ll keep that for the page.</span>
         </div>
       </article>
       <article className="talk-way" data-talk="voice">
@@ -804,14 +808,24 @@ function TalkFigure() {
           <Mic className="size-4" />
           <strong>Voice</strong>
         </p>
-        <div className="talk-wave">
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
+        <div className="talk-voice">
+          <div className="talk-wave">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="talk-transcript">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
       </article>
       <article className="talk-way" data-talk="mcp">
@@ -820,11 +834,27 @@ function TalkFigure() {
           <strong>MCP</strong>
         </p>
         <div className="talk-mcp">
-          <span>ChatGPT</span>
-          <span>Claude</span>
-          <span>Gemini</span>
-          <span>Ollama</span>
-          <span>More</span>
+          <div className="talk-clients">
+            <span>ChatGPT</span>
+            <span>Claude</span>
+            <span>Gemini</span>
+            <span>Ollama</span>
+            <span>More</span>
+          </div>
+          <div className="talk-tools">
+            <span className="talk-tool">
+              <ScanSearch className="size-3.5" />
+              Search entries
+            </span>
+            <span className="talk-tool">
+              <BookOpen className="size-3.5" />
+              Read a page
+            </span>
+            <span className="talk-tool">
+              <PenLine className="size-3.5" />
+              Append today
+            </span>
+          </div>
         </div>
       </article>
       <p className="talk-into">
@@ -878,6 +908,25 @@ const personaItems = [
     text: 'A few answers about how you want to sound — and who you are.',
   },
 ]
+
+const pluginMarks = [
+  { id: 'plugins', Icon: Puzzle },
+  { id: 'tables', Icon: Columns3 },
+  { id: 'charts', Icon: BarChart3 },
+  { id: 'highlights', Icon: Highlighter },
+  { id: 'calendar', Icon: CalendarClock },
+  { id: 'audio', Icon: Mic },
+]
+
+function PluginsFigure() {
+  return (
+    <figure className="illust illust-plugins" aria-hidden="true">
+      {pluginMarks.map((mark) => (
+        <mark.Icon key={mark.id} className="size-8" strokeWidth={1.5} />
+      ))}
+    </figure>
+  )
+}
 
 function DemoPlaceholder() {
   return (
@@ -1248,13 +1297,23 @@ const comparisonRows = [
   },
   {
     id: 'ios',
-    label: 'iOS and Android app',
-    marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'partial' },
+    label: 'iOS app',
+    marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'yes' },
   },
   {
-    id: 'win-linux',
-    label: 'Windows or Linux app',
-    marks: { Memlore: 'soon', 'Day One': 'partial', Journey: 'yes', 'Apple Journal': 'no' },
+    id: 'android',
+    label: 'Android app',
+    marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'windows',
+    label: 'Windows app',
+    marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'no' },
+  },
+  {
+    id: 'linux',
+    label: 'Linux app',
+    marks: { Memlore: 'soon', 'Day One': 'no', Journey: 'yes', 'Apple Journal': 'no' },
   },
   {
     id: 'beta-free',
@@ -1396,9 +1455,9 @@ export default function LandingPage() {
               <small>Local, on-device, or your own key.</small>
             </div>
             <div className="spec-item">
-              <dt>today</dt>
-              <dd>macOS</dd>
-              <small>Windows, Linux, iOS, and Android later.</small>
+              <dt>plugins</dt>
+              <dd>Coming soon</dd>
+              <small>Install only what you need.</small>
             </div>
           </dl>
         </section>
@@ -1548,6 +1607,19 @@ export default function LandingPage() {
               ))}
             </ul>
           </div>
+        </section>
+        <LedgerRule />
+        <section className="split" id="plugins">
+          <div>
+            <h2>
+              Plugins, only when you want them.
+              <span className="soon-badge">Coming soon</span>
+            </h2>
+            <p>
+              Extra tools arrive as plugins. Install one when you need it, and leave the rest out.
+            </p>
+          </div>
+          <PluginsFigure />
         </section>
         <SectionIndex>AI</SectionIndex>
         <section className="ai-section" id="ai">
