@@ -19,7 +19,6 @@
     "design": "python3 -m http.server 8080 --directory docs/design/project",
     "website:dev": "vite --config website/vite.config.ts",
     "website:build": "tsc -p website/tsconfig.json && vite build --config website/vite.config.ts",
-    "website:test": "vitest run --config website/vite.config.ts",
     "website:preview": "vite preview --config website/vite.config.ts",
     "cargo:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "web:dev": "bash scripts/web-dev.sh",

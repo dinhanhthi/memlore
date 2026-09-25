@@ -18,23 +18,18 @@ From the repository root, with root dependencies installed:
 pnpm website:dev       # Vite dev server — http://localhost:5176
 pnpm website:build     # typecheck + production bundle → website/dist/
 pnpm website:preview   # serve the built assets — http://localhost:4176
-pnpm website:test      # Vitest (jsdom) — backend, bridge, copy, streaming
 ```
 
-Playwright against the **built** preview (builds first, then serves port 4176):
+## Docs pages
 
-```sh
-pnpm exec playwright test --config website/playwright.config.ts
-```
+`/docs/` is the English "How Memlore works" section. To add a page:
 
-This is a separate config from the root web-harness suite on port 5175.
-Chromium is enough. If browsers are missing:
+1. Add a row to `src/docs/manifest.ts` (slug, title, description, group, optional diagram name). The manifest drives the route, the canonical URL, the sitemap entry, and the Vite input.
+2. Add a shell at `docs/<slug>.html` (overview is `docs/index.html`). Copy a sibling shell. Asset paths are `../`. Canonical is `https://memlore.app` plus the path from `docsPath`.
+3. Write `src/docs/content/<slug>.md`. Frontmatter needs `title`, `description`, `updated`, and one `sources:` line of repo paths you actually read. Allowed markdown is headings, paragraphs, lists, `**bold**`, absolute `/docs/...` links, and a `:::diagram <name>` line. No tables, images, code fences, or raw HTML.
+4. Optional: add the SVG string in `src/docs/diagrams/<name>.ts` and register it in `src/docs/diagrams/index.ts`. Colours are `currentColor` or tokens from `tokens.css`.
 
-```sh
-pnpm exec playwright install chromium
-```
-
-Screenshots land in `website/test-results/` (gitignored).
+Every factual sentence has to be traceable to the code named in `sources:`. Do not contradict `src/legal/privacy.md`. If the code and the policy disagree, describe the code and leave the policy for a separate change.
 
 ## What the demo is
 
@@ -72,18 +67,13 @@ after visible changes to the seeded entry or the app chrome.
   horizontally scrollable viewport. On a phone, use **Open separately**.
 - Chat **New** / **Send** are enabled because the demo seeds a local Ollama
   slot (`addedProviders: ['ollama']`). Replies stream from a timer, not a
-  model. Full token-contract coverage is in `website/tests/scenario.test.ts`
-  and `website/tests/streaming.test.ts`. Playwright only asserts that
-  sending a message starts the stream (Stop appears). Completing every
-  token in the iframe is timing-fragile.
+  model.
 - Entry create / edit / favorite / delete persistence is in-session only.
-  Covered by `website/tests/backend.test.ts`. A full TipTap edit-and-return
-  Playwright walkthrough is not part of the smoke suite.
 - Sync, export, import, and some system settings show an explicit
   “simulated” notice instead of silently doing nothing.
 - There is no production binary or store listing. The **Download beta**
-  control opens https://github.com/dinhanhthi/memlore. Doc is a coming-soon
-  disclosure, not a 404 link.
+  control opens https://github.com/dinhanhthi/memlore. **Docs** opens
+  `/docs/`.
 - macOS is the current platform. Windows, Linux, iOS, and Android are
   coming soon without a date.
 
@@ -101,6 +91,5 @@ after visible changes to the seeded entry or the app chrome.
 | `src/demoBridge.ts`             | Parent → iframe commands (theme, navigate, reset) |
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |
 | `tokens.css` / `src/styles.css` | Dark-only Hallmark Workbench tokens               |
-| `tests/landing.spec.ts`         | Production-preview Playwright smoke               |
-| `tests/legal.spec.ts`           | Privacy / terms production-preview Playwright     |
-| `playwright.config.ts`          | Website-only Playwright (port 4176)               |
+| `docs/`                         | HTML shells for `/docs/` and `/docs/<slug>`       |
+| `src/docs/`                     | Docs page, manifest, markdown, diagrams           |

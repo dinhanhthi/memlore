@@ -36,7 +36,7 @@ const LOOK_SECTORS = [
   'top-right',
 ] as const satisfies readonly AngledDirection[]
 
-const HEAD_ROTATE_PATH = './head-rotate'
+const HEAD_ROTATE_PATH = '/head-rotate'
 
 export function logoSrc(direction: LogoDirection): string {
   return `${HEAD_ROTATE_PATH}/${direction}.png`

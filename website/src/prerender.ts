@@ -7,8 +7,7 @@ import { githubUrl } from './links'
  * client-rendered shell it sees no app description and no privacy policy link,
  * both of which their homepage requirements demand. Every string here is copy
  * the React page renders too — never crawler-only text. The strings below are
- * duplicated from the components on purpose, and `prerender.test.ts` fails if
- * they drift.
+ * duplicated from the components on purpose — keep them in sync by hand.
  */
 export const prerenderCopy = {
   heroTitleLead: 'A little life.',
@@ -23,10 +22,11 @@ export const prerenderCopy = {
   syncTitle: 'Your cloud. Your account. Your key.',
   syncBody:
     'Entries are encrypted on your device, then synced through your own Google Drive or iCloud Drive. We never hold your files, your account, or your key.',
-  linksAria: 'About, changelog, privacy, terms, and GitHub',
+  linksAria: 'About, changelog, docs, privacy, terms, and GitHub',
   wordmark: 'Memlore',
   aboutLink: 'About',
   changelogLink: 'Changelog',
+  docsLink: 'Docs',
   privacyLink: 'Privacy',
   termsLink: 'Terms',
   github: 'GitHub',
@@ -51,6 +51,7 @@ export function renderLandingStaticHtml(): string {
     `<a href="index.html">${escapeHtml(c.wordmark)}</a>`,
     `<a href="about.html">${escapeHtml(c.aboutLink)}</a>`,
     `<a href="changelog.html">${escapeHtml(c.changelogLink)}</a>`,
+    `<a href="docs/index.html">${escapeHtml(c.docsLink)}</a>`,
     `<a href="privacy.html">${escapeHtml(c.privacyLink)}</a>`,
     `<a href="terms.html">${escapeHtml(c.termsLink)}</a>`,
     `<a href="${escapeHtml(githubUrl)}">${escapeHtml(c.github)}</a>`,

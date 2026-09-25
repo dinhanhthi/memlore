@@ -63,18 +63,7 @@ export function SiteHeader({
   const wide = useWideViewport()
   const [open, setOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
-  const docMenuRef = useRef<HTMLDetailsElement>(null)
   if (wide && open) setOpen(false)
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      const menu = docMenuRef.current
-      if (!menu?.open) return
-      if (event.target instanceof Node && menu.contains(event.target)) return
-      menu.open = false
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [])
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
@@ -130,16 +119,7 @@ export function SiteHeader({
           <a href="/changelog" aria-current={current === 'changelog' ? 'page' : undefined}>
             Changelog
           </a>
-          <details ref={docMenuRef} className="doc-menu">
-            <summary>Doc</summary>
-            <p>
-              Documentation is coming soon. For now, explore the{' '}
-              <a href={githubUrl} target="_blank" rel="noreferrer">
-                GitHub README
-              </a>
-              .
-            </p>
-          </details>
+          <a href="/docs/">Docs</a>
           <div className="nav-rule" aria-hidden="true" />
           <DownloadLink
             className="download nav-download"

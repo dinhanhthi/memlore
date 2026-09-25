@@ -1722,7 +1722,7 @@ export default function LandingPage() {
                     <th key={product.name} scope="col">
                       {product.name === 'Memlore' ? (
                         <span className="compare-brand">
-                          <img src="./head-rotate/default.png" alt="" width="28" height="28" />
+                          <img src={logoSrc('default')} alt="" width="28" height="28" />
                           {product.name}
                         </span>
                       ) : (
@@ -1761,7 +1761,7 @@ export default function LandingPage() {
                 <h3>
                   {product.name === 'Memlore' ? (
                     <span className="compare-brand">
-                      <img src="./head-rotate/default.png" alt="" width="28" height="28" />
+                      <img src={logoSrc('default')} alt="" width="28" height="28" />
                       {product.name}
                     </span>
                   ) : (

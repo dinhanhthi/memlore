@@ -1,7 +1,9 @@
+import { DOCS_PAGES, type DocsSlug } from './docs/manifest'
+
 /** Empty-root marker the Vite plugin replaces with the crawler twin. */
 export const ROOT_MARKER = '<div id="root"></div>'
 
-const LOGO_SRC = './logo-without-container/256.png'
+const LOGO_SRC = '/logo-without-container/256.png'
 
 const PAPER_DARK = 'oklch(0.145 0.004 55)'
 const INK_DARK = 'oklch(0.985 0.002 55)'
@@ -104,7 +106,54 @@ export function injectBootShell(html: string): string {
     .replace(ROOT_MARKER, () => `${renderBootSplash()}${renderBootNoscript()}${ROOT_MARKER}`)
 }
 
-const MARKETING_SHELL = /(?:^|\/)(index|about|privacy|terms|changelog)\.html$/
+const DOCS_HTML_TO_SLUG = new Map<string, DocsSlug>(
+  DOCS_PAGES.map((page) => [page.slug === 'overview' ? 'index' : page.slug, page.slug]),
+)
+
+const DOC_FILE = [...DOCS_HTML_TO_SLUG.keys()].join('|')
+
+const MARKETING_SHELL = new RegExp(
+  `(?:^|/)(?:(?:index|about|privacy|terms|changelog)\\.html|docs/(?:${DOC_FILE})\\.html)$`,
+)
+
+const LEGAL_NAMES = ['privacy', 'terms', 'about'] as const
+
+type LegalName = (typeof LEGAL_NAMES)[number]
+
+function isLegalName(value: string): value is LegalName {
+  return (LEGAL_NAMES as readonly string[]).includes(value)
+}
+
+/**
+ * `docs/` is checked first so `docs/index.html` is not the landing page and
+ * `docs/how-privacy-works.html` is not the privacy policy. Landing and legal
+ * shells are a bare filename or an absolute path, not any nested relative file
+ * that happens to end in `index.html` or `privacy.html`.
+ */
+export function twinKindFor(
+  path: string,
+):
+  | { kind: 'landing' }
+  | { kind: 'legal'; name: LegalName }
+  | { kind: 'docs'; slug: DocsSlug }
+  | undefined {
+  const normalized = path.replace(/\\/g, '/')
+  const docsFile = normalized.match(/(?:^|\/)docs\/([^/]+)\.html$/)
+  if (docsFile) {
+    const slug = DOCS_HTML_TO_SLUG.get(docsFile[1] ?? '')
+    return slug ? { kind: 'docs', slug } : undefined
+  }
+  const file = rootHtmlName(normalized)
+  if (file === 'index') return { kind: 'landing' }
+  if (file && isLegalName(file)) return { kind: 'legal', name: file }
+  return undefined
+}
+
+function rootHtmlName(path: string): string | undefined {
+  if (!path.includes('/')) return path.match(/^([^/]+)\.html$/)?.[1]
+  if (!path.startsWith('/')) return undefined
+  return path.match(/\/([^/]+)\.html$/)?.[1]
+}
 
 /** Inject the splash, then (optionally) the crawler twin — splash stays a sibling of #root. */
 export function applyMarketingShell(html: string, path: string, article?: string): string {

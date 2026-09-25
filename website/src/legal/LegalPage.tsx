@@ -3,11 +3,13 @@ import { preloadHeadSprites } from '../HeadFollowLogo'
 import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
+import { DIAGRAMS } from '../docs/diagrams'
 import { isExternalHref, parseInline, parseLegalMarkdown, type LegalBlock } from './markdown'
 
-function Inline({ text }: { text: string }) {
+export function Inline({ text }: { text: string }) {
   return parseInline(text).map((part, index) => {
     if (part.type === 'text') return <span key={index}>{part.text}</span>
+    if (part.type === 'strong') return <strong key={index}>{part.text}</strong>
     const external = isExternalHref(part.href)
     return (
       <a
@@ -21,9 +23,10 @@ function Inline({ text }: { text: string }) {
   })
 }
 
-function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean }) {
+export function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean }) {
   if (block.type === 'h1') return <h1>{block.text}</h1>
-  if (block.type === 'h2') return <h2>{block.text}</h2>
+  if (block.type === 'h2') return <h2 id={block.id}>{block.text}</h2>
+  if (block.type === 'h3') return <h3 id={block.id}>{block.text}</h3>
   if (block.type === 'ul') {
     return (
       <ul>
@@ -34,6 +37,20 @@ function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean }) {
         ))}
       </ul>
     )
+  }
+  if (block.type === 'ol') {
+    return (
+      <ol>
+        {block.items.map((item) => (
+          <li key={item}>
+            <Inline text={item} />
+          </li>
+        ))}
+      </ol>
+    )
+  }
+  if (block.type === 'diagram') {
+    return <figure dangerouslySetInnerHTML={{ __html: DIAGRAMS[block.name] }} />
   }
   return (
     <p className={intro ? 'legal-intro' : undefined}>

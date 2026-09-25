@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { DOCS_PAGES, docsRouteKey, type DocsSlug } from './docs/manifest'
 
-export type RouteName = 'home' | 'changelog' | 'privacy' | 'terms' | 'about'
+export type RouteName = 'home' | 'changelog' | 'privacy' | 'terms' | 'about' | `docs:${DocsSlug}`
+
+const DOC_ROUTES = Object.fromEntries(
+  DOCS_PAGES.map((page) => [
+    `docs:${page.slug}`,
+    { path: docsRouteKey(page.slug), title: `Memlore — ${page.title}` },
+  ]),
+) as Record<`docs:${DocsSlug}`, { path: string; title: string }>
 
 export const ROUTES: Record<RouteName, { path: string; title: string }> = {
   home: { path: '/', title: 'Memlore — A little life. A lasting story.' },
@@ -8,13 +16,14 @@ export const ROUTES: Record<RouteName, { path: string; title: string }> = {
   privacy: { path: '/privacy', title: 'Memlore — Privacy Policy' },
   terms: { path: '/terms', title: 'Memlore — Terms of Service' },
   about: { path: '/about', title: 'Memlore — About' },
+  ...DOC_ROUTES,
 }
 
 const ROUTE_BY_PATH = new Map<string, RouteName>(
   (Object.keys(ROUTES) as RouteName[]).map((name) => [ROUTES[name].path, name]),
 )
 
-/** `/privacy`, `/privacy.html` and `/privacy/` are the same route; anything unknown is home. */
+/** `/privacy`, `/privacy.html` and `/privacy/` are the same route; `/docs` is the overview. Anything unknown is home. */
 export function normalizePath(pathname: string): RouteName {
   const path = pathname
     .replace(/index\.html$/, '')

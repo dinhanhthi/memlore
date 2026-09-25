@@ -1,4 +1,2 @@
 dist/
 .cache/
-playwright-report/
-test-results/
