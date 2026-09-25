@@ -1483,8 +1483,9 @@ main {
 }
 .illust-emotions {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-content: center;
+  justify-items: start;
 }
 .illust-emotions [data-emotion='bad'] {
   --emotion-tint: var(--color-error);
@@ -1508,20 +1509,22 @@ main {
 .emotion-options > span {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: 6px;
+  padding: 6px 12px;
   border-radius: var(--radius-pill);
   background: var(--color-raised);
   border: var(--rule-width) solid var(--color-rule);
   color: var(--color-ink);
   font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .emotion-options > span[data-selected] {
   border-color: var(--emotion-tint);
   background: color-mix(in oklab, var(--emotion-tint) 18%, var(--color-raised));
 }
-.emotion-options > span > span {
-  font-size: 18px;
+.emotion-options > span > span:first-child {
+  font-size: 16px;
   line-height: 1;
 }
 .illust-map {
@@ -2696,6 +2699,16 @@ tbody th {
   font-size: var(--text-lead);
   line-height: 1.6;
 }
+/* Docs pages open straight into a diagram; a smaller lead keeps it in proportion. */
+.docs-layout .legal-intro {
+  font-size: var(--text-lead-s);
+}
+/* Docs reading text sits between the site-wide muted p/li and full ink. */
+.docs-layout .legal-article > :is(p, ul, ol):not(.legal-updated, .section-label),
+.docs-layout .legal-article > :is(ul, ol) > li,
+.docs-layout .docs-details :is(p, li) {
+  color: var(--color-ink-soft);
+}
 .legal-article h2 {
   font-family: var(--font-title);
   font-size: clamp(1.2rem, 2.2vw, 1.5rem);
@@ -2743,16 +2756,426 @@ tbody th {
   height: auto;
   display: block;
 }
-/* 720-wide diagrams drop under ~12px type once the column is this narrow. */
+/* Cap the drawing scale (~0.78 wide, ~0.8 narrow) so diagram labels sit at
+   or below body size instead of growing with the column. */
+.legal-article figure svg.docs-diagram-wide {
+  max-width: 35rem;
+  margin-inline: auto;
+}
+/* Below the cap the wide drawing would shrink past ~12px type; swap it. */
 .legal-article figure svg.docs-diagram-narrow {
   display: none;
+  max-width: 18rem;
+  margin-inline: auto;
 }
-@container (max-width: 32rem) {
+@container (max-width: 35rem) {
   .legal-article figure svg.docs-diagram-wide {
     display: none;
   }
   .legal-article figure svg.docs-diagram-narrow {
     display: block;
+  }
+}
+/* :::details — native disclosure; the marker is replaced by a CSS chevron. */
+.legal-article .docs-details {
+  margin: var(--space-md) var(--cell-inline);
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-panel);
+  margin-top: var(--space-xl);
+}
+.docs-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--cell-inline);
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+  list-style: none;
+}
+.docs-details > summary::-webkit-details-marker {
+  display: none;
+}
+.docs-details > summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-25%) rotate(45deg);
+}
+.docs-details[open] > summary::after {
+  transform: translateY(25%) rotate(-135deg);
+}
+.docs-details[open] {
+  padding-bottom: var(--space-sm);
+}
+/* :::cards — short title + one-line text tiles. */
+.legal-article .docs-cards {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+  padding: 0 var(--cell-inline);
+}
+.legal-article .docs-cards li {
+  margin: 0;
+  padding: var(--space-md);
+  background: var(--color-raised);
+  border-radius: var(--radius-panel);
+}
+.docs-cards li > strong {
+  display: block;
+  color: var(--color-ink);
+}
+.docs-cards li > span {
+  display: block;
+  margin-top: var(--space-2xs);
+  color: var(--color-ink-soft);
+}
+/* :::widget — frame for interactive explainers. */
+.legal-article .docs-widget {
+  margin: var(--space-lg) var(--cell-inline);
+  padding: var(--space-md);
+  background: var(--color-panel);
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-panel);
+}
+.docs-widget-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+.docs-widget-controls button {
+  padding: var(--space-2xs) var(--space-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  background: var(--color-raised);
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.docs-widget-controls button[aria-pressed='true'],
+.docs-widget-controls button[aria-selected='true'],
+.docs-widget-controls button[aria-current='step'] {
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.docs-widget-controls button:disabled,
+.docs-widget-controls button[aria-disabled='true'] {
+  color: var(--color-muted);
+  cursor: default;
+}
+.docs-widget-caption {
+  margin-top: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+/* :::widget privacy-toggle — device on the left, one lit path per switch. */
+.docs-widget-title {
+  margin-bottom: var(--space-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.docs-widget-privacy-toggle svg {
+  font-family: var(--font-body), sans-serif;
+  font-size: 16px;
+}
+.docs-widget-privacy-toggle .pt-device {
+  fill: var(--color-raised);
+  stroke: var(--color-rule-strong);
+  stroke-width: 2;
+}
+.docs-widget-privacy-toggle .pt-lock {
+  fill: var(--color-paper);
+  stroke: var(--color-accent);
+}
+.docs-widget-privacy-toggle .pt-shackle {
+  fill: none;
+}
+.docs-widget-privacy-toggle .pt-label {
+  fill: var(--color-ink);
+}
+.docs-widget-privacy-toggle .pt-muted {
+  fill: var(--color-muted);
+}
+.docs-widget-privacy-toggle .pt-line {
+  stroke: var(--color-muted);
+}
+.docs-widget-privacy-toggle .pt-line:not(.pt-arrow) {
+  stroke-dasharray: 5 6;
+}
+.docs-widget-privacy-toggle .pt-node {
+  fill: var(--color-panel);
+  stroke: var(--color-rule-strong);
+}
+.docs-widget-privacy-toggle .pt-memlore {
+  fill: var(--color-paper);
+  stroke: var(--color-rule-strong);
+}
+.docs-widget-privacy-toggle .pt-path[data-on='true'] .pt-line {
+  stroke: var(--color-accent);
+  stroke-dasharray: none;
+  stroke-width: 3;
+}
+.docs-widget-privacy-toggle .pt-path[data-on='true'] .pt-node {
+  fill: var(--color-raised);
+  stroke: var(--color-accent);
+}
+.legal-article .docs-widget-privacy-toggle .pt-captions {
+  list-style: none;
+  padding: 0;
+}
+.docs-widget-privacy-toggle .pt-captions li {
+  color: var(--color-ink);
+}
+.docs-widget-privacy-toggle .pt-always {
+  padding-top: var(--space-xs);
+  border-top: var(--rule-width) solid var(--color-rule-strong);
+  padding-left: 0;
+}
+/* :::widget encryption-steps + sync-steps — one node per stage; current = accent, done = solid, todo = dashed. */
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) svg {
+  font-family: var(--font-body), sans-serif;
+  font-size: 16px;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-dot {
+  min-inline-size: 2.25rem;
+  border-radius: 50%;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-node rect {
+  fill: var(--color-panel);
+  stroke: var(--color-rule-strong);
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-label {
+  fill: var(--color-muted);
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-sub {
+  fill: var(--color-muted);
+  font-size: 15px;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-node[data-state='done'] rect {
+  fill: var(--color-paper);
+  stroke-dasharray: none;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-node[data-state='done'] .es-label,
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps)
+  .es-node[data-state='current']
+  .es-label {
+  fill: var(--color-ink);
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-node[data-state='current'] rect {
+  fill: var(--color-raised);
+  stroke: var(--color-accent);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-link path {
+  stroke: var(--color-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps)
+  .es-link[data-state='todo']
+  path:not(.es-arrow) {
+  stroke-dasharray: 5 6;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-link[data-state='current'] path {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+}
+:is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-caption-title {
+  display: block;
+  margin-bottom: var(--space-2xs);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+/* :::widget locks-explorer — mock journal list; hidden = dashed placeholder, gated = lock badge. */
+:is(.docs-widget-locks-explorer, .docs-widget-ai-provider) .le-panel {
+  padding: var(--space-sm);
+  background: var(--color-paper);
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-panel);
+}
+.docs-widget-locks-explorer .le-unlock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.docs-widget-locks-explorer .le-icon {
+  flex: none;
+  inline-size: 1em;
+  block-size: 1em;
+  color: var(--color-accent);
+}
+.legal-article .docs-widget-locks-explorer .le-items {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legal-article .docs-widget-locks-explorer .le-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-raised);
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-control);
+}
+.docs-widget-locks-explorer .le-name {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.docs-widget-locks-explorer .le-kind {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+/* One hue per item kind: a stripe, a faint tint, and the kind label. */
+.docs-widget-locks-explorer .le-item[data-kind='ordinary'] {
+  --le-kind: var(--color-kind-ordinary);
+}
+.docs-widget-locks-explorer .le-item[data-kind='second-lock'] {
+  --le-kind: var(--color-kind-second-lock);
+}
+.docs-widget-locks-explorer .le-item[data-kind='vault'] {
+  --le-kind: var(--color-kind-vault);
+}
+.docs-widget-locks-explorer .le-item[data-kind='other-vault'] {
+  --le-kind: var(--color-kind-other-vault);
+}
+.legal-article .docs-widget-locks-explorer .le-item[data-kind] {
+  background: color-mix(in srgb, var(--le-kind) 8%, var(--color-raised));
+  border-color: color-mix(in srgb, var(--le-kind) 45%, transparent);
+  box-shadow: inset 3px 0 0 var(--le-kind);
+}
+.docs-widget-locks-explorer .le-item[data-kind] .le-kind {
+  color: var(--le-kind);
+}
+.docs-widget-locks-explorer .le-item[data-show='hidden'] {
+  background: transparent;
+  border-style: dashed;
+}
+.legal-article .docs-widget-locks-explorer .le-item[data-kind][data-show='hidden'] {
+  background: transparent;
+  box-shadow: none;
+}
+.docs-widget-locks-explorer .le-item[data-show='hidden'] .le-name {
+  font-weight: 400;
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+.legal-article .docs-widget-locks-explorer .le-item[data-kind][data-show='gated'] {
+  border-color: var(--le-kind);
+}
+.docs-widget-locks-explorer .le-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-inline-start: auto;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+}
+.legal-article :is(.docs-widget-locks-explorer, .docs-widget-ai-provider) .le-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-xs) var(--space-sm);
+  margin: var(--space-sm) 0 0;
+  padding-top: var(--space-sm);
+  border-top: var(--rule-width) solid var(--color-rule-strong);
+  font-size: var(--text-sm);
+}
+:is(.docs-widget-locks-explorer, .docs-widget-ai-provider) .le-features dt {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.legal-article :is(.docs-widget-locks-explorer, .docs-widget-ai-provider) .le-features dd {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+.docs-widget-locks-explorer .le-caption {
+  color: var(--color-ink);
+}
+/* :::widget ai-provider — this computer on the left; a solid accent line = text leaves it. */
+.docs-widget-ai-provider svg {
+  font-family: var(--font-body), sans-serif;
+  font-size: 16px;
+}
+.docs-widget-ai-provider .ap-device {
+  fill: var(--color-raised);
+  stroke: var(--color-rule-strong);
+}
+.docs-widget-ai-provider .ap-label {
+  fill: var(--color-ink);
+}
+.docs-widget-ai-provider .ap-node rect {
+  fill: var(--color-panel);
+  stroke: var(--color-rule-strong);
+}
+.docs-widget-ai-provider .ap-helper rect {
+  fill: var(--color-paper);
+}
+.docs-widget-ai-provider .ap-outer rect {
+  fill: var(--color-paper);
+  stroke: var(--color-accent);
+}
+.docs-widget-ai-provider .ap-none rect {
+  fill: none;
+  stroke-dasharray: 5 6;
+}
+.docs-widget-ai-provider .ap-none .ap-label {
+  fill: var(--color-muted);
+}
+.docs-widget-ai-provider .ap-link path {
+  stroke: var(--color-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.docs-widget-ai-provider .ap-link[data-leaves='true'] path {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+}
+.docs-widget-ai-provider .docs-widget-caption {
+  color: var(--color-ink);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .docs-details > summary::after {
+    transition: transform var(--dur-short) var(--ease-out);
+  }
+  .docs-widget-privacy-toggle .pt-line,
+  .docs-widget-privacy-toggle .pt-node,
+  :is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-node rect,
+  :is(.docs-widget-encryption-steps, .docs-widget-sync-steps) .es-link path {
+    transition:
+      stroke var(--dur-micro) var(--ease-feedback),
+      fill var(--dur-micro) var(--ease-feedback);
+  }
+  .docs-widget-locks-explorer .le-item {
+    transition:
+      background-color var(--dur-micro) var(--ease-feedback),
+      border-color var(--dur-micro) var(--ease-feedback);
+  }
+  .docs-widget-controls button {
+    transition:
+      background-color var(--dur-micro) var(--ease-feedback),
+      color var(--dur-micro) var(--ease-feedback),
+      border-color var(--dur-micro) var(--ease-feedback);
   }
 }
 .legal-article a {
@@ -3474,9 +3897,14 @@ tbody th {
     translate: 250% 0;
   }
 }
+main.ledger:has(> .docs-layout) {
+  display: flex;
+  flex-direction: column;
+}
 .docs-layout {
   --docs-sticky-top: calc(var(--space-2xl) + var(--space-xs));
   display: grid;
+  flex: 1 0 auto;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   overflow-wrap: anywhere;
@@ -3487,6 +3915,10 @@ tbody th {
 .docs-sidebar,
 .docs-toc {
   display: none;
+}
+.docs-layout > footer {
+  width: auto;
+  margin-inline: 0;
 }
 .docs-nav-disclosure {
   min-width: 0;
@@ -3569,9 +4001,28 @@ tbody th {
   border-top: var(--rule-width) solid var(--color-rule);
 }
 .docs-pager a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
   font-family: var(--font-title);
   font-size: var(--text-lead);
   line-height: 1.3;
+}
+.docs-pager-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .docs-pager-icon {
+    transition: transform var(--dur-micro) var(--ease-feedback);
+  }
+  .docs-pager a[rel='prev']:hover .docs-pager-icon {
+    transform: translateX(calc(-1 * var(--space-3xs)));
+  }
+  .docs-pager a[rel='next']:hover .docs-pager-icon {
+    transform: translateX(var(--space-3xs));
+  }
 }
 .docs-pager-next {
   margin-inline-start: auto;
@@ -3583,30 +4034,53 @@ html:has(.docs-layout) {
 /* Complement of (max-width: 68rem): three columns from 68rem + 0.01px. */
 @media (min-width: calc(68rem + 0.01px)) {
   .docs-layout {
+    position: relative;
     grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
     align-items: start;
   }
   .docs-layout:has(.docs-toc) {
     grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr) minmax(9rem, 13rem);
   }
+  .docs-layout > footer {
+    grid-column: 1 / -1;
+  }
+  /* Row 1 only: the rule follows the page, then stops on the footer. */
+  .docs-layout::before,
+  .docs-layout:has(.docs-toc)::after {
+    content: '';
+    position: absolute;
+    width: var(--rule-width);
+    background: var(--color-rule);
+    pointer-events: none;
+  }
+  .docs-layout::before {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    top: 0;
+    bottom: 0;
+    left: auto;
+    right: 0;
+  }
+  .docs-layout:has(.docs-toc)::after {
+    grid-column: 3 / 4;
+    grid-row: 1 / 2;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: auto;
+  }
   .docs-sidebar,
   .docs-toc {
+    display: block;
     position: sticky;
     top: var(--docs-sticky-top);
     align-self: start;
     max-height: calc(100dvh - var(--docs-sticky-top) - var(--space-sm));
     overflow: auto;
   }
-  .docs-sidebar {
-    display: block;
-    border-inline-end: var(--rule-width) solid var(--color-rule);
-  }
   .docs-nav-disclosure {
     display: none;
-  }
-  .docs-toc {
-    display: block;
-    border-inline-start: var(--rule-width) solid var(--color-rule);
   }
   .docs-layout > .legal-article {
     clip-path: inset(0);

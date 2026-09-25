@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { preloadHeadSprites } from '../HeadFollowLogo'
 import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
 import { SiteFooterBar } from '../SiteFooterBar'
@@ -101,24 +102,26 @@ export default function DocsPage({ slug, source }: { slug: DocsSlug; source: str
               <nav className="docs-pager" aria-label="Pagination">
                 {prev ? (
                   <a href={docsPath(prev.slug)} rel="prev">
+                    <ArrowLeft className="docs-pager-icon" aria-hidden="true" />
                     {prev.title}
                   </a>
                 ) : null}
                 {next ? (
                   <a className="docs-pager-next" href={docsPath(next.slug)} rel="next">
                     {next.title}
+                    <ArrowRight className="docs-pager-icon" aria-hidden="true" />
                   </a>
                 ) : null}
               </nav>
             ) : null}
           </article>
           <DocsToc blocks={blocks} />
+          <footer>
+            <LedgerRule />
+            <SiteFooterBar homeHref="/" current="docs" />
+          </footer>
         </div>
       </main>
-      <footer>
-        <LedgerRule />
-        <SiteFooterBar homeHref="/" current="docs" />
-      </footer>
     </>
   )
 }

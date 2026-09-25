@@ -4,6 +4,7 @@ import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
 import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
 import { DIAGRAMS } from '../docs/diagrams'
+import { WIDGETS } from '../docs/widgets'
 import { isExternalHref, parseInline, parseLegalMarkdown, type LegalBlock } from './markdown'
 
 export function Inline({ text }: { text: string }) {
@@ -51,6 +52,38 @@ export function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean
   }
   if (block.type === 'diagram') {
     return <figure dangerouslySetInnerHTML={{ __html: DIAGRAMS[block.name] }} />
+  }
+  if (block.type === 'details') {
+    return (
+      <details className="docs-details">
+        <summary>
+          <span>
+            <Inline text={block.summary} />
+          </span>
+        </summary>
+        {block.blocks.map((child, index) => (
+          <BlockView key={index} block={child} />
+        ))}
+      </details>
+    )
+  }
+  if (block.type === 'cards') {
+    return (
+      <ul className="docs-cards">
+        {block.items.map((item, index) => (
+          <li key={index}>
+            <strong>{item.title}</strong>
+            <span>
+              <Inline text={item.text} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  if (block.type === 'widget') {
+    const Widget = WIDGETS[block.name]
+    return <Widget />
   }
   return (
     <p className={intro ? 'legal-intro' : undefined}>

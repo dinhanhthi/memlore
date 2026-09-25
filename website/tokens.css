@@ -20,6 +20,8 @@
   --color-rule-strong: oklch(1 0 0 / 0.16);
   --color-ink: oklch(0.985 0.002 55);
   --color-muted: oklch(0.708 0.01 55);
+  /* Reading text on docs pages: brighter than muted, softer than ink. */
+  --color-ink-soft: oklch(0.85 0.006 55);
   --color-accent: oklch(89% 0.11 73);
   --color-accent-deep: oklch(0.8 0.137 58);
   --color-accent-ink: oklch(0.16 0.04 55);
@@ -29,6 +31,11 @@
   --color-success: oklch(0.88 0.19 144.88);
   --color-error: oklch(0.7 0.19 22);
   --color-warning: oklch(0.8 0.12 85);
+  /* Docs locks explorer: one hue per item kind. */
+  --color-kind-ordinary: oklch(0.8 0.1 240);
+  --color-kind-second-lock: oklch(0.8 0.12 300);
+  --color-kind-vault: oklch(0.82 0.12 165);
+  --color-kind-other-vault: oklch(0.8 0.12 350);
   --color-compare-surface: var(--color-paper);
   --color-compare-head: var(--color-panel);
   --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-paper));
@@ -44,6 +51,7 @@
   --text-md: 0.875rem;
   --text-base: 0.875rem;
   --text-lead: 1.125rem;
+  --text-lead-s: 1rem;
   --text-heading: clamp(1.5rem, 2vw, 1.875rem);
   --text-display: clamp(2.25rem, 5vw + 0.5rem, 3.75rem);
   --text-display-s: clamp(1.875rem, 4vw + 0.4rem, 2.75rem);

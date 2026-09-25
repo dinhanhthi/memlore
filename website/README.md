@@ -26,8 +26,17 @@ pnpm website:preview   # serve the built assets — http://localhost:4176
 
 1. Add a row to `src/docs/manifest.ts` (slug, title, description, group, optional diagram name). The manifest drives the route, the canonical URL, the sitemap entry, and the Vite input.
 2. Add a shell at `docs/<slug>.html` (overview is `docs/index.html`). Copy a sibling shell. Asset paths are `../`. Canonical is `https://memlore.app` plus the path from `docsPath`.
-3. Write `src/docs/content/<slug>.md`. Frontmatter needs `title`, `description`, `updated`, and one `sources:` line of repo paths you actually read. Allowed markdown is headings, paragraphs, lists, `**bold**`, absolute `/docs/...` links, and a `:::diagram <name>` line. No tables, images, code fences, or raw HTML.
-4. Optional: add the SVG string in `src/docs/diagrams/<name>.ts` and register it in `src/docs/diagrams/index.ts`. Colours are `currentColor` or tokens from `tokens.css`.
+3. Write `src/docs/content/<slug>.md`. Frontmatter needs `title`, `description`, `updated`, and one `sources:` line of repo paths you actually read. Allowed markdown is headings, paragraphs, lists, `**bold**`, absolute `/docs/...` links, and the blocks below. No tables, images, code fences, or raw HTML.
+4. Optional: add the SVG string in `src/docs/diagrams/<name>.ts` and register it in `src/docs/diagrams/index.ts`. Draw a `docs-diagram-wide` (720) and a `docs-diagram-narrow` (360) SVG. Colours are `currentColor` or tokens from `tokens.css`.
+
+Blocks, each on its own line (keep a blank line after the opening line and before the closing `:::` so prettier leaves them alone):
+
+- `:::diagram <name>` shows a registered SVG.
+- `:::widget <name>` shows an interactive explainer from `src/docs/widgets/` (registered in `widgets/index.ts`). The prerendered HTML shows its `WIDGET_FALLBACK` diagram instead.
+- `:::cards` … `:::` turns `- **Title** — text` lines into a tile grid.
+- `:::details <summary>` … `:::` folds edge cases into a closed disclosure (not used on docs pages). It cannot hold `:::cards`.
+
+Keep each page short, about 200–270 words: one intro sentence, the diagram or widget, then a few `##` sections of short bullets. Say each fact once, and skip recap sections. Docs pages do not use `:::details`; a caveat about what leaves the device, what is not encrypted, or what cannot be recovered goes in a bullet, not only in a widget state.
 
 Every factual sentence has to be traceable to the code named in `sources:`. Do not contradict `src/legal/privacy.md`. If the code and the policy disagree, describe the code and leave the policy for a separate change.
 
@@ -92,4 +101,4 @@ after visible changes to the seeded entry or the app chrome.
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |
 | `tokens.css` / `src/styles.css` | Dark-only Hallmark Workbench tokens               |
 | `docs/`                         | HTML shells for `/docs/` and `/docs/<slug>`       |
-| `src/docs/`                     | Docs page, manifest, markdown, diagrams           |
+| `src/docs/`                     | Docs page, manifest, markdown, diagrams, widgets  |

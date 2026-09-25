@@ -1,4 +1,33 @@
-export type DiagramName = 'privacy' | 'encryption' | 'locks' | 'sync' | 'ai'
+export type DiagramName =
+  | 'overview'
+  | 'privacy'
+  | 'encryption'
+  | 'locks'
+  | 'sync'
+  | 'ai'
+  | 'backup'
+  | 'search'
+  | 'memory'
+  | 'persona'
+  | 'customization'
+  | 'maps'
+  | 'editor'
+
+export type WidgetName =
+  | 'privacy-toggle'
+  | 'encryption-steps'
+  | 'locks-explorer'
+  | 'sync-steps'
+  | 'ai-provider'
+
+/** Static diagram rendered in place of each widget in prerendered HTML. */
+export const WIDGET_FALLBACK: Record<WidgetName, DiagramName> = {
+  'privacy-toggle': 'privacy',
+  'encryption-steps': 'encryption',
+  'locks-explorer': 'locks',
+  'sync-steps': 'sync',
+  'ai-provider': 'ai',
+}
 
 export type DocsSlug =
   | 'overview'
@@ -29,6 +58,7 @@ export const DOCS_PAGES: readonly DocsPage[] = [
     title: 'Overview',
     description: 'A plain-language map of how Memlore works.',
     group: 'protection',
+    diagram: 'overview',
   },
   {
     slug: 'how-privacy-works',
@@ -70,42 +100,52 @@ export const DOCS_PAGES: readonly DocsPage[] = [
     title: 'Backup and recovery',
     description: 'How to keep a copy, and what you need if you lose the password.',
     group: 'features',
+    diagram: 'backup',
   },
   {
     slug: 'search-and-media',
     title: 'Search and media',
     description: 'How search and attached photos, video, and files stay in the vault.',
     group: 'features',
+    diagram: 'search',
   },
   {
     slug: 'memory',
     title: 'Memory',
-    description: 'How Memlore keeps facts you ask it to remember.',
+    description:
+      'How Memlore keeps short facts about you, and which model reads your writing to make them.',
     group: 'features',
+    diagram: 'memory',
   },
   {
     slug: 'persona',
     title: 'Persona',
-    description: 'How a writing persona changes replies when you write with AI.',
+    description: 'How Memlore builds a private writing profile and uses it when AI writes for you.',
     group: 'features',
+    diagram: 'persona',
   },
   {
     slug: 'customization',
     title: 'Customization',
-    description: 'How themes, fonts, and design systems change the look of the app.',
+    description:
+      'How you change the look of the app, and which of those choices stay on this device.',
     group: 'features',
+    diagram: 'customization',
   },
   {
     slug: 'maps',
     title: 'Maps',
-    description: 'How a place on an entry uses map and weather services.',
+    description: 'What a place, a map, and weather send off this device, and how you avoid that.',
     group: 'features',
+    diagram: 'maps',
   },
   {
     slug: 'editor',
     title: 'Editor',
-    description: 'How each entry is one document you write and reopen later.',
+    description:
+      'How each entry is its own page that saves as you write, and how two devices combine those edits.',
     group: 'features',
+    diagram: 'editor',
   },
 ]
 

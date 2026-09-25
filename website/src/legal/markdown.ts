@@ -1,4 +1,4 @@
-import type { DiagramName } from '../docs/manifest'
+import { WIDGET_FALLBACK, type DiagramName, type WidgetName } from '../docs/manifest'
 import { DIAGRAMS } from '../docs/diagrams'
 
 export type LegalMeta = {
@@ -15,6 +15,9 @@ export type LegalBlock =
   | { type: 'ul'; items: string[] }
   | { type: 'ol'; items: string[] }
   | { type: 'diagram'; name: DiagramName }
+  | { type: 'details'; summary: string; blocks: LegalBlock[] }
+  | { type: 'cards'; items: { title: string; text: string }[] }
+  | { type: 'widget'; name: WidgetName }
 
 export type LegalDoc = {
   meta: LegalMeta
@@ -72,13 +75,42 @@ function isDiagramName(name: string): name is DiagramName {
   return Object.hasOwn(DIAGRAMS, name)
 }
 
-function parseBlocks(body: string): LegalBlock[] {
+function isWidgetName(name: string): name is WidgetName {
+  return Object.hasOwn(WIDGET_FALLBACK, name)
+}
+
+const FENCE_END = ':::'
+const CARD_ITEM = /^- \*\*([^*]+)\*\* (?:—|-) (.+)$/
+
+/** Lines after an opening fence up to the closing `:::`; throws if it never closes. */
+function fencedLines(lines: string[], start: number, fence: string): string[] {
+  const end = lines.findIndex((line, index) => index > start && line.trim() === FENCE_END)
+  if (end < 0) throw new Error(`unclosed ${fence} block`)
+  return lines.slice(start + 1, end)
+}
+
+function parseCards(lines: string[]): { title: string; text: string }[] {
+  const items: { title: string; text: string }[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    const item = CARD_ITEM.exec(line)
+    if (!item) throw new Error(`invalid cards item: ${line}`)
+    items.push({ title: item[1].trim(), text: item[2].trim() })
+  }
+  if (!items.length) throw new Error('empty cards block')
+  return items
+}
+
+function parseBlocks(
+  lines: string[],
+  headingIds = new Map<string, number>(),
+  inDetails = false,
+): LegalBlock[] {
   const blocks: LegalBlock[] = []
   const paragraph: string[] = []
   const list: string[] = []
   let listKind: 'ul' | 'ol' | null = null
-  const headingIds = new Map<string, number>()
-  const lines = body.replace(/\r\n/g, '\n').split('\n')
 
   const endParagraph = () => flushParagraph(paragraph, blocks)
   const endList = () => {
@@ -86,8 +118,8 @@ function parseBlocks(body: string): LegalBlock[] {
     listKind = null
   }
 
-  for (const raw of lines) {
-    const line = raw.trimEnd()
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].trimEnd()
     if (!line.trim()) {
       endParagraph()
       endList()
@@ -122,6 +154,39 @@ function parseBlocks(body: string): LegalBlock[] {
       blocks.push({ type: 'diagram', name })
       continue
     }
+    const widget = /^:::widget (\S+)$/.exec(line.trim())
+    if (widget) {
+      endParagraph()
+      endList()
+      const name = widget[1]
+      if (!isWidgetName(name)) throw new Error(`unknown widget: ${name}`)
+      blocks.push({ type: 'widget', name })
+      continue
+    }
+    const details = /^:::details (.+)$/.exec(line.trim())
+    if (details) {
+      if (inDetails) throw new Error('nested :::details blocks are not supported')
+      endParagraph()
+      endList()
+      const inner = fencedLines(lines, index, ':::details')
+      index += inner.length + 1
+      blocks.push({
+        type: 'details',
+        summary: details[1].trim(),
+        blocks: parseBlocks(inner, headingIds, true),
+      })
+      continue
+    }
+    if (line.trim() === ':::cards') {
+      if (inDetails) throw new Error(':::cards inside :::details is not supported')
+      endParagraph()
+      endList()
+      const inner = fencedLines(lines, index, ':::cards')
+      index += inner.length + 1
+      blocks.push({ type: 'cards', items: parseCards(inner) })
+      continue
+    }
+    if (line.trim().startsWith(':::')) throw new Error(`unexpected fence: ${line.trim()}`)
     if (/^- /.test(line)) {
       endParagraph()
       if (listKind === 'ol') endList()
@@ -146,7 +211,7 @@ function parseBlocks(body: string): LegalBlock[] {
 
 export function parseLegalMarkdown(source: string): LegalDoc {
   const { meta, body } = parseFrontmatter(source)
-  return { meta, blocks: parseBlocks(body) }
+  return { meta, blocks: parseBlocks(body.replace(/\r\n/g, '\n').split('\n')) }
 }
 
 const BOLD = /\*\*([^*]+)\*\*/
@@ -212,6 +277,20 @@ function renderBlock(block: LegalBlock, intro?: boolean): string {
   if (block.type === 'h2') return `<h2 id="${escapeHtml(block.id)}">${escapeHtml(block.text)}</h2>`
   if (block.type === 'h3') return `<h3 id="${escapeHtml(block.id)}">${escapeHtml(block.text)}</h3>`
   if (block.type === 'diagram') return DIAGRAMS[block.name]
+  if (block.type === 'details') {
+    const inner = block.blocks.map((child) => renderBlock(child)).join('')
+    return `<details class="docs-details"><summary><span>${renderInline(block.summary)}</span></summary>${inner}</details>`
+  }
+  if (block.type === 'cards') {
+    const items = block.items.map(
+      (item) =>
+        `<li><strong>${escapeHtml(item.title)}</strong><span>${renderInline(item.text)}</span></li>`,
+    )
+    return `<ul class="docs-cards">${items.join('')}</ul>`
+  }
+  if (block.type === 'widget') {
+    return `<figure class="docs-widget">${DIAGRAMS[WIDGET_FALLBACK[block.name]]}</figure>`
+  }
   return `<p${intro ? ' class="legal-intro"' : ''}>${renderInline(block.text)}</p>`
 }
 
