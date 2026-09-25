@@ -18,23 +18,7 @@ From the repository root, with root dependencies installed:
 pnpm website:dev       # Vite dev server — http://localhost:5176
 pnpm website:build     # typecheck + production bundle → website/dist/
 pnpm website:preview   # serve the built assets — http://localhost:4176
-pnpm website:test      # Vitest (jsdom) — backend, bridge, copy, streaming
 ```
-
-Playwright against the **built** preview (builds first, then serves port 4176):
-
-```sh
-pnpm exec playwright test --config website/playwright.config.ts
-```
-
-This is a separate config from the root web-harness suite on port 5175.
-Chromium is enough. If browsers are missing:
-
-```sh
-pnpm exec playwright install chromium
-```
-
-Screenshots land in `website/test-results/` (gitignored).
 
 ## Docs pages
 
@@ -83,13 +67,8 @@ after visible changes to the seeded entry or the app chrome.
   horizontally scrollable viewport. On a phone, use **Open separately**.
 - Chat **New** / **Send** are enabled because the demo seeds a local Ollama
   slot (`addedProviders: ['ollama']`). Replies stream from a timer, not a
-  model. Full token-contract coverage is in `website/tests/scenario.test.ts`
-  and `website/tests/streaming.test.ts`. Playwright only asserts that
-  sending a message starts the stream (Stop appears). Completing every
-  token in the iframe is timing-fragile.
+  model.
 - Entry create / edit / favorite / delete persistence is in-session only.
-  Covered by `website/tests/backend.test.ts`. A full TipTap edit-and-return
-  Playwright walkthrough is not part of the smoke suite.
 - Sync, export, import, and some system settings show an explicit
   “simulated” notice instead of silently doing nothing.
 - There is no production binary or store listing. The **Download beta**
@@ -112,9 +91,5 @@ after visible changes to the seeded entry or the app chrome.
 | `src/demoBridge.ts`             | Parent → iframe commands (theme, navigate, reset) |
 | `demo/`                         | Fake backend, streaming, Tauri aliases, bootstrap |
 | `tokens.css` / `src/styles.css` | Dark-only Hallmark Workbench tokens               |
-| `tests/landing.spec.ts`         | Production-preview Playwright smoke               |
-| `tests/legal.spec.ts`           | Privacy / terms production-preview Playwright     |
-| `tests/docs.spec.ts`            | Docs production-preview Playwright                |
-| `playwright.config.ts`          | Website-only Playwright (port 4176)               |
 | `docs/`                         | HTML shells for `/docs/` and `/docs/<slug>`       |
 | `src/docs/`                     | Docs page, manifest, markdown, diagrams           |

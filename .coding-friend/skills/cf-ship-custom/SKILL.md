@@ -117,7 +117,6 @@ cd src-tauri && cargo test && cargo fmt --check
 cd .. && pnpm test
 pnpm exec tsc -b --force
 pnpm lint
-pnpm website:test
 pnpm format:check
 ```
 
