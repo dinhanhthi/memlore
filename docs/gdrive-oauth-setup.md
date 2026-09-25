@@ -114,11 +114,8 @@ React entry point, so its shell is empty: the policy reads as blank, and the
 homepage shows no app description and no privacy link. The `prerenderStaticShells`
 plugin in `website/vite.config.ts` bakes the copy in at build time —
 `src/legal/markdown.ts` for the legal pages, `src/prerender.ts` for the landing.
-`prerenderCopy` duplicates the landing strings from the components on purpose and
-`website/tests/prerender.test.ts` fails if they drift, so the static text is never
-crawler-only.
-`website/tests/legal.spec.ts` asserts the raw HTTP body; do not delete it, because
-every other test runs JS and would pass on a blank page.
+`prerenderCopy` duplicates the landing strings from the components on purpose, so
+keep the two in sync by hand — the static text must never be crawler-only.
 
 Check the deploy the way Google does, and only then resubmit:
 
@@ -130,7 +127,7 @@ curl -s https://memlore.app/ | grep -c "privacy.html"              # >= 1
 The policy must say what Google data is accessed, how it is used, shared,
 protected, retained and deleted, plus that it is not sold to data brokers and not
 used for ads, AI training, or credit decisions. `website/src/legal/privacy.md`
-covers this; `website/tests/content.test.ts` guards it.
+covers this.
 
 ### Verification Center has two cards — only one can block you
 

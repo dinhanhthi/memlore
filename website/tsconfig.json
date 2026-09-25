@@ -4,7 +4,7 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "esnext",
-    "types": ["vite/client", "vitest/globals", "node"],
+    "types": ["vite/client", "node"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -36,11 +36,6 @@
     "../src/test/**",
     "../web/**/*.test.ts",
     "../web/**/*.test.tsx",
-    "playwright.config.ts",
-    "tests/landing.spec.ts",
-    "tests/legal.spec.ts",
-    "test-results",
-    "playwright-report",
     "dist"
   ]
 }

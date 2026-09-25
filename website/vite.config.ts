@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, type Plugin } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { applyMarketingShell } from './src/bootShell'
@@ -72,11 +72,6 @@ function emitSeoFiles(): Plugin {
 const TAURI_MOCK_IDS = [...ALIASED_TAURI]
 
 export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
-    restoreMocks: true,
-  },
   root: fileURLToPath(new URL('.', import.meta.url)),
   // Isolate from the Tauri dev server (port 5173). Both configs alias/pre-bundle
   // differently; sharing node_modules/.vite causes 504 Outdated Optimize Dep on
