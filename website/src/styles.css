@@ -3542,6 +3542,17 @@ tbody th {
 .docs-nav-disclosure a[aria-current='page'] {
   color: var(--color-ink);
 }
+.docs-toc ol {
+  padding-bottom: 0;
+}
+.docs-toc a {
+  padding-block: 0.125rem;
+  line-height: 1.35;
+}
+.docs-toc a[aria-current='true'] {
+  color: var(--color-ink);
+  font-weight: 600;
+}
 .docs-toc li[data-depth='3'] a {
   padding-inline-start: calc(var(--cell-inline) + var(--space-md));
 }

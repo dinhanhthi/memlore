@@ -5,6 +5,7 @@ import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
 import { BlockView } from '../legal/LegalPage'
 import { parseLegalMarkdown, type LegalBlock } from '../legal/markdown'
+import { useActiveTocAnchor } from './activeTocAnchor'
 import { DOCS_PAGES, docsPath, neighbours, type DocsSlug } from './manifest'
 import { buildToc } from './toc'
 
@@ -39,6 +40,7 @@ function DocsNav({ slug }: { slug: DocsSlug }) {
 
 function DocsToc({ blocks }: { blocks: readonly LegalBlock[] }) {
   const items = buildToc(blocks)
+  const active = useActiveTocAnchor(items.map((item) => item.id))
   if (items.length === 0) return null
   return (
     <nav className="docs-toc" aria-label="On this page">
@@ -46,7 +48,9 @@ function DocsToc({ blocks }: { blocks: readonly LegalBlock[] }) {
       <ol>
         {items.map((item) => (
           <li key={item.id} data-depth={item.depth}>
-            <a href={`#${item.id}`}>{item.text}</a>
+            <a href={`#${item.id}`} aria-current={active === item.id ? 'true' : undefined}>
+              {item.text}
+            </a>
           </li>
         ))}
       </ol>
