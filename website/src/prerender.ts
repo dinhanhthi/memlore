@@ -7,8 +7,7 @@ import { githubUrl } from './links'
  * client-rendered shell it sees no app description and no privacy policy link,
  * both of which their homepage requirements demand. Every string here is copy
  * the React page renders too — never crawler-only text. The strings below are
- * duplicated from the components on purpose, and `prerender.test.ts` fails if
- * they drift.
+ * duplicated from the components on purpose — keep them in sync by hand.
  */
 export const prerenderCopy = {
   heroTitleLead: 'A little life.',
