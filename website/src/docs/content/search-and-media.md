@@ -29,7 +29,7 @@ The fingerprints are kept in the same encrypted database. You choose who makes t
 
 When you add a photo, a video, or another file, Memlore copies it into a media folder on this device. The encrypted database remembers which entry it belongs to. The picture and video bytes themselves are ordinary files in that folder. They are not stored inside the database.
 
-Sync stays off until you turn it on. You pick one place: your Google Drive, or iCloud Drive on a Mac. Before a file is uploaded, Memlore scrambles it on this device. The file in the cloud is that sealed copy. Another device can open it only with your key. When a small preview exists, it is sealed and uploaded the same way, so the other device can show it without fetching the full file.
+Sync stays off until you turn it on. You pick one place: your Google Drive, iCloud Drive on a Mac, or a folder of your own. Before a file is uploaded to Google Drive or iCloud, Memlore scrambles it on this device. The file in the cloud is that sealed copy. A folder of your own gets the sealed file written into that place. Another device can open it only with your key. When a small preview exists, it is sealed and uploaded the same way for Google Drive or iCloud, and written into that folder, so the other device can show it without fetching the full file.
 
 ## Previews and size
 
@@ -45,7 +45,7 @@ On a Mac, a video under the limit can be made smaller, and only when the new fil
 - Meaning search compares a fingerprint of what a passage means. An on-device model keeps that work on this computer. A local helper still receives the text, and that path does not ask for the privacy notice. The notice is required only when the helper is classified as remote or subscription.
 - Memlore **cannot** stop that provider from reading the text you sent it.
 - Memlore **cannot** scramble the photo and video files in the media folder on this device. Someone who can open that folder can open the files without your journal password.
-- If you sync, the copy in Google Drive or iCloud is scrambled before it leaves.
+- If you sync, the copy in Google Drive or iCloud is scrambled before it leaves. A folder of your own gets that sealed file written into it.
 - Memlore **cannot** shrink videos on Windows or Linux. Those clips stay the size you added.
 - Word search, and the results of meaning search, leave a closed lock and a hidden journal out until you open them. Making a fingerprint is separate. Hidden entries are never included. Locked entries are included only when Include locked entries is on, and that does not wait until you open the second lock. A cloud helper then receives the passage text. [AI](/docs/ai) and [Locks](/docs/locks) describe that switch.
 

@@ -61,7 +61,10 @@ async function expectSiteMenuBar(page: Page, { compact }: { compact: boolean }) 
   await expect(nav.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '/#features')
   await expect(nav.getByRole('link', { name: 'Compare' })).toHaveAttribute('href', '/#compare')
   await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
-  await expect(nav.locator('summary')).toHaveText('Doc')
+  await expect(nav.getByRole('link', { name: 'Docs', exact: true })).toHaveAttribute(
+    'href',
+    '/docs/',
+  )
   await expect(header.locator('.header-github')).toHaveAttribute('href', GITHUB)
   if (compact) {
     await expect(header.locator('.header-github')).toBeVisible()
@@ -121,14 +124,14 @@ for (const path of [
   '/changelog',
   '/about',
 ] as const) {
-  test(`${path} keeps Demo, Features, Compare, Changelog, Doc, GitHub, and Download in the menu bar`, async ({
+  test(`${path} keeps Demo, Features, Compare, Changelog, Docs, GitHub, and Download in the menu bar`, async ({
     page,
   }) => {
     await page.goto(path)
     await expectSiteMenuBar(page, { compact: false })
   })
 
-  test(`${path} compact menu still has Demo, Features, Compare, Changelog, Doc, and GitHub`, async ({
+  test(`${path} compact menu still has Demo, Features, Compare, Changelog, Docs, and GitHub`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 })

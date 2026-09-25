@@ -182,3 +182,19 @@ test('encryption shows on-page contents once it has several sections', async ({ 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Encryption')
   await expect(page.getByRole('navigation', { name: 'On this page' })).toBeVisible()
 })
+
+test('the header Docs link reaches /docs/ and the footer Docs link is present', async ({
+  page,
+}) => {
+  await page.goto(docsPath('encryption'))
+  const headerDocs = page.locator('header').getByRole('link', { name: 'Docs', exact: true })
+  await expect(headerDocs).toBeVisible()
+  await expect(headerDocs).toHaveAttribute('href', '/docs/')
+  await headerDocs.click()
+  await expect(page).toHaveURL(/\/docs\/?$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overview')
+  const footerDocs = page.locator('footer').getByRole('link', { name: 'Docs', exact: true })
+  await expect(footerDocs).toBeVisible()
+  await expect(footerDocs).toHaveAttribute('href', '/docs/')
+  await expect(footerDocs).toHaveAttribute('aria-current', 'page')
+})

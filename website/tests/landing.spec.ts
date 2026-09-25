@@ -103,7 +103,7 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
     await expectSingleLine(nav.getByRole('link', { name: 'Features' }), 'nav Features')
     await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
     await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
-    await expectSingleLine(nav.locator('summary'), 'nav Doc')
+    await expectSingleLine(nav.getByRole('link', { name: 'Docs', exact: true }), 'nav Docs')
     await expectSingleLine(
       nav.getByRole('link', { name: 'Download the beta from GitHub' }),
       'nav download',
@@ -117,7 +117,11 @@ async function expectChromeSingleLine(page: Page, compact: boolean) {
   await expectSingleLine(nav.getByRole('link', { name: 'Compare' }), 'nav Compare')
   await expectSingleLine(nav.getByRole('link', { name: 'Changelog' }), 'nav Changelog')
   await expect(nav.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
-  await expectSingleLine(nav.locator('summary'), 'nav Doc')
+  await expectSingleLine(nav.getByRole('link', { name: 'Docs', exact: true }), 'nav Docs')
+  await expect(nav.getByRole('link', { name: 'Docs', exact: true })).toHaveAttribute(
+    'href',
+    '/docs/',
+  )
   await expectSingleLine(page.locator('.header-actions .download'), 'header download')
   await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
 }
@@ -1175,18 +1179,16 @@ test('compact nav keeps the header bar still and only swaps burger for close', a
   ).toBeLessThanOrEqual(1)
 })
 
-test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({ page }) => {
+test('demo disclaimer, Docs link, GitHub href, and beta download', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.demo-disclaimer')).toContainText(/sample data/i)
   await expect(page.locator('.demo-disclaimer')).toContainText(/simulated/i)
 
-  const doc = page.locator('details.doc-menu')
-  await expect(doc.locator('summary')).toHaveText('Doc')
-  await expect(doc.locator('summary')).not.toHaveAttribute('href', /.*/)
-  await doc.locator('summary').click()
-  await expect(doc).toHaveAttribute('open', '')
-  await expect(doc).toContainText(/coming soon/i)
-  await expect(doc.locator('a[href*="404"]')).toHaveCount(0)
+  const docs = page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Docs', exact: true })
+  await expect(docs).toBeVisible()
+  await expect(docs).toHaveAttribute('href', '/docs/')
 
   await expect(page.locator('.header-github')).toHaveAttribute('href', GITHUB)
   await expect(page.locator('.header-github .github-mark')).toHaveCount(1)
@@ -1201,17 +1203,14 @@ test('demo disclaimer, doc disclosure, GitHub href, and beta download', async ({
   await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky')
 })
 
-test('doc disclosure stays open on inside click and closes on outside click', async ({ page }) => {
+test('header Docs link opens the documentation overview', async ({ page }) => {
   await page.goto('/')
-  const doc = page.locator('details.doc-menu')
-  await doc.locator('summary').click()
-  await expect(doc).toHaveAttribute('open', '')
-
-  await doc.locator('p').click()
-  await expect(doc).toHaveAttribute('open', '')
-
-  await page.getByRole('heading', { level: 1 }).click()
-  await expect(doc).not.toHaveAttribute('open')
+  const docs = page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Docs', exact: true })
+  await docs.click()
+  await expect(page).toHaveURL(/\/docs\/?$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overview')
 })
 
 test('lock UI exists and chat composer is reachable after guided navigation', async ({ page }) => {

@@ -65,7 +65,7 @@ The second lock is one extra password, different from the app password. You mark
 
 While that sitting is closed, those entries drop out of lists and out of search. If you turn on "show existence," you still see a blank placeholder. The date stays. The title, the writing, the place, the weather, and the emotion are blank. Search still skips them.
 
-Open the sitting and the writing shows again. Search can find it again, including meaning search. Idle time closes the sitting. The choices are the same as the invisible vault: 1, 5, 15, or 30 minutes, or never. The start is 5 minutes.
+Open the sitting and the writing shows again. Word search can find it again. Meaning search can show a passage again only if that passage already has a fingerprint. Idle time closes the sitting. The choices are the same as the invisible vault: 1, 5, 15, or 30 minutes, or never. The start is 5 minutes.
 
 Where it hides things:
 
@@ -90,4 +90,4 @@ A lock flag can sync to your other devices with the entry. That still does not a
 - Neither extra password is a second encryption. Both are checks the app makes before it shows those entries. The journal file is still the one in [Encryption](/docs/encryption).
 - Forget an extra password and the app has no reset for it. Forget the device password and you still need the recovery words from that encryption page.
 - The entry list and a plain-text export leave invisible vaults out. A full Memlore zip still contains that writing in the snapshot, and their photos and files are in the zip as ordinary files, not locked again. An export includes second-locked entries. Do not treat an export as hidden.
-- AI that scans the journal skips invisible vaults. It also skips second-locked text in chat, summaries, and emotion suggestions, unless you opted in for indexing or Memory. Facts saved that way can still surface later. [AI](/docs/ai) is the longer account.
+- AI that scans the journal skips invisible vaults. Chat, summaries, and emotion suggestions skip second-locked text even after you open the sitting. Background indexing and Memory can include that text only if you turn that option on. Facts saved that way can still surface later. [AI](/docs/ai) is the longer account.

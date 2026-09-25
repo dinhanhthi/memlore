@@ -55,7 +55,7 @@ If you choose MapTiler, map pictures come from api.maptiler.com. If you choose A
 
 Place search uses the provider you pick. Photon (photon.komoot.io) is the default. You can switch to Nominatim (nominatim.openstreetmap.org), Mapbox (api.mapbox.com), MapTiler (api.maptiler.com), or Google (maps.googleapis.com). The app sends the place you typed, not your entry text.
 
-Weather comes from Open-Meteo at api.open-meteo.com. Older days use archive-api.open-meteo.com. The app sends the location and the date, not your journal.
+Weather comes from Open-Meteo. Today uses current conditions at api.open-meteo.com, and that request has no date. A day that is not today, and is still inside the forecast window, sends that date to the same host. A day older than 16 days uses archive-api.open-meteo.com. The app sends the location, and the date when the day is not today, not your journal.
 
 ### Update check
 

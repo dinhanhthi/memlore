@@ -359,8 +359,7 @@ main {
   align-items: center;
   gap: 28px;
 }
-.site-header nav > a,
-.doc-menu summary {
+.site-header nav > a {
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -416,29 +415,6 @@ main {
   width: 1.5rem;
   height: 1.5rem;
   flex-shrink: 0;
-}
-.doc-menu {
-  position: relative;
-}
-.doc-menu summary {
-  list-style: none;
-}
-.doc-menu summary::-webkit-details-marker {
-  display: none;
-}
-.doc-menu p {
-  position: absolute;
-  z-index: var(--z-dropdown);
-  top: 48px;
-  right: 0;
-  width: 260px;
-  padding: 20px;
-  background: var(--color-raised);
-  border: var(--rule-width) solid var(--color-rule);
-  border-radius: var(--radius-control);
-}
-.doc-menu p a {
-  text-decoration: underline;
 }
 .download,
 .button {
@@ -2760,11 +2736,24 @@ tbody th {
 }
 .legal-article figure {
   margin-block: var(--space-lg);
+  container-type: inline-size;
 }
 .legal-article figure svg {
   width: 100%;
   height: auto;
   display: block;
+}
+/* 720-wide diagrams drop under ~12px type once the column is this narrow. */
+.legal-article figure svg.docs-diagram-narrow {
+  display: none;
+}
+@container (max-width: 32rem) {
+  .legal-article figure svg.docs-diagram-wide {
+    display: none;
+  }
+  .legal-article figure svg.docs-diagram-narrow {
+    display: block;
+  }
 }
 .legal-article a {
   color: var(--color-ink);
@@ -3056,8 +3045,7 @@ tbody th {
     display: inline-flex;
     padding-inline: 2rem;
   }
-  .site-header nav > a,
-  .doc-menu summary {
+  .site-header nav > a {
     display: flex;
     width: auto;
     justify-content: center;
@@ -3067,8 +3055,7 @@ tbody th {
     color: var(--color-ink);
   }
   @media (hover: hover) and (pointer: fine) {
-    .site-header nav > a:hover,
-    .doc-menu summary:hover {
+    .site-header nav > a:hover {
       background: transparent;
       color: var(--color-accent);
     }
@@ -3076,22 +3063,6 @@ tbody th {
       background: var(--button-secondary-bg-hover);
       color: var(--color-ink);
     }
-  }
-  .doc-menu {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .doc-menu p {
-    position: static;
-    top: auto;
-    right: auto;
-    width: min(20rem, 100%);
-    margin: 0;
-    padding: 0;
-    text-align: center;
-    background: transparent;
-    border: 0;
   }
   .hero {
     gap: 0;

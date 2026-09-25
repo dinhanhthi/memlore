@@ -25,7 +25,7 @@ On this computer, reset asks for the 24 words and a new password. That works wit
 
 This works only if this computer still holds the sealed master key those words can open. That sealed key is not the 24 words. After you confirm you saved the sheet, the words are not kept here, so you still need the sheet. If the sealed key is missing, the app says recovery is unavailable. A journal set up before this reset existed cannot be reset here.
 
-Each computer has its own password. A fingerprint or face unlock you already turned on can still open the journal on that computer. You do not need the words for that. A computer that is already set up can keep opening its copy, as long as you can still unlock it.
+Each computer has its own password. On a Mac, Touch ID you already turned on can still open the journal on that computer. You do not need the words for that. A computer that is already set up can keep opening its copy, as long as you can still unlock it.
 
 ## Copies you save
 
@@ -57,4 +57,4 @@ Without sync, copy a Memlore file across and import it. Treat that file like the
 
 Store the sheet offline, on paper or on a drive you control. Memlore cannot recover a lost password without it. There is no account, and no one who can reset it for you.
 
-If you lose every password, no computer can still unlock with a fingerprint or face, and you lose the 24 words, the journal cannot be opened. A cloud copy does not change that. It is locked with the same secret.
+If you lose every password, no Mac can still unlock with Touch ID, and you lose the 24 words, the journal cannot be opened. A cloud copy does not change that. It is locked with the same secret.

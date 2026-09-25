@@ -216,7 +216,6 @@ const OPEN_SOURCE_BODY =
   'Open so you can see how a journal is secured and how your data is kept. Memlore stays free. Beta is only for extras that keep the project going.'
 const HERO_DOWNLOAD = 'Download for Mac'
 const DOWNLOAD_ARIA = 'Download the beta from GitHub'
-const DOC_DISCLOSURE = 'Documentation is coming soon. For now, explore the'
 const MASCOT_ALT_STILL = 'Memlore’s dog mascot.'
 const NAV_MENU = 'Open menu'
 const NAV_CLOSE_MENU = 'Close menu'
@@ -440,10 +439,8 @@ it('scores Day One and Journey optional AI as levels, Apple Journal as none of t
   expect(Number(aiRow.Memlore)).toBeGreaterThan(Number(aiRow['Day One']))
 })
 
-it('treats Doc as a coming-soon disclosure, not a documentation URL', () => {
-  expect(header).toContain(DOC_DISCLOSURE)
-  expect(DOC_DISCLOSURE).toMatch(/coming soon/i)
-  expect(DOC_DISCLOSURE).not.toMatch(/https?:\/\//i)
+it('links the header Docs item to /docs/', () => {
+  expect(header).toContain('href="/docs/"')
 })
 
 it('uses a still mascot description when the head does not follow the pointer', () => {

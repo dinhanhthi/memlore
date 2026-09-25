@@ -41,9 +41,9 @@ Sync stays off until you turn it on. You pick one place you already have. That i
 
 Entries, media, and settings are encrypted on your device before they upload. A short sync list is not your writing. It holds IDs, times, deletion flags, and your device name, so another device of yours knows what to fetch. Disconnecting in the app does not delete files already in that cloud folder. You remove those yourself if you want the copy gone.
 
-AI stays off until you opt in and accept a privacy notice. You choose a local or on-device path, or a hosted provider. If you pick a hosted provider, the text you send goes to that provider. Memlore does not run that service. Memlore does not see that traffic.
+AI stays off until you choose a provider. A local or on-device path does not ask for a privacy notice. A hosted provider does, and so does the Claude or Codex program on this computer. You choose a local or on-device path, or a hosted provider. If you pick a hosted provider, the text you send goes to that provider. Memlore does not run that service. Memlore does not see that traffic.
 
-Maps and geocoding also stay off until you turn them on. They talk to the provider you choose. A place on an entry is a separate step. If you save a place, or a default place is turned on, Memlore also asks Open-Meteo for the weather at that place and date. You do not choose that weather service. There is no speech-to-text. Speaking in the app stores a voice memo on this computer. It does not send audio to a provider.
+The map stays empty until you pick a source. Place search runs when you type. Photon is the default until you pick another service. Neither one receives the words of the entry. A place on an entry is a separate step. If you save a place, or a default place is turned on, Memlore also asks Open-Meteo for the weather at that place and date. You do not choose that weather service. There is no speech-to-text. Speaking in the app stores a voice memo on this computer. It does not send audio to a provider.
 
 You can change how the app looks. There are three designs: Signature, Clean, and Clay. You can use light or dark. The editor font can be a face that ships with the app. If you pick a Google Font instead, Memlore downloads that font from Google.
 
@@ -53,7 +53,7 @@ Each entry is one document. You write it, then you reopen it later. The editor c
 
 You can mark a mood on an entry and look back at it over time. You can put an entry on a map. You can import entries, including media, and export them again.
 
-A conversation about the day can become an entry when you save it. That stays off until you opt in. You can also speak instead of type. That stores a voice memo on this computer. It does not need a provider, and the audio is not sent out. A writing persona and the facts you ask Memlore to remember are AI features. They stay off until you opt in too.
+A conversation about the day can become an entry when you save it. That stays off until you opt in. You can also speak instead of type. That stores a voice memo on this computer. It does not need a provider, and the audio is not sent out. A writing persona, and short facts drawn from your journal and from what you type in Daily Chat, are AI features. They stay off until you opt in too.
 
 None of that changes the rule above. The journal is still on your device. A feature sends something only after you turn that feature on, or after you save a place and the weather lookup runs.
 
@@ -90,7 +90,7 @@ The sidebar has two groups after this page. The links below follow that same spl
 - [AI](/docs/ai) — how optional AI features use your journal, and what they do not send.
 - [Backup and recovery](/docs/backup-and-recovery) — how to keep a copy, and what you need if you lose the password.
 - [Search and media](/docs/search-and-media) — how search and attached photos, video, and files stay in the vault.
-- [Memory](/docs/memory) — how Memlore keeps facts you ask it to remember.
+- [Memory](/docs/memory) — how Memlore keeps short facts drawn from your journal and from Daily Chat.
 - [Persona](/docs/persona) — how a writing persona changes replies when you write with AI.
 - [Customization](/docs/customization) — how themes, fonts, and design systems change the look of the app.
 - [Maps](/docs/maps) — how a place on an entry uses map and weather services.
