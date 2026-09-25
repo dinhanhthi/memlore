@@ -176,9 +176,9 @@ test('overview table of contents scrolls to a heading that starts below the fold
   await expect(target).toBeInViewport()
 })
 
-test('a placeholder page with only an h1 omits the on-page contents', async ({ page }) => {
+test('encryption shows on-page contents once it has several sections', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto(docsPath('encryption'))
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Encryption')
-  await expect(page.getByRole('navigation', { name: 'On this page' })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'On this page' })).toBeVisible()
 })
