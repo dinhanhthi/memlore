@@ -8,7 +8,7 @@ export function SiteFooterBar({
   current,
 }: {
   homeHref: string
-  current?: 'privacy' | 'terms' | 'changelog' | 'about'
+  current?: 'privacy' | 'terms' | 'changelog' | 'about' | 'docs'
 }) {
   return (
     <>

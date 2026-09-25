@@ -5,6 +5,7 @@ import changelogHtml from '../changelog.html?raw'
 import privacyHtml from '../privacy.html?raw'
 import termsHtml from '../terms.html?raw'
 import demoHtml from '../demo.html?raw'
+import { DOCS_PAGES, docsPath, docsShellFile } from '../src/docs/manifest'
 import {
   buildRobots,
   buildSitemap,
@@ -14,7 +15,15 @@ import {
   type IndexableEntry,
 } from '../src/seo'
 
-const shells: Record<IndexableEntry, string> = {
+const SHELL_ENTRIES = [
+  'index.html',
+  'about.html',
+  'changelog.html',
+  'privacy.html',
+  'terms.html',
+] as const satisfies readonly IndexableEntry[]
+
+const shells: Record<(typeof SHELL_ENTRIES)[number], string> = {
   'index.html': indexHtml,
   'about.html': aboutHtml,
   'changelog.html': changelogHtml,
@@ -22,13 +31,54 @@ const shells: Record<IndexableEntry, string> = {
   'terms.html': termsHtml,
 }
 
+const docsShellHtml = import.meta.glob<string>('../docs/*.html', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+})
+
+function indexableShell(entry: IndexableEntry): string | undefined {
+  switch (entry) {
+    case 'index.html':
+    case 'about.html':
+    case 'changelog.html':
+    case 'privacy.html':
+    case 'terms.html':
+      return shells[entry]
+    default:
+      return docsShellHtml[`../${entry}`]
+  }
+}
+
 const entries = Object.keys(canonicalPaths) as IndexableEntry[]
 
 describe('canonical tags', () => {
-  it.each(entries)('%s declares its canonical URL and og:url', (entry) => {
+  it.each(SHELL_ENTRIES)('%s declares its canonical URL and og:url', (entry) => {
     const url = canonicalUrl(entry)
     expect(shells[entry]).toContain(`<link rel="canonical" href="${url}" />`)
     expect(shells[entry]).toContain(`<meta property="og:url" content="${url}" />`)
+  })
+
+  it('every indexable shell declares its canonical URL and og:url', () => {
+    for (const entry of entries) {
+      const html = indexableShell(entry)
+      expect(html, entry).toEqual(expect.any(String))
+      const url = canonicalUrl(entry)
+      expect(html, entry).toContain(`<link rel="canonical" href="${url}" />`)
+      expect(html, entry).toContain(`<meta property="og:url" content="${url}" />`)
+    }
+  })
+
+  it('maps every docs page onto its shell and lists that canonical once', () => {
+    const paths = canonicalPaths as Record<string, string>
+    const sitemap = buildSitemap()
+    for (const page of DOCS_PAGES) {
+      const file = docsShellFile(page.slug)
+      const path = docsPath(page.slug)
+      expect(paths[file], file).toBe(path)
+      const loc = `${siteOrigin}${path}`
+      expect(sitemap.split(`<loc>${loc}</loc>`), loc).toHaveLength(2)
+    }
   })
 
   it('canonicals are absolute on the https apex host', () => {
@@ -41,7 +91,7 @@ describe('canonical tags', () => {
   // pointing at any of them would hand Search Console a redirect as the indexable
   // URL, which is the reason those hosts were reported in the first place.
   it('no shell points a canonical at a redirecting host', () => {
-    for (const html of Object.values(shells)) {
+    for (const html of [...Object.values(shells), ...Object.values(docsShellHtml)]) {
       expect(html).not.toMatch(/rel="canonical"[^>]*(http:\/\/|www\.memlore\.app)/)
     }
   })

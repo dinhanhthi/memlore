@@ -10,13 +10,13 @@ import {
 } from '../src/logoDirection'
 
 describe('logoSrc', () => {
-  it('returns a relative path under ./head-rotate/', () => {
-    expect(logoSrc('default')).toBe('./head-rotate/default.png')
-    expect(logoSrc('straight')).toBe('./head-rotate/straight.png')
-    expect(logoSrc('top')).toBe('./head-rotate/top.png')
-    expect(logoSrc('top-left')).toBe('./head-rotate/top-left.png')
-    expect(logoSrc('top-right')).toBe('./head-rotate/top-right.png')
-    expect(logoSrc('down-left')).toBe('./head-rotate/down-left.png')
+  it('returns a root-absolute path under /head-rotate/', () => {
+    expect(logoSrc('default')).toBe('/head-rotate/default.png')
+    expect(logoSrc('straight')).toBe('/head-rotate/straight.png')
+    expect(logoSrc('top')).toBe('/head-rotate/top.png')
+    expect(logoSrc('top-left')).toBe('/head-rotate/top-left.png')
+    expect(logoSrc('top-right')).toBe('/head-rotate/top-right.png')
+    expect(logoSrc('down-left')).toBe('/head-rotate/down-left.png')
   })
 })
 

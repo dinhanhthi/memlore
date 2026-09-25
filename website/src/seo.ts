@@ -1,3 +1,5 @@
+import { DOCS_PAGES, docsPath, docsShellFile, type DocsSlug } from './docs/manifest'
+
 /**
  * Canonical URL set for the marketing site, shared by the `<link rel="canonical">`
  * tags in the page shells, `sitemap.xml`, and `robots.txt`.
@@ -9,7 +11,14 @@
  * router produces and what the site's own nav links to; `.html` stays reachable
  * because Memlore's Google OAuth consent screen registers `privacy.html`.
  */
+
 export const siteOrigin = 'https://memlore.app'
+
+type DocsCanonical = {
+  [P in DocsSlug as P extends 'overview'
+    ? 'docs/index.html'
+    : `docs/${P}.html`]: P extends 'overview' ? '/docs/' : `/docs/${P}`
+}
 
 /** Built HTML entry → the canonical path it should declare. `demo.html` is noindex. */
 export const canonicalPaths = {
@@ -18,7 +27,14 @@ export const canonicalPaths = {
   'changelog.html': '/changelog',
   'privacy.html': '/privacy',
   'terms.html': '/terms',
-} as const
+  ...Object.fromEntries(DOCS_PAGES.map((page) => [docsShellFile(page.slug), docsPath(page.slug)])),
+} as {
+  'index.html': '/'
+  'about.html': '/about'
+  'changelog.html': '/changelog'
+  'privacy.html': '/privacy'
+  'terms.html': '/terms'
+} & DocsCanonical
 
 export type IndexableEntry = keyof typeof canonicalPaths
 

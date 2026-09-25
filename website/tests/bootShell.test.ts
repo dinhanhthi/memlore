@@ -5,6 +5,7 @@ import {
   renderBootNoscript,
   renderBootSplash,
   renderBootStyle,
+  twinKindFor,
 } from '../src/bootShell'
 import { renderLandingStaticHtml } from '../src/prerender'
 
@@ -33,7 +34,7 @@ it('paints a branded splash outside #root with the Memlore wordmark and logo', (
   expect(splash).toContain('class="site-boot"')
   expect(splash).toContain('aria-hidden="true"')
   expect(splash).toContain('Memlore')
-  expect(splash).toContain('./logo-without-container/256.png')
+  expect(splash).toContain('/logo-without-container/256.png')
 
   const html = injectBootShell(SHELL)
   const splashAt = html.indexOf('class="site-boot"')
@@ -91,4 +92,34 @@ it('adds the splash to changelog.html without inventing a crawler twin', () => {
 
 it('does not inject the splash into demo.html', () => {
   expect(applyMarketingShell(SHELL, '/demo.html')).toBe(SHELL)
+})
+
+it('adds the splash to nested docs shells', () => {
+  for (const path of ['docs/index.html', 'docs/encryption.html', 'docs/how-privacy-works.html']) {
+    expect(applyMarketingShell(SHELL, path), path).toContain('class="site-boot"')
+  }
+})
+
+it('classifies the crawler twin from the html path', () => {
+  expect(twinKindFor('index.html')).toEqual({ kind: 'landing' })
+  expect(twinKindFor('/index.html')).toEqual({ kind: 'landing' })
+  expect(twinKindFor('/abs/website/index.html')).toEqual({ kind: 'landing' })
+  expect(twinKindFor('docs/index.html')).toEqual({ kind: 'docs', slug: 'overview' })
+  expect(twinKindFor('/docs/index.html')).toEqual({ kind: 'docs', slug: 'overview' })
+  expect(twinKindFor('/abs/website/docs/index.html')).toEqual({ kind: 'docs', slug: 'overview' })
+  expect(twinKindFor('privacy.html')).toEqual({ kind: 'legal', name: 'privacy' })
+  expect(twinKindFor('/privacy.html')).toEqual({ kind: 'legal', name: 'privacy' })
+  expect(twinKindFor('docs/how-privacy-works.html')).toEqual({
+    kind: 'docs',
+    slug: 'how-privacy-works',
+  })
+  expect(twinKindFor('/docs/encryption.html')).toEqual({ kind: 'docs', slug: 'encryption' })
+  expect(twinKindFor('changelog.html')).toBeUndefined()
+  expect(twinKindFor('/changelog.html')).toBeUndefined()
+  expect(twinKindFor('demo.html')).toBeUndefined()
+  expect(twinKindFor('/demo.html')).toBeUndefined()
+  expect(twinKindFor('about.html')).toEqual({ kind: 'legal', name: 'about' })
+  expect(twinKindFor('terms.html')).toEqual({ kind: 'legal', name: 'terms' })
+  expect(twinKindFor('subdir/index.html')).toBeUndefined()
+  expect(twinKindFor('subdir/privacy.html')).toBeUndefined()
 })

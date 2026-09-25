@@ -48,7 +48,11 @@ const header = flatten(headerSource)
 // the raw file: the frontmatter carries an `updated: 20xx-xx-xx` date that the
 // SHIP_DATE guard would read as a promised ship date.
 const aboutText = parseLegalMarkdown(aboutMarkdown)
-  .blocks.flatMap((block) => (block.type === 'ul' ? block.items : [block.text]))
+  .blocks.flatMap((block) => {
+    if (block.type === 'ul' || block.type === 'ol') return block.items
+    if (block.type === 'diagram') return []
+    return [block.text]
+  })
   .join('\n')
 
 function allCopy(): string {

@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { applyMarketingShell } from './src/bootShell'
+import { applyMarketingShell, twinKindFor } from './src/bootShell'
+import { DOCS_PAGES, docsShellFile } from './src/docs/manifest'
 import { renderLegalStaticHtml } from './src/legal/markdown'
 import { renderLandingStaticHtml } from './src/prerender'
 import { buildRobots, buildSitemap } from './src/seo'
@@ -36,13 +37,20 @@ function tauriAliasGuard() {
 // no app description or privacy link on the homepage. Both block publishing. Bake
 // the copy into the shell; React replaces it on mount. The boot splash hides that
 // twin from sighted JS users until the first React commit (see bootShell.ts).
+function readUtf8(relativePath: string): string {
+  return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8')
+}
+
 function staticArticleFor(path: string): string | undefined {
-  if (/\/index\.html$/.test(path)) return renderLandingStaticHtml()
-  const kind = path.match(/\/(privacy|terms|about)\.html$/)?.[1]
-  if (!kind) return
-  return renderLegalStaticHtml(
-    readFileSync(fileURLToPath(new URL(`./src/legal/${kind}.md`, import.meta.url)), 'utf8'),
-  )
+  const twin = twinKindFor(path)
+  if (!twin) return
+  if (twin.kind === 'landing') return renderLandingStaticHtml()
+  if (twin.kind === 'legal') {
+    return renderLegalStaticHtml(readUtf8(`./src/legal/${twin.name}.md`))
+  }
+  const markdownPath = fileURLToPath(new URL(`./src/docs/content/${twin.slug}.md`, import.meta.url))
+  if (!existsSync(markdownPath)) return
+  return renderLegalStaticHtml(readFileSync(markdownPath, 'utf8'))
 }
 
 function prerenderStaticShells() {
@@ -138,6 +146,12 @@ export default defineConfig({
         terms: fileURLToPath(new URL('./terms.html', import.meta.url)),
         changelog: fileURLToPath(new URL('./changelog.html', import.meta.url)),
         about: fileURLToPath(new URL('./about.html', import.meta.url)),
+        ...Object.fromEntries(
+          DOCS_PAGES.map((page) => [
+            page.slug === 'overview' ? 'docsIndex' : `docs_${page.slug.replaceAll('-', '_')}`,
+            fileURLToPath(new URL(`./${docsShellFile(page.slug)}`, import.meta.url)),
+          ]),
+        ),
       },
     },
   },
