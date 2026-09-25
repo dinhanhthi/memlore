@@ -3543,6 +3543,9 @@ tbody th {
   color: var(--color-ink);
 }
 .docs-toc ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
   padding-bottom: 0;
 }
 .docs-toc a {
