@@ -16,7 +16,7 @@ import type {
 } from '../../src/types/ai'
 import { getActiveScenario } from './activeScenario'
 import { webGetSetting } from './editorSettings'
-import { entries, entriesById, journalsById, memoryItems } from '../fixtures/index'
+import { entries, entriesById, journalsById, memoryItems, writingHours } from '../fixtures/index'
 import { APPLE_JOURNAL_IMPORT_PREVIEW } from '../scenarios/appleJournalImport'
 
 // Mirrors `CHAT_RAG_WARN_BYTES` / `CHAT_RAG_TOTAL_MAX_BYTES` in
@@ -390,6 +390,9 @@ const SAFE_DEFAULTS: Record<string, unknown | ((args: Record<string, unknown>) =
   // `route()` returns null for unhandled commands; PhotosCard would crash
   // on `null.items` the moment it mounts. Stats cards guard `data ?? []`.
   stats_streak_calendar: [],
+  // Scenarios that replace `invoke` entirely omit `stats_writing_hours`.
+  // A null result leaves the peak-hour tile on the empty dash.
+  stats_writing_hours: writingHours,
   stats_tag_frequency: [],
   stats_location_density: [],
   list_all_media_paged: { items: [], total: 0, hasMore: false },

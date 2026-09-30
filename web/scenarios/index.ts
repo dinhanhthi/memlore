@@ -26,6 +26,7 @@ import {
   moodTrend,
   tagFrequency,
   writingVolume,
+  writingHours,
   streakCalendar,
   locationDensity,
   streak,
@@ -458,6 +459,7 @@ const LOGGED_IN_INVOKE: Scenario['invoke'] = {
   stats_mood_trend: (_args: Record<string, unknown>) => moodTrend,
   stats_tag_frequency: tagFrequency,
   stats_writing_volume: (_args: Record<string, unknown>) => writingVolume,
+  stats_writing_hours: (_args: Record<string, unknown>) => writingHours,
   stats_streak_calendar: (_args: Record<string, unknown>) => streakCalendar,
   stats_location_density: locationDensity,
 

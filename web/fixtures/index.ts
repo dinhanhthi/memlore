@@ -49,6 +49,7 @@ export {
   moodTrend,
   tagFrequency,
   writingVolume,
+  writingHours,
   streakCalendar,
   locationDensity,
   streak,

@@ -4,6 +4,7 @@ import type {
   MoodTrendPoint,
   TagFrequencyRow,
   WritingVolumePoint,
+  WritingHourRow,
   StreakCalendarDay,
   LocationPoint,
   StreakInfo,
@@ -42,6 +43,12 @@ export const tagFrequency: TagFrequencyRow[] = [
   { tag_id: 'tag-coding-007', tag_name: 'coding', count: 3 },
   { tag_id: 'tag-friends-006', tag_name: 'friends', count: 2 },
 ]
+
+/** 24 clock hours. Hour 21 is the only non-zero bucket so peak hour is 9 PM. */
+export const writingHours: WritingHourRow[] = Array.from({ length: 24 }, (_, hour) => ({
+  hour,
+  count: hour === 21 ? 4 : 0,
+}))
 
 export const writingVolume: WritingVolumePoint[] = [
   { period_start: `${currentYear}-04-01`, total_words: 2400, entry_count: 8 },

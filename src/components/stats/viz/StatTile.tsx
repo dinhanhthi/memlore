@@ -24,6 +24,7 @@ export function StatTile({ tone, icon: Icon, value, label, action, children }: S
 
   return (
     <div
+      data-testid="stat-tile"
       className={cn(
         'bg-elevated @container flex h-full min-w-0 flex-col gap-2 rounded-2xl p-3',
         'shadow-(--elev-2) hover:shadow-(--elev-3)',

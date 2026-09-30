@@ -15,6 +15,7 @@ import { cn } from '../../lib/cn'
 import { useUiStore } from '../../stores/uiStore'
 import { Button } from '../common/Button'
 import { AiHintTile } from './AiHintTile'
+import { DashboardCardIdContext } from './dashboardCardIdContext'
 import { DashboardCustomizeModal } from './DashboardCustomizeModal'
 import { AiInsightsCard } from './cards/AiInsightsCard'
 import { ChatCard } from './cards/ChatCard'
@@ -110,17 +111,18 @@ export function DashboardView() {
               const Card = CARD_COMPONENTS[pref.id]
               const enabled = isAiGatedCardId(pref.id) ? aiEnabled[pref.id] : true
               return (
-                <div
-                  key={pref.id}
-                  data-card={pref.id}
-                  className={cn('min-h-0', dashboardCardSpanClass(pref.id, enabled))}
-                >
-                  {enabled ? (
-                    <Card />
-                  ) : (
-                    <AiHintTile title={t(`cards.${pref.id}`)} feature={t(`cards.${pref.id}`)} />
-                  )}
-                </div>
+                <DashboardCardIdContext.Provider key={pref.id} value={pref.id}>
+                  <div
+                    data-card={pref.id}
+                    className={cn('min-h-0', dashboardCardSpanClass(pref.id, enabled))}
+                  >
+                    {enabled ? (
+                      <Card />
+                    ) : (
+                      <AiHintTile title={t(`cards.${pref.id}`)} feature={t(`cards.${pref.id}`)} />
+                    )}
+                  </div>
+                </DashboardCardIdContext.Provider>
               )
             })}
           </div>
