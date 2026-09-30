@@ -1,6 +1,6 @@
 /**
  * Cold-cache placeholder for the Statistics → Charts tab. Mirrors the tab's
- * layout (2-column grid + full-width cards) so the page does not jump when
+ * layout (story-in-numbers tiles, then a 2-column grid + full-width cards) so the page does not jump when
  * the charts take over. Each card is a solid `card-glow` frame (matches
  * `ChartCard`) with a full-card pulse — no inner title bars or chart-area
  * placeholders.
@@ -20,9 +20,17 @@ function FauxCard({ className }: { className: string }) {
   )
 }
 
+const HERO_TILE_KEYS = ['entries', 'words', 'streak', 'mood', 'year', 'hour'] as const
+
 export default function ChartsSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
+      {/* Matches the story-in-numbers hero: 1 / 2 / 3 columns, two rows when wide. */}
+      <div className="grid grid-cols-1 gap-4 @min-[480px]:grid-cols-2 @min-[720px]:grid-cols-3">
+        {HERO_TILE_KEYS.map((key) => (
+          <div key={key} className="bg-panel-2 h-48 rounded-2xl motion-safe:animate-pulse" />
+        ))}
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Column 1 — entries over time + writing volume */}
         <div className="flex flex-col gap-4">

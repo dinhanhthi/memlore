@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { statsTagFrequency } from '../../lib/tauri'
 import type { TagFrequencyRow } from '../../lib/tauri'
-import { useAccentChartColors } from '../../hooks/useAccentChartColors'
 import { useStats } from '../../hooks/useStats'
 import { TAG_FREQUENCY_KEY } from './statsPeriod'
 
@@ -9,7 +8,6 @@ const MAX_TAGS = 20
 
 export function TagCloud() {
   const { t } = useTranslation('stats')
-  const accent = useAccentChartColors()
 
   const { data, isLoading } = useStats<TagFrequencyRow[]>(
     () => statsTagFrequency(),
@@ -41,10 +39,7 @@ export function TagCloud() {
           <li key={row.tag_id} role="listitem" className="flex items-center gap-2">
             <span className="text-fg-secondary w-24 shrink-0 truncate text-sm">{row.tag_name}</span>
             <div className="bg-panel-2 h-2 flex-1 rounded-full">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${barPercent}%`, backgroundColor: accent.primary }}
-              />
+              <div className="bg-viz-2 h-full rounded-full" style={{ width: `${barPercent}%` }} />
             </div>
             <span className="text-fg-muted w-8 shrink-0 text-right text-xs">{row.count}</span>
           </li>

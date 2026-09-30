@@ -37,6 +37,20 @@
     "365d": "1 năm",
     "all": "Tất cả"
   },
+  "story": {
+    "entries": "Bài viết",
+    "words": "Số từ",
+    "streak": "Chuỗi ngày",
+    "mood": "Tâm trạng",
+    "year": "Năm nay",
+    "hour": "Giờ cao điểm",
+    "entries_aria": "Số bài viết trong kỳ đã chọn",
+    "words_aria": "Số từ đã viết trong kỳ đã chọn",
+    "streak_aria": "Chuỗi hiện tại so với chuỗi dài nhất",
+    "mood_aria": "Tỷ lệ tâm trạng tốt, bình thường và không ổn",
+    "year_aria": "Những ngày có bài viết trong năm",
+    "hour_aria": "Bài viết theo giờ trong ngày"
+  },
   "chart": {
     "entries_over_time": {
       "title": "Số bài viết theo thời gian",

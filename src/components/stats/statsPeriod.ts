@@ -62,6 +62,7 @@ export function chartsCacheKeys(period: Period, year: number): string[] {
     entriesOverTimeKey(period),
     writingVolumeKey(period),
     moodHistogramKey(period),
+    writingHoursKey(period),
     TAG_FREQUENCY_KEY,
     streakCalendarKey(year),
     LOCATION_DENSITY_KEY,

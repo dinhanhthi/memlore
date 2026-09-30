@@ -65,6 +65,7 @@ describe('statsPeriod', () => {
       entriesOverTimeKey('30d'),
       writingVolumeKey('30d'),
       moodHistogramKey('30d'),
+      writingHoursKey('30d'),
       TAG_FREQUENCY_KEY,
       streakCalendarKey(2026),
       LOCATION_DENSITY_KEY,

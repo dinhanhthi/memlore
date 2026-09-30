@@ -2,9 +2,9 @@ import { useTranslation } from 'react-i18next'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { statsWritingVolume } from '../../lib/tauri'
 import type { WritingVolumePoint } from '../../lib/tauri'
-import { useAccentChartColors } from '../../hooks/useAccentChartColors'
 import { useStats } from '../../hooks/useStats'
 import { CHART_NEUTRAL } from '../../lib/themeColors'
+import { useVizColor } from '../../lib/vizColor'
 import type { Period } from './PeriodSelector'
 import { PERIOD_CONFIG, writingVolumeKey } from './statsPeriod'
 
@@ -14,6 +14,7 @@ interface WritingVolumeChartProps {
 
 export function WritingVolumeChart({ period }: WritingVolumeChartProps) {
   const { t } = useTranslation('stats')
+  const series = useVizColor('--color-viz-2')
   const { range, bucket } = PERIOD_CONFIG[period]
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -25,7 +26,6 @@ export function WritingVolumeChart({ period }: WritingVolumeChartProps) {
   )
 
   const colors = CHART_NEUTRAL
-  const accent = useAccentChartColors()
   const hasData = data !== null && data.length > 0
 
   if (!hasData && !isLoading) {
@@ -77,7 +77,7 @@ export function WritingVolumeChart({ period }: WritingVolumeChartProps) {
         />
         <Bar
           dataKey="total_words"
-          fill={accent.primary}
+          fill={series}
           radius={[4, 4, 0, 0]}
           isAnimationActive={!prefersReducedMotion}
         />

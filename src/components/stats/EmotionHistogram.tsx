@@ -11,6 +11,13 @@ interface EmotionHistogramProps {
   period: Period
 }
 
+/** Full class strings so Tailwind keeps the emotion text colours. */
+const EMOTION_PERCENT_TEXT: Record<EmotionKey, string> = {
+  bad: 'text-emotion-bad',
+  neutral: 'text-emotion-neutral',
+  good: 'text-emotion-good',
+}
+
 /**
  * 3-bar emotion distribution chart. Replaces the prior `MoodTrendChart`
  * (a line chart over averaged 1-5 intensity, which no longer exists
@@ -76,7 +83,7 @@ export function EmotionHistogram({ period }: EmotionHistogramProps) {
               <span className="font-medium">{tEditor(meta.i18nKey)}</span>
             </div>
             <div
-              className="relative h-3 flex-1 overflow-hidden rounded-full"
+              className="relative h-5 flex-1 overflow-hidden rounded-full"
               style={{ backgroundColor: 'var(--color-surface-subtle)' }}
             >
               <div
@@ -87,8 +94,9 @@ export function EmotionHistogram({ period }: EmotionHistogramProps) {
                 }}
               />
             </div>
-            <div className="text-fg-muted w-20 text-right text-xs tabular-nums">
-              {count} · {pct}%
+            <div className="w-20 text-right text-xs tabular-nums">
+              <span className="text-fg-muted">{count} · </span>
+              <span className={EMOTION_PERCENT_TEXT[meta.key]}>{pct}%</span>
             </div>
           </div>
         )

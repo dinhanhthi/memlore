@@ -6,6 +6,7 @@ import {
   statsMoodHistogram,
   statsStreakCalendar,
   statsTagFrequency,
+  statsWritingHours,
   statsWritingVolume,
 } from '../../lib/tauri'
 import { hasCachedStats, invalidateStatsCache, useStats } from '../../hooks/useStats'
@@ -22,6 +23,7 @@ import {
   moodHistogramKey,
   periodRangeDays,
   streakCalendarKey,
+  writingHoursKey,
   writingVolumeKey,
 } from './statsPeriod'
 
@@ -43,12 +45,15 @@ function ChartsPrefetch({ period, onReady }: { period: Period; onReady: () => vo
   const entries = useStats(() => statsEntriesOverTime(bucket, range), entriesOverTimeKey(period))
   const volume = useStats(() => statsWritingVolume(bucket, range), writingVolumeKey(period))
   const mood = useStats(() => statsMoodHistogram(periodRangeDays(period)), moodHistogramKey(period))
+  // `chartsCacheKeys` only skips the skeleton on a warm cache. This call is
+  // what actually holds `onReady` until writing hours have settled.
+  const hours = useStats(() => statsWritingHours(periodRangeDays(period)), writingHoursKey(period))
   const tags = useStats(() => statsTagFrequency(), TAG_FREQUENCY_KEY)
   const streak = useStats(() => statsStreakCalendar(year), streakCalendarKey(year))
   const locations = useStats(() => statsLocationDensity(), LOCATION_DENSITY_KEY)
   const emotion = useEntryEmotionByDate(year)
 
-  const results = [entries, volume, mood, tags, streak, locations, emotion]
+  const results = [entries, volume, mood, hours, tags, streak, locations, emotion]
   const settled = results.every((r) => !r.isLoading)
   const failed = results.some((r) => r.error)
 
@@ -62,7 +67,6 @@ function ChartsPrefetch({ period, onReady }: { period: Period; onReady: () => vo
     void Promise.all([
       import('./EntriesOverTimeChart'),
       import('./WritingVolumeChart'),
-      import('./WordCountBox'),
       import('./EmotionHistogram'),
       import('./TagCloud'),
       import('./StreakCalendar'),

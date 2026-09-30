@@ -10,9 +10,9 @@ import {
 } from 'recharts'
 import { statsEntriesOverTime } from '../../lib/tauri'
 import type { EntriesOverTimePoint } from '../../lib/tauri'
-import { useAccentChartColors } from '../../hooks/useAccentChartColors'
 import { useStats } from '../../hooks/useStats'
 import { CHART_NEUTRAL } from '../../lib/themeColors'
+import { useVizColor } from '../../lib/vizColor'
 import type { Period } from './PeriodSelector'
 import { PERIOD_CONFIG, entriesOverTimeKey } from './statsPeriod'
 
@@ -22,6 +22,7 @@ interface EntriesOverTimeChartProps {
 
 export function EntriesOverTimeChart({ period }: EntriesOverTimeChartProps) {
   const { t } = useTranslation('stats')
+  const series = useVizColor('--color-viz-1')
   const { range, bucket } = PERIOD_CONFIG[period]
 
   const cacheKey = entriesOverTimeKey(period)
@@ -31,7 +32,6 @@ export function EntriesOverTimeChart({ period }: EntriesOverTimeChartProps) {
   )
 
   const colors = CHART_NEUTRAL
-  const accent = useAccentChartColors()
   const hasData = data !== null && data.length > 0
 
   if (!hasData && !isLoading) {
@@ -73,10 +73,10 @@ export function EntriesOverTimeChart({ period }: EntriesOverTimeChartProps) {
         <Line
           type="monotone"
           dataKey="count"
-          stroke={accent.primary}
+          stroke={series}
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4, fill: accent.primary }}
+          activeDot={{ r: 4, fill: series }}
         />
       </LineChart>
     </ResponsiveContainer>

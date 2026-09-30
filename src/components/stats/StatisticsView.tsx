@@ -1,6 +1,20 @@
 import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, History, LineChart, Lightbulb, Sparkles, type LucideIcon } from 'lucide-react'
+import {
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  ChartColumn,
+  Feather,
+  History,
+  Lightbulb,
+  LineChart,
+  MapPin,
+  Smile,
+  Sparkles,
+  Tag,
+  type LucideIcon,
+} from 'lucide-react'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { cn } from '../../lib/cn'
@@ -10,6 +24,7 @@ import { ChartCard } from './ChartCard'
 import { ChartsGate } from './ChartsGate'
 import ChartsSkeleton from './ChartsSkeleton'
 import { PeriodSelector, type Period } from './PeriodSelector'
+import { StoryNumbersGrid } from './StoryNumbersGrid'
 import { AiAuditLogPanel } from './AiAuditLogPanel'
 import { AiUsagePanel } from './AiUsagePanel'
 import { InsightsPanel } from './InsightsPanel'
@@ -26,7 +41,6 @@ const EmotionHistogram = lazy(() =>
 const WritingVolumeChart = lazy(() =>
   import('./WritingVolumeChart').then((m) => ({ default: m.WritingVolumeChart })),
 )
-const WordCountBox = lazy(() => import('./WordCountBox').then((m) => ({ default: m.WordCountBox })))
 const TagCloud = lazy(() => import('./TagCloud').then((m) => ({ default: m.TagCloud })))
 const StreakCalendar = lazy(() =>
   import('./StreakCalendar').then((m) => ({ default: m.StreakCalendar })),
@@ -185,11 +199,15 @@ export function StatisticsView() {
             >
               {shouldRender && tab.id === 'charts' && (
                 <div className="flex flex-col gap-4 p-5">
+                  <div className="flex justify-end">
+                    <PeriodSelector value={period} onChange={setPeriod} />
+                  </div>
                   {/* One skeleton, one swap: `ChartsGate` holds the skeleton
                       until the chart data is cached, then the lazy chunks
                       resolve behind the identical Suspense fallback. */}
                   <Suspense fallback={<ChartsSkeleton />}>
                     <ChartsGate period={period}>
+                      <StoryNumbersGrid period={period} />
                       {/* 2-column grid */}
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         {/* Column 1 */}
@@ -197,7 +215,8 @@ export function StatisticsView() {
                           <ChartCard
                             title={t('chart.entries_over_time.title')}
                             exportName="entries-over-time"
-                            action={<PeriodSelector value={period} onChange={setPeriod} />}
+                            tone={1}
+                            icon={BookOpen}
                           >
                             <EntriesOverTimeChart period={period} />
                           </ChartCard>
@@ -205,6 +224,8 @@ export function StatisticsView() {
                           <ChartCard
                             title={t('chart.writing_volume.title')}
                             exportName="writing-volume"
+                            tone={2}
+                            icon={Feather}
                           >
                             <WritingVolumeChart period={period} />
                           </ChartCard>
@@ -213,13 +234,11 @@ export function StatisticsView() {
                         {/* Column 2 */}
                         <div className="flex flex-col gap-4">
                           <ChartCard
-                            title={t('chart.word_count.title')}
-                            action={<PeriodSelector value={period} onChange={setPeriod} />}
+                            title={t('chart.mood_trend.title')}
+                            exportName="mood-trend"
+                            tone={4}
+                            icon={Smile}
                           >
-                            <WordCountBox period={period} />
-                          </ChartCard>
-
-                          <ChartCard title={t('chart.mood_trend.title')} exportName="mood-trend">
                             <EmotionHistogram period={period} />
                           </ChartCard>
 
@@ -227,6 +246,8 @@ export function StatisticsView() {
                             title={t('chart.tag_frequency.title')}
                             exportName="tag-frequency"
                             exportRaster
+                            tone={2}
+                            icon={Tag}
                           >
                             <TagCloud />
                           </ChartCard>
@@ -236,6 +257,8 @@ export function StatisticsView() {
                       <ChartCard
                         title={t('chart.streak_calendar.title')}
                         exportName="streak-calendar"
+                        tone={3}
+                        icon={CalendarDays}
                       >
                         <StreakCalendar />
                       </ChartCard>
@@ -243,6 +266,8 @@ export function StatisticsView() {
                       <ChartCard
                         title={t('chart.emotion_heatmap.title')}
                         exportName="emotion-heatmap"
+                        tone={5}
+                        icon={ChartColumn}
                       >
                         <EmotionHeatmap />
                       </ChartCard>
@@ -251,6 +276,8 @@ export function StatisticsView() {
                         title={t('chart.location_heatmap.title')}
                         exportName="location-heatmap"
                         exportRaster
+                        tone={6}
+                        icon={MapPin}
                       >
                         <LocationHeatmap />
                       </ChartCard>

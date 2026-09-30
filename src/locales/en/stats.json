@@ -37,6 +37,20 @@
     "365d": "1y",
     "all": "All"
   },
+  "story": {
+    "entries": "Entries",
+    "words": "Words",
+    "streak": "Day streak",
+    "mood": "Mood",
+    "year": "This year",
+    "hour": "Peak hour",
+    "entries_aria": "Entries over the selected period",
+    "words_aria": "Words written over the selected period",
+    "streak_aria": "Current streak against the longest streak",
+    "mood_aria": "Share of good, neutral, and low moods",
+    "year_aria": "Days with entries this year",
+    "hour_aria": "Entries by hour of day"
+  },
   "chart": {
     "entries_over_time": {
       "title": "Entries Over Time",
