@@ -1,0 +1,38 @@
+{
+  "hash": "6aa1d22e18",
+  "planSha": "3f3b98f187863d68ac22ed2a43f26c61e8b972d0",
+  "sections": [
+    {
+      "name": "Intro",
+      "duration_ms": 14000
+    },
+    {
+      "name": "Hook",
+      "duration_ms": 5000
+    },
+    {
+      "name": "Privacy",
+      "duration_ms": 37000
+    },
+    {
+      "name": "Writing and looking back",
+      "duration_ms": 42500
+    },
+    {
+      "name": "Places",
+      "duration_ms": 10000
+    },
+    {
+      "name": "AI",
+      "duration_ms": 79000
+    },
+    {
+      "name": "Control",
+      "duration_ms": 19000
+    },
+    {
+      "name": "Finale",
+      "duration_ms": 31500
+    }
+  ]
+}

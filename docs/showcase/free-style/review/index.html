@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memlore · Review</title>
+<link rel="stylesheet" href="/review/app.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <h1 class="brand">Memlore <span class="dot">·</span> Review</h1>
+    <button id="save-status" class="pill" data-state="saved" type="button" disabled>Đã lưu</button>
+    <div class="spacer"></div>
+    <div id="audio-modes" class="segmented" role="group" aria-label="Âm thanh">
+      <button type="button" data-mode="orig">Nhạc gốc</button>
+      <button type="button" data-mode="preview">Nhạc xem trước</button>
+      <button type="button" data-mode="metronome">Metronome</button>
+      <button type="button" data-mode="off">Tắt</button>
+    </div>
+    <span id="audio-hint" class="chip warn" hidden></span>
+    <div id="duration" class="readout mono"></div>
+  </header>
+
+  <div id="banner" hidden></div>
+
+  <main id="player-area">
+    <div id="player-sizer">
+      <div id="player">
+        <iframe id="film" title="Film" tabindex="-1"></iframe>
+        <div id="overlay"></div>
+      </div>
+    </div>
+    <div id="player-loading">Đang tải phim…</div>
+  </main>
+
+  <aside id="sidebar">
+    <section id="comments-panel" aria-label="Bình luận"></section>
+  </aside>
+
+  <footer id="bottom">
+    <div id="transport">
+      <button id="play" class="icon-btn" type="button" aria-label="Phát">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+      </button>
+      <div id="timecode" class="mono">00:00.00 / 00:00.00</div>
+      <div id="scene-info">
+        <span id="scene-id" class="scene-id">–</span>
+        <span id="scene-section" class="chip section"></span>
+      </div>
+      <input id="scrub" type="range" min="0" max="156" step="0.016666666666666666" value="0" aria-label="Tua">
+      <button id="loop" class="toggle" type="button" aria-pressed="false">Lặp cảnh <kbd>L</kbd></button>
+      <button id="comment-mode" class="toggle" type="button" aria-pressed="false">Bình luận <kbd>C</kbd></button>
+    </div>
+    <div id="scene-strip"></div>
+    <div id="scene-editor"></div>
+  </footer>
+</div>
+<script src="/timing.js"></script>
+<script src="/review/app.js"></script>
+<script src="/review/editor.js"></script>
+<script src="/review/comments.js"></script>
+</body>
+</html>

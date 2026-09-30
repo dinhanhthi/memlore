@@ -1,0 +1,207 @@
+{
+  "duration": 120,
+  "fps": 60,
+  "timeline": [
+    {
+      "scene": "cold-open",
+      "start": 0,
+      "dur": 7
+    },
+    {
+      "scene": "brand",
+      "start": 7,
+      "dur": 7,
+      "opts": {
+        "events": [
+          {
+            "t": 2.2,
+            "kind": "chord"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "promise",
+      "start": 14,
+      "dur": 9,
+      "opts": {
+        "events": [
+          {
+            "t": 0.3,
+            "kind": "pop"
+          },
+          {
+            "t": 3.3,
+            "kind": "pop"
+          },
+          {
+            "t": 6.3,
+            "kind": "pop"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 23,
+      "dur": 14,
+      "opts": {
+        "shot": "write",
+        "events": [
+          {
+            "t": 2.4,
+            "kind": "click"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 37,
+      "dur": 12,
+      "opts": {
+        "shot": "find",
+        "events": [
+          {
+            "t": 3.2,
+            "kind": "tick"
+          },
+          {
+            "t": 6.2,
+            "kind": "pop"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 49,
+      "dur": 6,
+      "opts": {
+        "shot": "gallery"
+      }
+    },
+    {
+      "scene": "atlas",
+      "start": 55,
+      "dur": 6,
+      "opts": {
+        "events": [
+          {
+            "t": 1.2,
+            "kind": "pop"
+          },
+          {
+            "t": 1.6,
+            "kind": "pop"
+          },
+          {
+            "t": 2,
+            "kind": "pop"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 61,
+      "dur": 6,
+      "opts": {
+        "shot": "mood"
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 67,
+      "dur": 7,
+      "opts": {
+        "shot": "chat"
+      }
+    },
+    {
+      "scene": "orbit",
+      "start": 74,
+      "dur": 7
+    },
+    {
+      "scene": "mcp",
+      "start": 81,
+      "dur": 6,
+      "opts": {
+        "events": [
+          {
+            "t": 1.2,
+            "kind": "tick"
+          },
+          {
+            "t": 1.48,
+            "kind": "tick"
+          },
+          {
+            "t": 1.76,
+            "kind": "tick"
+          },
+          {
+            "t": 2.04,
+            "kind": "tick"
+          },
+          {
+            "t": 2.3200000000000003,
+            "kind": "tick"
+          },
+          {
+            "t": 2.6,
+            "kind": "tick"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "locks",
+      "start": 87,
+      "dur": 10,
+      "opts": {
+        "events": [
+          {
+            "t": 3.4,
+            "kind": "pop"
+          },
+          {
+            "t": 3.8,
+            "kind": "pop"
+          },
+          {
+            "t": 4.2,
+            "kind": "pop"
+          }
+        ]
+      }
+    },
+    {
+      "scene": "screen",
+      "start": 97,
+      "dur": 7,
+      "opts": {
+        "shot": "sync"
+      }
+    },
+    {
+      "scene": "designs",
+      "start": 104,
+      "dur": 9
+    },
+    {
+      "scene": "finale",
+      "start": 113,
+      "dur": 7,
+      "opts": {
+        "events": [
+          {
+            "t": 2,
+            "kind": "click"
+          }
+        ]
+      }
+    }
+  ]
+}

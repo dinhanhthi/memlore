@@ -1,0 +1,16 @@
+{
+  "note": "ElevenLabs Music composition plan for the film score (music.mjs). One section per chapter; each section's duration_ms comes from the timeline, so the music changes mood on chapter cuts. Built on the approved sample-2 style. lines stay empty: instrumental only.",
+  "model_id": "music_v1",
+  "positive_global_styles": ["feel-good acoustic pop", "115 bpm", "strummed acoustic guitar", "ukulele", "hand claps", "light shaker", "warm bass", "sunny", "optimistic", "clean mix with room for a voice-over", "instrumental"],
+  "negative_global_styles": ["vocals", "singing", "choir", "spoken word", "heavy distortion", "aggressive drums", "dark", "sad"],
+  "chapters": [
+    { "name": "Intro", "scenes": ["intro"], "positive": ["sparse and gentle", "soft fingerpicked acoustic guitar", "warm and intimate", "thins out into a short breath of near-silence at the very end"], "negative": ["drums", "claps", "loud"] },
+    { "name": "Hook", "scenes": ["hook"], "positive": ["sudden joyful burst", "bright full strum", "hand claps on every beat", "energetic", "big lift"], "negative": ["slow build", "soft intro"] },
+    { "name": "Privacy", "scenes": ["local", "encrypt", "locks"], "positive": ["calm and steady", "light percussion", "muted strums", "reassuring"], "negative": ["big crescendo"] },
+    { "name": "Writing and looking back", "scenes": ["editor", "find", "calendar", "tags", "onThisDay", "stats"], "positive": ["fuller groove", "claps on 2 and 4", "ukulele melody", "playful", "warm nostalgic touch"], "negative": ["breakdown", "silence"] },
+    { "name": "Places", "scenes": ["map"], "positive": ["travel feel", "open and airy", "light glockenspiel", "wanderlust"], "negative": ["heavy bass"] },
+    { "name": "AI", "scenes": ["aiIntro", "aiCards", "secondYou", "mcp"], "positive": ["energetic", "driving strum", "shimmering accents", "curious and bright", "steady groove"], "negative": ["electronic drop", "dubstep"] },
+    { "name": "Control", "scenes": ["sync", "import"], "positive": ["steady", "confident", "lighter arrangement"], "negative": ["big crescendo"] },
+    { "name": "Finale", "scenes": ["themes", "open", "outro"], "positive": ["lift to the fullest arrangement", "joyful", "celebratory claps", "final chord that rings out and fades"], "negative": ["abrupt ending", "vocals"] }
+  ]
+}

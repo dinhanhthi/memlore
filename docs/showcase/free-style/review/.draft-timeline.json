@@ -1,0 +1,93 @@
+{
+  "bpm": 120,
+  "note": "Scene lengths are in bars (4 beats, 2 s at 120 BPM). film.js and soundtrack.py both read this file, so cuts and musical hits stay locked.",
+  "scenes": [
+    {
+      "id": "intro",
+      "bars": 4,
+      "section": "intro"
+    },
+    {
+      "id": "hook",
+      "bars": 2,
+      "section": "build"
+    },
+    {
+      "id": "local",
+      "bars": 3,
+      "section": "verse"
+    },
+    {
+      "id": "encrypt",
+      "bars": 2,
+      "section": "verse"
+    },
+    {
+      "id": "locks",
+      "bars": 6,
+      "section": "verse"
+    },
+    {
+      "id": "editor",
+      "bars": 8,
+      "section": "chorus",
+      "speed": 0.6
+    },
+    {
+      "id": "find",
+      "bars": 3,
+      "section": "verse",
+      "speed": 0.45
+    },
+    {
+      "id": "map",
+      "bars": 6,
+      "section": "verse"
+    },
+    {
+      "id": "aiIntro",
+      "bars": 2,
+      "section": "build"
+    },
+    {
+      "id": "aiCards",
+      "bars": 13,
+      "section": "chorus"
+    },
+    {
+      "id": "secondYou",
+      "bars": 5,
+      "section": "bridge"
+    },
+    {
+      "id": "mcp",
+      "bars": 3,
+      "section": "verse"
+    },
+    {
+      "id": "sync",
+      "bars": 4,
+      "section": "verse"
+    },
+    {
+      "id": "import",
+      "bars": 2,
+      "section": "build"
+    },
+    {
+      "id": "themes",
+      "bars": 8,
+      "section": "chorus"
+    },
+    {
+      "id": "open",
+      "bars": 2,
+      "section": "verse"
+    },
+    {
+      "id": "outro",
+      "bars": 5,
+      "section": "outro"
+    }
+  ]
+}

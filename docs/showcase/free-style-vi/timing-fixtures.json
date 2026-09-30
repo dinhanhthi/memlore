@@ -1,0 +1,74 @@
+{
+  "note": "Shared by timing.test.mjs and the soundtrack.py port. points are [output-local seconds, source-local seconds]. No snap case lands on a .5 tie (JS and Python round differently there).",
+  "sceneMap": [
+    {
+      "name": "identity",
+      "scene": { "bars": 2 },
+      "bpm": 120,
+      "expect": { "srcDur": 4, "rawOutDur": 4, "outDur": 4, "points": [[0, 0], [1.5, 1.5], [4, 4], [-1, -1], [5, 5]] }
+    },
+    {
+      "name": "base speed 2",
+      "scene": { "bars": 4, "speed": 2 },
+      "bpm": 120,
+      "expect": { "srcDur": 8, "rawOutDur": 4, "outDur": 4, "points": [[0, 0], [1, 2], [4, 8], [-0.5, -1], [5, 10]] }
+    },
+    {
+      "name": "one range",
+      "scene": { "bars": 2, "warp": [{ "from": 1, "to": 3, "speed": 2 }] },
+      "bpm": 120,
+      "expect": { "srcDur": 4, "rawOutDur": 3, "outDur": 3, "points": [[0, 0], [1, 1], [1.5, 2], [2, 3], [2.5, 3.5], [3, 4]] }
+    },
+    {
+      "name": "two ranges, base speed 2",
+      "scene": { "bars": 4, "speed": 2, "warp": [{ "from": 0, "to": 2, "speed": 0.5 }, { "from": 4, "to": 6, "speed": 4 }] },
+      "bpm": 120,
+      "expect": { "srcDur": 8, "rawOutDur": 6.5, "outDur": 6.5, "points": [[0, 0], [2, 1], [4, 2], [4.5, 3], [5, 4], [5.25, 5], [5.5, 6], [6.5, 8]] }
+    },
+    {
+      "name": "extrapolation at base speed, not range speed",
+      "scene": { "bars": 1, "speed": 2, "warp": [{ "from": 0, "to": 1, "speed": 0.5 }] },
+      "bpm": 120,
+      "expect": { "srcDur": 2, "rawOutDur": 2.5, "outDur": 2.5, "points": [[-1, -2], [0, 0], [2, 1], [2.5, 2], [3.5, 4]] }
+    },
+    {
+      "name": "beat snap",
+      "scene": { "bars": 1, "speed": 1.25 },
+      "bpm": 120,
+      "expect": { "srcDur": 2, "rawOutDur": 1.6, "outDur": 1.5, "points": [[0, 0], [1, 1.25], [1.6, 2], [2, 2.5]] }
+    },
+    {
+      "name": "bar snap",
+      "scene": { "bars": 2, "speed": 0.625, "snap": "bar" },
+      "bpm": 120,
+      "expect": { "srcDur": 4, "rawOutDur": 6.4, "outDur": 6, "points": [[0, 0], [3.2, 2], [6.4, 4], [8, 5]] }
+    },
+    {
+      "name": "bar snap minimum one bar",
+      "scene": { "bars": 1, "speed": 4, "snap": "bar" },
+      "bpm": 120,
+      "expect": { "srcDur": 2, "rawOutDur": 0.5, "outDur": 2, "points": [[0, 0], [0.25, 1], [0.5, 2], [1, 4]] }
+    },
+    {
+      "name": "explicit beats",
+      "scene": { "bars": 2, "beats": 6 },
+      "bpm": 120,
+      "expect": { "srcDur": 4, "rawOutDur": 4, "outDur": 3, "points": [[0, 0], [3, 3], [4, 4]] }
+    }
+  ],
+  "fitSpeed": [
+    { "name": "possible, no warp", "scene": { "bars": 2 }, "bpm": 120, "beats": 16, "expect": 0.5 },
+    { "name": "possible, around a range", "scene": { "bars": 4, "warp": [{ "from": 0, "to": 2, "speed": 0.5 }] }, "bpm": 120, "beats": 12, "expect": 3 },
+    { "name": "impossible, ranges already fill the target", "scene": { "bars": 4, "warp": [{ "from": 0, "to": 2, "speed": 0.5 }] }, "bpm": 120, "beats": 8, "expect": null },
+    { "name": "impossible, above SPEED_MAX", "scene": { "bars": 8 }, "bpm": 120, "beats": 1, "expect": null }
+  ],
+  "validate": [
+    { "name": "valid, touching ranges", "scene": { "bars": 4, "speed": 2, "beats": 8, "snap": "bar", "warp": [{ "from": 0, "to": 2, "speed": 0.5 }, { "from": 2, "to": 4, "speed": 4 }] }, "errors": [] },
+    { "name": "invalid overlap", "scene": { "bars": 2, "warp": [{ "from": 0, "to": 2, "speed": 1.5 }, { "from": 1, "to": 3, "speed": 2 }] }, "errors": ["overlap"] },
+    { "name": "invalid unsorted", "scene": { "bars": 4, "warp": [{ "from": 4, "to": 6, "speed": 2 }, { "from": 0, "to": 2, "speed": 2 }] }, "errors": ["unsorted"] },
+    { "name": "invalid empty range", "scene": { "bars": 2, "warp": [{ "from": 2, "to": 2, "speed": 2 }] }, "errors": ["from >= to"] },
+    { "name": "invalid range outside scene", "scene": { "bars": 2, "warp": [{ "from": 3, "to": 5, "speed": 2 }] }, "errors": ["outside"] },
+    { "name": "invalid speeds", "scene": { "bars": 2, "speed": 5, "warp": [{ "from": 0, "to": 1, "speed": 0.1 }] }, "errors": ["speed", "speed"] },
+    { "name": "invalid beats and snap", "scene": { "bars": 2, "beats": 2.5, "snap": "half" }, "errors": ["beats", "snap"] }
+  ]
+}

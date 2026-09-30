@@ -1,0 +1,176 @@
+{
+  "note": "English voice-over, one entry per scene. `title` is the only text left on screen (null = no title). `vo` is spoken; an array means separate lines timed to beats inside the scene (aiCards: one per card). Edit freely, then voice.mjs regenerates only the lines that changed.",
+  "lang": "en",
+  "scenes": [
+    {
+      "id": "intro",
+      "title": "Memlore",
+      "vo": "Hey there. Every day leaves something behind: a thought, a feeling, a moment you don't want to lose. This is Memlore, where those moments find a home. And it all comes down to four little words.",
+      "at": 0.7
+    },
+    {
+      "id": "hook",
+      "title": "Write. Remember. Reflect. Privately.",
+      "vo": [
+        "Write!",
+        "Remember!",
+        "Reflect!",
+        "Privately."
+      ],
+      "at": [
+        0.1,
+        0.964,
+        1.9,
+        3.121
+      ]
+    },
+    {
+      "id": "local",
+      "title": "Lives on your device.",
+      "vo": "Your journal lives right on your device. It works completely offline! No server. No account. No tracking. Ever.",
+      "at": 0.7
+    },
+    {
+      "id": "encrypt",
+      "title": "Encrypted. Even from us.",
+      "vo": "Every single entry is encrypted, end to end. Not even we can read it!",
+      "at": 0.7
+    },
+    {
+      "id": "locks",
+      "title": "Hide what you want.",
+      "vo": "Privacy comes in layers! Start with the app lock: a password or Touch ID guards everything. Want more? Add a second lock, an extra password on the entries that matter most. And for what nobody should ever see, the invisible lock hides whole vaults. They simply don't exist, until you type the right password.",
+      "at": 0.7
+    },
+    {
+      "id": "editor",
+      "title": "Write in full colour.",
+      "vo": "Write the way you think! Headings, highlights, links, checklists, code... even math. Then drop in your media: photos, audio, and video.",
+      "at": 0.7
+    },
+    {
+      "id": "find",
+      "title": "Find anything.",
+      "vo": "Every word you've ever written? Just one search away. And with AI turned on, you can even search by meaning!",
+      "at": 0.7
+    },
+    {
+      "id": "calendar",
+      "title": "Every day, at a glance.",
+      "vo": "The calendar lights up every day you wrote.",
+      "at": 0.7
+    },
+    {
+      "id": "tags",
+      "title": "Your life, your tags.",
+      "vo": "Tags keep it all organised, your way.",
+      "at": 0.7
+    },
+    {
+      "id": "onThisDay",
+      "title": "Same day. Years apart.",
+      "vo": "On this day, Memlore brings back what you wrote a year ago... and the years before that.",
+      "at": 0.7
+    },
+    {
+      "id": "stats",
+      "title": "Your story, in numbers.",
+      "vo": "And your writing habits? Right there, in numbers!",
+      "at": 0.7
+    },
+    {
+      "id": "map",
+      "title": "Your life, on a map.",
+      "vo": "Photos, videos and voice memos pin every memory to the exact place it happened.",
+      "at": 0.7
+    },
+    {
+      "id": "aiIntro",
+      "title": "AI, only when you want it.",
+      "vo": "And AI? It stays off until you turn it on! Run it on your device, on your own server, or with any provider you like.",
+      "at": 0.7
+    },
+    {
+      "id": "aiCards",
+      "title": "All optional. All yours.",
+      "vo": [
+        "It can suggest a title,",
+        "read the mood of your day,",
+        "suggest tags,",
+        "pull out the lines worth keeping,",
+        "Stuck for ideas? It can ask you a deeper question,",
+        "keep writing with you, or say it warmer,",
+        "sum up a long day,",
+        "search by meaning,",
+        "or talk your day through with AI friends, each with their own personality, and turn those chats into entries, written in your own style.",
+        "turn a memory into a picture,",
+        "review your whole month,",
+        "and find the threads running through your life!",
+        "All optional. All yours."
+      ],
+      "at": [
+        0.3,
+        3.5,
+        6.7,
+        9.9,
+        13.1,
+        17.357,
+        21.4,
+        24.6,
+        27.8,
+        36.557,
+        39.757,
+        42.957,
+        46.5
+      ]
+    },
+    {
+      "id": "secondYou",
+      "title": "Meet your second you.",
+      "vo": "Memlore can remember what matters to you, and even learn to write like you. And every memory? Yours to edit.",
+      "at": 0.7
+    },
+    {
+      "id": "mcp",
+      "title": "Journal from other AI agents.",
+      "vo": "Already using an AI agent? Connect ChatGPT, Claude, or any MCP app to Memlore, and journal right from the chat. All locally, on your own machine.",
+      "at": 0.7
+    },
+    {
+      "id": "sync",
+      "title": "Your cloud. Your keys.",
+      "vo": "Sync through your own cloud! Google Drive and iCloud today, with more to come. And everything is encrypted before it ever leaves your device.",
+      "at": 0.7
+    },
+    {
+      "id": "import",
+      "title": "Moving from another app?",
+      "vo": "Moving from Day One, Journey or Apple Journal? Bring all your journals with you. And export everything, anytime.",
+      "at": 0.7
+    },
+    {
+      "id": "themes",
+      "title": "Same journal. Your look.",
+      "vo": "And make it yours! Memlore looks exactly the way you like, in countless combinations. Three design systems, light and dark, accent colours, layouts, and fonts.",
+      "at": 0.7
+    },
+    {
+      "id": "open",
+      "title": null,
+      "vo": "Best of all? Memlore is open source, free, and works across all your devices!",
+      "at": 0.7
+    },
+    {
+      "id": "outro",
+      "title": "Memlore",
+      "vo": "Memlore. A little life, a lasting story. Download it today!",
+      "at": 0.7
+    }
+  ],
+  "voice": {
+    "name": "Hope - upbeat and clear",
+    "voice_id": "tnSpp4vdxKPjI9w0GnoV",
+    "model_id": "eleven_v4",
+    "tempo": 1.12
+  }
+}

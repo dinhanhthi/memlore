@@ -1,0 +1,2201 @@
+{
+  "voice": {
+    "name": "Hope - upbeat and clear",
+    "voice_id": "tnSpp4vdxKPjI9w0GnoV",
+    "model_id": "eleven_v4",
+    "tempo": 1.12
+  },
+  "tempo": 1.12,
+  "lines": {
+    "intro": [
+      {
+        "file": "intro-0-14019ef5cc.mp3",
+        "text": "Hey there. Every day leaves something behind: a thought, a feeling, a moment you don't want to lose. This is Memlore, where those moments find a home. And it all comes down to four little words.",
+        "dur": 13,
+        "words": [
+          {
+            "w": "Hey",
+            "t": 0
+          },
+          {
+            "w": "there.",
+            "t": 0.214
+          },
+          {
+            "w": "Every",
+            "t": 0.75
+          },
+          {
+            "w": "day",
+            "t": 1.286
+          },
+          {
+            "w": "leaves",
+            "t": 1.571
+          },
+          {
+            "w": "something",
+            "t": 1.857
+          },
+          {
+            "w": "behind:",
+            "t": 2.214
+          },
+          {
+            "w": "a",
+            "t": 3.143
+          },
+          {
+            "w": "thought,",
+            "t": 3.286
+          },
+          {
+            "w": "a",
+            "t": 3.964
+          },
+          {
+            "w": "feeling,",
+            "t": 4.143
+          },
+          {
+            "w": "a",
+            "t": 5
+          },
+          {
+            "w": "moment",
+            "t": 5.143
+          },
+          {
+            "w": "you",
+            "t": 5.5
+          },
+          {
+            "w": "don't",
+            "t": 5.714
+          },
+          {
+            "w": "want",
+            "t": 5.929
+          },
+          {
+            "w": "to",
+            "t": 6.071
+          },
+          {
+            "w": "lose.",
+            "t": 6.214
+          },
+          {
+            "w": "This",
+            "t": 7.143
+          },
+          {
+            "w": "is",
+            "t": 7.571
+          },
+          {
+            "w": "Memlore,",
+            "t": 7.714
+          },
+          {
+            "w": "where",
+            "t": 8.5
+          },
+          {
+            "w": "those",
+            "t": 8.643
+          },
+          {
+            "w": "moments",
+            "t": 8.929
+          },
+          {
+            "w": "find",
+            "t": 9.429
+          },
+          {
+            "w": "a",
+            "t": 9.643
+          },
+          {
+            "w": "home.",
+            "t": 9.857
+          },
+          {
+            "w": "And",
+            "t": 10.393
+          },
+          {
+            "w": "it",
+            "t": 10.536
+          },
+          {
+            "w": "all",
+            "t": 10.714
+          },
+          {
+            "w": "comes",
+            "t": 10.964
+          },
+          {
+            "w": "down",
+            "t": 11.143
+          },
+          {
+            "w": "to",
+            "t": 11.429
+          },
+          {
+            "w": "four",
+            "t": 11.75
+          },
+          {
+            "w": "little",
+            "t": 12
+          },
+          {
+            "w": "words.",
+            "t": 12.429
+          }
+        ]
+      }
+    ],
+    "hook": [
+      {
+        "file": "hook-0-9688dfa1f3.mp3",
+        "text": "Write!",
+        "dur": 0.714,
+        "words": [
+          {
+            "w": "Write!",
+            "t": 0
+          }
+        ]
+      },
+      {
+        "file": "hook-1-60c688d632.mp3",
+        "text": "Remember!",
+        "dur": 0.786,
+        "words": [
+          {
+            "w": "Remember!",
+            "t": 0
+          }
+        ]
+      },
+      {
+        "file": "hook-2-b5bef137ce.mp3",
+        "text": "Reflect!",
+        "dur": 1.071,
+        "words": [
+          {
+            "w": "Reflect!",
+            "t": 0
+          }
+        ]
+      },
+      {
+        "file": "hook-3-a4331f9c70.mp3",
+        "text": "Privately.",
+        "dur": 1.143,
+        "words": [
+          {
+            "w": "Privately.",
+            "t": 0
+          }
+        ]
+      }
+    ],
+    "local": [
+      {
+        "file": "local-0-046887eb0a.mp3",
+        "text": "Your journal lives right on your device. It works completely offline! No server. No account. No tracking. Ever.",
+        "dur": 7.857,
+        "words": [
+          {
+            "w": "Your",
+            "t": 0
+          },
+          {
+            "w": "journal",
+            "t": 0.214
+          },
+          {
+            "w": "lives",
+            "t": 0.571
+          },
+          {
+            "w": "right",
+            "t": 0.929
+          },
+          {
+            "w": "on",
+            "t": 1.214
+          },
+          {
+            "w": "your",
+            "t": 1.321
+          },
+          {
+            "w": "device.",
+            "t": 1.429
+          },
+          {
+            "w": "It",
+            "t": 2.179
+          },
+          {
+            "w": "works",
+            "t": 2.286
+          },
+          {
+            "w": "completely",
+            "t": 2.571
+          },
+          {
+            "w": "offline!",
+            "t": 3.214
+          },
+          {
+            "w": "No",
+            "t": 4.214
+          },
+          {
+            "w": "server.",
+            "t": 4.429
+          },
+          {
+            "w": "No",
+            "t": 5.143
+          },
+          {
+            "w": "account.",
+            "t": 5.286
+          },
+          {
+            "w": "No",
+            "t": 6
+          },
+          {
+            "w": "tracking.",
+            "t": 6.286
+          },
+          {
+            "w": "Ever.",
+            "t": 7.25
+          }
+        ]
+      }
+    ],
+    "encrypt": [
+      {
+        "file": "encrypt-0-8e8f565ad8.mp3",
+        "text": "Every single entry is encrypted, end to end. Not even we can read it!",
+        "dur": 4.857,
+        "words": [
+          {
+            "w": "Every",
+            "t": 0
+          },
+          {
+            "w": "single",
+            "t": 0.357
+          },
+          {
+            "w": "entry",
+            "t": 0.714
+          },
+          {
+            "w": "is",
+            "t": 1.071
+          },
+          {
+            "w": "encrypted,",
+            "t": 1.464
+          },
+          {
+            "w": "end",
+            "t": 2.071
+          },
+          {
+            "w": "to",
+            "t": 2.286
+          },
+          {
+            "w": "end.",
+            "t": 2.5
+          },
+          {
+            "w": "Not",
+            "t": 3.143
+          },
+          {
+            "w": "even",
+            "t": 3.357
+          },
+          {
+            "w": "we",
+            "t": 3.714
+          },
+          {
+            "w": "can",
+            "t": 3.857
+          },
+          {
+            "w": "read",
+            "t": 4.071
+          },
+          {
+            "w": "it!",
+            "t": 4.214
+          }
+        ]
+      }
+    ],
+    "locks": [
+      {
+        "file": "locks-0-97ab7bc8bf.mp3",
+        "text": "Privacy comes in layers! Start with the app lock: a password or Touch ID guards everything. Want more? Add a second lock, an extra password on the entries that matter most. And for what nobody should ever see, the invisible lock hides whole vaults. They simply don't exist, until you type the right password.",
+        "dur": 19.286,
+        "words": [
+          {
+            "w": "Privacy",
+            "t": 0
+          },
+          {
+            "w": "comes",
+            "t": 0.5
+          },
+          {
+            "w": "in",
+            "t": 0.786
+          },
+          {
+            "w": "layers!",
+            "t": 1
+          },
+          {
+            "w": "Start",
+            "t": 1.929
+          },
+          {
+            "w": "with",
+            "t": 2.214
+          },
+          {
+            "w": "the",
+            "t": 2.357
+          },
+          {
+            "w": "app",
+            "t": 2.5
+          },
+          {
+            "w": "lock:",
+            "t": 2.714
+          },
+          {
+            "w": "a",
+            "t": 3.321
+          },
+          {
+            "w": "password",
+            "t": 3.357
+          },
+          {
+            "w": "or",
+            "t": 3.857
+          },
+          {
+            "w": "Touch",
+            "t": 4.107
+          },
+          {
+            "w": "ID",
+            "t": 4.286
+          },
+          {
+            "w": "guards",
+            "t": 4.857
+          },
+          {
+            "w": "everything.",
+            "t": 5.143
+          },
+          {
+            "w": "Want",
+            "t": 6.143
+          },
+          {
+            "w": "more?",
+            "t": 6.286
+          },
+          {
+            "w": "Add",
+            "t": 6.929
+          },
+          {
+            "w": "a",
+            "t": 7.143
+          },
+          {
+            "w": "second",
+            "t": 7.214
+          },
+          {
+            "w": "lock,",
+            "t": 7.75
+          },
+          {
+            "w": "an",
+            "t": 8.143
+          },
+          {
+            "w": "extra",
+            "t": 8.286
+          },
+          {
+            "w": "password",
+            "t": 8.643
+          },
+          {
+            "w": "on",
+            "t": 9.071
+          },
+          {
+            "w": "the",
+            "t": 9.214
+          },
+          {
+            "w": "entries",
+            "t": 9.357
+          },
+          {
+            "w": "that",
+            "t": 9.714
+          },
+          {
+            "w": "matter",
+            "t": 10
+          },
+          {
+            "w": "most.",
+            "t": 10.214
+          },
+          {
+            "w": "And",
+            "t": 11.096
+          },
+          {
+            "w": "for",
+            "t": 11.214
+          },
+          {
+            "w": "what",
+            "t": 11.393
+          },
+          {
+            "w": "nobody",
+            "t": 11.571
+          },
+          {
+            "w": "should",
+            "t": 12.071
+          },
+          {
+            "w": "ever",
+            "t": 12.286
+          },
+          {
+            "w": "see,",
+            "t": 12.571
+          },
+          {
+            "w": "the",
+            "t": 13.143
+          },
+          {
+            "w": "invisible",
+            "t": 13.464
+          },
+          {
+            "w": "lock",
+            "t": 13.786
+          },
+          {
+            "w": "hides",
+            "t": 14.071
+          },
+          {
+            "w": "whole",
+            "t": 14.571
+          },
+          {
+            "w": "vaults.",
+            "t": 14.786
+          },
+          {
+            "w": "They",
+            "t": 15.571
+          },
+          {
+            "w": "simply",
+            "t": 15.786
+          },
+          {
+            "w": "don't",
+            "t": 16.179
+          },
+          {
+            "w": "exist,",
+            "t": 16.357
+          },
+          {
+            "w": "until",
+            "t": 17.214
+          },
+          {
+            "w": "you",
+            "t": 17.571
+          },
+          {
+            "w": "type",
+            "t": 17.75
+          },
+          {
+            "w": "the",
+            "t": 17.929
+          },
+          {
+            "w": "right",
+            "t": 18.071
+          },
+          {
+            "w": "password.",
+            "t": 18.75
+          }
+        ]
+      }
+    ],
+    "editor": [
+      {
+        "file": "editor-0-276a2c924a.mp3",
+        "text": "Write the way you think! Headings, highlights, links, checklists, code... even math. Then drop in your media: photos, audio, and video.",
+        "dur": 9.571,
+        "words": [
+          {
+            "w": "Write",
+            "t": 0
+          },
+          {
+            "w": "the",
+            "t": 0.25
+          },
+          {
+            "w": "way",
+            "t": 0.357
+          },
+          {
+            "w": "you",
+            "t": 0.5
+          },
+          {
+            "w": "think!",
+            "t": 0.821
+          },
+          {
+            "w": "Headings,",
+            "t": 1.464
+          },
+          {
+            "w": "highlights,",
+            "t": 2.107
+          },
+          {
+            "w": "links,",
+            "t": 2.929
+          },
+          {
+            "w": "checklists,",
+            "t": 3.5
+          },
+          {
+            "w": "code...",
+            "t": 4.214
+          },
+          {
+            "w": "even",
+            "t": 4.929
+          },
+          {
+            "w": "math.",
+            "t": 5.214
+          },
+          {
+            "w": "Then",
+            "t": 6.143
+          },
+          {
+            "w": "drop",
+            "t": 6.357
+          },
+          {
+            "w": "in",
+            "t": 6.607
+          },
+          {
+            "w": "your",
+            "t": 6.714
+          },
+          {
+            "w": "media:",
+            "t": 6.857
+          },
+          {
+            "w": "photos,",
+            "t": 7.786
+          },
+          {
+            "w": "audio,",
+            "t": 8.143
+          },
+          {
+            "w": "and",
+            "t": 8.667
+          },
+          {
+            "w": "video.",
+            "t": 9.107
+          }
+        ]
+      }
+    ],
+    "find": [
+      {
+        "file": "find-0-e597ca2790.mp3",
+        "text": "Every word you've ever written? Just one search away. And with AI turned on, you can even search by meaning!",
+        "dur": 6.571,
+        "words": [
+          {
+            "w": "Every",
+            "t": 0
+          },
+          {
+            "w": "word",
+            "t": 0.286
+          },
+          {
+            "w": "you've",
+            "t": 0.536
+          },
+          {
+            "w": "ever",
+            "t": 0.786
+          },
+          {
+            "w": "written?",
+            "t": 1.179
+          },
+          {
+            "w": "Just",
+            "t": 1.786
+          },
+          {
+            "w": "one",
+            "t": 2.143
+          },
+          {
+            "w": "search",
+            "t": 2.357
+          },
+          {
+            "w": "away.",
+            "t": 2.571
+          },
+          {
+            "w": "And",
+            "t": 3.31
+          },
+          {
+            "w": "with",
+            "t": 3.464
+          },
+          {
+            "w": "AI",
+            "t": 3.643
+          },
+          {
+            "w": "turned",
+            "t": 3.929
+          },
+          {
+            "w": "on,",
+            "t": 4.214
+          },
+          {
+            "w": "you",
+            "t": 4.643
+          },
+          {
+            "w": "can",
+            "t": 4.821
+          },
+          {
+            "w": "even",
+            "t": 5
+          },
+          {
+            "w": "search",
+            "t": 5.286
+          },
+          {
+            "w": "by",
+            "t": 5.607
+          },
+          {
+            "w": "meaning!",
+            "t": 6.107
+          }
+        ]
+      }
+    ],
+    "calendar": [
+      {
+        "file": "calendar-0-fb7afd13ce.mp3",
+        "text": "The calendar lights up every day you wrote.",
+        "dur": 2.643,
+        "words": [
+          {
+            "w": "The",
+            "t": 0
+          },
+          {
+            "w": "calendar",
+            "t": 0.357
+          },
+          {
+            "w": "lights",
+            "t": 0.643
+          },
+          {
+            "w": "up",
+            "t": 0.929
+          },
+          {
+            "w": "every",
+            "t": 1.214
+          },
+          {
+            "w": "day",
+            "t": 1.571
+          },
+          {
+            "w": "you",
+            "t": 1.786
+          },
+          {
+            "w": "wrote.",
+            "t": 1.893
+          }
+        ]
+      }
+    ],
+    "tags": [
+      {
+        "file": "tags-0-daf3fafbc7.mp3",
+        "text": "Tags keep it all organised, your way.",
+        "dur": 2.857,
+        "words": [
+          {
+            "w": "Tags",
+            "t": 0
+          },
+          {
+            "w": "keep",
+            "t": 0.357
+          },
+          {
+            "w": "it",
+            "t": 0.607
+          },
+          {
+            "w": "all",
+            "t": 0.786
+          },
+          {
+            "w": "organised,",
+            "t": 1.071
+          },
+          {
+            "w": "your",
+            "t": 1.929
+          },
+          {
+            "w": "way.",
+            "t": 2.464
+          }
+        ]
+      }
+    ],
+    "onThisDay": [
+      {
+        "file": "onThisDay-0-279bdd65c1.mp3",
+        "text": "On this day, Memlore brings back what you wrote a year ago... and the years before that.",
+        "dur": 4.857,
+        "words": [
+          {
+            "w": "On",
+            "t": 0
+          },
+          {
+            "w": "this",
+            "t": 0.214
+          },
+          {
+            "w": "day,",
+            "t": 0.429
+          },
+          {
+            "w": "Memlore",
+            "t": 0.929
+          },
+          {
+            "w": "brings",
+            "t": 1.321
+          },
+          {
+            "w": "back",
+            "t": 1.679
+          },
+          {
+            "w": "what",
+            "t": 1.857
+          },
+          {
+            "w": "you",
+            "t": 2
+          },
+          {
+            "w": "wrote",
+            "t": 2.119
+          },
+          {
+            "w": "a",
+            "t": 2.286
+          },
+          {
+            "w": "year",
+            "t": 2.357
+          },
+          {
+            "w": "ago...",
+            "t": 2.571
+          },
+          {
+            "w": "and",
+            "t": 3.429
+          },
+          {
+            "w": "the",
+            "t": 3.5
+          },
+          {
+            "w": "years",
+            "t": 3.643
+          },
+          {
+            "w": "before",
+            "t": 3.857
+          },
+          {
+            "w": "that.",
+            "t": 4.464
+          }
+        ]
+      }
+    ],
+    "stats": [
+      {
+        "file": "stats-0-99e050af8d.mp3",
+        "text": "And your writing habits? Right there, in numbers!",
+        "dur": 3.214,
+        "words": [
+          {
+            "w": "And",
+            "t": 0
+          },
+          {
+            "w": "your",
+            "t": 0.214
+          },
+          {
+            "w": "writing",
+            "t": 0.429
+          },
+          {
+            "w": "habits?",
+            "t": 0.679
+          },
+          {
+            "w": "Right",
+            "t": 1.429
+          },
+          {
+            "w": "there,",
+            "t": 1.857
+          },
+          {
+            "w": "in",
+            "t": 2.143
+          },
+          {
+            "w": "numbers!",
+            "t": 2.714
+          }
+        ]
+      }
+    ],
+    "map": [
+      {
+        "file": "map-0-bd4f0d0f9b.mp3",
+        "text": "Photos, videos and voice memos pin every memory to the exact place it happened.",
+        "dur": 5,
+        "words": [
+          {
+            "w": "Photos,",
+            "t": 0
+          },
+          {
+            "w": "videos",
+            "t": 0.857
+          },
+          {
+            "w": "and",
+            "t": 1.143
+          },
+          {
+            "w": "voice",
+            "t": 1.357
+          },
+          {
+            "w": "memos",
+            "t": 1.643
+          },
+          {
+            "w": "pin",
+            "t": 2.071
+          },
+          {
+            "w": "every",
+            "t": 2.429
+          },
+          {
+            "w": "memory",
+            "t": 2.893
+          },
+          {
+            "w": "to",
+            "t": 3.143
+          },
+          {
+            "w": "the",
+            "t": 3.25
+          },
+          {
+            "w": "exact",
+            "t": 3.357
+          },
+          {
+            "w": "place",
+            "t": 3.857
+          },
+          {
+            "w": "it",
+            "t": 4.107
+          },
+          {
+            "w": "happened.",
+            "t": 4.214
+          }
+        ]
+      }
+    ],
+    "aiIntro": [
+      {
+        "file": "aiIntro-0-3137a0119d.mp3",
+        "text": "And AI? It stays off until you turn it on! Run it on your device, on your own server, or with any provider you like.",
+        "dur": 7.643,
+        "words": [
+          {
+            "w": "And",
+            "t": 0
+          },
+          {
+            "w": "AI?",
+            "t": 0.214
+          },
+          {
+            "w": "It",
+            "t": 1.071
+          },
+          {
+            "w": "stays",
+            "t": 1.214
+          },
+          {
+            "w": "off",
+            "t": 1.571
+          },
+          {
+            "w": "until",
+            "t": 1.929
+          },
+          {
+            "w": "you",
+            "t": 2.357
+          },
+          {
+            "w": "turn",
+            "t": 2.5
+          },
+          {
+            "w": "it",
+            "t": 2.679
+          },
+          {
+            "w": "on!",
+            "t": 2.786
+          },
+          {
+            "w": "Run",
+            "t": 3.5
+          },
+          {
+            "w": "it",
+            "t": 3.643
+          },
+          {
+            "w": "on",
+            "t": 3.786
+          },
+          {
+            "w": "your",
+            "t": 4
+          },
+          {
+            "w": "device,",
+            "t": 4.393
+          },
+          {
+            "w": "on",
+            "t": 4.821
+          },
+          {
+            "w": "your",
+            "t": 4.929
+          },
+          {
+            "w": "own",
+            "t": 5.143
+          },
+          {
+            "w": "server,",
+            "t": 5.357
+          },
+          {
+            "w": "or",
+            "t": 5.929
+          },
+          {
+            "w": "with",
+            "t": 6.107
+          },
+          {
+            "w": "any",
+            "t": 6.286
+          },
+          {
+            "w": "provider",
+            "t": 6.5
+          },
+          {
+            "w": "you",
+            "t": 6.929
+          },
+          {
+            "w": "like.",
+            "t": 7.286
+          }
+        ]
+      }
+    ],
+    "aiCards": [
+      {
+        "file": "aiCards-0-e689c27706.mp3",
+        "text": "It can suggest a title,",
+        "dur": 1.5,
+        "words": [
+          {
+            "w": "It",
+            "t": 0
+          },
+          {
+            "w": "can",
+            "t": 0.214
+          },
+          {
+            "w": "suggest",
+            "t": 0.464
+          },
+          {
+            "w": "a",
+            "t": 0.679
+          },
+          {
+            "w": "title,",
+            "t": 0.786
+          }
+        ]
+      },
+      {
+        "file": "aiCards-1-d70e7752ad.mp3",
+        "text": "read the mood of your day,",
+        "dur": 1.714,
+        "words": [
+          {
+            "w": "read",
+            "t": 0
+          },
+          {
+            "w": "the",
+            "t": 0.286
+          },
+          {
+            "w": "mood",
+            "t": 0.429
+          },
+          {
+            "w": "of",
+            "t": 0.714
+          },
+          {
+            "w": "your",
+            "t": 0.857
+          },
+          {
+            "w": "day,",
+            "t": 1.107
+          }
+        ]
+      },
+      {
+        "file": "aiCards-2-51b51b6c31.mp3",
+        "text": "suggest tags,",
+        "dur": 1.429,
+        "words": [
+          {
+            "w": "suggest",
+            "t": 0
+          },
+          {
+            "w": "tags,",
+            "t": 0.5
+          }
+        ]
+      },
+      {
+        "file": "aiCards-3-c9683bda4e.mp3",
+        "text": "pull out the lines worth keeping,",
+        "dur": 1.929,
+        "words": [
+          {
+            "w": "pull",
+            "t": 0
+          },
+          {
+            "w": "out",
+            "t": 0.214
+          },
+          {
+            "w": "the",
+            "t": 0.357
+          },
+          {
+            "w": "lines",
+            "t": 0.5
+          },
+          {
+            "w": "worth",
+            "t": 0.857
+          },
+          {
+            "w": "keeping,",
+            "t": 1.071
+          }
+        ]
+      },
+      {
+        "file": "aiCards-4-fe9add904c.mp3",
+        "text": "Stuck for ideas? It can ask you a deeper question,",
+        "dur": 3.357,
+        "words": [
+          {
+            "w": "Stuck",
+            "t": 0
+          },
+          {
+            "w": "for",
+            "t": 0.357
+          },
+          {
+            "w": "ideas?",
+            "t": 0.679
+          },
+          {
+            "w": "It",
+            "t": 1.429
+          },
+          {
+            "w": "can",
+            "t": 1.571
+          },
+          {
+            "w": "ask",
+            "t": 1.714
+          },
+          {
+            "w": "you",
+            "t": 2
+          },
+          {
+            "w": "a",
+            "t": 2.143
+          },
+          {
+            "w": "deeper",
+            "t": 2.25
+          },
+          {
+            "w": "question,",
+            "t": 2.571
+          }
+        ]
+      },
+      {
+        "file": "aiCards-5-f314bf006c.mp3",
+        "text": "keep writing with you, or say it warmer,",
+        "dur": 3.143,
+        "words": [
+          {
+            "w": "keep",
+            "t": 0
+          },
+          {
+            "w": "writing",
+            "t": 0.357
+          },
+          {
+            "w": "with",
+            "t": 0.75
+          },
+          {
+            "w": "you,",
+            "t": 0.929
+          },
+          {
+            "w": "or",
+            "t": 1.571
+          },
+          {
+            "w": "say",
+            "t": 1.929
+          },
+          {
+            "w": "it",
+            "t": 2.143
+          },
+          {
+            "w": "warmer,",
+            "t": 2.286
+          }
+        ]
+      },
+      {
+        "file": "aiCards-6-2a7dfb935e.mp3",
+        "text": "sum up a long day,",
+        "dur": 1.714,
+        "words": [
+          {
+            "w": "sum",
+            "t": 0
+          },
+          {
+            "w": "up",
+            "t": 0.286
+          },
+          {
+            "w": "a",
+            "t": 0.429
+          },
+          {
+            "w": "long",
+            "t": 0.571
+          },
+          {
+            "w": "day,",
+            "t": 0.929
+          }
+        ]
+      },
+      {
+        "file": "aiCards-7-69d79608e7.mp3",
+        "text": "search by meaning,",
+        "dur": 1.5,
+        "words": [
+          {
+            "w": "search",
+            "t": 0
+          },
+          {
+            "w": "by",
+            "t": 0.429
+          },
+          {
+            "w": "meaning,",
+            "t": 0.643
+          }
+        ]
+      },
+      {
+        "file": "aiCards-8-1222e1b9e7.mp3",
+        "text": "or talk your day through with AI friends, each with their own personality, and turn those chats into entries, written in your own style.",
+        "dur": 7.857,
+        "words": [
+          {
+            "w": "or",
+            "t": 0
+          },
+          {
+            "w": "talk",
+            "t": 0.25
+          },
+          {
+            "w": "your",
+            "t": 0.429
+          },
+          {
+            "w": "day",
+            "t": 0.571
+          },
+          {
+            "w": "through",
+            "t": 0.786
+          },
+          {
+            "w": "with",
+            "t": 1.107
+          },
+          {
+            "w": "AI",
+            "t": 1.286
+          },
+          {
+            "w": "friends,",
+            "t": 1.929
+          },
+          {
+            "w": "each",
+            "t": 2.357
+          },
+          {
+            "w": "with",
+            "t": 2.571
+          },
+          {
+            "w": "their",
+            "t": 2.75
+          },
+          {
+            "w": "own",
+            "t": 2.929
+          },
+          {
+            "w": "personality,",
+            "t": 3.143
+          },
+          {
+            "w": "and",
+            "t": 4.286
+          },
+          {
+            "w": "turn",
+            "t": 4.429
+          },
+          {
+            "w": "those",
+            "t": 4.75
+          },
+          {
+            "w": "chats",
+            "t": 4.929
+          },
+          {
+            "w": "into",
+            "t": 5.214
+          },
+          {
+            "w": "entries,",
+            "t": 5.5
+          },
+          {
+            "w": "written",
+            "t": 6.143
+          },
+          {
+            "w": "in",
+            "t": 6.5
+          },
+          {
+            "w": "your",
+            "t": 6.679
+          },
+          {
+            "w": "own",
+            "t": 6.857
+          },
+          {
+            "w": "style.",
+            "t": 7.143
+          }
+        ]
+      },
+      {
+        "file": "aiCards-9-cf42ddd2d2.mp3",
+        "text": "turn a memory into a picture,",
+        "dur": 2.143,
+        "words": [
+          {
+            "w": "turn",
+            "t": 0
+          },
+          {
+            "w": "a",
+            "t": 0.286
+          },
+          {
+            "w": "memory",
+            "t": 0.357
+          },
+          {
+            "w": "into",
+            "t": 0.857
+          },
+          {
+            "w": "a",
+            "t": 1.143
+          },
+          {
+            "w": "picture,",
+            "t": 1.429
+          }
+        ]
+      },
+      {
+        "file": "aiCards-10-38289c1f6c.mp3",
+        "text": "review your whole month,",
+        "dur": 1.571,
+        "words": [
+          {
+            "w": "review",
+            "t": 0
+          },
+          {
+            "w": "your",
+            "t": 0.429
+          },
+          {
+            "w": "whole",
+            "t": 0.714
+          },
+          {
+            "w": "month,",
+            "t": 1
+          }
+        ]
+      },
+      {
+        "file": "aiCards-11-cad4a51072.mp3",
+        "text": "and find the threads running through your life!",
+        "dur": 2.643,
+        "words": [
+          {
+            "w": "and",
+            "t": 0
+          },
+          {
+            "w": "find",
+            "t": 0.214
+          },
+          {
+            "w": "the",
+            "t": 0.5
+          },
+          {
+            "w": "threads",
+            "t": 0.643
+          },
+          {
+            "w": "running",
+            "t": 1.143
+          },
+          {
+            "w": "through",
+            "t": 1.429
+          },
+          {
+            "w": "your",
+            "t": 1.643
+          },
+          {
+            "w": "life!",
+            "t": 2.143
+          }
+        ]
+      },
+      {
+        "file": "aiCards-12-5857428f8e.mp3",
+        "text": "All optional. All yours.",
+        "dur": 2.429,
+        "words": [
+          {
+            "w": "All",
+            "t": 0
+          },
+          {
+            "w": "optional.",
+            "t": 0.357
+          },
+          {
+            "w": "All",
+            "t": 1.214
+          },
+          {
+            "w": "yours.",
+            "t": 1.5
+          }
+        ]
+      }
+    ],
+    "secondYou": [
+      {
+        "file": "secondYou-0-4fb3abe129.mp3",
+        "text": "Memlore can remember what matters to you, and even learn to write like you. And every memory? Yours to edit.",
+        "dur": 6.571,
+        "words": [
+          {
+            "w": "Memlore",
+            "t": 0
+          },
+          {
+            "w": "can",
+            "t": 0.5
+          },
+          {
+            "w": "remember",
+            "t": 0.643
+          },
+          {
+            "w": "what",
+            "t": 1.071
+          },
+          {
+            "w": "matters",
+            "t": 1.357
+          },
+          {
+            "w": "to",
+            "t": 1.75
+          },
+          {
+            "w": "you,",
+            "t": 1.857
+          },
+          {
+            "w": "and",
+            "t": 2.286
+          },
+          {
+            "w": "even",
+            "t": 2.5
+          },
+          {
+            "w": "learn",
+            "t": 2.821
+          },
+          {
+            "w": "to",
+            "t": 3
+          },
+          {
+            "w": "write",
+            "t": 3.179
+          },
+          {
+            "w": "like",
+            "t": 3.393
+          },
+          {
+            "w": "you.",
+            "t": 3.571
+          },
+          {
+            "w": "And",
+            "t": 4.143
+          },
+          {
+            "w": "every",
+            "t": 4.357
+          },
+          {
+            "w": "memory?",
+            "t": 4.964
+          },
+          {
+            "w": "Yours",
+            "t": 5.429
+          },
+          {
+            "w": "to",
+            "t": 5.714
+          },
+          {
+            "w": "edit.",
+            "t": 5.857
+          }
+        ]
+      }
+    ],
+    "mcp": [
+      {
+        "file": "mcp-0-f9836f5e31.mp3",
+        "text": "Already using an AI agent? Connect ChatGPT, Claude, or any MCP app to Memlore, and journal right from the chat. All locally, on your own machine.",
+        "dur": 9.929,
+        "words": [
+          {
+            "w": "Already",
+            "t": 0
+          },
+          {
+            "w": "using",
+            "t": 0.429
+          },
+          {
+            "w": "an",
+            "t": 0.714
+          },
+          {
+            "w": "AI",
+            "t": 0.857
+          },
+          {
+            "w": "agent?",
+            "t": 1.143
+          },
+          {
+            "w": "Connect",
+            "t": 2.036
+          },
+          {
+            "w": "ChatGPT,",
+            "t": 2.286
+          },
+          {
+            "w": "Claude,",
+            "t": 3.357
+          },
+          {
+            "w": "or",
+            "t": 3.964
+          },
+          {
+            "w": "any",
+            "t": 4.143
+          },
+          {
+            "w": "MCP",
+            "t": 4.5
+          },
+          {
+            "w": "app",
+            "t": 5
+          },
+          {
+            "w": "to",
+            "t": 5.143
+          },
+          {
+            "w": "Memlore,",
+            "t": 5.286
+          },
+          {
+            "w": "and",
+            "t": 5.953
+          },
+          {
+            "w": "journal",
+            "t": 6.071
+          },
+          {
+            "w": "right",
+            "t": 6.5
+          },
+          {
+            "w": "from",
+            "t": 6.714
+          },
+          {
+            "w": "the",
+            "t": 6.857
+          },
+          {
+            "w": "chat.",
+            "t": 7.25
+          },
+          {
+            "w": "All",
+            "t": 7.643
+          },
+          {
+            "w": "locally,",
+            "t": 7.857
+          },
+          {
+            "w": "on",
+            "t": 8.5
+          },
+          {
+            "w": "your",
+            "t": 8.679
+          },
+          {
+            "w": "own",
+            "t": 8.857
+          },
+          {
+            "w": "machine.",
+            "t": 9
+          }
+        ]
+      }
+    ],
+    "sync": [
+      {
+        "file": "sync-0-ee498794d5.mp3",
+        "text": "Sync through your own cloud! Google Drive and iCloud today, with more to come. And everything is encrypted before it ever leaves your device.",
+        "dur": 8.286,
+        "words": [
+          {
+            "w": "Sync",
+            "t": 0
+          },
+          {
+            "w": "through",
+            "t": 0.286
+          },
+          {
+            "w": "your",
+            "t": 0.536
+          },
+          {
+            "w": "own",
+            "t": 0.714
+          },
+          {
+            "w": "cloud!",
+            "t": 0.929
+          },
+          {
+            "w": "Google",
+            "t": 1.857
+          },
+          {
+            "w": "Drive",
+            "t": 2.071
+          },
+          {
+            "w": "and",
+            "t": 2.429
+          },
+          {
+            "w": "iCloud",
+            "t": 2.643
+          },
+          {
+            "w": "today,",
+            "t": 3.286
+          },
+          {
+            "w": "with",
+            "t": 3.714
+          },
+          {
+            "w": "more",
+            "t": 3.857
+          },
+          {
+            "w": "to",
+            "t": 4
+          },
+          {
+            "w": "come.",
+            "t": 4.393
+          },
+          {
+            "w": "And",
+            "t": 4.857
+          },
+          {
+            "w": "everything",
+            "t": 5
+          },
+          {
+            "w": "is",
+            "t": 5.5
+          },
+          {
+            "w": "encrypted",
+            "t": 5.857
+          },
+          {
+            "w": "before",
+            "t": 6.286
+          },
+          {
+            "w": "it",
+            "t": 6.536
+          },
+          {
+            "w": "ever",
+            "t": 6.75
+          },
+          {
+            "w": "leaves",
+            "t": 6.929
+          },
+          {
+            "w": "your",
+            "t": 7.214
+          },
+          {
+            "w": "device.",
+            "t": 7.75
+          }
+        ]
+      }
+    ],
+    "import": [
+      {
+        "file": "import-0-6eb6df8310.mp3",
+        "text": "Moving from Day One, Journey or Apple Journal? Bring all your journals with you. And export everything, anytime.",
+        "dur": 7.5,
+        "words": [
+          {
+            "w": "Moving",
+            "t": 0
+          },
+          {
+            "w": "from",
+            "t": 0.357
+          },
+          {
+            "w": "Day",
+            "t": 0.571
+          },
+          {
+            "w": "One,",
+            "t": 0.857
+          },
+          {
+            "w": "Journey",
+            "t": 1.429
+          },
+          {
+            "w": "or",
+            "t": 1.929
+          },
+          {
+            "w": "Apple",
+            "t": 2.214
+          },
+          {
+            "w": "Journal?",
+            "t": 2.821
+          },
+          {
+            "w": "Bring",
+            "t": 3.404
+          },
+          {
+            "w": "all",
+            "t": 3.643
+          },
+          {
+            "w": "your",
+            "t": 3.786
+          },
+          {
+            "w": "journals",
+            "t": 3.929
+          },
+          {
+            "w": "with",
+            "t": 4.286
+          },
+          {
+            "w": "you.",
+            "t": 4.5
+          },
+          {
+            "w": "And",
+            "t": 5.096
+          },
+          {
+            "w": "export",
+            "t": 5.214
+          },
+          {
+            "w": "everything,",
+            "t": 5.714
+          },
+          {
+            "w": "anytime.",
+            "t": 6.5
+          }
+        ]
+      }
+    ],
+    "themes": [
+      {
+        "file": "themes-0-f886d2b547.mp3",
+        "text": "And make it yours! Memlore looks exactly the way you like, in countless combinations. Three design systems, light and dark, accent colours, layouts, and fonts.",
+        "dur": 10.357,
+        "words": [
+          {
+            "w": "And",
+            "t": 0
+          },
+          {
+            "w": "make",
+            "t": 0.214
+          },
+          {
+            "w": "it",
+            "t": 0.429
+          },
+          {
+            "w": "yours!",
+            "t": 0.643
+          },
+          {
+            "w": "Memlore",
+            "t": 1.679
+          },
+          {
+            "w": "looks",
+            "t": 2.107
+          },
+          {
+            "w": "exactly",
+            "t": 2.286
+          },
+          {
+            "w": "the",
+            "t": 2.857
+          },
+          {
+            "w": "way",
+            "t": 3
+          },
+          {
+            "w": "you",
+            "t": 3.107
+          },
+          {
+            "w": "like,",
+            "t": 3.214
+          },
+          {
+            "w": "in",
+            "t": 3.786
+          },
+          {
+            "w": "countless",
+            "t": 3.929
+          },
+          {
+            "w": "combinations.",
+            "t": 4.357
+          },
+          {
+            "w": "Three",
+            "t": 5.5
+          },
+          {
+            "w": "design",
+            "t": 5.714
+          },
+          {
+            "w": "systems,",
+            "t": 6.071
+          },
+          {
+            "w": "light",
+            "t": 6.976
+          },
+          {
+            "w": "and",
+            "t": 7.143
+          },
+          {
+            "w": "dark,",
+            "t": 7.5
+          },
+          {
+            "w": "accent",
+            "t": 7.857
+          },
+          {
+            "w": "colours,",
+            "t": 8.214
+          },
+          {
+            "w": "layouts,",
+            "t": 9.036
+          },
+          {
+            "w": "and",
+            "t": 9.429
+          },
+          {
+            "w": "fonts.",
+            "t": 9.893
+          }
+        ]
+      }
+    ],
+    "open": [
+      {
+        "file": "open-0-d0f1db4340.mp3",
+        "text": "Best of all? Memlore is open source, free, and works across all your devices!",
+        "dur": 5.214,
+        "words": [
+          {
+            "w": "Best",
+            "t": 0
+          },
+          {
+            "w": "of",
+            "t": 0.286
+          },
+          {
+            "w": "all?",
+            "t": 0.429
+          },
+          {
+            "w": "Memlore",
+            "t": 1
+          },
+          {
+            "w": "is",
+            "t": 1.429
+          },
+          {
+            "w": "open",
+            "t": 1.643
+          },
+          {
+            "w": "source,",
+            "t": 1.929
+          },
+          {
+            "w": "free,",
+            "t": 2.5
+          },
+          {
+            "w": "and",
+            "t": 3.024
+          },
+          {
+            "w": "works",
+            "t": 3.143
+          },
+          {
+            "w": "across",
+            "t": 3.357
+          },
+          {
+            "w": "all",
+            "t": 3.857
+          },
+          {
+            "w": "your",
+            "t": 4
+          },
+          {
+            "w": "devices!",
+            "t": 4.143
+          }
+        ]
+      }
+    ],
+    "outro": [
+      {
+        "file": "outro-0-80a6acec0b.mp3",
+        "text": "Memlore. A little life, a lasting story. Download it today!",
+        "dur": 4.357,
+        "words": [
+          {
+            "w": "Memlore.",
+            "t": 0
+          },
+          {
+            "w": "A",
+            "t": 0.893
+          },
+          {
+            "w": "little",
+            "t": 1
+          },
+          {
+            "w": "life,",
+            "t": 1.429
+          },
+          {
+            "w": "a",
+            "t": 1.893
+          },
+          {
+            "w": "lasting",
+            "t": 2
+          },
+          {
+            "w": "story.",
+            "t": 2.5
+          },
+          {
+            "w": "Download",
+            "t": 3.393
+          },
+          {
+            "w": "it",
+            "t": 3.607
+          },
+          {
+            "w": "today!",
+            "t": 3.714
+          }
+        ]
+      }
+    ]
+  }
+}

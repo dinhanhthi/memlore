@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inline": "node inline-assets.mjs --src video.html --out dist/video.html",
+    "sheet": "node capture.mjs --mode sheet --src dist/video.html --out sheet-en.jpg",
+    "timeline": "node capture.mjs --mode timeline --src dist/video.html --out timeline.json",
+    "audio": "python3 audio.py --timeline timeline.json --out audio.wav"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}

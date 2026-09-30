@@ -1,0 +1,7 @@
+# regenerated for free from cached sources: node mix.mjs / soundtrack.py --stem sfx
+voice.wav
+sfx.wav
+audio.wav
+music/test.mp3
+music/*.part
+stills/

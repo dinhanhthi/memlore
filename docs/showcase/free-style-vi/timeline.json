@@ -1,0 +1,27 @@
+{
+  "bpm": 120,
+  "note": "Scene lengths are in bars (4 beats, 2 s at 120 BPM); an optional beats field sets the output length on the 0.5 s grid (written by fit.mjs from the voice-over). film.js and soundtrack.py both read this file, so cuts and musical hits stay locked.",
+  "scenes": [
+    { "id": "intro", "bars": 8, "section": "intro", "beats": 30 },
+    { "id": "hook", "bars": 3, "section": "build", "beats": 9 },
+    { "id": "local", "bars": 6, "section": "verse", "beats": 21 },
+    { "id": "encrypt", "bars": 3, "section": "verse" },
+    { "id": "locks", "bars": 10, "section": "verse" },
+    { "id": "editor", "bars": 7, "section": "chorus", "beats": 26 },
+    { "id": "find", "bars": 5, "section": "verse", "beats": 17 },
+    { "id": "calendar", "bars": 5, "section": "verse", "beats": 18 },
+    { "id": "tags", "bars": 4, "section": "verse", "beats": 14 },
+    { "id": "onThisDay", "bars": 5, "section": "bridge", "beats": 17 },
+    { "id": "stats", "bars": 4, "section": "chorus" },
+    { "id": "map", "bars": 5, "section": "verse" },
+    { "id": "aiIntro", "bars": 5, "section": "build", "beats": 18 },
+    { "id": "aiCards", "bars": 27, "section": "chorus", "beats": 105 },
+    { "id": "secondYou", "bars": 7, "section": "bridge", "beats": 26 },
+    { "id": "mcp", "bars": 8, "section": "verse" },
+    { "id": "sync", "bars": 6, "section": "verse", "beats": 21 },
+    { "id": "import", "bars": 6, "section": "build", "beats": 22 },
+    { "id": "themes", "bars": 5.5, "section": "chorus", "speed": 0.7 },
+    { "id": "open", "bars": 4, "section": "verse", "beats": 15 },
+    { "id": "outro", "bars": 5, "section": "outro", "beats": 18 }
+  ]
+}

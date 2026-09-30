@@ -1,0 +1,136 @@
+{
+  "note": "Vietnamese voice-over script, one entry per scene (mirrors narration.json). `title` is the only text left on screen (null = no title). `vo` is spoken; an array means separate lines timed to beats inside the scene. The voice block is copied from the English script as a placeholder: the real Vietnamese voice_id is decided after the voice audition. No `at` values yet; they are measured when the Vietnamese voice is generated.",
+  "lang": "vi",
+  "scenes": [
+    {
+      "id": "intro",
+      "title": "Memlore",
+      "vo": "Xin chào. Mỗi ngày trôi qua đều để lại điều gì đó: một suy nghĩ, một cảm xúc, một khoảnh khắc bạn không muốn đánh mất. Đây là app nhật ký Memlore, nơi những khoảnh khắc ấy có một chốn để về. Và tất cả gói gọn trong bốn điều nhỏ."
+    },
+    {
+      "id": "hook",
+      "title": "Viết. Nhớ. Suy ngẫm. Riêng tư.",
+      "vo": [
+        "Viết!",
+        "Ghi nhớ!",
+        "Suy ngẫm!",
+        "Và riêng tư."
+      ]
+    },
+    {
+      "id": "local",
+      "title": "Chỉ tồn tại trên thiết bị của bạn.",
+      "vo": "Nhật ký của bạn nằm ngay trên thiết bị của bạn. Và hoạt động hoàn toàn ngoại tuyến! Không máy chủ. Không tài khoản. Không theo dõi. Và sẽ luôn như vậy."
+    },
+    {
+      "id": "encrypt",
+      "title": "Mã hóa. Kể cả với chúng tôi.",
+      "vo": "Mỗi mục nhật ký đều được mã hóa đầu cuối. Ngay cả chúng tôi cũng không đọc được!"
+    },
+    {
+      "id": "locks",
+      "title": "Giấu điều bạn muốn.",
+      "vo": "Quyền riêng tư có nhiều lớp! Đầu tiên là khóa ứng dụng: mật khẩu hoặc Touch ID bảo vệ mọi thứ. Muốn chắc hơn? Thêm khóa phụ, một mật khẩu riêng cho những mục quan trọng nhất. Còn với điều không ai được thấy hay biết về chúng, khóa vô hình sẽ ẩn các mục bạn chọn. Chúng đơn giản là không tồn tại, cho đến khi bạn nhập đúng mật khẩu."
+    },
+    {
+      "id": "editor",
+      "title": "Soạn thảo đầy tự do.",
+      "vo": "Viết theo cách bạn nghĩ! Tiêu đề, làm nổi bật, liên kết, danh sách việc cần làm, chèn code... thậm chí cả công thức toán. Rồi thêm các file đa phương tiện như: ảnh, âm thanh và video."
+    },
+    {
+      "id": "find",
+      "title": "Tìm mọi thứ.",
+      "vo": "Mọi thứ bạn từng viết? Chỉ vài từ khoá là ra! Và khi AI được bật, bạn còn có thể tìm theo ý nghĩa thay vì từ khoá!"
+    },
+    {
+      "id": "calendar",
+      "title": "Mỗi ngày, trong tầm mắt.",
+      "vo": "Lịch sáng lên ở mỗi ngày bạn đã viết. Nó giúp bạn có một cái nhìn tổng quát về quãng thời gian qua hay theo dõi cảm xúc của mình biến chuyển thế nào."
+    },
+    {
+      "id": "tags",
+      "title": "Cuộc sống của bạn, thẻ của bạn.",
+      "vo": "Bạn cũng có thể nhóm các bài theo chủ đề riêng với thẻ. Thẻ giúp mọi thứ gọn gàng, theo cách của bạn."
+    },
+    {
+      "id": "onThisDay",
+      "title": "Cùng ngày. Trong quá khứ.",
+      "vo": "Với chức năng \"Ngày này năm xưa\", Memlore sẽ giúp bạn nhớ lại những gì bạn đã viết một năm trước... và nhiều năm trước nữa."
+    },
+    {
+      "id": "stats",
+      "title": "Câu chuyện của bạn, qua những con số.",
+      "vo": "Để biết về thói quen viết của mình? OK thôi, Memlore sẽ cho bạn thấy một bức tranh tổng thể dưới hình hài các con số!"
+    },
+    {
+      "id": "map",
+      "title": "Cuộc sống của bạn, trên bản đồ.",
+      "vo": "Với chức năng nhật ký theo bản đồ. Bạn sẽ thấy ảnh, video và ghi âm, đi kèm với các kỷ niệm, xuất hiện đúng nơi mà chúng đã xảy ra."
+    },
+    {
+      "id": "aiIntro",
+      "title": "AI, chỉ khi bạn muốn.",
+      "vo": "Còn AI? Nó luôn tắt cho đến khi bạn bật lên! Chạy ngay trên thiết bị, trên máy chủ riêng của bạn, hoặc với bất kỳ nhà cung cấp nào bạn thích."
+    },
+    {
+      "id": "aiCards",
+      "title": "Tất cả tùy chọn. Quyết định của bạn.",
+      "vo": [
+        "Nó có thể gợi ý tiêu đề theo nội dung bài viết,",
+        "đoán cảm xúc trong ngày của bạn,",
+        "gợi ý chủ đề hay thẻ với điều bạn đã viết,",
+        "chọn ra những điểm chính của một nhật ký dài,",
+        "Bí ý tưởng ư? Nó có thể hỏi và gợi ý sâu hơn,",
+        "viết tiếp cùng bạn, hoặc diễn đạt lại theo một cách ấm áp hơn,",
+        "tóm tắt một ngày dài,",
+        "tìm kiếm theo ý nghĩa,",
+        "hoặc trò chuyện cùng với những người bạn AI. Mỗi người một cá tính, rồi biến cuộc trò chuyện thành mục nhật ký, theo đúng phong cách viết của bạn.",
+        "chuyển một kỷ niệm thành hình ảnh sinh động,",
+        "nhìn lại những việc trong quá khứ,",
+        "và tìm ra những điều quan trọng nhất xuyên suốt cuộc đời bạn!",
+        "Tất cả là tùy chọn. Dùng chúng hay không, quyết định của bạn."
+      ]
+    },
+    {
+      "id": "secondYou",
+      "title": "Gặp con người thứ hai của bạn.",
+      "vo": "Memlore có thể ghi nhớ điều quan trọng với bạn dưới dạng các ký ức, thậm chí học cách viết giống bạn. Một phiên bản thứ hai của chính mình. Và tất nhiên, bạn toàn quyền chỉnh sửa cũng như bật hay tắt chức năng này."
+    },
+    {
+      "id": "mcp",
+      "title": "Viết nhật ký từ các AI agent khác.",
+      "vo": "Bạn đã dùng AI agent rồi? Hãy kết nối ChatGPT, Claude, hay bất kỳ ứng dụng MCP nào với Memlore. Khi ấy, chỉ việc chat như bình thường, Memlore sẽ lo phần tổng hợp thành các nhật ký và lưu chúng lại. Tất cả chạy cục bộ, ngay trên máy của bạn."
+    },
+    {
+      "id": "sync",
+      "title": "Nơi lưu trữ của bạn. Khóa của bạn.",
+      "vo": "Đồng bộ qua dịch vụ lưu trữ của chính bạn! Hiện hỗ trợ Google Drive và iCloud nhưng có thể thêm sau này. Mọi dữ liệu này đều được mã hóa trước khi rời khỏi thiết bị của bạn."
+    },
+    {
+      "id": "import",
+      "title": "Bạn đã quen dùng app khác?",
+      "vo": "Bạn đang dùng Day One, Journey hay Apple Journal để viết nhật ký? Đừng lo, Memlore hỗ trợ chuyển đổi dễ dàng từ các ứng dụng này cũng như xuất ra các định dạng phổ biến khác."
+    },
+    {
+      "id": "themes",
+      "title": "Tuỳ chỉnh app theo phong cách của bạn.",
+      "vo": "App được xây dựng mang tính tuỳ biến rất cao! Giao diện Memlore do bạn quyết định cùng vô số cách kết hợp. Ba hệ giao diện khác nhau, tuỳ chỉnh sáng tối, màu sắc, bố cục và phông chữ."
+    },
+    {
+      "id": "open",
+      "title": null,
+      "vo": "Tuyệt nhất là gì? App là một phần mềm mã nguồn mở, miễn phí, và có thể dùng được trên nhiều thiết bị khác nhau!"
+    },
+    {
+      "id": "outro",
+      "title": "Memlore",
+      "vo": "Memlore. Một chút đời thường, một câu chuyện dài lâu. Tải về ngay hôm nay để trải nghiệm bạn nhé!"
+    }
+  ],
+  "voice": {
+    "name": "Hope - upbeat and clear",
+    "voice_id": "tnSpp4vdxKPjI9w0GnoV",
+    "model_id": "eleven_v4",
+    "tempo": 1.12
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "film": "free-style",
+  "rev": 19,
+  "updatedAt": "2026-09-29T23:22:05.895Z",
+  "timing": {},
+  "comments": [
+    {
+      "id": "c_flu1u56fbb3g",
+      "sceneId": "intro",
+      "sourceT": 1.233,
+      "x": 856,
+      "y": 492,
+      "text": "thay vì các tam giác nhỏ, thay bằng các dot tròn với các kích thước khác nhau và opacity khác nhau, kèm shadow xung quanh.",
+      "status": "resolved",
+      "reply": "The triangle shards are now round glowing dots of mixed size and opacity, each with a soft shadow.",
+      "createdAt": "2026-09-28T16:17:51.340Z",
+      "resolvedAt": "2026-09-29T23:22:05.896Z"
+    }
+  ]
+}

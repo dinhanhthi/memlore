@@ -1,0 +1,649 @@
+{
+  "_comment": "Nội dung chữ trên video (tiếng Việt). Lời thoại nằm trong narration.vi.json. Mỗi cảnh: các khóa chữ, và `cue` = từ trong lời thoại để hình ảnh xuất hiện đúng lúc. Cụm cue là ước đoán, cần kiểm lại sau khi có giọng đọc thật.",
+  "intro": {
+    "tagline": {
+      "a": "Một cuộc sống nhỏ.",
+      "b": "Một câu chuyện bền lâu."
+    },
+    "kicker": "Nhật ký riêng tư · lưu ngay trên máy · Bật AI khi bạn muốn",
+    "cue": {
+      "tagline": "nơi những khoảnh khắc",
+      "thought": "một suy nghĩ",
+      "feeling": "một cảm xúc",
+      "moment": "một khoảnh khắc",
+      "memlore": "Memlore"
+    }
+  },
+  "hook": {},
+  "local": {
+    "wifiOff": "Ngoại tuyến",
+    "wifiOn": "Trực tuyến",
+    "entryTitle": "Thứ Ba, trên tàu",
+    "entryBody": "Không có sóng giữa hai ga, nhưng chẳng sao. Từng chữ được ghi thẳng vào ổ đĩa của mình.",
+    "saved": "Đã lưu trên máy Mac này"
+  },
+  "encrypt": {
+    "lines": {
+      "a": "Nhật ký ơi, mình đã nói với Mai rồi.",
+      "b": "Cô ấy cười, bảo đã biết từ lâu.",
+      "c": "Chưa bao giờ mình hồi hộp mà vui đến thế."
+    },
+    "pill": {
+      "aes": "AES-256-GCM",
+      "argon": "Khóa Argon2id",
+      "zk": "Zero-knowledge"
+    },
+    "cue": {
+      "encrypted": "mã hóa",
+      "endToEnd": "đầu cuối",
+      "notEvenWe": "Ngay cả chúng tôi"
+    }
+  },
+  "locks": {
+    "allEntries": "Tất cả mục nhật ký",
+    "count": "{n} mục",
+    "lockedEntry": "Mục đã khóa",
+    "welcome": "Chào mừng trở lại",
+    "welcomeSub": "Nhật ký của bạn được mã hóa trên thiết bị này.",
+    "touchIdWait": "Touch ID…",
+    "touchIdOk": "Touch ID ✓",
+    "journal": {
+      "vault": "Vô hình · Riêng tư",
+      "daily": "Nhật ký hằng ngày",
+      "health": "Sức khỏe & Cá nhân",
+      "work": "Ghi chú công việc"
+    },
+    "entry": {
+      "party": "Tiệc bất ngờ cho Mai",
+      "resign": "Thư xin nghỉ việc — bản nháp",
+      "startup": "Ý tưởng khởi nghiệp: Hướng Dương",
+      "run": "Chạy bộ buổi sáng bên sông",
+      "therapy": "Ghi chú buổi trị liệu",
+      "sprint": "Lên kế hoạch kỳ xuân",
+      "dad": "Thư gửi ba",
+      "lunch": "Ghi chú giờ nghỉ trưa",
+      "health": "Kết quả khám sức khỏe",
+      "market": "Đi chợ cuối tuần",
+      "book": "Cảm nhận câu lạc bộ sách"
+    },
+    "cue": {
+      "appLock": "khóa ứng dụng",
+      "secondLock": "khóa phụ",
+      "invisibleLock": "khóa vô hình",
+      "guardsEverything": "bảo vệ mọi thứ",
+      "wantMore": "Muốn chắc hơn",
+      "extraPassword": "một mật khẩu riêng",
+      "matterMost": "quan trọng nhất",
+      "andForWhat": "Còn với điều",
+      "typePassword": "bạn nhập đúng",
+      "rightPassword": "đúng mật khẩu"
+    }
+  },
+  "editor": {
+    "windowTitle": "Thứ Bảy ở Porto",
+    "h1": "Thứ Bảy ở Porto",
+    "p": {
+      "a": "Buổi chiều ở ",
+      "link": "Ribeira",
+      "b": ", ánh sáng ",
+      "mark": "kỳ ảo",
+      "c": "."
+    },
+    "todo": "Pastel de nata",
+    "photoCaption": "Hoàng hôn trên sông Douro",
+    "menu": {
+      "heading": "Tiêu đề",
+      "checklist": "Danh sách việc",
+      "code": "Khối mã",
+      "math": "Công thức khối",
+      "image": "Hình ảnh",
+      "table": "Bảng"
+    },
+    "words": "{n} từ",
+    "saved": "Đã lưu",
+    "cue": {
+      "headings": "Tiêu đề",
+      "checklists": "danh sách việc cần làm",
+      "code": "code",
+      "math": "công thức toán",
+      "photos": "ảnh",
+      "audio": "âm thanh",
+      "video": "video"
+    }
+  },
+  "find": {
+    "q1": "buổi sáng",
+    "q2": "khi nào mình thấy bình yên?",
+    "ai": "AI",
+    "r1": {
+      "0": {
+        "h": "Khởi đầu mới",
+        "b": "Dậy sớm và thấy thật lạc quan về cả tuần phía trước...",
+        "d": "T2, 28 thg 9"
+      },
+      "1": {
+        "h": "Chạy bộ buổi sáng bên sông",
+        "b": "Năm cây số trước bữa sáng. Hai chân nặng trĩu lúc đầu…",
+        "d": "T2, 28 thg 9"
+      },
+      "2": {
+        "h": "Một buổi sáng tệ",
+        "b": "Chuông báo thức không reo, mình lỡ cuộc họp đầu ngày…",
+        "d": "T5, 24 thg 9"
+      }
+    },
+    "r2": {
+      "0": {
+        "h": "Vẽ phác thảo bên mặt hồ",
+        "b": "Vẽ thuyền lúc mưa tạnh dần. Chẳng cần sửa gì, chẳng phải đi đâu…",
+        "d": "CN, 30 thg 8"
+      },
+      "1": {
+        "h": "Thứ Bảy ở Porto",
+        "b": "Ngồi bên sông đến khi đèn lên trên dòng Douro…",
+        "d": "T7, 19 thg 9"
+      },
+      "2": {
+        "h": "Chủ Nhật chậm rãi",
+        "b": "Không kế hoạch, một buổi tắm lâu, và sự yên ắng sau một tuần vất vả…",
+        "d": "CN, 13 thg 9"
+      }
+    },
+    "cue": {
+      "written": "viết",
+      "aiOn": "AI được bật",
+      "turnedOn": "bật",
+      "byMeaning": "tìm theo ý nghĩa"
+    }
+  },
+  "calendar": {
+    "month": "Tháng 9, 2026",
+    "dow": {
+      "mon": "T2",
+      "tue": "T3",
+      "wed": "T4",
+      "thu": "T5",
+      "fri": "T6",
+      "sat": "T7",
+      "sun": "CN"
+    },
+    "legendDots": "Chấm · nhật ký",
+    "legendFaces": "Biểu cảm · tâm trạng",
+    "journal": {
+      "daily": "Nhật ký hằng ngày",
+      "work": "Ghi chú công việc",
+      "health": "Sức khỏe",
+      "travel": "Du lịch",
+      "reading": "Đọc sách"
+    },
+    "mood": {
+      "good": "Ổn",
+      "neutral": "Bình thường",
+      "bad": "Không ổn"
+    }
+  },
+  "tags": {
+    "tagCount": "THẺ {n}",
+    "entryCount": "MỤC {n}",
+    "cardMeta": "NHẬT KÝ HẰNG NGÀY · T7, 19 THG 9",
+    "cardTitle": "Thứ Bảy ở Porto",
+    "tag": {
+      "travel": "du lịch",
+      "porto": "porto",
+      "running": "chạy bộ",
+      "family": "gia đình",
+      "work": "công việc",
+      "food": "ẩm thực",
+      "reading": "đọc sách",
+      "gratitude": "biết ơn"
+    },
+    "cue": {
+      "yourWay": "theo cách của bạn"
+    }
+  },
+  "onThisDay": {
+    "date": "Ngày 30 tháng 9, {year}",
+    "y4": {
+      "ago": "4 năm trước",
+      "h": "Ngày đầu ở căn hộ mới",
+      "b": "Thùng carton khắp nơi. Pizza ăn ngay trên sàn."
+    },
+    "y3": {
+      "ago": "3 năm trước",
+      "h": "Leo núi ở Sintra",
+      "b": "Sương mù, rồi cả bờ biển hiện ra cùng lúc."
+    },
+    "y2": {
+      "ago": "2 năm trước",
+      "h": "Chủ Nhật mưa",
+      "b": "Một ấm trà, một cuốn tiểu thuyết, chẳng phải đi đâu."
+    },
+    "y1": {
+      "ago": "1 năm trước",
+      "h": "Bữa tối cùng gia đình",
+      "b": "Mẹ lại nấu canh cá."
+    }
+  },
+  "stats": {
+    "mood": {
+      "good": "Ổn",
+      "neutral": "Bình thường",
+      "bad": "Không ổn"
+    },
+    "peakHour": "9 giờ tối"
+  },
+  "map": {
+    "place": {
+      "denver": {
+        "name": "Denver",
+        "note": "Hẻm núi đá đỏ lúc hoàng hôn"
+      },
+      "brookings": {
+        "name": "Brookings, SD",
+        "note": "Gương mặt tạc vào đá granite"
+      },
+      "detroit": {
+        "name": "Detroit",
+        "note": "Khung cảnh trong thành phố"
+      },
+      "paris": {
+        "name": "Paris",
+        "note": "Buổi tối bên sông Seine"
+      },
+      "bentre": {
+        "name": "Bến Tre",
+        "note": "Con đường dưới rặng dừa"
+      }
+    },
+    "cue": {
+      "photos": "Ảnh",
+      "videos": "video",
+      "voice": "ghi âm",
+      "pin": "kỷ niệm",
+      "place": "nơi"
+    }
+  },
+  "aiIntro": {
+    "cue": {
+      "ai": "AI",
+      "turnOn": "bật lên",
+      "device": "thiết bị",
+      "server": "máy chủ riêng",
+      "provider": "nhà cung cấp",
+      "youLike": "bạn thích"
+    },
+    "label": "AI",
+    "on": "BẬT",
+    "off": "TẮT",
+    "way": {
+      "device": "Trên thiết bị",
+      "server": "Máy chủ",
+      "cli": "CLI",
+      "cloud": "API đám mây"
+    }
+  },
+  "aiCards": {
+    "snip": "Cố tình đi lạc trong khu Ribeira. Ánh hoàng hôn đẹp đến khó tin. Tìm được một quán tasca nhỏ có món bacalhau ngon nhất thành phố, rồi ngồi bên sông đến khi đèn lên.",
+    "more": "Hai lần đi bộ qua cầu Dom Luís I, một lần giữa trưa và một lần về đêm. Chân đau nhưng mình chẳng bận tâm. Mua một viên gạch men xanh nhỏ để treo ở bếp. Mai: Livraria Lello, nếu hàng người cho phép.",
+    "card": {
+      "title": {
+        "name": "Tạo tiêu đề",
+        "desc": "Một tiêu đề hợp ý, từ chính điều bạn viết."
+      },
+      "emotion": {
+        "name": "Gợi ý cảm xúc",
+        "desc": "Không ổn, bình thường hay ổn — nó đọc được tâm trạng."
+      },
+      "tags": {
+        "name": "Gợi ý thẻ",
+        "desc": "Những thẻ hợp với cách bạn hay dùng từ."
+      },
+      "highlights": {
+        "name": "Điểm nổi bật",
+        "desc": "Những dòng đáng nhớ, được chọn ra."
+      },
+      "deeper": {
+        "name": "Gợi ý viết sâu hơn",
+        "desc": "Vài câu hỏi nhẹ nhàng để mở rộng trang viết."
+      },
+      "rewrite": {
+        "name": "Viết tiếp & viết lại",
+        "desc": "Viết tiếp, hoặc diễn đạt ấm áp hơn."
+      },
+      "summary": {
+        "name": "Tóm tắt bằng AI",
+        "desc": "Mục dài, gói trong ba dòng."
+      },
+      "search": {
+        "name": "Tìm kiếm ngữ nghĩa",
+        "desc": "Tìm theo ý nghĩa, không chỉ theo từ khóa."
+      },
+      "chat": {
+        "name": "Trò chuyện hằng ngày",
+        "desc": "Kể lại ngày của bạn với một người bạn AI."
+      },
+      "image": {
+        "name": "Tạo ảnh",
+        "desc": "Biến một kỷ niệm thành tranh."
+      },
+      "review": {
+        "name": "Tổng kết định kỳ",
+        "desc": "Tuần, tháng hay năm của bạn — nhìn lại."
+      },
+      "insights": {
+        "name": "Phân tích chủ đề",
+        "desc": "Những sợi chỉ xuyên suốt cuộc đời bạn."
+      }
+    },
+    "pill": "AI",
+    "c0": {
+      "placeholder": "Chưa đặt tên",
+      "title": "Thứ Bảy ở Porto",
+      "btn": "Gợi ý tiêu đề"
+    },
+    "c1": {
+      "bad": "Không ổn",
+      "neutral": "Bình thường",
+      "good": "Ổn"
+    },
+    "c2": {
+      "a": "#du-lịch",
+      "b": "#porto",
+      "c": "#ẩm-thực",
+      "d": "#dạo-buổi-tối"
+    },
+    "c3": {
+      "a": "Ánh hoàng hôn đẹp đến khó tin.",
+      "b": "Ngồi bên sông đến khi đèn lên.",
+      "c": "Hai lần đi bộ qua cầu Dom Luís I."
+    },
+    "c4": {
+      "a": "Điều gì khiến ánh sáng ấy đẹp đến thế?",
+      "b": "Bạn muốn dẫn ai đến Ribeira xem?",
+      "c": "Hôm nay bạn muốn nhớ điều gì?"
+    },
+    "c5": {
+      "base": "Ánh hoàng hôn đẹp đến khó tin.",
+      "cont": "Và mình tự hứa sẽ quay lại vào mùa xuân, với nhiều thời gian hơn và ít hành lý hơn.",
+      "warm": "Ánh hoàng hôn vàng óng ấm áp đến khó tin, như thể cả thành phố đang rực sáng chỉ dành cho mình. Mình tự hứa sẽ quay lại vào mùa xuân.",
+      "continue": "Viết tiếp",
+      "rewrite": "Viết lại · ấm áp hơn"
+    },
+    "c6": {
+      "a": "Một ngày thứ Bảy dài và vui ở Porto.",
+      "b": "Lang thang khu Ribeira và tìm được quán tasca yêu thích.",
+      "c": "Kết thúc bên sông lúc hoàng hôn, muốn quay lại."
+    },
+    "c7": {
+      "query": "khi nào mình thấy bình yên?",
+      "r1": {
+        "h": "Một buổi tối yên tĩnh",
+        "b": "Nấu bữa tối, đọc sách một tiếng, đi ngủ sớm."
+      },
+      "r2": {
+        "h": "Trà ngoài ban công",
+        "b": "Mưa rơi trên lan can, chẳng phải đi đâu cả."
+      },
+      "r3": {
+        "h": "Hồ lúc 6 giờ sáng",
+        "b": "Sương mờ, một con diệc, và không điện thoại."
+      }
+    },
+    "c8": {
+      "sunny": {
+        "name": "Sunny",
+        "tone": "Vui vẻ"
+      },
+      "luna": {
+        "name": "Luna",
+        "tone": "Điềm tĩnh & sâu sắc"
+      },
+      "m1": "Hôm nay của bạn thế nào?",
+      "m2": "Mệt, nhưng chạy bộ giúp ích nhiều.",
+      "m3": "Chạy bộ giúp đầu óc nhẹ nhõm. Bạn để ý thấy gì bên sông?",
+      "m4": "Nghe như một ngày đáng giữ lại! 🙂",
+      "kicker": "TRÒ CHUYỆN HẰNG NGÀY · 30 THG 9",
+      "style": "Viết đúng phong cách của bạn",
+      "title": "Một ngày mệt, một dòng sông đẹp",
+      "body": "Hôm nay mệt, nhưng buổi chạy bên sông giúp mình nhiều hơn mình tưởng. Mặt nước lặng và ánh sáng dịu xuống. Một ngày đáng giữ lại."
+    },
+    "c9": {
+      "prompt": "tranh màu nước Porto lúc hoàng hôn"
+    },
+    "c10": {
+      "h": "Nhìn lại tháng 9",
+      "entries": "mục",
+      "words": "từ",
+      "streak": "ngày liên tiếp",
+      "note": "“Bạn viết nhiều nhất vào tối Chủ nhật, và thấy vui nhất sau mỗi buổi chạy.”"
+    },
+    "c11": {
+      "work": "Công việc",
+      "health": "Sức khỏe",
+      "family": "Gia đình",
+      "travel": "Du lịch",
+      "reading": "Đọc sách",
+      "note": "Căng thẳng công việc dịu đi vào những tuần bạn đi bộ đường dài."
+    },
+    "cue": {
+      "friends": "bạn AI",
+      "personality": "cá tính",
+      "turn": "biến cuộc",
+      "style": "phong cách"
+    }
+  },
+  "secondYou": {
+    "cue": {
+      "remember": "ghi nhớ",
+      "persona": "thậm chí",
+      "learn": "học cách",
+      "write": "viết",
+      "everyMemory": "Một phiên",
+      "memory": "thứ hai",
+      "edit": "chỉnh sửa"
+    },
+    "entry": {
+      "a": "Lại là Chủ nhật — xem lại tuần nhanh trước khi ngủ.",
+      "b": "Trà xanh trước, rồi mới đến laptop. Lúc nào cũng vậy.",
+      "c": "Mai có buổi thuyết trình lớn. Bụng cồn cào."
+    },
+    "entryMeta": "MỤC · {d} THG 9",
+    "memories": "Ký ức",
+    "mem": {
+      "a": "Thích xem lại tuần vào tối Chủ nhật.",
+      "b": "Uống trà xanh mỗi sáng.",
+      "c": "Hay lo lắng trước những buổi thuyết trình lớn.",
+      "d": "Thích đi bộ đường dài trên núi.",
+      "e": "Muốn quay lại Đà Nẵng."
+    },
+    "persona": "Phong cách của bạn",
+    "slider": {
+      "a": {
+        "l": "Ấm áp",
+        "r": "Thẳng thắn"
+      },
+      "b": {
+        "l": "Ngắn gọn",
+        "r": "Chi tiết"
+      },
+      "c": {
+        "l": "Nghiêm túc",
+        "r": "Vui tươi"
+      }
+    },
+    "persText": "“Viết câu ngắn, ấm áp. Yêu những buổi sáng chậm, núi non và Đà Nẵng.”",
+    "you": "Bạn",
+    "second": "Bạn thứ hai",
+    "orbit": {
+      "a": "Xem lại tuần Chủ nhật",
+      "b": "Trà xanh",
+      "c": "Hồi hộp thuyết trình",
+      "d": "Đi bộ đường núi",
+      "e": "Đà Nẵng"
+    },
+    "bubble": "Tối Chủ nhật rồi — đến giờ xem lại tuần nhỉ? Trà xanh trước đã 🍵"
+  },
+  "mcp": {
+    "agent": "AI agent của bạn",
+    "connected": "Memlore đã kết nối",
+    "greet": "Chào bạn! Hôm nay mình làm gì nhé?",
+    "user": "Thêm vào nhật ký: sáng nay chạy 5 km dọc bờ sông, cảm thấy tuyệt.",
+    "called": "Đã gọi",
+    "reply": "Xong rồi. Mình đã thêm vào mục “Chạy bộ sáng bên sông”.",
+    "input": "Hỏi bất cứ điều gì",
+    "appKicker": "NHẬT KÝ HẰNG NGÀY · 07:12",
+    "appTitle": "Chạy bộ sáng bên sông",
+    "appBody": "Năm cây số trước bữa sáng. Ban đầu chân nặng trịch, rồi tìm được nhịp.",
+    "appNote": "+ Sáng nay chạy 5 km dọc bờ sông, cảm thấy tuyệt.",
+    "badge": {
+      "local": "Chỉ chạy cục bộ",
+      "off": "Mặc định tắt",
+      "noProvider": "Không cần nhà cung cấp AI"
+    },
+    "cue": {
+      "connect": "kết nối",
+      "journal": "chat",
+      "right": "tổng hợp",
+      "chat": "lưu chúng",
+      "allLocally": "Tất cả",
+      "locally": "cục bộ",
+      "agent": "agent"
+    }
+  },
+  "sync": {
+    "device": {
+      "mac": "MacBook Pro",
+      "imac": "iMac · Studio",
+      "oldAir": "MacBook Air cũ"
+    },
+    "svc": {
+      "gdrive": "Google Drive",
+      "icloud": "iCloud Drive",
+      "more": "Sắp có thêm"
+    },
+    "listTitle": "THIẾT BỊ ĐÃ KẾT NỐI",
+    "status": {
+      "this": "Thiết bị này · vừa đồng bộ",
+      "imac": "Đồng bộ 2 phút trước",
+      "old": "Lần cuối thấy 94 ngày trước",
+      "revoked": "Đã thu hồi quyền · đã xoay khóa"
+    },
+    "revoke": "Thu hồi",
+    "revoked": "Đã thu hồi",
+    "cue": {
+      "sync": "Đồng bộ",
+      "own": "của chính bạn",
+      "cloud": "lưu trữ",
+      "google": "Google",
+      "icloud": "iCloud",
+      "more": "thêm sau",
+      "encrypted": "mã hóa",
+      "before": "trước khi"
+    }
+  },
+  "import": {
+    "kicker": "NHẬP & XUẤT",
+    "src": {
+      "dayOne": "Day One",
+      "journey": "Journey",
+      "appleJournal": "Apple Journal",
+      "markdown": "Markdown"
+    },
+    "out": {
+      "json": "Memlore JSON",
+      "markdown": "Markdown"
+    },
+    "cue": {
+      "moving": "Bạn",
+      "dayOne": "Day One",
+      "journey": "Journey",
+      "appleJournal": "Apple Journal",
+      "bring": "chuyển đổi",
+      "export": "xuất",
+      "everything": "định dạng"
+    }
+  },
+  "themes": {
+    "mode": {
+      "light": "Sáng",
+      "dark": "Tối",
+      "deep": "Đậm",
+      "soft": "Dịu",
+      "lumen": "Lumen"
+    },
+    "railDs": "HỆ GIAO DIỆN · CHẾ ĐỘ",
+    "accent": {
+      "orange": "Cam",
+      "violet": "Tím",
+      "rose": "Hồng",
+      "emerald": "Xanh lá",
+      "line2": "trên mọi giao diện",
+      "rail": "MÀU NHẤN"
+    },
+    "layout": {
+      "left": {
+        "name": "Nội dung bên trái",
+        "line2": "nội dung, danh sách, thanh bên"
+      },
+      "mid": {
+        "name": "Nội dung ở giữa",
+        "line2": "thanh bên, nội dung, danh sách"
+      },
+      "classic": {
+        "name": "Cổ điển",
+        "line2": "thanh bên, danh sách, nội dung"
+      },
+      "rail": "BỐ CỤC"
+    },
+    "fonts": {
+      "name": "Phông chữ",
+      "line2": "do bạn chọn",
+      "rail": "PHÔNG CHỮ"
+    },
+    "badge": {
+      "ds": "3 hệ giao diện",
+      "looks": "8 diện mạo",
+      "accents": "6+ màu nhấn",
+      "layouts": "3 bố cục",
+      "fonts": "Aa phông chữ"
+    },
+    "cue": {
+      "and": "tuỳ biến",
+      "exactly": "Memlore",
+      "like": "quyết định",
+      "countless": "vô số",
+      "combinations": "kết hợp",
+      "three": "Ba",
+      "systems": "hệ giao diện",
+      "light": "sáng",
+      "dark": "tối",
+      "accent": "màu",
+      "colours": "sắc",
+      "layouts": "cục",
+      "andFonts": "và phông",
+      "fonts": "chữ"
+    }
+  },
+  "open": {
+    "label": {
+      "opensource": "Mã nguồn mở",
+      "price": "Miễn phí",
+      "cross": "Đa nền tảng"
+    },
+    "cue": {
+      "opensource": "mã nguồn",
+      "free": "miễn phí",
+      "across": "trên nhiều"
+    }
+  },
+  "outro": {
+    "tagline": {
+      "a": "Một chút đời thường.",
+      "b": "Một câu chuyện dài lâu."
+    },
+    "download": "Tải Memlore",
+    "cue": {
+      "tagline": "chút"
+    }
+  }
+}

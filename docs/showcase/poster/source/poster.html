@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Memlore poster</title>
+    <style>
+      /* Fonts: the app's own faces, from docs/showcase/assets/fonts/ */
+      @font-face {
+        font-family: "Fraunces";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("../../assets/fonts/fraunces-latin-wght-normal.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Fraunces";
+        font-style: italic;
+        font-weight: 100 900;
+        src: url("../../assets/fonts/fraunces-latin-wght-italic.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Geist";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("../../assets/fonts/geist-latin-wght-normal.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Geist Mono";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("../../assets/fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+      }
+
+      /* Brand tokens: website/tokens.css (paper, ink, muted, rules, amber accent) */
+      :root {
+        --paper: oklch(0.145 0.004 55);
+        --panel: oklch(0.185 0.004 55);
+        --rule: oklch(1 0 0 / 0.08);
+        --rule-strong: oklch(1 0 0 / 0.16);
+        --ink: oklch(0.985 0.002 55);
+        --ink-soft: oklch(0.85 0.006 55);
+        --muted: oklch(0.708 0.01 55);
+        --accent: oklch(89% 0.11 73);
+        --accent-deep: oklch(0.8 0.137 58);
+        --shadow: oklch(0 0 0 / 0.45);
+        --font-display: "Fraunces", ui-serif, Georgia, serif;
+        --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+        --font-mono: "Geist Mono", ui-monospace, monospace;
+        --w: 1200px;
+        --h: 630px;
+        --page-w: 1200px;
+        --page-h: 630px;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      h1,
+      p,
+      dl,
+      dt,
+      dd {
+        margin: 0;
+      }
+
+      /* preview: frame centered and scaled to the window */
+      body {
+        background: #3a3d46;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .stage {
+        overflow: hidden;
+      }
+      .poster {
+        transform-origin: 0 0;
+      }
+      body.capture {
+        background: none;
+        display: block;
+        min-height: 0;
+        padding: 0;
+      }
+      body.capture .stage {
+        width: auto !important;
+        height: auto !important;
+      }
+      body.capture .poster {
+        transform: none !important;
+      }
+      @media print {
+        body {
+          background: none;
+          display: block;
+          min-height: 0;
+          padding: 0;
+        }
+        .stage {
+          width: auto !important;
+          height: auto !important;
+        }
+        .poster {
+          transform: none !important;
+        }
+      }
+
+      /* ---------- frame ---------- */
+      .poster {
+        position: relative;
+        width: var(--w);
+        height: var(--h);
+        overflow: hidden;
+        background:
+          radial-gradient(
+            46% 70% at 64% 100%,
+            oklch(0.72 0.178 55 / 0.16),
+            transparent 70%
+          ),
+          var(--paper);
+        color: var(--ink);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      /* ---------- left: the ledger column ---------- */
+      .copy {
+        position: absolute;
+        left: 56px;
+        top: 48px;
+        bottom: 44px;
+        width: 520px;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+      }
+      .mark {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--rule-strong);
+      }
+      .mark img {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+      }
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 24px;
+        letter-spacing: -0.01em;
+      }
+      .kicker {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .title {
+        margin-top: 34px;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 66px;
+        line-height: 1.03;
+        letter-spacing: -0.025em;
+      }
+      .title span {
+        display: block;
+      }
+      .title .t2 {
+        font-style: italic;
+        font-weight: 400;
+        color: var(--accent);
+      }
+      .lead {
+        margin-top: 22px;
+        font-size: 18.5px;
+        line-height: 1.5;
+        color: var(--muted);
+        max-width: 30em;
+      }
+      .lead strong {
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .spec {
+        margin-top: auto;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-top: 1px solid var(--rule-strong);
+        border-bottom: 1px solid var(--rule-strong);
+      }
+      .spec > div {
+        padding: 13px 12px 14px;
+        border-left: 1px solid var(--rule);
+        min-width: 0;
+      }
+      .spec > div:first-child {
+        border-left: 0;
+        padding-left: 0;
+      }
+      .spec dt {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+      }
+      .spec dd {
+        margin-top: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .spec small {
+        display: block;
+        margin-top: 4px;
+        font-size: 12.5px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+      .foot {
+        margin-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        font-size: 13.5px;
+        color: var(--muted);
+      }
+      .foot .url {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--accent);
+      }
+
+      /* ---------- right: a real screen, with the dog resting on it ---------- */
+      .plate {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: 1024px;
+        height: 640px;
+        border-radius: 14px 0 0 0;
+        border: 1px solid var(--rule-strong);
+        overflow: hidden;
+        background: var(--panel);
+        box-shadow:
+          0 30px 80px -20px var(--shadow),
+          0 0 0 8px oklch(1 0 0 / 0.025);
+        z-index: 1;
+      }
+      .plate img {
+        display: block;
+        width: 1024px;
+        height: 640px;
+      }
+      /* --bar-mid: vertical centre of each screenshot's title bar (traffic lights) */
+      .plate.sig {
+        --x: 716px;
+        --y: 36px;
+        --bar-mid: 12.6px;
+      }
+      .plate.clean {
+        --x: 668px;
+        --y: 82px;
+        --bar-mid: 12.6px;
+      }
+      .plate.clay {
+        --x: 620px;
+        --y: 128px;
+        --bar-mid: 15.5px;
+      }
+      .plate .tag {
+        position: absolute;
+        left: 244px;
+        top: var(--bar-mid);
+        transform: translateY(-50%);
+        padding: 4px 9px;
+        line-height: 1;
+        border-radius: 999px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--paper);
+        box-shadow: 0 0 0 1px var(--rule-strong);
+      }
+      .dog {
+        position: absolute;
+        left: 592px;
+        bottom: -46px;
+        width: 250px;
+        height: 250px;
+        z-index: 3;
+        filter: drop-shadow(0 18px 24px oklch(0 0 0 / 0.55));
+      }
+    </style>
+  </head>
+  <body data-size="1200x630">
+    <div class="stage">
+      <main id="poster" class="poster">
+        <section class="copy">
+          <div class="mark">
+            <img src="../../assets/appicon.png" alt="" />
+            <span class="wordmark" data-str="name"></span>
+            <span class="kicker" data-str="kicker"></span>
+          </div>
+          <h1 class="title">
+            <span data-str="title1"></span>
+            <span class="t2" data-str="title2"></span>
+          </h1>
+          <p class="lead">
+            <strong data-str="leadStrong"></strong>
+            <span data-str="leadRest"></span>
+          </p>
+          <dl class="spec">
+            <div>
+              <dt data-str="s1.label"></dt>
+              <dd data-str="s1.value"></dd>
+              <small data-str="s1.note"></small>
+            </div>
+            <div>
+              <dt data-str="s2.label"></dt>
+              <dd data-str="s2.value"></dd>
+              <small data-str="s2.note"></small>
+            </div>
+            <div>
+              <dt data-str="s3.label"></dt>
+              <dd data-str="s3.value"></dd>
+              <small data-str="s3.note"></small>
+            </div>
+            <div>
+              <dt data-str="s4.label"></dt>
+              <dd data-str="s4.value"></dd>
+              <small data-str="s4.note"></small>
+            </div>
+          </dl>
+          <div class="foot">
+            <span data-str="meta"></span>
+            <span class="url" data-str="url"></span>
+          </div>
+        </section>
+
+        <div class="plate sig">
+          <img src="../../assets/shots/v2/sig-write.jpg" alt="" />
+          <span class="tag" data-str="ds.signature"></span>
+        </div>
+        <div class="plate clean">
+          <img src="../../assets/shots/v2/clean-light.jpg" alt="" />
+          <span class="tag" data-str="ds.clean"></span>
+        </div>
+        <div class="plate clay">
+          <img src="../../assets/shots/v2/clay-dark.jpg" alt="" />
+          <span class="tag" data-str="ds.clay"></span>
+        </div>
+        <img class="dog" src="../../assets/logo-straight.png" alt="" />
+      </main>
+    </div>
+
+    <script>
+      /* Query: ?size=WxH  ?lang=xx. Copy lives in STR; set with textContent only. */
+      const Q = new URLSearchParams(location.search);
+      const CAPTURE = Q.get("capture") === "1";
+
+      const STR = {
+        en: {
+          name: "Memlore",
+          kicker: "Open source · Free",
+          title1: "A little life.",
+          title2: "A lasting story.",
+          leadStrong: "Memlore is a private journal.",
+          leadRest:
+            "For the days you want to remember, and the thoughts you need to put somewhere.",
+          s1: {
+            label: "data",
+            value: "On your device",
+            note: "Works fully offline.",
+          },
+          s2: {
+            label: "sync",
+            value: "Your cloud",
+            note: "Google Drive, iCloud Drive, more coming.",
+          },
+          s3: {
+            label: "ai",
+            value: "Optional",
+            note: "Local, on-device, or your own key.",
+          },
+          s4: {
+            label: "license",
+            value: "AGPLv3",
+            note: "Read the source.",
+          },
+          ds: { signature: "Signature", clean: "Clean", clay: "Clay" },
+          meta: "No account · Encrypted on your device · macOS today",
+          url: "memlore.app",
+        },
+      };
+      const LANGS = Object.keys(STR);
+      const LANG = STR[Q.get("lang")] ? Q.get("lang") : LANGS[0];
+
+      const FONT_LIST = [
+        { family: "Fraunces", weight: 500 },
+        { family: "Fraunces", weight: 600 },
+        { family: "Geist", weight: 400 },
+        { family: "Geist", weight: 600 },
+        { family: "Geist Mono", weight: 400 },
+      ];
+      const FONT_SAMPLE = "Aa Memlore · A lasting story.";
+
+      const SIZE = (() => {
+        const q = Q.get("size") || document.body.dataset.size || "1200x630";
+        const m = /^(\d+)x(\d+)$/.exec(q);
+        if (!m || q !== "1200x630")
+          console.warn(`poster: composed for 1200x630, got "${q}"`);
+        const [w, h] = m ? [+m[1], +m[2]] : [1200, 630];
+        return { w, h, page: [`${w}px`, `${h}px`] };
+      })();
+      const W = SIZE.w,
+        H = SIZE.h;
+
+      const root = document.documentElement;
+      const frame = document.getElementById("poster");
+      if (CAPTURE) document.body.classList.add("capture");
+      root.lang = LANG;
+      root.style.setProperty("--w", `${W}px`);
+      root.style.setProperty("--h", `${H}px`);
+      root.style.setProperty("--page-w", SIZE.page[0]);
+      root.style.setProperty("--page-h", SIZE.page[1]);
+      const pageRule = document.createElement("style");
+      pageRule.textContent = `@page { size: ${SIZE.page[0]} ${SIZE.page[1]}; margin: 0 }`;
+      document.head.append(pageRule);
+
+      const lookup = (key) =>
+        key.split(".").reduce((o, k) => (o == null ? o : o[k]), STR[LANG]);
+      for (const el of document.querySelectorAll("[data-str]")) {
+        const value = lookup(el.dataset.str);
+        if (value === undefined)
+          console.warn(`poster: missing string "${el.dataset.str}" (${LANG})`);
+        el.textContent = value || "";
+        el.hidden = !value;
+      }
+
+      function checkFit() {
+        const copy = frame.querySelector(".copy");
+        const els = [...copy.querySelectorAll("[data-str]:not([hidden])")];
+        const clipped = els.filter(
+          (el) => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1,
+        );
+        const spec = copy.querySelector(".spec").getBoundingClientRect();
+        const title = copy.querySelector(".lead").getBoundingClientRect();
+        if (clipped.length)
+          console.warn(
+            `poster: text clipped: ${clipped.map((e) => e.dataset.str).join(", ")}`,
+          );
+        if (spec.top < title.bottom + 16)
+          console.warn("poster: content still overflows the frame; cut the copy");
+        if (copy.scrollHeight > copy.clientHeight + 1)
+          console.warn("poster: content still overflows the frame; cut the copy");
+      }
+
+      function preview() {
+        const s = Math.min(1, (innerWidth - 48) / W, (innerHeight - 48) / H);
+        frame.style.transform = `scale(${s})`;
+        frame.parentElement.style.width = `${W * s}px`;
+        frame.parentElement.style.height = `${H * s}px`;
+      }
+
+      const ready = (async () => {
+        await Promise.all([...frame.querySelectorAll("img")].map((i) => i.decode()));
+        try {
+          await Promise.all(
+            FONT_LIST.map(({ family, weight }) =>
+              document.fonts.load(`${weight} 64px "${family}"`, FONT_SAMPLE),
+            ),
+          );
+          await document.fonts.ready;
+        } catch (e) {
+          console.warn("font load failed:", e && e.message);
+        }
+        checkFit();
+        if (!CAPTURE) {
+          preview();
+          addEventListener("resize", preview);
+        }
+      })();
+
+      window.__showcase = {
+        ready,
+        width: W,
+        height: H,
+        fonts: FONT_LIST,
+        fontSample: FONT_SAMPLE,
+        lang: LANG,
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Memlore intro</title>
+    <style>
+      @font-face { font-family: "Fraunces"; font-weight: 100 900; font-style: normal; src: url("../../assets/fonts/fraunces-latin-wght-normal.woff2") format("woff2"); }
+      @font-face { font-family: "Geist"; font-weight: 100 900; font-style: normal; src: url("../../assets/fonts/geist-latin-wght-normal.woff2") format("woff2"); }
+      @font-face { font-family: "Geist Mono"; font-weight: 100 900; font-style: normal; src: url("../../assets/fonts/geist-mono-latin-wght-normal.woff2") format("woff2"); }
+      :root {
+        color-scheme: dark;
+        --bg: #0d0d0d;
+        --panel: #1c1c1c;
+        --fg: #eeeeee;
+        --mute: #a8a29e;
+        --accent: #0079c7;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      body {
+        font:
+          14px/1.5 Geist,
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+        padding: 28px 16px;
+        display: flex;
+        justify-content: center;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 1280px;
+        display: grid;
+        gap: 14px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        margin: 0;
+        font:
+          700 clamp(20px, 3vw, 28px)/1.1 Geist,
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+        letter-spacing: -0.02em;
+      }
+      .meta {
+        color: var(--mute);
+        font:
+          500 11px/1 "Geist Mono",
+          ui-monospace,
+          monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .stage {
+        display: flex;
+        justify-content: center;
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        max-width: 100%;
+        max-height: 78vh;
+        height: auto;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      button {
+        font:
+          600 13px/1 Geist,
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+        color: #fff;
+        background: var(--accent);
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 18px;
+        cursor: pointer;
+        min-width: 84px;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--fg);
+        box-shadow: inset 0 0 0 1px #363636;
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #38cfff;
+        outline-offset: 2px;
+      }
+      input[type="range"] {
+        flex: 1;
+        min-width: 0;
+        accent-color: var(--accent);
+      }
+      .tc {
+        font:
+          500 12px/1 "Geist Mono",
+          ui-monospace,
+          monospace;
+        font-variant-numeric: tabular-nums;
+        min-width: 9ch;
+        text-align: right;
+      }
+      .chapters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chapters button {
+        background: var(--panel);
+        color: var(--fg);
+        font-weight: 500;
+        padding: 8px 14px;
+        min-width: 0;
+      }
+      @media (max-width: 520px) {
+        .bar {
+          flex-wrap: wrap;
+        }
+        input[type="range"] {
+          flex-basis: 100%;
+          order: 3;
+        }
+      }
+      /* capture mode: canvas only, at its real size */
+      body.capture {
+        padding: 0;
+        display: block;
+      }
+      body.capture .ui {
+        display: none;
+      }
+      body.capture .wrap {
+        max-width: none;
+        display: block;
+      }
+      body.capture .stage {
+        border-radius: 0;
+        display: block;
+      }
+      #imgs { display: none; }
+      body.capture canvas {
+        max-width: none;
+        max-height: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="ui">
+        <h1 id="title">Memlore intro</h1>
+        <div class="meta" id="meta"></div>
+      </header>
+      <div class="stage">
+        <canvas id="film" aria-label="Memlore introduction film"></canvas>
+      </div>
+      <div class="bar ui">
+        <button id="play" type="button">Play</button>
+        <button id="restart" class="ghost" type="button">Replay</button>
+        <input
+          id="scrub"
+          type="range"
+          min="0"
+          max="1000"
+          value="0"
+          step="1"
+          aria-label="Scrub timeline"
+        />
+        <span id="tc" class="tc">0:00.0</span>
+        <button id="lang" class="ghost" type="button">Language</button>
+      </div>
+      <div class="chapters ui" id="chapters"></div>
+    </div>
+
+    <!-- images the scenes draw: inlined as data URIs, decoded before ready -->
+    <div id="imgs">
+      <img id="img-logo" src="../../assets/logo.png" alt="" />
+      <img id="img-appicon" src="../../assets/appicon.png" alt="" />
+      <img id="img-st-privacy" src="../../assets/stickers/sticker-privacy.png" alt="" />
+      <img id="img-st-offline" src="../../assets/stickers/sticker-offline.png" alt="" />
+      <img id="img-st-hi" src="../../assets/stickers/sticker-hi.png" alt="" />
+      <img id="img-sig-write" src="../../assets/shots/v2/sig-write.jpg" alt="" />
+      <img id="img-sig-search" src="../../assets/shots/v2/sig-search.jpg" alt="" />
+      <img id="img-sig-lookback" src="../../assets/shots/v2/sig-lookback.jpg" alt="" />
+      <img id="img-sig-gallery" src="../../assets/shots/v2/sig-gallery.jpg" alt="" />
+      <img id="img-sig-stats" src="../../assets/shots/v2/sig-stats.jpg" alt="" />
+      <img id="img-sig-chat" src="../../assets/shots/v2/sig-chat.jpg" alt="" />
+      <img id="img-sig-sync" src="../../assets/shots/v2/sig-sync.jpg" alt="" />
+      <img id="img-sig-lock" src="../../assets/shots/v2/sig-lock.jpg" alt="" />
+      <img id="img-sig-light" src="../../assets/shots/v2/sig-light.jpg" alt="" />
+      <img id="img-clean-light" src="../../assets/shots/v2/clean-light.jpg" alt="" />
+      <img id="img-clay-light" src="../../assets/shots/v2/clay-light.jpg" alt="" />
+      <img id="img-clay-dark" src="../../assets/shots/v2/clay-dark.jpg" alt="" />
+    </div>
+    <!-- copy: all on-screen text, keep this tag first -->
+    <script src="strings.js"></script>
+    <script src="../../assets/land.js"></script>
+    <script>
+      /* ============================================================
+   Engine. Everything drawn on the canvas is a pure function of t.
+   Edit BRAND and TIMELINE here, copy in strings.example.js;
+   scenes live in scenes/<name>.js and load after this script.
+   ============================================================ */
+      const Q = new URLSearchParams(location.search);
+      const CAPTURE = Q.get("capture") === "1";
+
+      /* ---------- canvas size: ?aspect=16x9|1x1|9x16, or ?size=WxH ---------- */
+      const ASPECTS = {
+        "16x9": [1920, 1080],
+        "1x1": [1080, 1080],
+        "9x16": [1080, 1920],
+      };
+      const [W, H] = (() => {
+        const m = /^(\d+)x(\d+)$/.exec(Q.get("size") || "");
+        if (m) return [+m[1], +m[2]];
+        return ASPECTS[Q.get("aspect")] || ASPECTS["16x9"];
+      })();
+
+      /* ---------- brand tokens: take these from the project's real brand sources ----------
+         colors: hex only, #RGB, #RRGGBB or #RRGGBBAA. Scenes derive alpha tints from them
+         and throw on rgb(), hsl(), oklch() or names; convert those to hex first. */
+      const BRAND = {
+        name: "Memlore",
+        /* Signature .dark tokens, src/styles/globals.css:368-434 (oklch accents converted to hex) */
+        colors: {
+          bg: "#0d0d0d", // --color-app
+          panel: "#1c1c1c", // --color-elevated
+          fg: "#eeeeee", // --color-fg
+          mute: "#a8a29e", // --color-fg-muted
+          accent: "#00b4f0", // --color-accent  oklch(72% 0.15 230)
+          accent2: "#38cfff", // primary gradient start  oklch(0.8 0.14 226)
+          fill: "#0079c7", // --color-accent-fill  oklch(53% 0.2 230)
+          line: "#2a2a2a", // --color-surface-subtle
+        },
+        fonts: {
+          sans: { family: "Geist", weights: [400, 500, 600], fallback: "ui-sans-serif, system-ui, sans-serif" },
+          serif: { family: "Fraunces", weights: [400, 600], fallback: "Georgia, serif" },
+          mono: { family: "Geist Mono", weights: [400, 500], fallback: "ui-monospace, Menlo, monospace" },
+        },
+      };
+      /* Sample text for font loading: must contain the special characters of every language in STR. */
+      const FONT_SAMPLE = "Aa Memlore — 0123 · ⌘";
+      const FONT = Object.fromEntries(
+        Object.entries(BRAND.fonts).map(([k, f]) => [
+          k,
+          `"${f.family}", ${f.fallback}`,
+        ]),
+      );
+
+      /* ---------- copy: one table per language, selected with ?lang= ---------- */
+      /* Copy strings.example.js next to this file and edit it per project (all of it is sample text).
+   One table per language, same keys everywhere; scenes read their group, opts override it. */
+      const STR = window.STR_PRESET;
+      const LANGS = Object.keys(STR);
+      let LANG = STR[Q.get("lang")] ? Q.get("lang") : LANGS[0];
+
+      /* ---------- timeline: data, not magic numbers in scene code ---------- */
+      /* Starts are cumulative and the last entry ends at the target length. A slot longer than a
+   scene's natural length holds its last state; a shorter one cuts the animation. */
+      const TIMELINE = [
+        { scene: "cold-open", start: 0, dur: 7 },
+        { scene: "brand", start: 7, dur: 7, opts: { events: [{ t: 2.2, kind: "chord" }] } },
+        { scene: "promise", start: 14, dur: 9, opts: { events: [{ t: 0.3, kind: "pop" }, { t: 3.3, kind: "pop" }, { t: 6.3, kind: "pop" }] } },
+        { scene: "screen", start: 23, dur: 14, opts: { shot: "write", events: [{ t: 2.4, kind: "click" }] } },
+        { scene: "screen", start: 37, dur: 12, opts: { shot: "find", events: [{ t: 3.2, kind: "tick" }, { t: 6.2, kind: "pop" }] } },
+        { scene: "screen", start: 49, dur: 6, opts: { shot: "gallery" } },
+        { scene: "atlas", start: 55, dur: 6, opts: { events: [{ t: 1.2, kind: "pop" }, { t: 1.6, kind: "pop" }, { t: 2.0, kind: "pop" }] } },
+        { scene: "screen", start: 61, dur: 6, opts: { shot: "mood" } },
+        { scene: "screen", start: 67, dur: 7, opts: { shot: "chat" } },
+        { scene: "orbit", start: 74, dur: 7 },
+        { scene: "mcp", start: 81, dur: 6, opts: { events: [0, 1, 2, 3, 4, 5].map((i) => ({ t: 1.2 + i * 0.28, kind: "tick" })) } },
+        { scene: "locks", start: 87, dur: 10, opts: { events: [{ t: 3.4, kind: "pop" }, { t: 3.8, kind: "pop" }, { t: 4.2, kind: "pop" }] } },
+        { scene: "screen", start: 97, dur: 7, opts: { shot: "sync" } },
+        { scene: "designs", start: 104, dur: 9 },
+        { scene: "finale", start: 113, dur: 7, opts: { events: [{ t: 2.0, kind: "click" }] } },
+      ];
+      const DURATION = TIMELINE.reduce(
+        (m, e) => Math.max(m, e.start + e.dur),
+        0,
+      );
+      const TRANSITION = 0.9; // seconds of bloom dissolve at the start of every entry after the first
+
+      /* ---------- math + easing ---------- */
+      const TAU = Math.PI * 2;
+      const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const seg = (t, a, b) => clamp((t - a) / (b - a));
+      const ease = {
+        linear: (t) => t,
+        expoOut: (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+        expoIn: (t) => (t <= 0 ? 0 : Math.pow(2, 10 * t - 10)),
+        expoInOut: (t) =>
+          t <= 0
+            ? 0
+            : t >= 1
+              ? 1
+              : t < 0.5
+                ? Math.pow(2, 20 * t - 10) / 2
+                : (2 - Math.pow(2, -20 * t + 10)) / 2,
+        backOut: (t, s = 1.70158) =>
+          1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2),
+        cubicOut: (t) => 1 - Math.pow(1 - t, 3),
+        cubicInOut: (t) =>
+          t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+      };
+      /* Damped spring from 0 to 1 (settles near 1). stiffness ~ oscillation speed, damping in (0,1). */
+      function spring(t, { stiffness = 2.2, damping = 0.4 } = {}) {
+        if (t <= 0) return 0;
+        const w = TAU * stiffness,
+          z = clamp(damping, 0.01, 0.99),
+          wd = w * Math.sqrt(1 - z * z);
+        return (
+          1 -
+          Math.exp(-z * w * t) *
+            (Math.cos(wd * t) + ((z * w) / wd) * Math.sin(wd * t))
+        );
+      }
+      /* Seeded PRNG: same seed, same sequence, every frame. */
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let r = Math.imul(a ^ (a >>> 15), 1 | a);
+          r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+          return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      /* Stateless hash noise in [0,1) for (x, y, seed): use for per-item jitter without keeping state. */
+      function hash(x, y = 0, seed = 0) {
+        let h = Math.imul(
+          (x | 0) * 374761393 + (y | 0) * 668265263 + (seed | 0) * 2246822519,
+          1274126177,
+        );
+        h ^= h >>> 13;
+        return ((Math.imul(h, 1274126177) ^ (h >>> 16)) >>> 0) / 4294967296;
+      }
+
+      /* ---------- canvas + drawing helpers ---------- */
+      const cv = document.getElementById("film");
+      cv.width = W;
+      cv.height = H;
+      const ctx = cv.getContext("2d");
+      function resetCtx() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.filter = "none";
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.letterSpacing = "0px";
+      }
+      function fillAll(color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, W, H);
+      }
+      function rr(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, Math.max(0, Math.min(r, w / 2, h / 2)));
+      }
+      function text(s, x, y, font, color, align = "left", spacing = 0) {
+        ctx.font = font;
+        ctx.fillStyle = color;
+        ctx.textAlign = align;
+        ctx.textBaseline = "alphabetic";
+        ctx.letterSpacing = spacing + "px";
+        ctx.fillText(s, x, y);
+        ctx.letterSpacing = "0px";
+      }
+      /* Largest font size (<= max) that fits s into maxW: layout is measured, never hard-coded per language. */
+      function fitSize(s, weight, family, max, maxW) {
+        ctx.font = `${weight} ${max}px ${family}`;
+        const w = ctx.measureText(s).width;
+        return w <= maxW ? max : Math.floor((max * maxW) / w);
+      }
+
+      /* ---------- scenes: SCENES["<name>"] = { draw(ctx, lt, opts, env) }, lt = local time 0..dur.
+   Filled by the scenes/<name>.js tags after this script. ---------- */
+      const SCENES = {};
+
+      /* ---------- film grain: seeded patterns, chosen by frame index ---------- */
+      let GRAIN = [];
+      function buildGrain() {
+        const rand = mulberry32(11);
+        GRAIN = [0, 1, 2].map(() => {
+          const g = document.createElement("canvas");
+          g.width = g.height = 256;
+          const gx = g.getContext("2d"),
+            im = gx.createImageData(256, 256);
+          for (let k = 0; k < im.data.length; k += 4) {
+            const v = rand() * 255;
+            im.data[k] = im.data[k + 1] = im.data[k + 2] = v;
+            im.data[k + 3] = 255;
+          }
+          gx.putImageData(im, 0, 0);
+          return ctx.createPattern(g, "repeat");
+        });
+      }
+      function drawGrain(t) {
+        if (!GRAIN.length) return;
+        const f = Math.floor(t * 24);
+        ctx.save();
+        ctx.globalCompositeOperation = "overlay";
+        ctx.globalAlpha = 0.05;
+        ctx.fillStyle = GRAIN[f % 3];
+        ctx.translate((f * 73) % 256, (f * 131) % 256);
+        ctx.fillRect(-256, -256, W + 512, H + 512);
+        ctx.restore();
+      }
+
+      /* ---------- render(t): pure function of t ---------- */
+      function env(entry) {
+        return {
+          W,
+          H,
+          dur: entry.dur,
+          ease,
+          spring,
+          rand: mulberry32(entry.start * 1000 + 7),
+          hash,
+          str: STR[LANG],
+          brand: BRAND,
+          fonts: FONT,
+          img: IMG,
+        };
+      }
+      /* offscreen buffer for the incoming entry of a dissolve */
+      const buf = document.createElement("canvas");
+      buf.width = W;
+      buf.height = H;
+      const bctx = buf.getContext("2d");
+      function resetOn(c) {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = 1;
+        c.globalCompositeOperation = "source-over";
+        c.filter = "none";
+        c.shadowColor = "transparent";
+        c.shadowBlur = 0;
+        c.letterSpacing = "0px";
+      }
+      function drawEntry(entry, lt, c = ctx) {
+        const scene = SCENES[entry.scene];
+        resetOn(c);
+        if (!scene) {
+          fillAll("#f0f");
+          text(
+            `missing scene: ${entry.scene}`,
+            W / 2,
+            H / 2,
+            `600 48px ${FONT.mono}`,
+            "#000",
+            "center",
+          );
+          return;
+        }
+        c.save();
+        scene.draw(c, clamp(lt, 0, entry.dur), entry.opts || {}, env(entry));
+        c.restore();
+      }
+      /* Shared transition device: a slow bloom dissolve. The outgoing shot brightens into a soft
+   accent light, the incoming one resolves out of it. Same device on every cut. */
+      function drawTransition(prev, next, t) {
+        const p = ease.cubicInOut(seg(t - next.start, 0, TRANSITION));
+        drawEntry(prev, t - prev.start);
+        drawEntry(next, t - next.start, bctx);
+        resetCtx();
+        ctx.globalAlpha = p;
+        ctx.drawImage(buf, 0, 0);
+        const b = Math.sin(Math.PI * p);
+        const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.hypot(W, H) * 0.55);
+        const a = (x) => Math.round(clamp(x) * 255).toString(16).padStart(2, "0");
+        g.addColorStop(0, BRAND.colors.accent2 + a(0.22 * b));
+        g.addColorStop(0.5, BRAND.colors.accent + a(0.1 * b));
+        g.addColorStop(1, BRAND.colors.accent + "00");
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        resetCtx();
+      }
+      function render(t) {
+        t = clamp(t, 0, DURATION - 1e-6);
+        let i = 0;
+        while (i < TIMELINE.length - 1 && t >= TIMELINE[i + 1].start) i++;
+        const entry = TIMELINE[i];
+        if (i > 0 && t - entry.start < TRANSITION)
+          drawTransition(TIMELINE[i - 1], entry, t);
+        else drawEntry(entry, t - entry.start);
+        resetCtx();
+        drawGrain(t);
+      }
+
+      /* ---------- fonts: load every family/weight with the language sample ---------- */
+      const FONT_LIST = Object.values(BRAND.fonts).flatMap((f) =>
+        f.weights.map((weight) => ({ family: f.family, weight })),
+      );
+      const ready = (async () => {
+        /* scenes/*.js load after this script: wait until they have all run */
+        if (document.readyState === "loading")
+          await new Promise((r) =>
+            document.addEventListener("DOMContentLoaded", r, { once: true }),
+          );
+        try {
+          await Promise.all(
+            FONT_LIST.map(({ family, weight }) =>
+              document.fonts.load(`${weight} 64px "${family}"`, FONT_SAMPLE),
+            ),
+          );
+          await document.fonts.ready;
+          await Promise.all([...document.querySelectorAll("#imgs img")].map((i) => i.decode()));
+        } catch (e) {
+          console.warn("font load failed:", e && e.message);
+        }
+        buildGrain();
+      })();
+      /* scenes look images up by name: IMG["sig-write"] */
+      const IMG = Object.fromEntries([...document.querySelectorAll("#imgs img")].map((i) => [i.id.slice(4), i]));
+
+      window.__showcase = {
+        duration: DURATION,
+        fps: 60,
+        width: W,
+        height: H,
+        timeline: TIMELINE,
+        render,
+        ready,
+        fonts: FONT_LIST,
+        fontSample: FONT_SAMPLE,
+        lang: LANG,
+      };
+
+      /* ---------- preview player (not used by capture) ---------- */
+      if (CAPTURE) {
+        document.body.classList.add("capture");
+      } else {
+        const $ = (id) => document.getElementById(id);
+        const btn = $("play"),
+          scrub = $("scrub"),
+          tc = $("tc"),
+          chap = $("chapters");
+        const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const settled = (e) => e.start + e.dur - 0.05; // last frame of an entry, once everything has landed
+        let playing = false,
+          cur = 0,
+          t0 = null,
+          raf = 0;
+        scrub.max = Math.round(DURATION * 1000);
+        $("meta").textContent = `${W}×${H} · 60p · ${DURATION.toFixed(1)} s`;
+        function show(t) {
+          cur = t;
+          render(t);
+          scrub.value = Math.round(t * 1000);
+          tc.textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+        }
+        /* rAF timestamp drives playback; the time base is set on the first tick after play(). */
+        function tick(now) {
+          if (t0 === null) t0 = now - cur * 1000;
+          let t = (now - t0) / 1000;
+          if (t >= DURATION + 1.5) {
+            t0 = now;
+            t = 0;
+          }
+          show(Math.min(t, DURATION - 1e-6));
+          raf = requestAnimationFrame(tick);
+        }
+        function play() {
+          playing = true;
+          btn.textContent = "Pause";
+          t0 = null;
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(tick);
+        }
+        function pause() {
+          playing = false;
+          btn.textContent = "Play";
+          cancelAnimationFrame(raf);
+        }
+        function chrome() {
+          const T = STR[LANG];
+          document.documentElement.lang = LANG;
+          $("title").textContent = T.title || document.title;
+          $("lang").textContent = T.toggle || LANG;
+          chap.replaceChildren(
+            ...TIMELINE.map((e, i) => {
+              const b = document.createElement("button");
+              b.type = "button";
+              b.textContent = (T.chapters && T.chapters[i]) || e.scene;
+              b.addEventListener("click", () => {
+                if (REDUCED) {
+                  pause();
+                  show(settled(e));
+                } else {
+                  cur = e.start + 0.01;
+                  play();
+                }
+              });
+              return b;
+            }),
+          );
+        }
+        btn.addEventListener("click", () => (playing ? pause() : play()));
+        $("restart").addEventListener("click", () => {
+          cur = 0;
+          play();
+        });
+        scrub.addEventListener("input", () => {
+          pause();
+          show(scrub.value / 1000);
+        });
+        $("lang").addEventListener("click", () => {
+          LANG = LANGS[(LANGS.indexOf(LANG) + 1) % LANGS.length];
+          window.__showcase.lang = LANG;
+          chrome();
+          if (!playing) show(cur);
+        });
+        chrome();
+        ready.then(() => {
+          if (REDUCED) show(settled(TIMELINE[TIMELINE.length - 1]));
+          else play();
+        });
+      }
+    </script>
+    <!-- scenes register into the engine's SCENES, so they load after it -->
+    <script src="scenes/kit.js"></script>
+    <script src="scenes/cold-open.js"></script>
+    <script src="scenes/brand.js"></script>
+    <script src="scenes/promise.js"></script>
+    <script src="scenes/screen.js"></script>
+    <script src="scenes/atlas.js"></script>
+    <script src="scenes/orbit.js"></script>
+    <script src="scenes/mcp.js"></script>
+    <script src="scenes/locks.js"></script>
+    <script src="scenes/designs.js"></script>
+    <script src="scenes/finale.js"></script>
+  </body>
+</html>
