@@ -210,6 +210,19 @@
   --color-emotion-neutral: #f59e0b;
   --color-emotion-good: #10b981;
 
+  /* Categorical numerals and series (entries, words, streak, mood,
+     heatmap, time of day). Hue order is fixed: 1 amber, 2 violet,
+     3 teal, 4 green, 5 rose, 6 sky. Each clears 4.5:1 on
+     --color-elevated. Amber and teal sit a step under 0.12 chroma so
+     they stay inside sRGB. `.dark` redefines the set; Soft and Lumen
+     inherit those values because their elevated surfaces still clear AA. */
+  --color-viz-1: oklch(0.54 0.11 75);
+  --color-viz-2: oklch(0.53 0.12 292);
+  --color-viz-3: oklch(0.51 0.09 186);
+  --color-viz-4: oklch(0.51 0.12 130);
+  --color-viz-5: oklch(0.53 0.12 12);
+  --color-viz-6: oklch(0.52 0.12 240);
+
   --color-editor-highlight: oklch(90% 0.16 95);
 }
 
@@ -466,6 +479,16 @@
   --color-emotion-bad: #fb7185;
   --color-emotion-neutral: #fbbf24;
   --color-emotion-good: #34d399;
+
+  /* Same hue order, lightened for charcoal elevated. Soft (#242424)
+     and Lumen inherit these — both still clear 4.5:1, so they are not
+     redefined there. Teal chroma is 0.11 so the ink stays in sRGB. */
+  --color-viz-1: oklch(0.7 0.12 75);
+  --color-viz-2: oklch(0.7 0.12 292);
+  --color-viz-3: oklch(0.68 0.11 186);
+  --color-viz-4: oklch(0.68 0.12 130);
+  --color-viz-5: oklch(0.7 0.12 12);
+  --color-viz-6: oklch(0.69 0.12 240);
 
   --color-editor-highlight: oklch(58% 0.14 95 / 0.55);
 
@@ -788,6 +811,15 @@
   --color-emotion-neutral: #f59e0b;
   --color-emotion-good: #10b981;
 
+  /* Categorical viz — same ink as Signature light. Restated, not
+     inherited, so the Clean paint-token parity check stays meaningful. */
+  --color-viz-1: oklch(0.54 0.11 75);
+  --color-viz-2: oklch(0.53 0.12 292);
+  --color-viz-3: oklch(0.51 0.09 186);
+  --color-viz-4: oklch(0.51 0.12 130);
+  --color-viz-5: oklch(0.53 0.12 12);
+  --color-viz-6: oklch(0.52 0.12 240);
+
   --color-editor-highlight: oklch(0.94 0.12 95);
   --content-grad-from: oklch(1 0 0);
   --content-grad-to: oklch(1 0 0);
@@ -867,6 +899,15 @@
   --color-emotion-bad: #fb7185;
   --color-emotion-neutral: #fbbf24;
   --color-emotion-good: #34d399;
+
+  /* Same ink as Signature .dark. Restated so html.dark.ds-clean does
+     not keep the light block's dark-on-paper values. */
+  --color-viz-1: oklch(0.7 0.12 75);
+  --color-viz-2: oklch(0.7 0.12 292);
+  --color-viz-3: oklch(0.68 0.11 186);
+  --color-viz-4: oklch(0.68 0.12 130);
+  --color-viz-5: oklch(0.7 0.12 12);
+  --color-viz-6: oklch(0.69 0.12 240);
 
   --content-grad-from: oklch(0.145 0 0);
   --content-grad-to: oklch(0.145 0 0);
@@ -977,6 +1018,16 @@
   --color-emotion-neutral: #ac762e;
   --color-emotion-good: #2d9068;
 
+  /* Same hue order at the kit's lower chroma (~0.1), darkened until
+     each numeral clears 4.5:1 on --color-elevated and on
+     --color-surface-control (dashboard card fill). */
+  --color-viz-1: oklch(0.48 0.1 75);
+  --color-viz-2: oklch(0.49 0.1 292);
+  --color-viz-3: oklch(0.47 0.08 186);
+  --color-viz-4: oklch(0.47 0.1 130);
+  --color-viz-5: oklch(0.49 0.1 12);
+  --color-viz-6: oklch(0.48 0.1 240);
+
   --color-editor-highlight: oklch(0.93 0.06 50);
   --content-grad-from: #f7f1e6;
   --content-grad-to: #f7f1e6;
@@ -1076,6 +1127,15 @@
   --color-emotion-bad: #e08790;
   --color-emotion-neutral: #ebc472;
   --color-emotion-good: #6ccba1;
+
+  /* Same muted hues, lightened for clay-dark elevated and
+     --color-surface-control. */
+  --color-viz-1: oklch(0.7 0.1 75);
+  --color-viz-2: oklch(0.7 0.1 292);
+  --color-viz-3: oklch(0.68 0.1 186);
+  --color-viz-4: oklch(0.69 0.1 130);
+  --color-viz-5: oklch(0.71 0.1 12);
+  --color-viz-6: oklch(0.69 0.1 240);
 
   --color-editor-highlight: oklch(0.42 0.06 50);
   --content-grad-from: #201d1a;

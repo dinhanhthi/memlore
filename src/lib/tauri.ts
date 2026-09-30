@@ -1948,6 +1948,11 @@ export interface WritingVolumePoint {
   entry_count: number
 }
 
+export interface WritingHourRow {
+  hour: number
+  count: number
+}
+
 export interface StreakCalendarDay {
   date: string
   entry_count: number
@@ -1973,6 +1978,9 @@ export const statsTagFrequency = (): Promise<TagFrequencyRow[]> => invoke('stats
 
 export const statsWritingVolume = (period: string, range: number): Promise<WritingVolumePoint[]> =>
   invoke('stats_writing_volume', { period, range })
+
+export const statsWritingHours = (rangeDays: number): Promise<WritingHourRow[]> =>
+  invoke('stats_writing_hours', { rangeDays })
 
 export const statsStreakCalendar = (year: number): Promise<StreakCalendarDay[]> =>
   invoke('stats_streak_calendar', { year })

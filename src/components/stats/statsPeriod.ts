@@ -21,8 +21,9 @@ export const PERIOD_CONFIG: Record<Period, { range: number; bucket: StatsBucket 
 }
 
 /**
- * Day count for the bucket-less commands (mood histogram). Derived from
- * `PERIOD_CONFIG` rather than a second table so the two can never drift.
+ * Day count for the bucket-less commands (mood histogram, writing hours).
+ * Derived from `PERIOD_CONFIG` rather than a second table so the two can
+ * never drift.
  */
 export function periodRangeDays(period: Period): number {
   return PERIOD_CONFIG[period].range
@@ -41,6 +42,11 @@ export function writingVolumeKey(period: Period): string {
 
 export function moodHistogramKey(period: Period): string {
   return `mood_histogram:${periodRangeDays(period)}`
+}
+
+/** Bucket-less, like the mood histogram: the command takes range days only. */
+export function writingHoursKey(period: Period): string {
+  return `writing_hours:${periodRangeDays(period)}`
 }
 
 export function streakCalendarKey(year: number): string {

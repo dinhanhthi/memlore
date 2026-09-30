@@ -2154,6 +2154,7 @@ pub fn run() {
             commands::stats::stats_emotion_trend,
             commands::stats::stats_tag_frequency,
             commands::stats::stats_writing_volume,
+            commands::stats::stats_writing_hours,
             commands::stats::stats_streak_calendar,
             commands::stats::stats_location_density,
             // Stats export

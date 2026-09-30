@@ -1978,6 +1978,36 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
   })
 })
 
+describe('Categorical viz tokens', () => {
+  const VIZ_TOKENS = [
+    '--color-viz-1',
+    '--color-viz-2',
+    '--color-viz-3',
+    '--color-viz-4',
+    '--color-viz-5',
+    '--color-viz-6',
+  ] as const
+
+  it.each(
+    SHIPPING_SURFACES.flatMap(({ id, label }) => VIZ_TOKENS.map((fg) => ({ id, label, fg }))),
+  )('$label: $fg exists and ≥ 4.5:1 on --color-elevated', ({ id, fg }) => {
+    expect(tokensBySurface[id].get(fg)).toBeDefined()
+    expect(contrastOf(tokensBySurface[id], fg, '--color-elevated')).toBeGreaterThanOrEqual(
+      WCAG_AA_MIN,
+    )
+  })
+
+  it.each(
+    SHIPPING_SURFACES.filter(
+      (surface) => surface.id === 'clay-light' || surface.id === 'clay-dark',
+    ).flatMap(({ id, label }) => VIZ_TOKENS.map((fg) => ({ id, label, fg }))),
+  )('$label: $fg ≥ 4.5:1 on --color-surface-control', ({ id, fg }) => {
+    expect(contrastOf(tokensBySurface[id], fg, '--color-surface-control')).toBeGreaterThanOrEqual(
+      WCAG_AA_MIN,
+    )
+  })
+})
+
 describe('Entry-card fill interpolation', () => {
   it('registers --entry-card-fill as an interpolating <color> @property', () => {
     expect(cssCode).toMatch(/@property\s+--entry-card-fill\s*\{[^}]*syntax:\s*['"]<color>['"]/)

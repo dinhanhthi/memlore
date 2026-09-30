@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::{
     self, EmotionTrendBucket, EntriesOverTimePoint, LocationPoint, MoodHistogramRow,
-    MoodTrendPoint, StreakCalendarDay, TagFrequencyRow, WritingVolumePoint,
+    MoodTrendPoint, StreakCalendarDay, TagFrequencyRow, WritingHourRow, WritingVolumePoint,
 };
 use crate::AppState;
 
@@ -69,6 +69,16 @@ pub fn stats_writing_volume(
     let range = range.min(3650);
     let conn = state.lock()?;
     db::query_writing_volume(&conn, &period, range).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stats_writing_hours(
+    range_days: u32,
+    state: State<'_, AppState>,
+) -> Result<Vec<WritingHourRow>, String> {
+    let range_days = range_days.min(3650);
+    let conn = state.lock()?;
+    db::query_writing_hours(&conn, range_days).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -633,6 +643,139 @@ mod tests {
         assert_eq!(
             result[0].count, 1,
             "media at same location as entry should not double-count"
+        );
+    }
+
+    /// Noon UTC on a day `days` ago, matching the other stats tests so
+    /// `strftime(..., 'localtime')` stays on a stable calendar day.
+    fn noon_utc_days_ago(days: i64) -> i64 {
+        let now = now_unix();
+        (now - days * 86_400) / 86_400 * 86_400 + 43_200
+    }
+
+    /// Hour bucket SQLite assigns this timestamp. Do not hardcode an hour:
+    /// `'localtime'` follows the host zone.
+    fn local_hour(conn: &Connection, ts: i64) -> u8 {
+        let hour: String = conn
+            .query_row(
+                "SELECT strftime('%H', ?1, 'unixepoch', 'localtime')",
+                [ts],
+                |row| row.get(0),
+            )
+            .unwrap();
+        hour.parse().unwrap()
+    }
+
+    fn assert_hours_0_through_23(rows: &[db::WritingHourRow]) {
+        assert_eq!(rows.len(), 24, "writing hours always returns 24 rows");
+        for (i, row) in rows.iter().enumerate() {
+            assert_eq!(row.hour, i as u8, "row {i} should be hour {i}");
+        }
+    }
+
+    #[test]
+    fn writing_hours_sums_two_entries_in_the_same_hour() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let jid = default_journal_id(&conn);
+        let ts = noon_utc_days_ago(2);
+        insert_entry_at(&conn, &jid, ts);
+        insert_entry_at(&conn, &jid, ts + 60);
+
+        let hour = local_hour(&conn, ts);
+        let rows = db::query_writing_hours(&conn, 30).unwrap();
+        assert_hours_0_through_23(&rows);
+        assert_eq!(rows[hour as usize].count, 2);
+        assert_eq!(rows.iter().map(|r| r.count).sum::<u64>(), 2);
+    }
+
+    #[test]
+    fn writing_hours_excludes_deleted_entries() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let jid = default_journal_id(&conn);
+        let ts = noon_utc_days_ago(2);
+        insert_entry_at(&conn, &jid, ts);
+        let deleted = insert_entry_at(&conn, &jid, ts + 60);
+        db::soft_delete_entry(&conn, &deleted).unwrap();
+
+        let hour = local_hour(&conn, ts);
+        let rows = db::query_writing_hours(&conn, 30).unwrap();
+        assert_eq!(rows[hour as usize].count, 1);
+        assert_eq!(rows.iter().map(|r| r.count).sum::<u64>(), 1);
+    }
+
+    #[test]
+    fn writing_hours_excludes_invisible_entries() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let jid = default_journal_id(&conn);
+        let ts = noon_utc_days_ago(2);
+        insert_entry_at(&conn, &jid, ts);
+        let hidden = insert_entry_at(&conn, &jid, ts + 60);
+        db::set_entry_invisible(&conn, &hidden, true, Some("test-vault")).unwrap();
+
+        let hour = local_hour(&conn, ts);
+        let rows = db::query_writing_hours(&conn, 30).unwrap();
+        assert_eq!(rows[hour as usize].count, 1);
+        assert_eq!(rows.iter().map(|r| r.count).sum::<u64>(), 1);
+    }
+
+    #[test]
+    fn writing_hours_empty_db_returns_24_zero_rows() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let rows = db::query_writing_hours(&conn, 30).unwrap();
+        assert_hours_0_through_23(&rows);
+        assert!(rows.iter().all(|r| r.count == 0));
+    }
+
+    #[test]
+    fn writing_hours_excludes_entries_before_cutoff() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        let jid = default_journal_id(&conn);
+        let recent = noon_utc_days_ago(2);
+        let old = noon_utc_days_ago(40);
+        insert_entry_at(&conn, &jid, recent);
+        insert_entry_at(&conn, &jid, old);
+
+        let hour = local_hour(&conn, recent);
+        let rows = db::query_writing_hours(&conn, 30).unwrap();
+        assert_eq!(rows[hour as usize].count, 1);
+        assert_eq!(
+            rows.iter().map(|r| r.count).sum::<u64>(),
+            1,
+            "entry older than range_days must be excluded"
+        );
+    }
+
+    #[test]
+    fn stats_writing_hours_clamps_over_large_range() {
+        use crate::test_support::mock_app::mock_app_with_state;
+        use crate::{EncryptionKeyState, StartupMode};
+        use tauri::Manager;
+
+        let state = make_state();
+        {
+            let conn = state.lock().unwrap();
+            let jid = default_journal_id(&conn);
+            // Inside a 3650-day window, outside nothing smaller. The 4000-day
+            // entry is inside an unclamped 10000-day range and outside 3650.
+            insert_entry_at(&conn, &jid, noon_utc_days_ago(1));
+            insert_entry_at(&conn, &jid, noon_utc_days_ago(4000));
+        }
+        let app = mock_app_with_state(
+            state,
+            EncryptionKeyState::new(),
+            StartupMode::PasswordLocked,
+        );
+        let rows = super::stats_writing_hours(10_000, app.state()).unwrap();
+        assert_eq!(rows.len(), 24);
+        assert_eq!(
+            rows.iter().map(|r| r.count).sum::<u64>(),
+            1,
+            "range_days above 3650 must be clamped so the 4000-day-old entry is excluded"
         );
     }
 }

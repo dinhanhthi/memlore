@@ -9,6 +9,7 @@ import {
   moodHistogramKey,
   periodRangeDays,
   streakCalendarKey,
+  writingHoursKey,
   writingVolumeKey,
 } from './statsPeriod'
 
@@ -40,6 +41,16 @@ describe('statsPeriod', () => {
     expect(streakCalendarKey(2026)).toBe('streak_calendar:2026')
     expect(TAG_FREQUENCY_KEY).toBe('tag_frequency')
     expect(LOCATION_DENSITY_KEY).toBe('location_density')
+  })
+
+  it('keys writing hours by period range and stays stable for the same period', () => {
+    expect(writingHoursKey('7d')).toBe('writing_hours:7')
+    expect(writingHoursKey('30d')).toBe('writing_hours:30')
+    expect(writingHoursKey('all')).toBe('writing_hours:3650')
+    expect(writingHoursKey('7d')).not.toBe(writingHoursKey('30d'))
+    expect(writingHoursKey('30d')).not.toBe(writingHoursKey('all'))
+    expect(writingHoursKey('7d')).not.toBe(writingHoursKey('all'))
+    expect(writingHoursKey('30d')).toBe(writingHoursKey('30d'))
   })
 
   it('gives each period a distinct set of period-dependent keys', () => {

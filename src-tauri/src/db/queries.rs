@@ -17896,6 +17896,50 @@ pub fn query_writing_volume(
     rows.collect()
 }
 
+/// One hour-of-day bucket (local time) for the writing-hours histogram.
+/// `hour` is `0..=23`. Callers always receive all 24 hours, zero-filled.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WritingHourRow {
+    pub hour: u8,
+    pub count: u64,
+}
+
+/// Count entries by local hour of day over the last `range_days`.
+///
+/// Always returns hours 0–23, zero-filled. `range_days` is always applied as
+/// a cutoff (`now - range_days * 86400`); the command clamps the range first.
+pub fn query_writing_hours(conn: &Connection, range_days: u32) -> Result<Vec<WritingHourRow>> {
+    let cutoff = now_unix() - range_days as i64 * 86_400;
+    let sql = format!(
+        "SELECT CAST(strftime('%H', e.entry_date, 'unixepoch', 'localtime') AS INTEGER) AS hour,
+                COUNT(*) AS cnt
+         FROM entries e
+         JOIN journals j ON j.id = e.journal_id
+         WHERE e.is_deleted = 0
+           AND e.entry_date >= ?1
+           AND {}
+         GROUP BY hour",
+        invisible_entry_exclusion_predicate()
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut counts = [0u64; 24];
+    let rows = stmt.query_map([cutoff], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)? as u64))
+    })?;
+    for row in rows {
+        let (hour, count) = row?;
+        if (0..24).contains(&hour) {
+            counts[hour as usize] = count;
+        }
+    }
+    Ok((0..24)
+        .map(|hour| WritingHourRow {
+            hour: hour as u8,
+            count: counts[hour as usize],
+        })
+        .collect())
+}
+
 /// Return a full calendar for the given year with per-day entry counts (0 for days with no entries).
 pub fn query_streak_calendar(conn: &Connection, year: i32) -> Result<Vec<StreakCalendarDay>> {
     // Query DB for per-day entry counts for this year.
