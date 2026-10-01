@@ -68,6 +68,7 @@ import {
   downloadUrl,
   editorFeatureRequestUrl,
   githubUrl,
+  introVideoEmbedUrl,
   licenseUrl,
 } from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
@@ -1330,6 +1331,90 @@ const platformItems = [
   { name: 'iOS & Android' as const, status: 'Coming soon' },
 ] satisfies { name: PlatformName; status: string; href?: string }[]
 
+function PageActions({
+  className,
+  demoArrow = false,
+  onWatch,
+}: {
+  className: string
+  demoArrow?: boolean
+  onWatch: () => void
+}) {
+  return (
+    <div className={className}>
+      <DownloadLink
+        className="download download-hero"
+        label="Download for Mac"
+        shortLabel="Download"
+        ariaLabel="Download the beta from GitHub"
+      />
+      <a className="button" href="#demo" data-variant="secondary">
+        {demoArrow ? (
+          <>
+            Demo <ArrowDown className="size-4" />
+          </>
+        ) : (
+          'Demo'
+        )}
+      </a>
+      <button
+        type="button"
+        className="button"
+        aria-label="Watch the introduction"
+        onClick={onWatch}
+      >
+        <Play className="size-4" /> Watch
+      </button>
+    </div>
+  )
+}
+
+function IntroVideoDialog({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useLayoutEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    dialog.showModal()
+    dialog.focus()
+    return () => {
+      if (dialog.open) dialog.close()
+      opener?.focus()
+    }
+  }, [])
+  return (
+    <dialog
+      ref={ref}
+      className="intro-dialog"
+      aria-labelledby="intro-dialog-title"
+      tabIndex={-1}
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="intro-dialog-bar">
+        <h2 id="intro-dialog-title">Introduction</h2>
+        <button type="button" className="intro-dialog-close" aria-label="Close" onClick={onClose}>
+          <X className="size-4" />
+        </button>
+      </div>
+      <div className="intro-frame">
+        <iframe
+          src={introVideoEmbedUrl}
+          title="Memlore — A little life. A lasting story."
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+    </dialog>
+  )
+}
+
 function formatLedgerDate(isoDate: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',
@@ -1341,6 +1426,7 @@ function formatLedgerDate(isoDate: string): string {
 
 export default function LandingPage() {
   const wide = useWideViewport()
+  const [introOpen, setIntroOpen] = useState(false)
   useEffect(() => {
     preloadHeadSprites()
   }, [])
@@ -1405,16 +1491,11 @@ export default function LandingPage() {
             the thoughts you need to put somewhere.
           </p>
           <LedgerRule area="r3" />
-          <div className="button-row">
-            <DownloadLink
-              className="download download-hero"
-              label="Download for Mac"
-              ariaLabel="Download the beta from GitHub"
-            />
-            <a className="button" href="#demo" data-variant="secondary">
-              Try the demo <ArrowDown className="size-4" />
-            </a>
-          </div>
+          <PageActions
+            className="button-row page-actions"
+            demoArrow
+            onWatch={() => setIntroOpen(true)}
+          />
           <LedgerRule area="r4" />
           <p className="hero-meta">No account · Encrypted on your device · macOS today</p>
         </section>
@@ -1839,20 +1920,15 @@ export default function LandingPage() {
             <br />
             are worth keeping.
           </h2>
-          <div className="button-row footer-actions">
-            <DownloadLink
-              className="download download-hero"
-              label="Download for Mac"
-              ariaLabel="Download the beta from GitHub"
-            />
-            <a className="button" href="#demo" data-variant="secondary">
-              Try the demo
-            </a>
-          </div>
+          <PageActions
+            className="button-row page-actions footer-actions"
+            onWatch={() => setIntroOpen(true)}
+          />
         </div>
         <LedgerRule />
         <SiteFooterBar homeHref="#main" />
       </footer>
+      {introOpen && <IntroVideoDialog onClose={() => setIntroOpen(false)} />}
     </>
   )
 }

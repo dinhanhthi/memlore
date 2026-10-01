@@ -7,10 +7,12 @@ import { useWideViewport } from './useWideViewport'
 export function DownloadLink({
   className,
   label,
+  shortLabel,
   ariaLabel,
 }: {
   className: string
   label: string
+  shortLabel?: string
   ariaLabel: string
 }) {
   return (
@@ -27,7 +29,14 @@ export function DownloadLink({
         <span className="download-glow-v" />
       </span>
       <Download className="size-4" />
-      <span className="download-label">{label}</span>
+      {shortLabel ? (
+        <span className="download-label">
+          <span className="download-label-long">{label}</span>
+          <span className="download-label-short">{shortLabel}</span>
+        </span>
+      ) : (
+        <span className="download-label">{label}</span>
+      )}
     </a>
   )
 }
