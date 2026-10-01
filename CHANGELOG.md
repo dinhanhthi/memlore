@@ -8,6 +8,27 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
 `website/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
 
+## v0.2.1 (2026-10-01)
+
+### Added
+
+- **Story numbers on Statistics and the home dashboard.** The Charts tab opens
+  with six tiles for the selected period: entries, words, day streak, mood
+  split, days written this year, and the hour you write most, each with a small
+  chart. Home cards use the same charts and tone chips, with more padding and
+  an icon beside each title.
+  [#d9a1b33](https://github.com/dinhanhthi/memlore/commit/d9a1b33)
+  [#6e0c7ab](https://github.com/dinhanhthi/memlore/commit/6e0c7ab)
+  [#3eec79f](https://github.com/dinhanhthi/memlore/commit/3eec79f)
+  [#a59815b](https://github.com/dinhanhthi/memlore/commit/a59815b)
+  [#1e6c8bf](https://github.com/dinhanhthi/memlore/commit/1e6c8bf)
+
+### Notes for maintainers
+
+- Dev Cargo builds stay smaller; `scripts/tauri.sh` keeps the release bundle
+  profile in-repo.
+  [#67f482a](https://github.com/dinhanhthi/memlore/commit/67f482a)
+
 ## v0.2.0 (2026-09-21)
 
 ### Added

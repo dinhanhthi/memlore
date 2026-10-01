@@ -83,9 +83,12 @@ describe('useCountUp', () => {
   })
 
   it('jumps to a new target after the first animation without ramping from 0', () => {
-    const { result, rerender } = renderHook(({ target }: { target: number }) => useCountUp(target), {
-      initialProps: { target: 100 },
-    })
+    const { result, rerender } = renderHook(
+      ({ target }: { target: number }) => useCountUp(target),
+      {
+        initialProps: { target: 100 },
+      },
+    )
 
     advance(900)
     expect(result.current).toBe(100)

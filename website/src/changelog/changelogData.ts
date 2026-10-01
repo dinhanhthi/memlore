@@ -25,6 +25,17 @@ export type ChangelogRelease = {
 /** Newest release first. */
 export const releases: ChangelogRelease[] = [
   {
+    version: '0.2.1',
+    date: '2026-10-01',
+    stable: true,
+    items: [
+      {
+        kind: 'new',
+        text: 'Statistics and Home now open with a story in numbers: how many entries and words you wrote, your streak, your mood, the days you showed up this year, and the hour you usually write. Each number has a small chart for the period you pick, and home cards use the same style with an icon next to the title.',
+      },
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-09-21',
     stable: true,
