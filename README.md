@@ -6,7 +6,7 @@
     <a href="https://memlore.app">Website</a> ·
     <a href="https://dl.memlore.app/mac">Download for Mac</a> ·
     <a href="https://memlore.app/#demo">Live demo</a> ·
-    <a href="https://www.youtube.com/watch?v=lcFDDCMZI5s">Intro Video</a>
+    <a href="https://youtu.be/Mv3LZ_P5lwg">Intro Video</a>
   </p>
 </div>
 
@@ -16,8 +16,8 @@
 <img src="docs/showcase/poster/memlore-poster.png" width="100%" alt="Memlore: A little life. A lasting story." />
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=lcFDDCMZI5s">
-    <img src="https://i.ytimg.com/vi/lcFDDCMZI5s/maxresdefault.jpg" width="640" alt="Watch the introduction: Memlore — A little life. A lasting story." />
+  <a href="https://youtu.be/Mv3LZ_P5lwg">
+    <img src="https://i.ytimg.com/vi/Mv3LZ_P5lwg/maxresdefault.jpg" width="640" alt="Watch the introduction: Memlore — A little life. A lasting story." />
   </a>
 </p>
 

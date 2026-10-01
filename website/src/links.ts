@@ -13,9 +13,9 @@ export const aiFeatureRequestUrl = `${githubUrl}/issues/new?title=${encodeURICom
 // Releases page, so the button degrades rather than dies. See workers/stats/.
 export const downloadUrl = 'https://dl.memlore.app/mac'
 
-export const introVideoUrl = 'https://www.youtube.com/watch?v=lcFDDCMZI5s'
+export const introVideoUrl = 'https://youtu.be/Mv3LZ_P5lwg'
 
 // Privacy-enhanced embed: no cookie until the visitor presses play. Autoplay
 // only runs because the iframe mounts after the Watch click.
 export const introVideoEmbedUrl =
-  'https://www.youtube-nocookie.com/embed/lcFDDCMZI5s?rel=0&autoplay=1'
+  'https://www.youtube-nocookie.com/embed/Mv3LZ_P5lwg?rel=0&autoplay=1'
