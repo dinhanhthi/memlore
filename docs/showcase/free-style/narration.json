@@ -57,7 +57,7 @@
     {
       "id": "calendar",
       "title": "Every day, at a glance.",
-      "vo": "The calendar lights up every day you wrote.",
+      "vo": "The calendar lights up every day you wrote. It shows the time you've spent, and how your mood has changed.",
       "at": 0.7
     },
     {

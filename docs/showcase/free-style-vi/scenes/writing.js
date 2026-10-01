@@ -49,11 +49,21 @@ scene('editor', {
     const TM = {};
     const SM = 0.6; // slash menu on screen
     TM.h1 = typer([MK('# ', ''), { raw: T('editor.h1'), html: T('editor.h1') }], q('headings', 2.3) - 0.3, 30);
-    // the paragraph is typed at 70 cps, slowed down (to at most 30 cps) so it fills the time up to "danh sách việc cần làm"
-    // instead of finishing early and leaving the window still while the voice lists "làm nổi bật, liên kết"
-    const pPieces = [T('editor.p.a'), { ...MK(`[${T('editor.p.link')}](https://…)`, `<a>${T('editor.p.link')}</a>`), pause: 0.3 }, T('editor.p.b'), MK(`==${T('editor.p.mark')}==`, `<mark>${T('editor.p.mark')}</mark>`), T('editor.p.c')];
-    const pA = TM.h1.end + 0.05, pFit = Math.max(q('checklists', 4.2) - 0.1 - 0.4 - pA, 0.1);
-    TM.p = typer(pPieces, pA, clamp(70 * (typer(pPieces, pA, 70).end - pA) / pFit, 30, 70));
+    // voice order is "làm nổi bật, liên kết": the mark lands on the first phrase, the link on the second
+    const hi = cueT(c, 'editor.cue.highlight', 0, 2.85), lk = cueT(c, 'editor.cue.link', 0, 3.7);
+    const lead = T('editor.p.lead'), mid = T('editor.p.mid'), mark = T('editor.p.mark'), linkWord = T('editor.p.link');
+    const leadCps = 46, markCps = 32, midCps = 48, linkCps = 44;
+    const leadDur = lead.length / leadCps, markRaw = `==${mark}==`, markDur = markRaw.length / markCps, midDur = mid.length / midCps;
+    const pA = Math.max(TM.h1.end + 0.04, hi - leadDur);
+    const pauseAfterMark = Math.max(0.04, lk - (pA + leadDur + markDur + midDur));
+    const pPieces = [
+      lead,
+      { ...MK(markRaw, `<mark>${mark}</mark>`), cps: markCps, pause: pauseAfterMark },
+      { raw: mid, html: mid, cps: midCps },
+      { ...MK(`[${linkWord}](https://…)`, `<a>${linkWord}</a>`), cps: linkCps },
+      T('editor.p.c'),
+    ];
+    TM.p = typer(pPieces, pA, leadCps);
     TM.slash1 = Math.max(TM.p.end + 0.35, q('checklists', 4.2) - 0.1); // "/" → checklist, once the paragraph is typed
     TM.todo1 = typer([T('editor.todo')], TM.slash1 + 0.4, 40);
     TM.check1 = TM.todo1.end + 0.15;
@@ -212,24 +222,20 @@ scene('find', {
   build(root, c) {
     c.bg = blobs(root, ['#5cb8ff2a', '#45d6c822', '#f3a73b1a'], 66);
     c.cap = title(root, c.title, { y: 70, size: 80 });
-    c.bar = el('div', 'panel abs flex', root); place(c.bar, 330, 300, 1000, 96); css(c.bar, { gap: '20px', padding: '0 34px', borderRadius: '24px' }); // bar + AI switch centred as one group
+    // the bar and the results share one centred column; the AI state is the gold mark inside the bar
+    const bw = 1000, bx = (W - bw) / 2;
+    c.bar = el('div', 'panel abs flex', root); place(c.bar, bx, 300, bw, 96); css(c.bar, { gap: '20px', padding: '0 34px', borderRadius: '24px' });
     icon('search', 36, c.bar, 'var(--cream-3)');
     c.q = el('div', '', c.bar); css(c.q, { fontSize: '36px', flex: 1 });
-    // meaning-match badge (icon only), shown for the semantic query
     c.badge = el('div', 'ico', c.bar, svgIcon('sparkles', 'var(--gold-2)', 2.2));
     css(c.badge, { width: '54px', height: '54px', padding: '12px', borderRadius: '50%', background: '#f3a73b30', border: '1px solid #f3a73b88' });
-    // AI switch next to the search bar: appears on "AI turned on", then flips on
-    c.ai = el('div', 'panel abs flex', root); place(c.ai, 1360, 312, 230, 72);
-    css(c.ai, { gap: '14px', padding: '0 20px', borderRadius: '22px', fontSize: '26px', fontWeight: 700, justifyContent: 'space-between' });
-    c.aiLabel = el('span', 'flex', c.ai, `<span class="ico" style="width:28px;height:28px">${svgIcon('sparkles', '#c9b6ff', 2.2)}</span>${T('find.ai')}`); css(c.aiLabel, { gap: '10px' });
-    c.aiTg = toggle(c.ai, 'var(--violet)');
     const R = (set, i) => [T(`find.${set}.${i}.h`), T(`find.${set}.${i}.b`), T(`find.${set}.${i}.d`)];
     const sets = [
       [T('find.q1'), [0, 1, 2].map(i => R('r1', i))],
       [null, [0, 1, 2].map(i => R('r2', i))],
     ];
     c.sets = sets.map(([word, res]) => ({ word, rows: res.map(([h, b, d], i) => {
-      const r = el('div', 'panel-2 abs', root); place(r, 330, 450 + i * 150, 1000, 130); css(r, { padding: '22px 32px' });
+      const r = el('div', 'panel-2 abs', root); place(r, bx, 450 + i * 150, bw, 130); css(r, { padding: '22px 32px' });
       const hl = s => (word ? s.replace(new RegExp(`(${word})`, 'i'), '<mark style="background:#f3a73b55;color:#fff;border-radius:5px;padding:0 3px">$1</mark>') : s);
       const spark = word ? '' : `<span class="ico" style="width:22px;height:22px;margin-right:14px">${svgIcon('sparkles', 'var(--gold-2)', 2.2)}</span>`;
       r.innerHTML = `<div class="flex" style="justify-content:space-between"><div class="display" style="font-size:32px">${hl(h)}</div><div class="flex mono" style="font-size:18px;color:var(--cream-3)">${spark}${d}</div></div><div style="font-size:22px;color:var(--cream-2);margin-top:10px">${hl(b)}</div>`;
@@ -241,8 +247,7 @@ scene('find', {
     const qc = (key, fb) => cueT(c, `find.cue.${key}`, 0, fb);
     titleIn(c.cap, t, 0.15);
     riseIn(c.bar, t, 0.1, 0.6, 40);
-    // "Every word..." types "morning" → results on "written?" → the AI switch turns on at "AI turned on"
-    // → backspace → the semantic query is typed on "search by meaning" with the sparkle badge
+    // keyword query, then the gold AI mark inside the bar on "AI được bật", then the meaning query
     const Q1 = T('find.q1'), Q2 = T('find.q2');
     const aQ1 = voAt(c) + 0.35, aRes1 = qc('written', 1.9) + 0.3;
     const aAi = qc('aiOn', 4.3), aAiOn = qc('turnedOn', 4.6) + 0.28, aBack = aAiOn + 0.2, aQ2 = qc('byMeaning', 6.0);
@@ -252,14 +257,7 @@ scene('find', {
     else if (t < aQ2) q = Q1.slice(0, Math.max(0, Q1.length - Math.floor((t - aBack) * 14)));
     else q = typed(Q2, t, aQ2 + 0.05, 24);
     c.q.innerHTML = q + caretHtml(t);
-    const ap = ep(t, aAi, aAi + 0.4, 'outBack');
-    css(c.ai, { display: ap > 0 ? 'flex' : 'none' });
-    tf(c.ai, { s: lerp(0.6, 1, ap), o: clamp(ap * 2), x: (1 - ap) * 40 });
-    const on = ep(t, aAiOn, aAiOn + 0.3);
-    setToggle(c.aiTg, on);
-    c.ai.style.borderColor = on > 0.5 ? '#a58bffaa' : 'var(--line)';
-    c.ai.style.boxShadow = `0 30px 80px #0008, 0 0 ${50 * on * (0.7 + 0.3 * Math.sin(t * 4))}px #a58bff66`;
-    const bp = ep(t, aQ2, aQ2 + 0.45, 'outBack');
+    const bp = ep(t, aAi, aAi + 0.45, 'outBack');
     css(c.badge, { display: bp > 0 ? 'flex' : 'none' });
     tf(c.badge, { s: lerp(0.3, 1, bp) * (1 + 0.06 * Math.sin(t * 4) * bp), o: clamp(bp * 2), r: lerp(-90, 0, bp) });
     const [A, B] = c.sets;

@@ -761,9 +761,9 @@
     ],
     "calendar": [
       {
-        "file": "calendar-0-fb7afd13ce.mp3",
-        "text": "The calendar lights up every day you wrote.",
-        "dur": 2.643,
+        "file": "calendar-0-a6e8ec8c31.mp3",
+        "text": "The calendar lights up every day you wrote. It shows the time you've spent, and how your mood has changed.",
+        "dur": 5.786,
         "words": [
           {
             "w": "The",
@@ -771,31 +771,79 @@
           },
           {
             "w": "calendar",
-            "t": 0.357
+            "t": 0.143
           },
           {
             "w": "lights",
-            "t": 0.643
+            "t": 0.571
           },
           {
             "w": "up",
-            "t": 0.929
+            "t": 0.857
           },
           {
             "w": "every",
-            "t": 1.214
+            "t": 1.143
           },
           {
             "w": "day",
-            "t": 1.571
+            "t": 1.5
           },
           {
             "w": "you",
-            "t": 1.786
+            "t": 1.714
           },
           {
             "w": "wrote.",
             "t": 1.893
+          },
+          {
+            "w": "It",
+            "t": 2.667
+          },
+          {
+            "w": "shows",
+            "t": 2.821
+          },
+          {
+            "w": "the",
+            "t": 3
+          },
+          {
+            "w": "time",
+            "t": 3.143
+          },
+          {
+            "w": "you've",
+            "t": 3.357
+          },
+          {
+            "w": "spent,",
+            "t": 3.571
+          },
+          {
+            "w": "and",
+            "t": 4
+          },
+          {
+            "w": "how",
+            "t": 4.286
+          },
+          {
+            "w": "your",
+            "t": 4.429
+          },
+          {
+            "w": "mood",
+            "t": 4.619
+          },
+          {
+            "w": "has",
+            "t": 4.786
+          },
+          {
+            "w": "changed.",
+            "t": 5.321
           }
         ]
       }
@@ -1978,11 +2026,11 @@
       {
         "file": "themes-0-f886d2b547.mp3",
         "text": "And make it yours! Memlore looks exactly the way you like, in countless combinations. Three design systems, light and dark, accent colours, layouts, and fonts.",
-        "dur": 10.357,
+        "dur": 16.277,
         "words": [
           {
             "w": "And",
-            "t": 0
+            "t": 0.0
           },
           {
             "w": "make",
@@ -2014,7 +2062,7 @@
           },
           {
             "w": "way",
-            "t": 3
+            "t": 3.0
           },
           {
             "w": "you",
@@ -2042,43 +2090,43 @@
           },
           {
             "w": "design",
-            "t": 5.714
+            "t": 5.7
           },
           {
             "w": "systems,",
-            "t": 6.071
+            "t": 6.1
           },
           {
             "w": "light",
-            "t": 6.976
+            "t": 8.56
           },
           {
             "w": "and",
-            "t": 7.143
+            "t": 8.92
           },
           {
             "w": "dark,",
-            "t": 7.5
+            "t": 9.04
           },
           {
             "w": "accent",
-            "t": 7.857
+            "t": 11.29
           },
           {
             "w": "colours,",
-            "t": 8.214
+            "t": 11.71
           },
           {
             "w": "layouts,",
-            "t": 9.036
+            "t": 14.68
           },
           {
             "w": "and",
-            "t": 9.429
+            "t": 15.08
           },
           {
             "w": "fonts.",
-            "t": 9.893
+            "t": 15.24
           }
         ]
       }

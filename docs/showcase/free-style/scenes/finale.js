@@ -13,10 +13,6 @@ const FX = 330, FY = 240, FW = 1260, FH = 787.5, K = FW / 1440;
 const SPEED = 0.7; // the scene plays at 0.7x (timeline.json): one output second is 0.7 source seconds
 const OUT = x => x * SPEED; // output seconds -> source seconds, for the reveal / hold lengths below
 
-// labels of the right-hand rail: [name, line 2, small caps subtitle, swatch colour]
-const LAYOUT_NAMES = [['Content left', 'content, list, sidebar'], ['Sidebar first', 'sidebar, content, list'], ['Classic', 'sidebar, list, content']];
-const ACCENT_NAMES = ['Amber', 'Violet', 'Rose', 'Emerald'];
-
 scene('themes', {
   enter: 'iris', enterOpts: { x: 960, y: 600 },
   build(root, c) {
@@ -26,15 +22,14 @@ scene('themes', {
     css(c.frame, { borderRadius: '22px', overflow: 'hidden', boxShadow: '0 50px 120px #000c, 0 0 0 1px #ffffff22' });
     const layer = (src) => { const d = el('div', 'abs', c.frame); css(d, { inset: 0, backgroundImage: `url(../assets/shots/free-style/${src}.jpg)`, backgroundSize: 'cover' }); return d; };
     c.base = layer('clay-dark');
-    // each step reveals a screenshot on top of the last, [shot, kind, cue phrase, offset in output s, label]; later steps paint over earlier ones
-    const th = (src, sys, mode) => ({ src, kind: 'theme', label: [sys, mode, 'DESIGN SYSTEM · MODE', SYSTEMS.find(x => x[0] === sys)[1]] });
+    // the base shot holds through "in countless combinations"; the steps below start only at "Three"
+    const th = (src) => ({ src, kind: 'theme' });
     c.steps = [
-      [th('clay-light', 'Clay', 'Light'), 'exactly', 0], [th('clean-dark', 'Clean', 'Dark'), 'like', 0], [th('sig-deep', 'Signature', 'Deep'), 'countless', 0], [th('sig-light', 'Signature', 'Light'), 'combinations', 0], // "looks exactly the way you like, in countless combinations"
-      [th('clay-dark', 'Clay', 'Dark'), 'Three', -0.1], [th('clean-dark', 'Clean', 'Dark'), 'systems', -0.15], [th('sig-soft', 'Signature', 'Soft'), 'systems', 0.4], // "Three design systems": Clay -> Clean -> Signature
-      [th('sig-light', 'Signature', 'Light'), 'light', -0.05], [th('sig-deep', 'Signature', 'Deep'), 'dark', -0.05], // "light and dark"
-      ...ACCENTS.map(([src, col], i) => [{ src, kind: 'accent', label: [ACCENT_NAMES[i], 'on any theme', 'ACCENT COLOUR', col] }, ...[['accent', -0.05], ['colours', 0], ['colours', 0.35], ['layouts', -0.2]][i]]), // "accent colours"
-      ...LAYOUTS.map((src, i) => [{ src, kind: 'layout', label: [LAYOUT_NAMES[i][0], LAYOUT_NAMES[i][1], 'LAYOUT', '#f5eee4'] }, ...[['layouts', 0], ['and fonts', 0], ['fonts', -0.2]][i]]), // "layouts"
-    ].map(([d, ph, off]) => ({ ...d, el: layer(d.src), ph, off }));
+      th('clay-light'), th('clean-dark'), th('sig-soft'), // "Three design systems": Clay, Clean, Signature
+      th('sig-light'), th('sig-deep'), // "light and dark"
+      ...ACCENTS.map(([src]) => ({ src, kind: 'accent' })),
+      ...LAYOUTS.map((src) => ({ src, kind: 'layout' })),
+    ].map(d => ({ ...d, el: layer(d.src) }));
     // icon swatches (left rail): design system, light/dark, accent, layout, fonts
     c.rail = el('div', 'abs col', root); place(c.rail, 40, 330, 250); css(c.rail, { gap: '34px' });
     const row = () => { const r = el('div', 'flex', c.rail); css(r, { gap: '10px', justifyContent: 'center' }); return r; };
@@ -49,12 +44,6 @@ scene('themes', {
     c.layTiles = LAYOUTS.map(() => tile(layRow, svgIcon('layout-panel-left', 'var(--cream)', 2)));
     const fontRow = row(); c.rows.push(fontRow);
     c.fontTile = tile(fontRow, svgIcon('type', 'var(--cream)', 2));
-    // right-hand label rail: name, second line, small caps subtitle, swatch
-    c.lab = el('div', 'abs', root); place(c.lab, 1618, 560, 290);
-    c.labSw = el('div', 'abs', c.lab); css(c.labSw, { left: 0, top: '-44px', width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--line-2)' });
-    c.labName = el('div', 'display', c.lab); css(c.labName, { fontSize: '56px', lineHeight: '1.05', color: 'var(--cream)' });
-    c.labMode = el('div', 'display grad-gold', c.lab); css(c.labMode, { fontSize: '40px', lineHeight: '1.1' });
-    c.labSub = el('div', 'mono', c.lab); css(c.labSub, { marginTop: '22px', fontSize: '19px', letterSpacing: '0.2em', color: 'var(--cream-3)' });
     // closing wall
     c.wall = THEMES.map(([s, sys, mode], i) => {
       const w = el('div', 'abs', root); place(w, 90 + (i % 4) * 440, 235 + Math.floor(i / 4) * 330, 420, 262.5);
@@ -68,64 +57,78 @@ scene('themes', {
   },
   update(t, c) {
     c.bg.update(t);
-    const A = (ph, off = 0) => cue(c, ph, 0, 0.7 + 1) + OUT(off); // a spoken word, shifted by output seconds
+    const A = (ph) => cue(c, ph, 0, 1); // spoken word, scene-local source seconds
     titleIn(c.cap, t, 0.2);
     // theme toggle sits at (1383, 20) in app CSS px; the "New Entry" accent button at (70, 72)
     const TX = 1383 * K, TY = 20 * K, AX = 70 * K, AY = 72 * K;
-    const at = c.steps.map(st => A(st.ph, st.off));
+    // The phrases stay at speaking speed. Each group's steps begin with the phrase and
+    // finish in the silence after it, wipe included, before the next phrase starts.
+    const spread = (t0, t1, n) => {
+      if (n <= 1) return [t0];
+      const end = Math.max(t0, t1), step = (end - t0) / (n - 1);
+      return Array.from({ length: n }, (_, i) => t0 + step * i);
+    };
+    const sysT = spread(A('Three'), A('light') - OUT(1.54), 3);
+    const modeTm = [A('light'), A('accent') - OUT(1.22)];
+    const accT = spread(A('accent'), A('layouts') - OUT(0.82), 4);
+    const layT = spread(A('layouts'), A('fonts') + OUT(1.05), 3);
+    const at = [...sysT, ...modeTm, ...accT, ...layT];
+    const FN = layT[2];
+    // wall follows the last layout. Z < 1 only if that leaves less than OUT(4.1) of the scene.
+    const Z = clamp((c.dur * SPEED - 0.15 - FN) / OUT(4.1), 0.45, 1), O = x => OUT(x * Z);
     c.steps.forEach((st, i) => {
       const a = at[i];
-      if (st.kind === 'layout') { const p = ep(t, a, a + OUT(0.45), 'inOutExpo'); st.el.style.display = p > 0 ? 'block' : 'none'; st.el.style.clipPath = `inset(0 ${(1 - p) * 100}% 0 0)`; return; }
-      const p = ep(t, a, a + OUT(st.kind === 'accent' ? 0.3 : 0.5), 'inOutCubic'), [x, y] = st.kind === 'accent' ? [AX, AY] : [TX, TY];
+      const wipe = st.kind === 'layout' ? 0.85 : st.kind === 'accent' ? 0.55 : 0.9; // output seconds
+      if (st.kind === 'layout') { const p = ep(t, a, a + OUT(wipe), 'inOutExpo'); st.el.style.display = p > 0 ? 'block' : 'none'; st.el.style.clipPath = `inset(0 ${(1 - p) * 100}% 0 0)`; return; }
+      const p = ep(t, a, a + OUT(wipe), 'inOutCubic'), [x, y] = st.kind === 'accent' ? [AX, AY] : [TX, TY];
       st.el.style.display = p > 0 ? 'block' : 'none'; st.el.style.clipPath = `circle(${p * 1600}px at ${x}px ${y}px)`;
     });
-    // the frame comes in on "And make it yours"; the closing wall comes 1.3 s after "fonts" (v2 timing)
-    const S0 = cue(c, 'And', 0, 0.7), FN = A('fonts');
-    const W0 = FN + OUT(1.3), wallP = ep(t, W0, W0 + OUT(0.8), 'inOutCubic');
-    riseIn(c.frame, t, S0 - 0.2, 0.8, 120, { s: lerp(1, 0.33, wallP), o: ep(t, S0 - 0.2, S0 + 0.4) * (1 - ep(t, W0 + OUT(0.3), W0 + OUT(0.7))) });
+    // the frame comes in on "And make it yours"; the demo style itself stays put until "Three".
+    // the wall follows the last layout, once that wipe has landed.
+    const S0 = cue(c, 'And', 0, 0.7);
+    const W0 = FN + O(1.1), wallP = ep(t, W0, W0 + O(0.8), 'inOutCubic');
+    riseIn(c.frame, t, S0 - 0.2, 0.8, 120, { s: lerp(1, 0.33, wallP), o: ep(t, S0 - 0.2, S0 + 0.4) * (1 - ep(t, W0 + O(0.3), W0 + O(0.7))) });
     // swatches light up on their spoken word
     const on = (d, act) => { d.style.background = act ? 'var(--gold)' : 'var(--ink-3)'; d.style.color = act ? '#2a1a05' : 'var(--cream)'; const sv = d.querySelector('svg'); if (sv) { sv.dataset.c ??= sv.getAttribute('stroke'); sv.setAttribute('stroke', act ? '#2a1a05' : sv.dataset.c); } };
-    const T = { three: A('Three', -0.1), clean: A('systems', -0.15), sig: A('systems', 0.4), light: A('light', -0.05), dark: A('dark', -0.05), accent: A('accent', -0.05), layouts: A('layouts'), fonts: FN };
-    const RA = [T.three, T.light, T.accent, T.layouts, T.fonts], railO = 1 - ep(t, W0 + OUT(0.2), W0 + OUT(0.6));
+    // each left-hand row appears with the phrase it belongs to
+    const fontsAt = A('fonts');
+    const TM = { three: sysT[0], clean: sysT[1], sig: sysT[2], light: modeTm[0], dark: modeTm[1], accent: accT[0], layouts: layT[0], fonts: fontsAt };
+    const RA = [TM.three, TM.light, TM.accent, TM.layouts, TM.fonts], railO = 1 - ep(t, W0 + O(0.2), W0 + O(0.6));
     c.rows.forEach((r, i) => riseIn(r, t, RA[i] - OUT(0.3), 0.4, 30, { o: ep(t, RA[i] - OUT(0.3), RA[i] + 0.1) * railO }));
     const cur = k => c.steps.reduce((n, st, i) => (st.kind === k && t >= at[i] ? n + 1 : n), 0); // steps reached of a kind
-    const ds = t >= T.three ? (t >= T.sig ? 2 : t >= T.clean ? 1 : 0) : -1;
+    const ds = t >= TM.three ? (t >= TM.sig ? 2 : t >= TM.clean ? 1 : 0) : -1;
     c.dsTiles.forEach((d, i) => { const act = ds === i; d.style.background = act ? 'var(--ink-4)' : 'var(--ink-3)'; d.style.outline = act ? '3px solid var(--gold)' : 'none'; tf(d, { s: act ? 1.12 : 1 }); });
-    c.modeTiles.forEach((d, i) => { on(d, i ? t >= T.dark : t >= T.light && t < T.dark); });
+    c.modeTiles.forEach((d, i) => { on(d, i ? t >= TM.dark : t >= TM.light && t < TM.dark); });
     const ac = cur('accent') - 1, ly = cur('layout') - 1;
     c.accTiles.forEach((d, i) => { d.style.outline = ac === i ? '3px solid var(--cream)' : 'none'; tf(d, { s: ac === i ? 1.15 : 1 }); });
     c.layTiles.forEach((d, i) => on(d, ly === i));
-    on(c.fontTile, t >= FN);
-    // right-hand label: the latest step reached (the closing "fonts" word gets its own label)
-    let k = -1; at.forEach((a, i) => { if (t >= a) k = i; });
-    const fonts = t >= FN, lb = fonts ? ['Fonts', 'yours to pick', 'FONTS', '#f5eee4'] : k >= 0 ? c.steps[k].label : null, la = fonts ? FN : k >= 0 ? at[k] : 0;
-    if (lb && c.lab.dataset.k !== lb[0] + lb[1]) { c.lab.dataset.k = lb[0] + lb[1]; c.labName.textContent = lb[0]; c.labMode.textContent = lb[1]; c.labSub.textContent = lb[2]; c.labSw.style.background = lb[3]; c.labSw.textContent = fonts ? 'Aa' : ''; }
-    if (!lb && c.lab.dataset.k) { c.lab.dataset.k = ''; }
-    if (lb && lb[0] !== 'Fonts') c.labSw.textContent = '';
-    c.lab.style.opacity = lb ? (0.35 + 0.65 * ep(t, la, la + OUT(0.25))) * railO * ep(t, S0 + 0.4, S0 + 0.8) : 0;
-    // wall of looks, popping one by one, then the tally badges
-    c.wall.forEach((d, i) => { d.style.display = t > W0 + OUT(0.6) ? 'block' : 'none'; popIn(d, t, W0 + OUT(0.7 + i * 0.13), 0.5, { y: bob(t, i, 6) }); });
-    c.badges.forEach((b, i) => popIn(b, t, W0 + OUT(1.9 + i * 0.12), 0.4));
+    on(c.fontTile, t >= fontsAt);
+    // wall of looks, popping one by one, then the tally badges. The scene runs long enough that Z stays 1
+    // and the finished wall holds before the cut.
+    c.wall.forEach((d, i) => { d.style.display = t > W0 + O(0.6) ? 'block' : 'none'; popIn(d, t, W0 + O(0.7 + i * 0.13), 0.5, { y: bob(t, i, 6) }); });
+    c.badges.forEach((b, i) => popIn(b, t, W0 + O(1.9 + i * 0.12), 0.4));
   },
 });
 
 scene('open', {
   enter: 'rise',
   build(root, c) {
-    css(root, { background: 'var(--paper)' });
+    c.bg = blobs(root, ['#f3a73b33', '#a58bff33', '#45d6c822'], 151);
     c.items = ['opensource', 'price', 'cross-platforms'].map((st, i) => {
       const box = el('div', 'abs col', root); place(box, 110 + i * 590, 230, 520); css(box, { alignItems: 'center', textAlign: 'center' });
       // same height for all three stickers, bottom-aligned in a fixed slot
       const slot = el('div', 'flex', box); css(slot, { height: '380px', width: '520px', alignItems: 'flex-end', justifyContent: 'center' });
-      const im = el('img', '', slot); im.src = `../assets/stickers/sticker-${st}.png`; css(im, { height: '360px', width: 'auto', filter: 'drop-shadow(0 20px 30px #0003)', transformOrigin: '50% 100%' });
-      const lab = el('div', 'display', box, ['Open source', 'Free', 'Cross-platform'][i]); css(lab, { fontSize: '76px', color: 'var(--paper-ink)', marginTop: '36px', whiteSpace: 'nowrap' });
+      const im = el('img', '', slot); im.src = `../assets/stickers/sticker-${st}.png`; css(im, { height: '360px', width: 'auto', filter: 'drop-shadow(0 20px 30px #0009)', transformOrigin: '50% 100%' });
+      const lab = el('div', 'display grad-gold', box, ['Open source', 'Free', 'Cross-platform'][i]); css(lab, { fontSize: '76px', marginTop: '36px', whiteSpace: 'nowrap', lineHeight: 1.25, paddingBottom: '0.16em' });
       return { box, im, lab };
     });
   },
   update(t, c) {
+    c.bg.update(t);
     // stickers and their labels pop on "open source", "free" and "across all your devices"
     const CU = [cue(c, 'open source', 0, 2.3), cue(c, 'free', 0, 3.2), cue(c, 'across', 0, 4.06)];
-    c.items.forEach(({ im, lab }, i) => { const a = CU[i] - 0.1; popIn(im, t, a, 0.5, { y: bob(t, i, 8) }); riseIn(lab, t, a + 0.1, 0.5, 30); });
+    // the first sticker shows up right after "Best of all?" (its label still waits for the spoken word)
+    c.items.forEach(({ im, lab }, i) => { const a = CU[i] - 0.1; popIn(im, t, i ? a : Math.min(a, voAt(c) + 0.5), 0.5, { y: bob(t, i, 8) }); riseIn(lab, t, a + 0.1, 0.5, 30); });
   },
 });
 
@@ -139,7 +142,7 @@ scene('outro', {
       const im = el('img', 'abs', c.head); im.src = `../assets/head/${n}.png`; css(im, { inset: 0, width: '100%', height: '100%', filter: 'drop-shadow(0 26px 40px #0009)' }); c.heads[n] = im;
     }
     c.word = el('div', 'abs display', root, 'Memlore'); css(c.word, { left: 0, right: 0, top: '410px', textAlign: 'center', fontSize: '170px' });
-    c.tag = el('div', 'abs', root, 'A little life. A lasting story.'); css(c.tag, { left: 0, right: 0, top: '630px', textAlign: 'center', fontSize: '42px', color: 'var(--cream-2)', letterSpacing: '0.02em' });
+    c.tag = el('div', 'abs display ital', root, 'A little life. <span class="grad-gold">A lasting story.</span>'); css(c.tag, { left: 0, right: 0, top: '620px', textAlign: 'center', fontSize: '58px', fontWeight: 400, color: 'var(--cream-2)', lineHeight: 1.25, paddingBottom: '0.12em' });
     c.btn = el('div', 'abs btn', root, `${svgIcon('download', '#2a1a05', 2.4)}Download Memlore`); place(c.btn, 960 - 185, 740); css(c.btn, { fontSize: '30px', padding: '20px 36px', borderRadius: '20px', boxShadow: '0 20px 50px #f3a73b55' }); c.btn.querySelector('svg').style.width = '30px';
     c.url = el('div', 'abs mono', root, 'memlore.app  ·  github.com/dinhanhthi/memlore'); css(c.url, { left: 0, right: 0, top: '880px', textAlign: 'center', fontSize: '34px', color: 'var(--cream-3)', letterSpacing: '0.04em' });
     c.cursor = el('div', 'abs', root); css(c.cursor, { width: '44px', height: '44px', zIndex: 20 });

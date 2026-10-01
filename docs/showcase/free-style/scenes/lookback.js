@@ -41,11 +41,10 @@ scene('calendar', {
   },
   update(t, c) {
     c.bg.update(t);
-    const w = s => voAt(c) + s * (c.vo[0] ? c.vo[0].dur / 2.96 : 1 / 1.12); // raw word start -> scene time
     titleIn(c.cap, t, 0.2);
     riseIn(c.panel, t, 0.05, 0.7, 70);
-    // the cursor walks the month from "lights up" (raw 0.72) to just before the end of the scene, dots pop in behind it
-    const A = w(0.72), STEP = ((c.dur || 6) - 0.9 - A) / 30;
+    // the cursor walks the month from "lights up" to just before the end of the scene, dots pop in behind it
+    const A = cue(c, 'lights', 0, 1.2), STEP = ((c.dur || 6) - 0.9 - A) / 30;
     let cur = -1;
     riseIn(c.legend, t, 0.15, 0.7, 70);
     c.legendRows.forEach((l, i) => riseIn(l, t, 0.5 + i * 0.12, 0.45, 20));

@@ -20,7 +20,7 @@
     { "id": "mcp", "bars": 8, "section": "verse" },
     { "id": "sync", "bars": 6, "section": "verse", "beats": 21 },
     { "id": "import", "bars": 6, "section": "build", "beats": 22 },
-    { "id": "themes", "bars": 5.5, "section": "chorus", "speed": 0.7 },
+    { "id": "themes", "bars": 7.7, "section": "chorus", "speed": 0.7 },
     { "id": "open", "bars": 4, "section": "verse", "beats": 15 },
     { "id": "outro", "bars": 5, "section": "outro", "beats": 18 }
   ]

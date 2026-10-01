@@ -83,10 +83,10 @@
     "windowTitle": "Thứ Bảy ở Porto",
     "h1": "Thứ Bảy ở Porto",
     "p": {
-      "a": "Buổi chiều ở ",
-      "link": "Ribeira",
-      "b": ", ánh sáng ",
+      "lead": "Ánh sáng ",
       "mark": "kỳ ảo",
+      "mid": " ở ",
+      "link": "Ribeira",
       "c": "."
     },
     "todo": "Pastel de nata",
@@ -103,6 +103,8 @@
     "saved": "Đã lưu",
     "cue": {
       "headings": "Tiêu đề",
+      "highlight": "làm nổi bật",
+      "link": "liên kết",
       "checklists": "danh sách việc cần làm",
       "code": "code",
       "math": "công thức toán",
@@ -114,7 +116,6 @@
   "find": {
     "q1": "buổi sáng",
     "q2": "khi nào mình thấy bình yên?",
-    "ai": "AI",
     "r1": {
       "0": {
         "h": "Khởi đầu mới",
@@ -614,11 +615,14 @@
       "countless": "vô số",
       "combinations": "kết hợp",
       "three": "Ba",
+      "each": "nhau",
       "systems": "hệ giao diện",
+      "tune": "chỉnh",
       "light": "sáng",
       "dark": "tối",
       "accent": "màu",
       "colours": "sắc",
+      "board": "bố",
       "layouts": "cục",
       "andFonts": "và phông",
       "fonts": "chữ"
