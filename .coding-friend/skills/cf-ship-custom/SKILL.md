@@ -45,11 +45,23 @@ Also read `HAS APP CHANGES`. When it is `no`, there is **nothing to release** �
 
 If the level is not in args, decide it from the commits. **Do not ask for confirmation** — analyse and proceed.
 
-- **PATCH** (x.x.Z) — improvements or refinements to existing behaviour: bug fixes, UX polish, copy tweaks, performance, docs. Changelog heading `Fixed` or `Improved`.
-- **MINOR** (x.Y.0) — a new capability the user can invoke or opt into: a new feature, a new setting, a new import source. Changelog heading `Added`.
+**PATCH is the default and the usual answer.** Choose it unless MINOR's bar below is clearly cleared. When you are unsure, the answer is PATCH. A changelog heading of `Added` does not decide the version — it only labels a bullet.
+
+- **PATCH** (x.x.Z) — bug fixes, UX polish, copy, performance, refactors, **and a single new capability**. One feature, one setting, one screen, one chart, one import source, or one tool is PATCH, however many commits it took and however large its diff is. So is a refinement of something that already exists: extra tiles, a new card, tighter layout, another row in Settings. Headings: `Fixed`, `Improved`, or a lone `Added`.
+- **MINOR** (x.Y.0) — only when **both** are true:
+  1. **Several distinct new features**, plural. Each would stand as its own user-facing `Added` bullet, and each is something the user can invoke or opt into on its own. Parts of one feature do not count as several features. One feature plus polish does not count.
+  2. **A large release overall.** Many release-relevant commits, spanning those features. A short series around a single theme is not large, no matter how the changelog reads.
+  New capability has to be the dominant story. A release that is mostly fixes, with features mixed in, stays PATCH.
 - **MAJOR** (X.0.0) — a breaking change to data, schema or behaviour users depend on.
 
-**Default to PATCH, and bias strongly toward it.** One incidental new thing among many fixes is still PATCH. MINOR is for releases where new capability is the dominant story.
+Still PATCH, even when it feels like "a new thing":
+
+- Several commits that are all pieces of the same feature.
+- New UI on a surface that already exists (charts on Statistics, cards on Home, another settings control).
+- Internal work (build, CI, bundle size) even when the diff is large.
+- One substantial capability — a new server, a new sync path, a new editor mode — shipped on its own.
+
+MINOR looks like a release that, for example, adds a new sync provider, a new editor mode, and a new import format, each independently usable, across a large commit range. If you cannot name several such features without stretching, it is PATCH.
 
 While the app is pre-1.0, MAJOR is reserved for something genuinely drastic.
 
@@ -203,6 +215,7 @@ Name the channel explicitly, since a `-beta`/`-rc` tag is published as a prerele
 - Published tags on `origin` are the single source of truth. `bump-info.sh` fetches them first.
 - **NEVER bump when the file version is already ahead of the tag** — changelog only.
 - **NEVER count `website/`, `web/`, `docs/` or `e2e/` changes, or `(website)`-scoped commits, toward a bump.** This is the user's explicit requirement.
+- **PATCH unless both bars for MINOR are met.** One new feature is a patch, however large. MINOR needs several distinct new features and a large change set together. When unsure, PATCH. An `Added` heading is not a reason to bump minor.
 - `HAS APP CHANGES: no` means nothing to release. It does not mean patch.
 - One feature, one changelog bullet. Entries are net changes versus the previous release, never a commit dump.
 - **Every `CHANGELOG.md` entry that has a commit behind it carries its link.** v0.1.0 shipped with none because the instruction said "append commit links" without saying in what shape; `bump-info.sh` now prints them ready-made, so there is no excuse to omit them.

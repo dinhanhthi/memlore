@@ -24,13 +24,30 @@ notarization round-trip.
 | You want                                      | You say               | Version goes                         |
 | --------------------------------------------- | --------------------- | ------------------------------------ |
 | A normal release                              | `/cf-ship`            | `0.1.0` → `0.1.1`                    |
-| Let the model pick the level from the commits | `/cf-ship`            | ↑ same, it decides patch/minor/major |
+| Let the model pick the level from the commits | `/cf-ship`            | patch, unless the bar below is cleared |
 | Force the level                               | `/cf-ship minor`      | `0.1.0` → `0.2.0`                    |
 | A release candidate                           | `/cf-ship --rc`       | `0.1.0` → `0.1.1-rc.1`               |
 | Another candidate after a fix                 | `/cf-ship --rc`       | `0.1.1-rc.1` → `0.1.1-rc.2`          |
 | **Promote the candidate to real**             | `/cf-ship`            | `0.1.1-rc.2` → **`0.1.1`**           |
 | A beta for the Beta channel                   | `/cf-ship --beta`     | `0.1.0` → `0.1.1-beta.1`             |
 | A candidate for a bigger release              | `/cf-ship minor --rc` | `0.1.0` → `0.2.0-rc.1`               |
+
+### When the model picks the level
+
+**Patch is the default.** A minor bump happens only when the commits since the
+last tag contain **both** of these:
+
+1. **Several distinct new features** — more than one, each something a user can
+   invoke or opt into on its own. Commits that are pieces of a single feature
+   count as one feature.
+2. **A large release overall** — many release-relevant commits spanning those
+   features, not a short series around one theme.
+
+One new capability is a patch, however large its diff is. So is new UI on a
+surface that already exists, and so is a release that is mostly fixes with a
+feature mixed in. An `Added` changelog heading does not make the bump minor.
+When it is close, the model ships a patch. Pass `minor` yourself only when you
+want to override that.
 
 ### The promote row is the one to remember
 

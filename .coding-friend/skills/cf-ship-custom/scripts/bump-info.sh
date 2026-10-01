@@ -295,6 +295,11 @@ if [[ -n "$REQUESTED_LEVEL" ]]; then
   echo "Requested level:       $REQUESTED_LEVEL  (asked for explicitly)"
 else
   echo "Requested level:       (none — decide from the commits below)"
+  echo "Level policy:          PATCH unless BOTH are true: several distinct new"
+  echo "                       features (plural — parts of one feature do not"
+  echo "                       count) AND a large overall change set. One new"
+  echo "                       capability, however big, is still PATCH. An Added"
+  echo "                       changelog heading does not make it MINOR."
 fi
 if [[ -n "$PRERELEASE_KIND" ]]; then
   echo "Prerelease:            -$PRERELEASE_KIND  (asked for explicitly)"
