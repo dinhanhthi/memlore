@@ -1,3 +1,4 @@
+import { PenLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useOnThisDay } from '../../../hooks/useOnThisDay'
 import { getIntlLocale } from '../../../lib/dates'
@@ -5,6 +6,7 @@ import { triggerNewEntry } from '../../../lib/newEntry'
 import type { Entry } from '../../../types/entry'
 import { Button } from '../../common/Button'
 import { EMOTION_BY_KEY } from '../../common/emotions'
+import { Tooltip } from '../../common/Tooltip'
 import { DashboardCard } from '../DashboardCard'
 
 // ponytail: shares list_on_this_day with OnThisDayCard on mount; dedupe via a store if it shows in profiles
@@ -36,9 +38,16 @@ export function TodayCard() {
     <DashboardCard
       title={title}
       action={
-        <Button variant="primary" size="xs" onClick={triggerNewEntry}>
-          {t('actions.write')}
-        </Button>
+        <Tooltip content={t('actions.write')}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="rounded-full"
+            icon={<PenLine className="size-4" />}
+            aria-label={t('actions.write')}
+            onClick={triggerNewEntry}
+          />
+        </Tooltip>
       }
     >
       {isLoading ? (

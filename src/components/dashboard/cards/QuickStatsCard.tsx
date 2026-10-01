@@ -1,4 +1,3 @@
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useCountUp } from '../../../hooks/useCountUp'
 import { useStats } from '../../../hooks/useStats'
@@ -6,12 +5,12 @@ import { cn } from '../../../lib/cn'
 import { DASHBOARD_CARD_VISUALS } from '../../../lib/dashboardCardVisuals'
 import { statsEntriesOverTime, statsWritingVolume } from '../../../lib/tauri'
 import { useTabStore } from '../../../stores/tabStore'
-import { Button } from '../../common/Button'
 import { entriesOverTimeKey, writingVolumeKey } from '../../stats/statsPeriod'
 import { MiniBars } from '../../stats/viz/MiniBars'
 import { Sparkline } from '../../stats/viz/Sparkline'
 import { VIZ_TONE } from '../../stats/viz/vizTone'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 const STORY_NUMERAL =
   'font-title text-2xl leading-none font-semibold tabular-nums @min-[8rem]:text-3xl'
@@ -38,18 +37,14 @@ export function QuickStatsCard() {
     <DashboardCard
       title={t('cards.quick_stats')}
       action={
-        <Button
-          variant="ghost"
-          size="xs"
-          icon={<ArrowRight className="size-4" />}
+        <DashboardNavButton
+          label={t('actions.stats')}
           onClick={() =>
             useTabStore
               .getState()
               .updateActiveTab({ activeView: 'stats', statsTab: 'charts', selectedEntryId: null })
           }
-        >
-          {t('actions.stats')}
-        </Button>
+        />
       }
     >
       {isLoading ? (

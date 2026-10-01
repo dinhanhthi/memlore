@@ -1,5 +1,4 @@
 import { useState, type MouseEvent } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useRecentEntries } from '../../../hooks/useRecentEntries'
 import { formatCompactDate } from '../../../lib/dates'
@@ -7,9 +6,9 @@ import { isMiddleClick, isNewTabModifier } from '../../../lib/modifierClick'
 import { useEntryStore } from '../../../stores/entryStore'
 import { useTabStore } from '../../../stores/tabStore'
 import type { Entry } from '../../../types/entry'
-import { Button } from '../../common/Button'
 import { SecondLockPromptModal } from '../../common/SecondLockPromptModal'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 function openEntry(entry: Entry, background: boolean) {
   if (background) {
@@ -42,19 +41,15 @@ export function RecentEntriesCard() {
       <DashboardCard
         title={t('cards.recent_entries')}
         action={
-          <Button
-            variant="ghost"
-            size="xs"
-            icon={<ArrowRight className="size-4" />}
+          <DashboardNavButton
+            label={t('actions.entries')}
             onClick={() =>
               useTabStore.getState().updateActiveTab({
                 activeView: 'entries',
                 selectedEntryId: null,
               })
             }
-          >
-            {t('actions.entries')}
-          </Button>
+          />
         }
       >
         {isLoading ? (

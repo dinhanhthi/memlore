@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAiBulkContextConsent } from '../../../hooks/useAiBulkContextConsent'
 import { useAiDashboardInsightsEnabled } from '../../../hooks/useAiDashboardInsightsEnabled'
@@ -15,6 +14,7 @@ import { ShimmerText } from '../../common/ShimmerText'
 import { AIBulkContextNoticeModal } from '../../settings/AIBulkContextNoticeModal'
 import { pickThemeInsightsResult } from '../../stats/pickThemeInsightsResult'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 function normaliseErrorCode(raw: string): string {
   const idx = raw.indexOf(': ')
@@ -74,10 +74,8 @@ export function AiInsightsCard() {
           {t('insights.generate')}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="xs"
-        icon={<ArrowRight className="size-4" />}
+      <DashboardNavButton
+        label={t('actions.insights')}
         onClick={() =>
           useTabStore.getState().updateActiveTab({
             activeView: 'stats',
@@ -85,9 +83,7 @@ export function AiInsightsCard() {
             selectedEntryId: null,
           })
         }
-      >
-        {t('actions.insights')}
-      </Button>
+      />
     </div>
   )
 

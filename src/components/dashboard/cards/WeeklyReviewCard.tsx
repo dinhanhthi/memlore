@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAiBulkContextConsent } from '../../../hooks/useAiBulkContextConsent'
 import { usePeriodReview } from '../../../hooks/usePeriodReview'
@@ -11,6 +10,7 @@ import { Button } from '../../common/Button'
 import { ShimmerText } from '../../common/ShimmerText'
 import { AIBulkContextNoticeModal } from '../../settings/AIBulkContextNoticeModal'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 function normaliseErrorCode(raw: string): string {
   const idx = raw.indexOf(': ')
@@ -54,10 +54,8 @@ export function WeeklyReviewCard() {
           {t('weekly_review.generate')}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="xs"
-        icon={<ArrowRight className="size-4" />}
+      <DashboardNavButton
+        label={t('actions.reviews')}
         onClick={() =>
           useTabStore.getState().updateActiveTab({
             activeView: 'stats',
@@ -65,9 +63,7 @@ export function WeeklyReviewCard() {
             selectedEntryId: null,
           })
         }
-      >
-        {t('actions.reviews')}
-      </Button>
+      />
     </div>
   )
 

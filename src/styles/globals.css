@@ -247,9 +247,6 @@
   /* Dashboard bento row unit; scales with Interface size and skin type
      scale so hard-capped card content never clips. */
   --dashboard-row: calc(9rem * var(--ui-font-scale) * var(--ds-type-scale));
-  /* Dashboard card radius: rounded-xl, scaled like the row unit.
-     Bottom-right is 2× this value. */
-  --dashboard-card-r: calc(0.75rem * var(--ui-font-scale) * var(--ds-type-scale));
 
   /* Button border-radius — pill in Signature, shadcn rounded-md in Clean.
      Used by Button.tsx as `rounded-(--button-radius)`. */
@@ -2013,22 +2010,6 @@
     mask-composite: exclude;
     pointer-events: none;
   }
-}
-
-/* Dashboard cards: rounded-xl on TL/TR/BL; BR is 2× (rounded-2xl). */
-@utility card-wave-edge {
-  border-radius: var(--dashboard-card-r) var(--dashboard-card-r) calc(2 * var(--dashboard-card-r))
-    var(--dashboard-card-r);
-}
-
-/* Clay: same extruded slab as secondary buttons (fill + --shadow-control). */
-:root.ds-clay .dashboard-card-shell {
-  box-shadow: var(--shadow-control);
-}
-:root.ds-clay .dashboard-card-fill {
-  background-color: var(--color-surface-control);
-  background-image: var(--grad-surface);
-  border-color: transparent;
 }
 
 /* Dashboard card titles: clip a two-stop accent gradient to the glyphs. */

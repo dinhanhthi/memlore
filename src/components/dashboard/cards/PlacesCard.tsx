@@ -1,4 +1,4 @@
-import { ArrowRight, MapPin } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useCountUp } from '../../../hooks/useCountUp'
 import { useStats } from '../../../hooks/useStats'
@@ -6,10 +6,10 @@ import { cn } from '../../../lib/cn'
 import { DASHBOARD_CARD_VISUALS } from '../../../lib/dashboardCardVisuals'
 import { statsLocationDensity } from '../../../lib/tauri'
 import { useTabStore } from '../../../stores/tabStore'
-import { Button } from '../../common/Button'
 import { LOCATION_DENSITY_KEY } from '../../stats/statsPeriod'
 import { VIZ_TONE } from '../../stats/viz/vizTone'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 const STORY_NUMERAL =
   'font-title text-2xl leading-none font-semibold tabular-nums @min-[8rem]:text-3xl'
@@ -27,16 +27,12 @@ export function PlacesCard() {
     <DashboardCard
       title={t('cards.places')}
       action={
-        <Button
-          variant="ghost"
-          size="xs"
-          icon={<ArrowRight className="size-4" />}
+        <DashboardNavButton
+          label={t('actions.map')}
           onClick={() =>
             useTabStore.getState().updateActiveTab({ activeView: 'map', selectedEntryId: null })
           }
-        >
-          {t('actions.map')}
-        </Button>
+        />
       }
     >
       {isLoading ? (

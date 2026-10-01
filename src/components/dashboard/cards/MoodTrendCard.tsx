@@ -1,4 +1,3 @@
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useCountUp } from '../../../hooks/useCountUp'
 import { useEmotionTrend } from '../../../hooks/useEmotionTrend'
@@ -7,11 +6,11 @@ import { DASHBOARD_CARD_VISUALS } from '../../../lib/dashboardCardVisuals'
 import { moodTrendBody } from '../../../lib/moodTrendBody'
 import { moodSplit } from '../../../lib/vizMath'
 import { useTabStore } from '../../../stores/tabStore'
-import { Button } from '../../common/Button'
 import { EmotionTrendChart } from '../../stats/EmotionTrendChart'
 import { SplitBars } from '../../stats/viz/SplitBars'
 import { VIZ_TONE } from '../../stats/viz/vizTone'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 const STORY_NUMERAL =
   'font-title text-2xl leading-none font-semibold tabular-nums @min-[8rem]:text-3xl'
@@ -44,18 +43,14 @@ export function MoodTrendCard() {
     <DashboardCard
       title={t('cards.mood_trend')}
       action={
-        <Button
-          variant="ghost"
-          size="xs"
-          icon={<ArrowRight className="size-4" />}
+        <DashboardNavButton
+          label={t('actions.stats')}
           onClick={() =>
             useTabStore
               .getState()
               .updateActiveTab({ activeView: 'stats', statsTab: 'charts', selectedEntryId: null })
           }
-        >
-          {t('actions.stats')}
-        </Button>
+        />
       }
     >
       {body === 'skeleton' ? (

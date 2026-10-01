@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, LockKeyhole } from 'lucide-react'
+import { LockKeyhole } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { listAllMediaPaged, type GalleryMediaRow } from '../../../lib/tauri'
 import { useInvisibleLockStore } from '../../../stores/invisibleLockStore'
 import { useSecondLockStore } from '../../../stores/secondLockStore'
 import { useTabStore } from '../../../stores/tabStore'
 import type { PagedResult } from '../../../types/pagination'
-import { Button } from '../../common/Button'
 import { SecondLockPromptModal } from '../../common/SecondLockPromptModal'
 import { MediaAttachment } from '../../media/MediaAttachment'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 export function PhotosCard() {
   const { t } = useTranslation('dashboard')
@@ -31,19 +31,15 @@ export function PhotosCard() {
       <DashboardCard
         title={t('cards.photos')}
         action={
-          <Button
-            variant="ghost"
-            size="xs"
-            icon={<ArrowRight className="size-4" />}
+          <DashboardNavButton
+            label={t('actions.media')}
             onClick={() =>
               useTabStore.getState().updateActiveTab({
                 activeView: 'media',
                 selectedEntryId: null,
               })
             }
-          >
-            {t('actions.media')}
-          </Button>
+          />
         }
       >
         {query.isPending ? (

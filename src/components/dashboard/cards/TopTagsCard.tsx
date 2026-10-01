@@ -1,14 +1,13 @@
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useStats } from '../../../hooks/useStats'
 import { cn } from '../../../lib/cn'
 import { DASHBOARD_CARD_VISUALS } from '../../../lib/dashboardCardVisuals'
 import { statsTagFrequency } from '../../../lib/tauri'
 import { useTabStore } from '../../../stores/tabStore'
-import { Button } from '../../common/Button'
 import { TAG_FREQUENCY_KEY } from '../../stats/statsPeriod'
 import { VIZ_TONE } from '../../stats/viz/vizTone'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 const STORY_NUMERAL =
   'font-title text-2xl leading-none font-semibold tabular-nums @min-[8rem]:text-3xl'
@@ -39,16 +38,7 @@ export function TopTagsCard() {
   return (
     <DashboardCard
       title={t('cards.top_tags')}
-      action={
-        <Button
-          variant="ghost"
-          size="xs"
-          icon={<ArrowRight className="size-4" />}
-          onClick={() => openTag(null)}
-        >
-          {t('actions.tags')}
-        </Button>
-      }
+      action={<DashboardNavButton label={t('actions.tags')} onClick={() => openTag(null)} />}
     >
       {isLoading ? (
         <div className="flex max-h-14 flex-wrap gap-1.5 overflow-hidden">
@@ -79,7 +69,7 @@ export function TopTagsCard() {
                 className="flex min-w-0 items-center gap-1.5 text-left"
                 onClick={() => openTag(row.tag_id)}
               >
-                <span className="text-fg-secondary w-14 shrink-0 truncate text-xs">
+                <span className="text-fg-secondary w-24 shrink-0 truncate text-xs">
                   #{row.tag_name}
                 </span>
                 <span className="bg-panel-2 h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">

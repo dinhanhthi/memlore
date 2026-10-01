@@ -64,7 +64,6 @@
     "none": "Nothing written yet today"
   },
   "heatmap": {
-    "hint": "Last 16 weeks",
     "summary": "{{days}} days with entries in the last 16 weeks"
   },
   "top_tags": {

@@ -1,14 +1,13 @@
 import { useState, type MouseEvent } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useOnThisDay } from '../../../hooks/useOnThisDay'
 import { isMiddleClick, isNewTabModifier } from '../../../lib/modifierClick'
 import { useEntryStore } from '../../../stores/entryStore'
 import { useTabStore } from '../../../stores/tabStore'
 import type { Entry } from '../../../types/entry'
-import { Button } from '../../common/Button'
 import { SecondLockPromptModal } from '../../common/SecondLockPromptModal'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 function openEntry(entry: Entry, background: boolean) {
   if (background) {
@@ -48,19 +47,15 @@ export function OnThisDayCard() {
       <DashboardCard
         title={t('cards.on_this_day')}
         action={
-          <Button
-            variant="ghost"
-            size="xs"
-            icon={<ArrowRight className="size-4" />}
+          <DashboardNavButton
+            label={t('actions.onthisday')}
             onClick={() =>
               useTabStore.getState().updateActiveTab({
                 activeView: 'onthisday',
                 selectedEntryId: null,
               })
             }
-          >
-            {t('actions.onthisday')}
-          </Button>
+          />
         }
       >
         {isLoading ? (

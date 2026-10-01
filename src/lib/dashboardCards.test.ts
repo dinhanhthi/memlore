@@ -208,7 +208,7 @@ describe('DASHBOARD_CARD_SPANS', () => {
     heatmap: { cols: 2, rows: 2 },
     recent_entries: { cols: 2, rows: 2 },
     on_this_day: { cols: 1, rows: 2 },
-    top_tags: { cols: 1, rows: 1 },
+    top_tags: { cols: 2, rows: 2 },
     places: { cols: 1, rows: 1 },
     photos: { cols: 2, rows: 2 },
     weekly_review: { cols: 2, rows: 2 },
@@ -234,12 +234,12 @@ describe('dashboardCardSpan', () => {
     expect(dashboardCardSpan('streak', false)).toEqual({ cols: 1, rows: 1 })
   })
 
-  it('sums to 38 cells across all cards when AI is enabled', () => {
+  it('sums to 41 cells across all cards when AI is enabled', () => {
     const area = DASHBOARD_CARD_IDS.reduce((sum, id) => {
       const { cols, rows } = dashboardCardSpan(id, true)
       return sum + cols * rows
     }, 0)
-    expect(area).toBe(38)
+    expect(area).toBe(41)
   })
 })
 

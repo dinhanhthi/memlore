@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { useDashboardRecentChats } from '../../../hooks/useDashboardRecentChats'
 import { useTabStore } from '../../../stores/tabStore'
-import { Button } from '../../common/Button'
 import { DashboardCard } from '../DashboardCard'
+import { DashboardNavButton } from '../DashboardNavButton'
 
 export function ChatCard() {
   const { t } = useTranslation('dashboard')
@@ -19,11 +19,7 @@ export function ChatCard() {
   return (
     <DashboardCard
       title={t('cards.chat')}
-      action={
-        <Button variant="primary" size="xs" onClick={() => openChat(null)}>
-          {t('chat.start')}
-        </Button>
-      }
+      action={<DashboardNavButton label={t('chat.start')} onClick={() => openChat(null)} />}
     >
       {isLoading ? (
         <div className="flex flex-col gap-2">

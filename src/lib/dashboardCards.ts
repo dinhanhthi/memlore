@@ -43,7 +43,7 @@ export const DASHBOARD_CARD_SPANS: Record<DashboardCardId, DashboardCardSpan> = 
   heatmap: { cols: 2, rows: 2 },
   recent_entries: { cols: 2, rows: 2 },
   on_this_day: { cols: 1, rows: 2 },
-  top_tags: { cols: 1, rows: 1 },
+  top_tags: { cols: 2, rows: 2 },
   places: { cols: 1, rows: 1 },
   photos: { cols: 2, rows: 2 },
   weekly_review: { cols: 2, rows: 2 },

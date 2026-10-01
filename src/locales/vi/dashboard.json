@@ -64,7 +64,6 @@
     "none": "Hôm nay chưa viết gì"
   },
   "heatmap": {
-    "hint": "16 tuần gần nhất",
     "summary": "{{days}} ngày có mục trong 16 tuần gần nhất"
   },
   "top_tags": {
