@@ -11,6 +11,7 @@ import type { ThemeInsightsResult } from '../../../types/ai'
 import { AiIcon } from '../../common/AiIcon'
 import { Button } from '../../common/Button'
 import { ShimmerText } from '../../common/ShimmerText'
+import { ThinkingOrb } from '../../common/ThinkingOrb'
 import { AIBulkContextNoticeModal } from '../../settings/AIBulkContextNoticeModal'
 import { pickThemeInsightsResult } from '../../stats/pickThemeInsightsResult'
 import { DashboardCard } from '../DashboardCard'
@@ -21,7 +22,19 @@ function normaliseErrorCode(raw: string): string {
   return idx >= 0 ? raw.slice(idx + 2).trim() : raw.trim()
 }
 
-const CHIP_CLASS = 'bg-panel-2 text-fg-secondary rounded-full px-2.5 py-0.5 text-xs'
+function InsightList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-fg-muted text-xs font-medium">{title}</p>
+      <ul className="text-fg-secondary list-disc space-y-0.5 pl-4 text-sm">
+        {items.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export function AiInsightsCard() {
   const { t } = useTranslation('dashboard')
@@ -100,26 +113,23 @@ export function AiInsightsCard() {
       <div className="flex h-full min-h-0 flex-col gap-2">
         <div className="min-h-0 flex-1 overflow-hidden">
           {shown ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex flex-wrap gap-1.5 overflow-hidden">
-                {shown.themes.slice(0, 5).map((theme, i) => (
-                  <span key={`theme-${i}`} className={CHIP_CLASS}>
-                    {theme}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5 overflow-hidden">
-                {shown.moodDrivers.slice(0, 3).map((driver, i) => (
-                  <span key={`mood-${i}`} className={CHIP_CLASS}>
-                    {driver}
-                  </span>
-                ))}
-              </div>
+            <div className="flex flex-col gap-2">
+              <InsightList
+                title={tStats('insights.section_themes')}
+                items={shown.themes.slice(0, 5)}
+              />
+              <InsightList
+                title={tStats('insights.section_mood_drivers')}
+                items={shown.moodDrivers.slice(0, 3)}
+              />
             </div>
           ) : insightsEnabled === false ? (
             <p className="text-fg-muted text-sm">{tStats('insights.disabled_hint')}</p>
           ) : phase.kind === 'loading' ? (
-            <ShimmerText className="text-sm">{tStats('insights.generating')}</ShimmerText>
+            <div className="flex h-full flex-col items-center justify-center gap-2">
+              <ThinkingOrb state="working" size={64} />
+              <ShimmerText className="text-sm">{tStats('insights.generating')}</ShimmerText>
+            </div>
           ) : phase.kind === 'error' ? (
             <p className="text-danger-text text-sm" role="alert">
               {tAi(`theme_insights.errors.${normaliseErrorCode(phase.code)}`, {

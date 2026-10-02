@@ -7,7 +7,7 @@ import { shiftPeriodAnchor } from '../../../lib/periodReview'
 import { useTabStore } from '../../../stores/tabStore'
 import { AiIcon } from '../../common/AiIcon'
 import { Button } from '../../common/Button'
-import { ShimmerText } from '../../common/ShimmerText'
+import { ThinkingOrb } from '../../common/ThinkingOrb'
 import { AIBulkContextNoticeModal } from '../../settings/AIBulkContextNoticeModal'
 import { DashboardCard } from '../DashboardCard'
 import { DashboardNavButton } from '../DashboardNavButton'
@@ -83,7 +83,9 @@ export function WeeklyReviewCard() {
               <p className="text-fg-secondary line-clamp-3 text-xs">{phase.result.insight}</p>
             </div>
           ) : phase.kind === 'loading' ? (
-            <ShimmerText className="text-sm">{t('weekly_review.generating')}</ShimmerText>
+            <div className="flex h-full items-center justify-center">
+              <ThinkingOrb state="working" size={64} aria-label={t('weekly_review.generating')} />
+            </div>
           ) : phase.kind === 'error' ? (
             <p className="text-danger-text text-sm" role="alert">
               {tAi(`period_review.errors.${normaliseErrorCode(phase.code)}`, {
