@@ -7,7 +7,7 @@ import { applyMarketingShell, twinKindFor } from './src/bootShell'
 import { DOCS_PAGES, docsShellFile } from './src/docs/manifest'
 import { renderLegalStaticHtml } from './src/legal/markdown'
 import { renderLandingStaticHtml } from './src/prerender'
-import { buildRobots, buildSitemap } from './src/seo'
+import { buildRobots, buildSitemap, renderSocialMeta } from './src/seo'
 
 const ALIASED_TAURI = new Set([
   '@tauri-apps/api/core',
@@ -64,6 +64,21 @@ function prerenderStaticShells() {
   }
 }
 
+// Link-preview crawlers (Facebook, X, LinkedIn, Slack, iMessage) and Google read raw
+// HTML, so the share-card tags are baked into every shell at build time.
+function injectSocialMeta(): Plugin {
+  return {
+    name: 'inject-social-meta',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html: string) {
+        const tags = renderSocialMeta(html)
+        return tags ? html.replace('</head>', `    ${tags}\n  </head>`) : html
+      },
+    },
+  }
+}
+
 // Emitted from the bundle rather than dropped in `publicDir`, which points at the
 // repo-root `public/` the Tauri app also bundles — crawler files have no business
 // inside the desktop binary.
@@ -87,7 +102,14 @@ export default defineConfig({
   cacheDir: fileURLToPath(new URL('./.cache/vite', import.meta.url)),
   base: './',
   publicDir: fileURLToPath(new URL('../public', import.meta.url)),
-  plugins: [tailwindcss(), react(), tauriAliasGuard(), prerenderStaticShells(), emitSeoFiles()],
+  plugins: [
+    tailwindcss(),
+    react(),
+    tauriAliasGuard(),
+    prerenderStaticShells(),
+    injectSocialMeta(),
+    emitSeoFiles(),
+  ],
   optimizeDeps: {
     exclude: TAURI_MOCK_IDS,
     // These heavy deps are reached only through dynamic imports (the lazy stats
