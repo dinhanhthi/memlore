@@ -65,7 +65,7 @@ export function RecentEntriesCard() {
         ) : entries.length === 0 ? (
           <p className="text-fg-muted text-sm">{t('recent.empty')}</p>
         ) : (
-          <div className="-mx-3 flex flex-col">
+          <div className="flex flex-col">
             {entries.map((entry) => {
               const isCoveredLocked =
                 entry.is_locked &&

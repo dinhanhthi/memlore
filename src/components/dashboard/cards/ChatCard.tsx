@@ -34,7 +34,7 @@ export function ChatCard() {
       ) : chats.length === 0 ? (
         <p className="text-fg-muted text-sm">{t('chat.empty')}</p>
       ) : (
-        <div className="-mx-3 flex flex-col">
+        <div className="flex flex-col">
           {chats.map((chat) => (
             <button
               key={chat.id}

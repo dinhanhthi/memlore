@@ -71,52 +71,54 @@ export function OnThisDayCard() {
         ) : pastEntries.length === 0 ? (
           <p className="text-fg-muted text-sm">{t('on_this_day.empty')}</p>
         ) : (
-          pastEntries.map((entry) => {
-            const year = new Date(entry.entry_date * 1000).getFullYear()
-            const isCoveredLocked =
-              entry.is_locked &&
-              entry.title === null &&
-              entry.preview_text === null &&
-              entry.content_text === null
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                className="hover:bg-panel-2 flex w-full items-baseline justify-between gap-2 rounded-md px-1 py-1.5 text-left"
-                onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                  if (isCoveredLocked) {
-                    setUnlockEntryId(entry.id)
-                    return
-                  }
-                  if (isNewTabModifier(e)) {
+          <div className="flex flex-col">
+            {pastEntries.map((entry) => {
+              const year = new Date(entry.entry_date * 1000).getFullYear()
+              const isCoveredLocked =
+                entry.is_locked &&
+                entry.title === null &&
+                entry.preview_text === null &&
+                entry.content_text === null
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className="hover:bg-panel-2 flex w-full items-baseline justify-between gap-2 rounded-lg px-3 py-2 text-left"
+                  onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                    if (isCoveredLocked) {
+                      setUnlockEntryId(entry.id)
+                      return
+                    }
+                    if (isNewTabModifier(e)) {
+                      e.preventDefault()
+                      openEntry(entry, true)
+                      return
+                    }
+                    openEntry(entry, false)
+                  }}
+                  onMouseDown={(e) => {
+                    if (isMiddleClick(e)) e.preventDefault()
+                  }}
+                  onAuxClick={(e) => {
+                    if (!isMiddleClick(e)) return
                     e.preventDefault()
+                    if (isCoveredLocked) {
+                      setUnlockEntryId(entry.id)
+                      return
+                    }
                     openEntry(entry, true)
-                    return
-                  }
-                  openEntry(entry, false)
-                }}
-                onMouseDown={(e) => {
-                  if (isMiddleClick(e)) e.preventDefault()
-                }}
-                onAuxClick={(e) => {
-                  if (!isMiddleClick(e)) return
-                  e.preventDefault()
-                  if (isCoveredLocked) {
-                    setUnlockEntryId(entry.id)
-                    return
-                  }
-                  openEntry(entry, true)
-                }}
-              >
-                <span className="text-fg-muted text-2xs shrink-0 font-mono">{year}</span>
-                <span className="text-fg min-w-0 truncate text-sm">
-                  {isCoveredLocked
-                    ? t('entry_card.locked_entry', { ns: 'editor' })
-                    : entry.title || t('media_gallery.untitled', { ns: 'nav' })}
-                </span>
-              </button>
-            )
-          })
+                  }}
+                >
+                  <span className="text-fg-muted text-2xs shrink-0 font-mono">{year}</span>
+                  <span className="text-fg min-w-0 truncate text-sm">
+                    {isCoveredLocked
+                      ? t('entry_card.locked_entry', { ns: 'editor' })
+                      : entry.title || t('media_gallery.untitled', { ns: 'nav' })}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         )}
       </DashboardCard>
       <SecondLockPromptModal
