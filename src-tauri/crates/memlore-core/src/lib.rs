@@ -6,6 +6,7 @@ pub mod envelope;
 pub mod key_state;
 pub mod keyring_types;
 pub mod metadata;
+pub mod outbox;
 pub mod recovery;
 pub mod sync_control;
 

@@ -1047,9 +1047,7 @@ pub fn get_emotion_by_date(
 }
 
 /// Upper bound on a single Yjs document blob. Well below AES-GCM's
-/// per-message safety limit (~64 GiB) — this is a product-level cap to
-/// keep entries from becoming unwieldy, not a cryptographic one.
-pub const MAX_YJS_DOC_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
+pub use memlore_core::outbox::MAX_YJS_DOC_BYTES;
 
 /// Save the Yjs binary document and plain-text for an entry.
 /// Phase 3: all fields are stored as plaintext at the application layer;

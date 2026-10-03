@@ -38,6 +38,7 @@ use memlore_core::metadata::{
     compute_diff, compute_journal_diff, merge_metadata_lww, DeviceMetadata, EntryMetadata,
     SyncedJournalSummary,
 };
+use memlore_core::outbox::{self, OutboxEntryV1};
 use memlore_core::recovery::{validate_recovery_mnemonic, RECOVERY_WORD_COUNT};
 use memlore_core::sync_control::{
     authorize_recovery_push, RecoveryOwnerPermit, SyncControlV1, SYNC_CONTROL_VERSION,
@@ -397,6 +398,44 @@ pub fn seal_outbox_media(ring: &KeyRing, plaintext: &[u8]) -> Result<Vec<u8>, Js
 #[wasm_bindgen(js_name = sealOutboxThumb)]
 pub fn seal_outbox_thumb(ring: &KeyRing, jpeg: &[u8]) -> Result<Vec<u8>, JsError> {
     seal_media_inner(&ring.state, jpeg, true).map_err(js_err)
+}
+
+fn seal_outbox_entry_inner(state: &KeyRingState, entry_json: &str) -> Result<Vec<u8>, String> {
+    let entry: OutboxEntryV1 = parse_json("outbox entry", entry_json)?;
+    let list = state.list()?;
+    outbox::seal_outbox_entry(list, &entry).map_err(|e| e.to_string())
+}
+
+/// Seal an outbox entry intent JSON into encrypted wire bytes.
+#[wasm_bindgen(js_name = sealOutboxEntry)]
+pub fn seal_outbox_entry(ring: &KeyRing, entry_json: &str) -> Result<Vec<u8>, JsError> {
+    seal_outbox_entry_inner(&ring.state, entry_json).map_err(js_err)
+}
+
+fn open_outbox_entry_inner(state: &KeyRingState, bytes: &[u8]) -> Result<String, String> {
+    check_len("outbox entry file", bytes.len(), MAX_ENTRY_BYTES)?;
+    let list = state.list()?;
+    let entry = outbox::open_outbox_entry(list, bytes).map_err(|e| e.to_string())?;
+    to_json("outbox entry", &entry)
+}
+
+/// Open an encrypted outbox entry intent file; returns JSON text of `OutboxEntryV1`.
+#[wasm_bindgen(js_name = openOutboxEntry)]
+pub fn open_outbox_entry(ring: &KeyRing, bytes: &[u8]) -> Result<String, JsError> {
+    open_outbox_entry_inner(&ring.state, bytes).map_err(js_err)
+}
+
+fn open_outbox_acks_inner(state: &KeyRingState, bytes: &[u8]) -> Result<String, String> {
+    check_len("outbox acks file", bytes.len(), MAX_BIN_BYTES)?;
+    let list = state.list()?;
+    let acks = outbox::open_outbox_acks(list, bytes).map_err(|e| e.to_string())?;
+    to_json("outbox acks", &acks)
+}
+
+/// Open an encrypted `outbox-acks.bin` file; returns JSON text of `OutboxAcksV1`.
+#[wasm_bindgen(js_name = openOutboxAcks)]
+pub fn open_outbox_acks(ring: &KeyRing, bytes: &[u8]) -> Result<String, JsError> {
+    open_outbox_acks_inner(&ring.state, bytes).map_err(js_err)
 }
 
 // ---------------------------------------------------------------------------

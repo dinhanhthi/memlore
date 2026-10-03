@@ -21,6 +21,7 @@ pub mod local_provider;
 pub mod media_cache;
 pub mod media_sync;
 pub mod metadata;
+pub mod outbox_import;
 pub mod provider;
 pub mod recovery;
 pub mod rotation;
