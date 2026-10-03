@@ -46,6 +46,14 @@ export class OAuthConnectError extends Error {
   }
 }
 
+/** Message of the `OAuthConnectError` raised when the popup was closed without signing in. */
+export const SIGN_IN_CANCELLED_MESSAGE = 'Sign-in cancelled'
+
+/** True for the "popup closed" cancel (the only connect error that is a silent return). */
+export function isSignInCancelled(error: unknown): boolean {
+  return error instanceof OAuthConnectError && error.message === SIGN_IN_CANCELLED_MESSAGE
+}
+
 export interface PopupHandle {
   readonly closed: boolean
   close?: () => void
@@ -231,7 +239,7 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
         poll = null
         refresh().then(
           () => finish(null),
-          () => finish(new OAuthConnectError('Sign-in cancelled')),
+          () => finish(new OAuthConnectError(SIGN_IN_CANCELLED_MESSAGE)),
         )
       }, POPUP_POLL_MS)
       timer = deps.setTimeoutImpl(() => {

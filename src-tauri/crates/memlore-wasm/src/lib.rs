@@ -128,6 +128,16 @@ impl KeyRingState {
         self.master.as_deref().ok_or_else(|| LOCKED.to_string())
     }
 
+    /// Seed epoch 1 = master. Refuses when a list is already loaded: that would downgrade the ring.
+    fn seed_master_only(&mut self) -> Result<(), String> {
+        let list = self.master().map(master_only_list)?;
+        if self.list.is_some() {
+            return Err("content key list is already loaded".to_string());
+        }
+        self.list = Some(list);
+        Ok(())
+    }
+
     fn list(&self) -> Result<&ContentKeyList, String> {
         if self.master.is_none() {
             return Err(LOCKED.to_string());
@@ -153,6 +163,21 @@ fn key_ring_from_recovery(
         envelope::unwrap_master_with_recovery(phrase, wrapped_master_hex).map_err(envelope_err)?;
     envelope::verify_master_fingerprint(&master, expected_fingerprint_hex).map_err(envelope_err)?;
     Ok(KeyRingState::with_master(master))
+}
+
+/// The content-key list of a pre-content-key vault whose `_content.json` is ABSENT: epoch 1 is
+/// the master key itself, `latest = 1` (desktop `onboard_complete_inner` absent branch,
+/// `commands/crypto.rs:2639-2656`; same seed as core `EncryptionKeyState::set_key`,
+/// `key_state.rs:97-109`). `db_key` is the zero placeholder, as in `envelope::load_content_list`.
+fn master_only_list(master: &[u8; KEY_SIZE]) -> ContentKeyList {
+    let mut keys = std::collections::BTreeMap::new();
+    keys.insert(1u32, Zeroizing::new(*master));
+    ContentKeyList {
+        keys,
+        latest: 1,
+        db_key: Zeroizing::new([0u8; KEY_SIZE]),
+        master: Zeroizing::new(*master),
+    }
 }
 
 /// Opaque handle to the vault keys. The master key and the content-key list live
@@ -210,6 +235,15 @@ impl KeyRing {
             .map_err(js_err)?;
         self.state.list = Some(list);
         Ok(())
+    }
+
+    /// Seed the content-key list for a vault whose `_content.json` is CONFIRMED absent
+    /// (pre-content-key vault): epoch 1 = master. Call this ONLY on a confirmed "not found",
+    /// never on a read error (that would "succeed" with the wrong key on a vault that has a
+    /// random content key).
+    #[wasm_bindgen(js_name = loadMasterOnly)]
+    pub fn load_master_only(&mut self) -> Result<(), JsError> {
+        self.state.seed_master_only().map_err(js_err)
     }
 
     /// Zeroize every key. Later calls on this ring return an error.
@@ -646,6 +680,32 @@ mod tests {
         let err = key_ring_from_recovery(&phrase, &wrapped, &"0".repeat(64)).err();
         assert_eq!(err.unwrap(), "master key fingerprint mismatch");
         assert!(key_ring_from_recovery("nope", &wrapped, &fp).is_err());
+    }
+
+    #[test]
+    fn master_only_list_seeds_epoch_one_with_the_master() {
+        let mut s = KeyRingState::with_master(Zeroizing::new([7u8; KEY_SIZE]));
+        let list = s.master().map(master_only_list).unwrap();
+        assert_eq!(list.latest, 1);
+        assert_eq!(list.keys.len(), 1);
+        assert_eq!(*list.keys[&1], [7u8; KEY_SIZE]);
+        s.list = Some(list);
+        // The ring now seals and opens with epoch 1 = master.
+        let media = seal_media_inner(&s, b"img", false).unwrap();
+        assert_eq!(open_bare_inner(&s, &media, false).unwrap(), b"img");
+        s.lock();
+        assert_eq!(s.master().map(master_only_list).err().unwrap(), LOCKED);
+    }
+
+    #[test]
+    fn seed_master_only_refuses_to_replace_a_loaded_list() {
+        let mut s = KeyRingState::with_master(Zeroizing::new([7u8; KEY_SIZE]));
+        s.seed_master_only().unwrap();
+        let err = s.seed_master_only().unwrap_err();
+        assert!(err.contains("already loaded"));
+        assert_eq!(s.list.as_ref().unwrap().latest, 1);
+        s.lock();
+        assert_eq!(s.seed_master_only().unwrap_err(), LOCKED);
     }
 
     #[test]

@@ -1,3 +1,4 @@
+import { authHandlers } from './commands/auth'
 import { unsupported } from './unsupported'
 
 export type Handler = (args: Record<string, unknown>) => unknown | Promise<unknown>
@@ -22,6 +23,8 @@ export const handlers: Record<string, Handler> = {
 export function registerHandlers(table: Record<string, Handler>): void {
   Object.assign(handlers, table)
 }
+
+registerHandlers(authHandlers)
 
 export async function route(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   if (Object.hasOwn(handlers, cmd)) return handlers[cmd](args)

@@ -1,0 +1,751 @@
+import { IDBFactory } from 'fake-indexeddb'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadCore, type Core } from '../../core/core'
+import { DriveReader, DriveWriter, VaultNotReadyError } from '../drive/client'
+import {
+  FakeDrive,
+  bytes,
+  fakeLocks,
+  fixtureBytes,
+  json,
+  loadDesktopFixture,
+  seedFromFixture,
+  text,
+  violations,
+  type DesktopFixture,
+  type Recorded,
+  type SeedFixtureOptions,
+} from '../drive/fakeDrive'
+import { isValidOwnId } from '../drive/paths'
+import { configureKeysEnv, dispose, getKeyRing, isUnlocked } from '../keys'
+import {
+  StorageUnavailableError,
+  WRAPPED_MASTER_HEX_LEN,
+  assertDeviceRecord,
+  openWebDb,
+  type WebDb,
+} from '../storage/idb'
+import {
+  CONTENT_READ_ATTEMPTS,
+  DeviceRecordConflictError,
+  FingerprintMismatchError,
+  FormatUnsupportedError,
+  GenerationMismatchError,
+  InvalidDeviceIdError,
+  InvalidPhraseError,
+  RecoveryInProgressError,
+  TransientReadError,
+  VaultChangedError,
+  VaultCorruptError,
+  WrongPhraseError,
+  browserName,
+  isAcceptableDeviceId,
+  onboardComplete,
+  validatePassphrase,
+  type OnboardDeps,
+} from './onboard'
+
+const PASSWORD = '12345678'
+const OTHER_PHRASE = `${'zoo '.repeat(23)}vote`
+const CHROME_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+const REUSED_ID = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb'
+const FIXED_ID = 'cccccccc-1111-4222-8333-dddddddddddd'
+const DESKTOP_RE = /^[A-Za-z0-9_-]{4,64}$/
+const WEB_RE = /^[0-9a-fA-F-]{8,64}$/
+const META = '.meta/keyring/_meta.json'
+const CONTROL = '.meta/control.json'
+const RECOVERY = '.meta/keyring/_recovery.json'
+const CONTENT = '.meta/keyring/_content.json'
+
+let core: Core
+let fixture: DesktopFixture
+
+interface Env {
+  drive: FakeDrive
+  db: WebDb
+  deps: OnboardDeps
+  /** Backoff sleeps requested by onboard.ts itself (not the Drive client). */
+  onboardSleeps: number[]
+  persist: ReturnType<typeof vi.fn<() => Promise<boolean>>>
+  randomUUID: ReturnType<typeof vi.fn<() => string>>
+}
+
+function patched(path: string, change: (value: Record<string, unknown>) => void): string {
+  const value = JSON.parse(text(fixtureBytes(fixture, path))) as Record<string, unknown>
+  change(value)
+  return JSON.stringify(value)
+}
+
+async function setup(seed: SeedFixtureOptions = {}): Promise<Env> {
+  const drive = new FakeDrive()
+  seedFromFixture(drive, fixture, seed)
+  const driveDeps = {
+    getToken: async () => 'tok',
+    fetchImpl: drive.fetch,
+    sleep: async () => {},
+    locks: fakeLocks(drive),
+  }
+  const reader = new DriveReader(driveDeps)
+  const writer = new DriveWriter(reader, driveDeps)
+  const db = await openWebDb({ factory: new IDBFactory() })
+  const onboardSleeps: number[] = []
+  const persist = vi.fn<() => Promise<boolean>>(async () => true)
+  const randomUUID = vi.fn<() => string>(() => FIXED_ID)
+  const deps: OnboardDeps = {
+    reader,
+    writer,
+    db,
+    core,
+    now: () => 1_800_000_000_000,
+    randomUUID,
+    userAgent: () => CHROME_UA,
+    persist,
+    sleep: async (ms) => {
+      onboardSleeps.push(ms)
+    },
+  }
+  return { drive, db, deps, onboardSleeps, persist, randomUUID }
+}
+
+const run = (env: Env, phrase = fixture.recovery_phrase) =>
+  onboardComplete(env.deps, { phrase, password: PASSWORD })
+
+/** Every file of the fake Drive as a comparable string (id, name, parent, bytes, version). */
+function snapshot(drive: FakeDrive): Map<string, string> {
+  return new Map(
+    drive.files.map((f) => [
+      f.id,
+      JSON.stringify([f.name, f.parents, Buffer.from(f.content).toString('base64'), f.version]),
+    ]),
+  )
+}
+
+function expectNothingWritten(env: Env, before: Map<string, string>): void {
+  expect(env.drive.mutating()).toEqual([])
+  expect(snapshot(env.drive)).toEqual(before)
+}
+
+async function expectNoSideEffects(env: Env): Promise<void> {
+  expect(await env.db.device.get()).toBeUndefined()
+  expect(isUnlocked()).toBe(false)
+}
+
+/** The request that created or updated the device slot; asserts it is the ONLY mutation. */
+function onlySlotWrite(drive: FakeDrive, deviceId: string): Recorded {
+  const writes = drive.mutating()
+  expect(writes).toHaveLength(1)
+  const [req] = writes
+  const devices = drive.find(['Memlore', '.meta', 'keyring', 'devices'])
+  expect(devices).toBeDefined()
+  if (req.method === 'POST') {
+    expect(req.url.pathname).toBe('/upload/drive/v3/files')
+    expect(req.url.searchParams.get('uploadType')).toBe('multipart')
+    const raw = Buffer.from(req.body ?? new Uint8Array()).toString('latin1')
+    expect(raw).toContain(`"name":"${deviceId}.json"`)
+    expect(raw).toContain(`"parents":["${devices?.id}"]`)
+  } else {
+    expect(req.method).toBe('PATCH')
+    const slot = drive.find(['Memlore', '.meta', 'keyring', 'devices', `${deviceId}.json`])
+    expect(slot).toBeDefined()
+    expect(req.url.pathname).toBe(`/upload/drive/v3/files/${slot?.id}`)
+  }
+  return req
+}
+
+/** Make the Nth `alt=media` GET of `path` run `change` first (then the fake answers normally). */
+function onNthRead(env: Env, path: string, nth: number, change: () => void): void {
+  const file = env.drive.find(['Memlore', ...path.split('/')])
+  if (!file) throw new Error(`no such file ${path}`)
+  let seen = 0
+  env.drive.interceptors.push((req) => {
+    if (req.method === 'GET' && req.url.pathname === `/drive/v3/files/${file.id}`) {
+      if (req.url.searchParams.get('alt') === 'media' && ++seen === nth) change()
+    }
+    return undefined
+  })
+}
+
+const entryPath = (id: string): string =>
+  `generations/g-${fixture.generation}/${fixture.device_id}/entries/${id}.bin`
+
+function expectOpensFixtureEntries(ring = getKeyRing()): void {
+  for (const e of fixture.expected.entries) {
+    const opened = core.openEntry(ring, fixtureBytes(fixture, entryPath(e.entry_id)))
+    expect((JSON.parse(opened.metadataJson) as { title: string }).title).toBe(e.title)
+  }
+}
+
+beforeAll(async () => {
+  core = await loadCore()
+  fixture = loadDesktopFixture()
+})
+
+beforeEach(() => {
+  violations.length = 0
+  // No real timers or events from the key holder's idle watchers.
+  configureKeysEnv({
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    emit: () => {},
+    document: null,
+    window: null,
+  })
+})
+
+afterEach(() => {
+  dispose()
+  expect(violations).toEqual([])
+})
+
+describe('onboardComplete: happy path', () => {
+  it('unlocks a ring that opens the fixture entries and writes only the device slot', async () => {
+    const env = await setup()
+    const before = snapshot(env.drive)
+    const result = await run(env)
+
+    expect(isUnlocked()).toBe(true)
+    expectOpensFixtureEntries()
+    expect(result).toMatchObject({
+      deviceId: FIXED_ID,
+      deviceName: 'Memlore Web (Chrome)',
+      reusedDeviceId: false,
+      recoveryGeneration: 0,
+      persisted: true,
+    })
+
+    // The ONE write: a single create of .meta/keyring/devices/<id>.json, nothing else.
+    onlySlotWrite(env.drive, FIXED_ID)
+    const after = snapshot(env.drive)
+    const added = [...after.keys()].filter((id) => !before.has(id))
+    expect(added).toHaveLength(1)
+    for (const [id, state] of before) expect(after.get(id)).toBe(state) // incl. _meta/control
+    const slotFile = env.drive.find(['Memlore', '.meta', 'keyring', 'devices', `${FIXED_ID}.json`])
+    const slot = JSON.parse(core.parseDeviceSlot(text(slotFile?.content ?? new Uint8Array()))) as {
+      device_id: string
+      name: string
+      created_at: number
+      last_seen_at: number
+      version: number
+    }
+    expect(slot).toEqual({
+      version: 2,
+      device_id: FIXED_ID,
+      name: 'Memlore Web (Chrome)',
+      created_at: 1_800_000_000,
+      last_seen_at: 1_800_000_000,
+    })
+  })
+
+  it('stores only the wrapped master: it unlocks with the web password, no raw key or phrase', async () => {
+    const env = await setup()
+    await run(env)
+    const record = await env.db.device.get()
+    expect(record).toBeDefined()
+    assertDeviceRecord(record)
+    expect(record.deviceId).toBe(FIXED_ID)
+    expect(record.wrappedMasterHex).toHaveLength(WRAPPED_MASTER_HEX_LEN)
+    expect(record.kekSaltHex).toMatch(/^[0-9a-f]{32}$/)
+    expect(record.recoveryGeneration).toBe(0)
+    expect(record.name).toBe('Memlore Web (Chrome)')
+    const meta = JSON.parse(text(fixtureBytes(fixture, META))) as { master_fingerprint: string }
+    expect(record.masterFingerprint).toBe(meta.master_fingerprint)
+    const serialized = JSON.stringify(record)
+    expect(serialized).not.toContain('abandon')
+    expect(serialized).not.toContain(PASSWORD)
+
+    // The stored blob round-trips through unlockLocal with the web password only.
+    const salt = Uint8Array.from(Buffer.from(record.kekSaltHex, 'hex'))
+    const ring = core.KeyRing.unlockLocal(record.wrappedMasterHex, PASSWORD, salt)
+    ring.loadContentList(text(fixtureBytes(fixture, CONTENT)))
+    expectOpensFixtureEntries(ring)
+    ring.lock()
+    expect(() => core.KeyRing.unlockLocal(record.wrappedMasterHex, 'wrong', salt)).toThrow()
+  })
+
+  it('caches the _content.json text it read (pinned, under its Drive path) for offline unlock', async () => {
+    const env = await setup()
+    await run(env)
+    const cached = await env.db.files.get(CONTENT)
+    expect(cached?.pinned).toBe(true)
+    expect(text(cached?.ciphertext ?? new Uint8Array())).toBe(text(fixtureBytes(fixture, CONTENT)))
+  })
+
+  it('caches nothing when _content.json is confirmed absent', async () => {
+    const env = await setup({ omit: (p) => p === CONTENT })
+    await run(env)
+    expect(await env.db.files.get(CONTENT)).toBeUndefined()
+  })
+
+  it('uses a crypto.randomUUID id that desktop and the web client both accept', async () => {
+    const env = await setup()
+    delete env.deps.randomUUID
+    const result = await run(env)
+    expect(result.deviceId).toMatch(DESKTOP_RE)
+    expect(result.deviceId).toMatch(WEB_RE)
+    expect(isValidOwnId(result.deviceId)).toBe(true)
+    expect(isAcceptableDeviceId(result.deviceId)).toBe(true)
+    onlySlotWrite(env.drive, result.deviceId)
+  })
+
+  it('carries the control generation into the stored record', async () => {
+    const env = await setup({
+      overrides: {
+        [CONTROL]: patched(CONTROL, (c) => (c.recovery_generation = 3)),
+        [META]: patched(META, (m) => (m.recovery_generation = 3)),
+      },
+    })
+    const result = await run(env)
+    expect(result.recoveryGeneration).toBe(3)
+    expect((await env.db.device.get())?.recoveryGeneration).toBe(3)
+  })
+
+  it('asks for durable storage once; a refusal or an error is not fatal', async () => {
+    const env = await setup()
+    await run(env)
+    expect(env.persist).toHaveBeenCalledTimes(1)
+
+    const refused = await setup()
+    refused.persist.mockResolvedValue(false)
+    expect((await run(refused)).persisted).toBe(false)
+
+    dispose()
+    const broken = await setup()
+    broken.persist.mockRejectedValue(new Error('denied'))
+    const result = await run(broken)
+    expect(result.persisted).toBe(false)
+    expect(isUnlocked()).toBe(true)
+  })
+
+  it('a failed slot write aborts: no device record, no key left loaded', async () => {
+    const env = await setup()
+    env.drive.interceptors.push((req) =>
+      req.method === 'POST' ? json({ error: 'boom' }, 500) : undefined,
+    )
+    await expect(run(env)).rejects.toThrow()
+    await expectNoSideEffects(env)
+    expect(env.persist).not.toHaveBeenCalled()
+  })
+})
+
+describe('onboardComplete: vault checks (zero writes on refusal)', () => {
+  it('refuses while a recovery lease is active', async () => {
+    const env = await setup({
+      overrides: {
+        [CONTROL]: patched(CONTROL, (c) => {
+          c.recovery_generation = 1
+          c.recovery_lease = {
+            version: 1,
+            job_id: 1,
+            owner_device_id: 'aaaaaaaa-bbbb',
+            operation: 'local_to_cloud',
+            recovery_generation: 1,
+            nonce: 'abcdef0123456789',
+            created_at: 1,
+            updated_at: 1,
+          }
+        }),
+      },
+    })
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(RecoveryInProgressError)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+  })
+
+  it('maps a wrong phrase, a malformed phrase and a foreign fingerprint to typed errors', async () => {
+    const env = await setup()
+    const before = snapshot(env.drive)
+    await expect(run(env, OTHER_PHRASE)).rejects.toBeInstanceOf(WrongPhraseError)
+    await expect(run(env, 'not a real phrase')).rejects.toBeInstanceOf(InvalidPhraseError)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+
+    const foreign = await setup({
+      overrides: { [META]: patched(META, (m) => (m.master_fingerprint = 'ab'.repeat(32))) },
+    })
+    await expect(run(foreign)).rejects.toBeInstanceOf(FingerprintMismatchError)
+    expect(foreign.drive.mutating()).toEqual([])
+    await expectNoSideEffects(foreign)
+  })
+
+  it('refuses when meta.recovery_generation differs from control', async () => {
+    const env = await setup({
+      overrides: { [CONTROL]: patched(CONTROL, (c) => (c.recovery_generation = 1)) },
+    })
+    await expect(run(env)).rejects.toBeInstanceOf(GenerationMismatchError)
+    expect(env.drive.mutating()).toEqual([])
+    await expectNoSideEffects(env)
+  })
+
+  it.each([
+    ['control.json', CONTROL, 9],
+    ['_meta.json', META, 3],
+    ['_recovery.json', RECOVERY, 3],
+    ['_content.json', CONTENT, 3],
+  ])('format guard: an unknown version in %s is read-only-incompatible', async (_n, path, v) => {
+    const env = await setup({
+      overrides: { [path]: patched(path, (value) => (value.version = v)) },
+    })
+    const before = snapshot(env.drive)
+    const error = await run(env).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(FormatUnsupportedError)
+    expect((error as FormatUnsupportedError).path).toBe(path)
+    expect((error as FormatUnsupportedError).version).toBe(v)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+  })
+
+  it('refuses a missing recovery slot and an empty content list as a corrupt vault', async () => {
+    const noRecovery = await setup({ omit: (p) => p === RECOVERY })
+    await expect(run(noRecovery)).rejects.toBeInstanceOf(VaultCorruptError)
+    expect(noRecovery.drive.mutating()).toEqual([])
+
+    const empty = await setup({
+      overrides: {
+        [CONTENT]: JSON.stringify({ version: 2, latest_epoch: 0, entries: [], created_at: 1 }),
+      },
+    })
+    await expect(run(empty)).rejects.toBeInstanceOf(VaultCorruptError)
+    expect(empty.drive.mutating()).toEqual([])
+    await expectNoSideEffects(empty)
+  })
+})
+
+describe('onboardComplete: _content.json three-way handling', () => {
+  it('present: every epoch is unwrapped and the fixture entries open', async () => {
+    const env = await setup()
+    await run(env)
+    expectOpensFixtureEntries()
+  })
+
+  it('confirmed absent: epoch 1 = master (the vault keys are NOT the fixture content keys)', async () => {
+    const env = await setup({ omit: (p) => p === CONTENT })
+    await run(env)
+    expect(isUnlocked()).toBe(true)
+    const entry = fixture.expected.entries[0]
+    expect(() =>
+      core.openEntry(getKeyRing(), fixtureBytes(fixture, entryPath(entry.entry_id))),
+    ).toThrow()
+    onlySlotWrite(env.drive, FIXED_ID)
+  })
+
+  it('transient error: retried a bounded number of times, then TransientReadError, never absent', async () => {
+    const env = await setup()
+    const file = env.drive.find(['Memlore', ...CONTENT.split('/')])
+    env.drive.interceptors.push((req) =>
+      req.url.pathname === `/drive/v3/files/${file?.id}` ? json({ error: 'down' }, 503) : undefined,
+    )
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(TransientReadError)
+    expect(env.onboardSleeps).toEqual([500, 1000]) // between the 3 attempts, none after the last
+    expect(CONTENT_READ_ATTEMPTS).toBe(3)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+  })
+
+  it('transient error that clears: the retry loads the real content keys', async () => {
+    const env = await setup()
+    const file = env.drive.find(['Memlore', ...CONTENT.split('/')])
+    let failures = 0
+    env.drive.interceptors.push((req) => {
+      if (req.url.pathname !== `/drive/v3/files/${file?.id}`) return undefined
+      // The Drive client itself makes 4 attempts per read: fail the first full read only.
+      return ++failures <= 4 ? json({ error: 'down' }, 503) : undefined
+    })
+    await run(env)
+    expect(env.onboardSleeps).toEqual([500])
+    expectOpensFixtureEntries()
+  })
+})
+
+describe('onboardComplete: TOCTOU re-read', () => {
+  it('aborts when control.json changes between the read and the re-read', async () => {
+    const env = await setup()
+    onNthRead(env, CONTROL, 2, () => {
+      const file = env.drive.find(['Memlore', ...CONTROL.split('/')])
+      if (file) file.content = bytes(patched(CONTROL, (c) => (c.updated_at = 99)))
+    })
+    await expect(run(env)).rejects.toBeInstanceOf(VaultChangedError)
+    expect(env.drive.mutating()).toEqual([])
+    await expectNoSideEffects(env)
+  })
+
+  it('aborts when a rotation changes the keyring meta between the read and the re-read', async () => {
+    const env = await setup()
+    onNthRead(env, META, 2, () => {
+      const file = env.drive.find(['Memlore', ...META.split('/')])
+      if (file) file.content = bytes(patched(META, (m) => (m.epoch = 2)))
+    })
+    await expect(run(env)).rejects.toBeInstanceOf(VaultChangedError)
+    expect(env.drive.mutating()).toEqual([])
+    await expectNoSideEffects(env)
+  })
+
+  it('aborts when a recovery lease appears on the re-read', async () => {
+    const env = await setup()
+    onNthRead(env, CONTROL, 2, () => {
+      const file = env.drive.find(['Memlore', ...CONTROL.split('/')])
+      if (file) {
+        file.content = bytes(
+          patched(CONTROL, (c) => {
+            c.recovery_lease = {
+              version: 1,
+              job_id: 1,
+              owner_device_id: 'aaaaaaaa-bbbb',
+              operation: 'cloud_cleanup',
+              recovery_generation: 0,
+              nonce: 'abcdef0123456789',
+              created_at: 1,
+              updated_at: 1,
+            }
+          }),
+        )
+      }
+    })
+    await expect(run(env)).rejects.toThrow()
+    expect(env.drive.mutating()).toEqual([])
+    await expectNoSideEffects(env)
+  })
+})
+
+describe('onboardComplete: the shared devices folder is never created', () => {
+  it('VaultNotReadyError with ZERO writes when .meta/keyring/devices is missing', async () => {
+    const env = await setup({ omit: (p) => p.startsWith('.meta/keyring/devices/') })
+    expect(env.drive.find(['Memlore', '.meta', 'keyring', 'devices'])).toBeUndefined()
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(VaultNotReadyError)
+    expectNothingWritten(env, before) // no slot, no folder, no _meta.json
+    await expectNoSideEffects(env)
+    expect(env.persist).not.toHaveBeenCalled()
+  })
+})
+
+describe('onboardComplete: device id', () => {
+  const storedRecord = (masterFingerprint: string, deviceId = REUSED_ID) => ({
+    deviceId,
+    wrappedMasterHex: 'ab'.repeat(WRAPPED_MASTER_HEX_LEN / 2),
+    kekSaltHex: 'cd'.repeat(16),
+    recoveryGeneration: 0,
+    masterFingerprint,
+    name: 'Memlore Web (Firefox)',
+  })
+  const vaultFingerprint = (): string =>
+    (JSON.parse(text(fixtureBytes(fixture, META))) as { master_fingerprint: string })
+      .master_fingerprint
+
+  it('reuses the IndexedDB device id of the same vault (rotation deleted the slot)', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord(vaultFingerprint()))
+    const result = await run(env)
+    expect(result.deviceId).toBe(REUSED_ID)
+    expect(result.reusedDeviceId).toBe(true)
+    expect(env.randomUUID).not.toHaveBeenCalled()
+    onlySlotWrite(env.drive, REUSED_ID)
+    const record = await env.db.device.get()
+    expect(record?.deviceId).toBe(REUSED_ID)
+    // The stale wrapped master is replaced by the freshly wrapped one.
+    expect(record?.wrappedMasterHex).not.toBe('ab'.repeat(WRAPPED_MASTER_HEX_LEN / 2))
+  })
+
+  it('updates an existing own slot in place (one PATCH, no second slot)', async () => {
+    const env = await setup()
+    const devices = env.drive.chain('Memlore', '.meta', 'keyring', 'devices')
+    env.drive.addFile(`${REUSED_ID}.json`, devices, '{}')
+    await env.db.device.put(storedRecord(vaultFingerprint()))
+    await run(env)
+    const req = onlySlotWrite(env.drive, REUSED_ID)
+    expect(req.method).toBe('PATCH')
+    expect(req.url.searchParams.get('uploadType')).toBe('media')
+    expect(req.headers.has('if-match')).toBe(true)
+  })
+
+  it('generates a new id when the stored record belongs to another vault', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord('ef'.repeat(32)))
+    const result = await run(env)
+    expect(result.deviceId).toBe(FIXED_ID)
+    expect(result.reusedDeviceId).toBe(false)
+    expect(env.randomUUID).toHaveBeenCalledTimes(1)
+    onlySlotWrite(env.drive, FIXED_ID)
+  })
+
+  it('different vault + unsent drafts: refused with ZERO writes (cloud and IndexedDB)', async () => {
+    const env = await setup()
+    const old = storedRecord('ef'.repeat(32))
+    await env.db.device.put(old)
+    await env.db.drafts.put({ entryId: 'e1', sealed: new Uint8Array([1, 2]), updatedAt: 1 })
+    await env.db.files.put({
+      path: 'x',
+      ciphertext: new Uint8Array([1]),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: false,
+    })
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
+    expectNothingWritten(env, before)
+    expect(await env.db.device.get()).toEqual(old)
+    expect(await env.db.drafts.list()).toHaveLength(1)
+    expect(await env.db.files.get('x')).toBeDefined()
+    expect(isUnlocked()).toBe(false)
+  })
+
+  it('different vault, no drafts: the old vault cache is cleared and the new record stored', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord('ef'.repeat(32)))
+    await env.db.files.put({
+      path: 'old-vault-file',
+      ciphertext: new Uint8Array([1]),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: false,
+    })
+    await env.db.meta.put({ key: 'k', value: 1 })
+    await run(env)
+    expect(await env.db.files.get('old-vault-file')).toBeUndefined()
+    expect(await env.db.meta.get('k')).toBeUndefined()
+    expect((await env.db.device.get())?.masterFingerprint).toBe(vaultFingerprint())
+  })
+
+  it('same vault: the id is reused and nothing is cleared (drafts and cache survive)', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord(vaultFingerprint()))
+    await env.db.drafts.put({ entryId: 'e1', sealed: new Uint8Array([1, 2]), updatedAt: 1 })
+    await env.db.files.put({
+      path: 'keep',
+      ciphertext: new Uint8Array([1]),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: false,
+    })
+    const result = await run(env)
+    expect(result.reusedDeviceId).toBe(true)
+    expect(await env.db.drafts.list()).toHaveLength(1)
+    expect(await env.db.files.get('keep')).toBeDefined()
+  })
+
+  it('probes IndexedDB before the cloud write: a storage failure leaves no orphan slot', async () => {
+    const env = await setup()
+    vi.spyOn(env.db.meta, 'put').mockRejectedValueOnce(new StorageUnavailableError())
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(StorageUnavailableError)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+  })
+
+  it('a failed content cache write drops the stale cached copy; an absent file drops it too', async () => {
+    const stale = {
+      path: CONTENT,
+      ciphertext: new TextEncoder().encode('stale'),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: true,
+    }
+    const failing = await setup()
+    await failing.db.files.put(stale)
+    vi.spyOn(failing.db.files, 'put').mockImplementationOnce(async () => {
+      throw new StorageUnavailableError()
+    })
+    await run(failing)
+    expect(await failing.db.files.get(CONTENT)).toBeUndefined()
+
+    const absent = await setup({ omit: (p) => p === CONTENT })
+    await absent.db.files.put(stale)
+    await run(absent)
+    expect(await absent.db.files.get(CONTENT)).toBeUndefined()
+  })
+
+  it('does not reuse a stored id that the desktop or the web client would reject', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord(vaultFingerprint(), 'web-1234')) // not hex: web rejects
+    const result = await run(env)
+    expect(result.deviceId).toBe(FIXED_ID)
+    expect(result.reusedDeviceId).toBe(false)
+  })
+
+  it('refuses a generated id that fails either validator, before any write', async () => {
+    const env = await setup()
+    env.randomUUID.mockReturnValue('not/an/id')
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(InvalidDeviceIdError)
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+  })
+
+  it('isAcceptableDeviceId requires BOTH rules', () => {
+    expect(isAcceptableDeviceId('9c5eba44-ed3f-4dae-a3c7-31c0d96792dd')).toBe(true)
+    expect(isAcceptableDeviceId('abcd1234')).toBe(true)
+    expect(isAcceptableDeviceId('abcd')).toBe(false) // web needs 8+
+    expect(isAcceptableDeviceId('zzzzzzzz')).toBe(false) // not hex
+    expect(isAcceptableDeviceId('-abcd1234')).toBe(false)
+    expect(isAcceptableDeviceId('abcd/1234')).toBe(false)
+    expect(isAcceptableDeviceId(`${'a'.repeat(65)}`)).toBe(false)
+    expect(isAcceptableDeviceId(undefined)).toBe(false)
+  })
+})
+
+describe('browserName', () => {
+  it.each([
+    [CHROME_UA, 'Chrome'],
+    [`${CHROME_UA} Edg/126.0.0.0`, 'Edge'],
+    [`${CHROME_UA} OPR/110.0.0.0`, 'Opera'],
+    ['Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0', 'Firefox'],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+      'Safari',
+    ],
+    ['curl/8.0', 'Browser'],
+    ['', 'Browser'],
+  ])('%s -> %s', (ua, name) => {
+    expect(browserName(ua)).toBe(name)
+  })
+})
+
+describe('validatePassphrase (onboard_validate_passphrase)', () => {
+  it('accepts the right phrase: read-only, no control read, no key, no device record', async () => {
+    const env = await setup()
+    const before = snapshot(env.drive)
+    await validatePassphrase(env.deps.reader, fixture.recovery_phrase, { core })
+    expectNothingWritten(env, before)
+    await expectNoSideEffects(env)
+    const control = env.drive.find(['Memlore', ...CONTROL.split('/')])
+    expect(env.drive.requests.some((r) => r.url.pathname.endsWith(`/${control?.id}`))).toBe(false)
+  })
+
+  it('maps wrong phrase, malformed phrase, foreign fingerprint and a missing recovery slot', async () => {
+    const env = await setup()
+    await expect(
+      validatePassphrase(env.deps.reader, OTHER_PHRASE, { core }),
+    ).rejects.toBeInstanceOf(WrongPhraseError)
+    await expect(validatePassphrase(env.deps.reader, 'nope', { core })).rejects.toBeInstanceOf(
+      InvalidPhraseError,
+    )
+
+    const foreign = await setup({
+      overrides: { [META]: patched(META, (m) => (m.master_fingerprint = 'ab'.repeat(32))) },
+    })
+    await expect(
+      validatePassphrase(foreign.deps.reader, fixture.recovery_phrase, { core }),
+    ).rejects.toBeInstanceOf(FingerprintMismatchError)
+
+    const missing = await setup({ omit: (p) => p === RECOVERY })
+    await expect(
+      validatePassphrase(missing.deps.reader, fixture.recovery_phrase, { core }),
+    ).rejects.toBeInstanceOf(VaultCorruptError)
+  })
+
+  it('reports a wrong phrase before a missing _meta.json (desktop order: unwrap, then meta)', async () => {
+    const env = await setup({ omit: (p) => p === META })
+    await expect(
+      validatePassphrase(env.deps.reader, OTHER_PHRASE, { core }),
+    ).rejects.toBeInstanceOf(WrongPhraseError)
+    await expect(
+      validatePassphrase(env.deps.reader, fixture.recovery_phrase, { core }),
+    ).rejects.toBeInstanceOf(VaultCorruptError)
+  })
+})

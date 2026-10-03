@@ -7,6 +7,7 @@ import {
   type ChannelHandle,
   type OAuthClientDeps,
   type PopupHandle,
+  isSignInCancelled,
 } from './oauth'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -334,6 +335,8 @@ describe('connect', () => {
     h.popup.closed = true
     h.tick()
     await expect(p).rejects.toThrow(/cancelled/)
+    // auth.ts maps exactly this error to OAUTH_CANCELLED: the two must not drift apart.
+    expect(isSignInCancelled(await p.catch((e: unknown) => e))).toBe(true)
     h.tick()
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })

@@ -94,18 +94,13 @@ const AI_SETTINGS_OFF = {
  * serves into the router handler table; the coverage test requires removing them here.
  */
 export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
-  // Boot, vault and startup state (Phase 9 replaces these with the real unlock flow).
-  // TODO(later): see docs/LATER.md - boot placeholders replaced in Phase 9 (get_startup_mode, get_encryption_mode, get_device_id, is_encryption_initialized)
+  // Boot and vault state (startup/encryption mode, device id: served by commands/auth.ts).
   app_version: null,
   check_for_update: null,
-  get_encryption_mode: 'password',
-  get_startup_mode: 'password_locked',
-  is_encryption_initialized: false,
   get_pending_first_time_setup: null,
   is_biometric_available: false,
   is_biometric_unlock_enabled: false,
   second_lock_status: false,
-  get_device_id: 'web-unavailable',
   // Journals, entries, tags, templates (read paths: Phases 10-12).
   list_journals: [],
   get_journal: null,
@@ -425,17 +420,13 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'stop_recording',
   // TODO(later): see docs/LATER.md - Entry delete
   'soft_delete_entry',
-  // TODO(later): see docs/LATER.md - Vault creation, password and biometric management (companion app: the vault is created on desktop; unlock arrives with Phase 9)
+  // TODO(later): see docs/LATER.md - Vault creation, password and biometric management (companion app: the vault is created on desktop)
   'begin_first_time_setup',
   'cancel_first_time_setup',
   'change_password',
   'confirm_first_time_setup',
   'disable_biometric_unlock',
   'enable_biometric_unlock',
-  'initialize_encryption',
-  'lock_encryption',
-  'onboard_complete',
-  'onboard_validate_passphrase',
   'recover_with_passphrase',
   'unlock_with_biometric',
   'verify_password',
@@ -445,9 +436,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'create_entry',
   'delete_media',
   'ensure_video_thumbnail',
-  'gdrive_begin_connect',
-  'gdrive_cancel_connect',
-  'gdrive_complete_connect',
   'gdrive_disconnect',
   'gdrive_refresh_storage_quota',
   'gdrive_test_connection',
