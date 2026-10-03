@@ -32,6 +32,8 @@ coverage/
 
 # Rust / Cargo
 src-tauri/target/
+# rust-analyzer flycheck output when the IDE opens the repo root
+/target/
 
 # Tauri build outputs
 *.deb
