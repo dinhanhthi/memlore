@@ -13,6 +13,8 @@ pub mod engine;
 pub mod entry_sync;
 pub mod gdrive_oauth;
 pub mod gdrive_provider;
+#[cfg(test)]
+mod golden_fixtures;
 pub mod keyring_v2;
 pub mod local_keyring_v2;
 pub mod local_provider;

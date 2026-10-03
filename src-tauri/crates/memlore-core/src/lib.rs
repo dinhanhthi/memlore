@@ -2,8 +2,12 @@
 
 pub mod encryption;
 pub mod entry_sync;
+pub mod envelope;
 pub mod key_state;
+pub mod keyring_types;
+pub mod metadata;
 pub mod recovery;
+pub mod sync_control;
 
 /// Failure modes of the payload codec, kept independent of any sync transport.
 /// Display strings match the desktop `SyncError` variants of the same names.

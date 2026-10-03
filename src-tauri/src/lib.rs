@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Mutex;
 use tauri::menu::{AboutMetadata, MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{Emitter, Listener, Manager};
-use zeroize::Zeroizing;
 
 pub mod ai;
 pub mod commands;
