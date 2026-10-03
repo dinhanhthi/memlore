@@ -31,5 +31,5 @@
     }
   },
   "include": ["../src", "."],
-  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**", "dist"]
+  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**", "scripts", "dist"]
 }

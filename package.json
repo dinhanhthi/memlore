@@ -19,6 +19,7 @@
     "design": "python3 -m http.server 8080 --directory docs/design/project",
     "web:wasm": "bash scripts/web-wasm.sh",
     "web:test": "pnpm web:wasm && vitest run --config web/vitest.config.ts",
+    "web:fixture:envelopes": "pnpm web:wasm --test-sealers && node --experimental-strip-types web/scripts/gen-web-fixture.ts",
     "web:dev": "vite --config web/vite.config.ts",
     "web:build": "pnpm web:wasm && tsc -p web/tsconfig.json --noEmit && vite build --config web/vite.config.ts",
     "web:preview": "vite preview --config web/vite.config.ts",

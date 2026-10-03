@@ -34,3 +34,20 @@ MEMLORE_REGEN_FIXTURES=1 cargo test golden_desktop_fixture_regen -- --ignored
 The generator is `#[ignore]`d and also checks the env var, so without both it
 writes nothing. The JSON is excluded from prettier (`.prettierignore`); do not
 reflow it.
+
+## web-envelopes.v1.json
+
+A V2 media envelope, a thumbnail and an entry envelope sealed by the WASM build
+(`memlore-wasm`, `test-sealers`) under the keys of `desktop-vault.v1.json`, plus the
+expected plaintexts. The native tests `golden_web_envelopes_*` in `envelope.rs` open
+them with the content keys unwrapped from the desktop vault (WASM to native parity;
+the reverse direction is `web/src/core/core.wasm.test.ts`).
+
+Same rules as the desktop oracle: never regenerate casually. The generator refuses to
+overwrite the file unless `MEMLORE_REGEN_FIXTURES=1`:
+
+```bash
+MEMLORE_REGEN_FIXTURES=1 pnpm web:fixture:envelopes
+```
+
+`web:fixture:outbox` (Phase 14.3) is a separate script and never regenerates this file.

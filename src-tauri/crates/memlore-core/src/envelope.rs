@@ -1147,4 +1147,155 @@ mod tests {
             Err(EnvelopeError::Malformed(_))
         ));
     }
+
+    // ---- golden: sealed by WASM, opened natively ----
+
+    fn b64_decode(text: &str) -> Vec<u8> {
+        let mut out = Vec::new();
+        let (mut acc, mut bits) = (0u32, 0u32);
+        for c in text.bytes().filter(|c| *c != b'=') {
+            let v = match c {
+                b'A'..=b'Z' => c - b'A',
+                b'a'..=b'z' => c - b'a' + 26,
+                b'0'..=b'9' => c - b'0' + 52,
+                b'+' => 62,
+                b'/' => 63,
+                _ => panic!("bad base64 byte {c}"),
+            };
+            acc = (acc << 6) | u32::from(v);
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                out.push((acc >> bits) as u8);
+                acc &= (1 << bits) - 1;
+            }
+        }
+        out
+    }
+
+    /// Content keys of the frozen desktop vault, loaded exactly like
+    /// `golden_desktop_fixture_decodes` does.
+    fn desktop_vault_list() -> ContentKeyList {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/");
+        let vault: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(format!("{dir}desktop-vault.v1.json")).unwrap(),
+        )
+        .unwrap();
+        let file = |path: &str| -> String {
+            String::from_utf8(b64_decode(vault["files"][path].as_str().unwrap())).unwrap()
+        };
+        let recovery: serde_json::Value =
+            serde_json::from_str(&file(".meta/keyring/_recovery.json")).unwrap();
+        let meta: serde_json::Value =
+            serde_json::from_str(&file(".meta/keyring/_meta.json")).unwrap();
+        let master = unwrap_master_with_recovery(
+            vault["recovery_phrase"].as_str().unwrap(),
+            recovery["wrapped_master"].as_str().unwrap(),
+        )
+        .unwrap();
+        verify_master_fingerprint(&master, meta["master_fingerprint"].as_str().unwrap()).unwrap();
+        load_content_list(&file(".meta/keyring/_content.json"), &master).unwrap()
+    }
+
+    fn web_fixture() -> serde_json::Value {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/fixtures/web-envelopes.v1.json"
+        );
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    fn fixture_bytes(fixture: &serde_json::Value, section: &str, field: &str) -> Vec<u8> {
+        b64_decode(fixture[section][field].as_str().unwrap())
+    }
+
+    /// Same keys under shifted epoch numbers: no epoch of the envelope exists.
+    fn shifted_epochs(list: &ContentKeyList) -> ContentKeyList {
+        ContentKeyList {
+            keys: list
+                .keys
+                .iter()
+                .map(|(e, k)| (e + 100, key(k[0])))
+                .collect(),
+            latest: list.latest + 100,
+            db_key: key(0),
+            master: key(9),
+        }
+    }
+
+    fn flip_last_byte(bytes: &[u8]) -> Vec<u8> {
+        let mut bad = bytes.to_vec();
+        *bad.last_mut().unwrap() ^= 0x01;
+        bad
+    }
+
+    #[test]
+    fn golden_web_envelopes_open_entry() {
+        let list = desktop_vault_list();
+        let f = web_fixture();
+        let env = fixture_bytes(&f, "entry", "envelope_b64");
+        assert_eq!(&env[..4], b"XJS1");
+        let opened = open_entry(&list, &env).unwrap();
+        assert_eq!(
+            opened.metadata_json,
+            f["entry"]["expected_metadata_json"]
+                .as_str()
+                .unwrap()
+                .as_bytes()
+        );
+        assert_eq!(opened.yjs, fixture_bytes(&f, "entry", "expected_yjs_b64"));
+    }
+
+    #[test]
+    fn golden_web_envelopes_open_media_and_thumb() {
+        let list = desktop_vault_list();
+        let f = web_fixture();
+        for section in ["media", "thumb"] {
+            let env = fixture_bytes(&f, section, "envelope_b64");
+            assert_eq!(env[0], 0x02, "{section} must be a V2 epoch envelope");
+            assert_eq!(
+                open_media(&list, &env).unwrap(),
+                fixture_bytes(&f, section, "expected_b64"),
+                "{section}"
+            );
+        }
+    }
+
+    #[test]
+    fn golden_web_envelopes_tampering_fails() {
+        let list = desktop_vault_list();
+        let f = web_fixture();
+        for section in ["media", "thumb"] {
+            let env = fixture_bytes(&f, section, "envelope_b64");
+            assert_eq!(
+                open_media(&list, &flip_last_byte(&env)),
+                Err(EnvelopeError::WrongKey),
+                "{section}"
+            );
+        }
+        let entry = fixture_bytes(&f, "entry", "envelope_b64");
+        assert!(open_entry(&list, &flip_last_byte(&entry)).is_err());
+    }
+
+    #[test]
+    fn golden_web_envelopes_wrong_epoch_fails() {
+        let list = desktop_vault_list();
+        let wrong = shifted_epochs(&list);
+        let f = web_fixture();
+        for section in ["media", "thumb"] {
+            let env = fixture_bytes(&f, section, "envelope_b64");
+            assert!(
+                matches!(
+                    open_media(&wrong, &env),
+                    Err(EnvelopeError::UnknownEpoch(_))
+                ),
+                "{section}"
+            );
+        }
+        let entry = fixture_bytes(&f, "entry", "envelope_b64");
+        assert_eq!(
+            open_entry(&wrong, &entry),
+            Err(EnvelopeError::FingerprintMismatch)
+        );
+    }
 }
