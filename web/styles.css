@@ -1,0 +1,4 @@
+/* The Vite root is web/, so tell Tailwind v4 to scan src/ for utility classes. */
+@source '../src';
+
+@import '../src/styles/globals.css';

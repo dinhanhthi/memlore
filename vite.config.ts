@@ -53,5 +53,7 @@ export default defineConfig(({ command }) => ({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     include: ['src/**/*.test.{ts,tsx}', 'mockup/**/*.test.ts', 'workers/**/*.test.ts'],
+    // Web tests run via `pnpm web:test` (web/vitest.config.ts), never in the desktop suite.
+    exclude: ['**/node_modules/**', '**/dist/**', 'workers/web-auth/**'],
   },
 }))

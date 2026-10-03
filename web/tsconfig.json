@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.web.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "types": ["vite/client", "vitest/globals", "node"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@tauri-apps/api/core": ["./src/tauri/core.ts"],
+      "@tauri-apps/api/event": ["./src/tauri/event.ts"],
+      "@tauri-apps/api/window": ["./src/tauri/window.ts"],
+      "@tauri-apps/api/path": ["./src/tauri/path.ts"],
+      "@tauri-apps/plugin-opener": ["./src/tauri/plugin-opener.ts"],
+      "@tauri-apps/plugin-dialog": ["./src/tauri/plugin-dialog.ts"],
+      "@tauri-apps/plugin-notification": ["./src/tauri/plugin-notification.ts"],
+      "@tauri-apps/plugin-autostart": ["./src/tauri/plugin-autostart.ts"]
+    }
+  },
+  "include": ["../src", "."],
+  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**", "dist"]
+}

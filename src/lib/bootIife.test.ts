@@ -43,6 +43,31 @@ const iifes = HTML_FILES.map(({ label, path }) => ({
   script: extractBootIife(readFileSync(path, 'utf8')),
 }))
 
+describe('web app boot script', () => {
+  const webBoot = readFileSync(resolve(REPO_ROOT, 'web/public/boot.js'), 'utf8')
+  const webHtml = readFileSync(resolve(REPO_ROOT, 'web/index.html'), 'utf8')
+
+  it('keeps web/public/boot.js in lockstep with the desktop inline IIFE', () => {
+    expect(normalizeIife(webBoot)).toBe(normalizeIife(iifes[0].script))
+  })
+
+  it('stamps the same way as the desktop IIFE', () => {
+    const stamp = runBootIife(webBoot, { designSystem: 'clay', theme: 'light' })
+    expect(stamp.className).toBe('ds-clay rad-high')
+    expect(stamp.backgroundColor).toBe('#ebe3d6')
+  })
+
+  it('web/index.html has no inline script (CSP script-src self)', () => {
+    const scripts = [...webHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
+    expect(scripts.length).toBeGreaterThan(0)
+    for (const [, attrs, body] of scripts) {
+      expect(attrs).toMatch(/\bsrc="/)
+      expect(body?.trim()).toBe('')
+    }
+    expect(webHtml).toContain('<script src="/boot.js"></script>')
+  })
+})
+
 describe('boot IIFE lockstep', () => {
   it('keeps index.html and mockup/index.html stamp logic in lockstep', () => {
     expect(normalizeIife(iifes[0].script)).toBe(normalizeIife(iifes[1].script))
