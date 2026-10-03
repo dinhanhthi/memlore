@@ -1,8 +1,12 @@
 import { authHandlers } from './commands/auth'
+import { cacheHandlers, installCacheStatsEmitter } from './commands/cache'
 import { entryHandlers } from './commands/entries'
+import { mediaHandlers } from './commands/media'
 import { searchHandlers } from './commands/search'
 import { installSyncAutostart, syncHandlers } from './commands/sync'
 import { taxonomyHandlers } from './commands/taxonomy'
+import { installConfigAutostart } from './config'
+import { installEvictorAutostart } from './storage/evictor'
 import { unsupported } from './unsupported'
 
 export type Handler = (args: Record<string, unknown>) => unknown | Promise<unknown>
@@ -30,10 +34,15 @@ export function registerHandlers(table: Record<string, Handler>): void {
 
 registerHandlers(authHandlers)
 registerHandlers(entryHandlers)
+registerHandlers(mediaHandlers)
+registerHandlers(cacheHandlers)
 registerHandlers(taxonomyHandlers)
 registerHandlers(searchHandlers)
 registerHandlers(syncHandlers)
 installSyncAutostart()
+installEvictorAutostart()
+installConfigAutostart()
+installCacheStatsEmitter()
 
 export async function route(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   if (Object.hasOwn(handlers, cmd)) return handlers[cmd](args)

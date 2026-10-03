@@ -106,7 +106,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   // Media.
   list_media_for_entry: [],
   list_all_media_paged: EMPTY_PAGE,
-  get_media_cache_stats: { usedBytes: 0, maxBytes: 512 * 1024 * 1024 },
   get_media_upload_limits: { photoBytes: -1, videoBytes: -1 },
   // Sync and devices.
   get_sync_catchup_status: { complete: true, pulled: 0, total: 0 },
@@ -401,7 +400,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'unlock_with_biometric',
   'verify_password',
   // Entry and media writes and Drive connection: Phases 9-16 move these into the handler table (registerHandlers).
-  'clear_media_cache',
   'cloud_folder_connect',
   'create_entry',
   'delete_media',
@@ -409,7 +407,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'gdrive_disconnect',
   'gdrive_refresh_storage_quota',
   'gdrive_test_connection',
-  'get_media_status',
   'mark_entry_date_user_edited',
   'move_entry_to_journal',
   'pick_files_to_attach',
@@ -418,14 +415,9 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'pick_video',
   'pick_videos_from_library',
   'push_entry',
-  'read_media_bytes',
-  'read_media_thumbnail_bytes',
   'recalculate_streak',
-  'resolve_media',
-  'resolve_media_thumbnail',
   'save_entry_content',
   'save_pasted_image',
-  'set_media_cache_limit',
   'set_media_upload_limits',
   'set_sync_enabled',
   'set_sync_settings',

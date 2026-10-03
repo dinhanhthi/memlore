@@ -23,6 +23,7 @@ import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '
 import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
+import type { Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 
 /** The part of the vault the read commands use. */
@@ -66,10 +67,23 @@ export interface PullOutcome {
    * templates changed. False for the very first pull of a session (nothing was shown before).
    */
   changed: boolean
+  /** Devices whose manifest could not be read fresh (the cached one was used). Empty or absent: none. */
+  degraded?: ReadonlyArray<{ device: string; reason: string }>
+}
+
+/** What the media commands (Phase 11.1) need besides the vault: ciphertext cache, reader, core. */
+export interface MediaBackend {
+  db: Pick<WebDb, 'blobs' | 'files' | 'device'>
+  reader: Pick<DriveReader, 'readDeviceFile'>
+  core: Pick<Core, 'openMedia'>
+  /** The puller's download limiter (concurrency 4), shared so media and entries obey one cap. */
+  limit: Limiter
 }
 
 export interface ReadSession {
   vault: VaultApi
+  /** Absent in sessions that cannot serve media. */
+  media?: MediaBackend
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
   ready: () => Promise<Taxonomy>
   /**
@@ -235,10 +249,10 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const changed =
       before !== null &&
       (result.stale.length > 0 || taxonomyChanged || indexDiffers(before, puller.index))
-    return { stale: result.stale, changed }
+    return { stale: result.stale, changed, degraded: puller.getDegradedDevices() }
   }
 
-  return { vault, ready, pull }
+  return { vault, media: { db, reader, core, limit: puller.limit }, ready, pull }
 }
 
 function indexDiffers(

@@ -19,7 +19,9 @@ import {
   DriveNotFoundError,
   DriveProtocolError,
   DriveReader,
+  DriveTooLargeError,
   DriveWriter,
+  DEFAULT_MAX_DOWNLOAD_BYTES,
   ForbiddenWriteError,
   LockUnavailableError,
   VaultNotReadyError,
@@ -666,6 +668,138 @@ describe('reader: paging, alt=media, bearer', () => {
     const last = h.drive.requests[h.drive.requests.length - 1]
     expect(last.url.searchParams.get('alt')).toBe('media')
     expect(last.url.href.startsWith(`${API}/drive/v3/files/`)).toBe(true)
+  })
+
+  describe('getFile byte cap', () => {
+    const readerFor = (respond: () => Response): DriveReader =>
+      new DriveReader({ getToken: async () => 'tok', fetchImpl: async () => respond() })
+
+    /** An endless body that counts its pulls, with a declared length when given. */
+    function endless(contentLength?: number): { response: Response; state: { pulls: number } } {
+      const state = { pulls: 0 }
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          state.pulls += 1
+          if (state.pulls > 1000) controller.close() // a runaway read ends instead of hanging
+          controller.enqueue(new Uint8Array(10))
+        },
+      })
+      const headers: Record<string, string> =
+        contentLength === undefined ? {} : { 'content-length': String(contentLength) }
+      return { response: new Response(stream, { headers }), state }
+    }
+
+    it('refuses a declared Content-Length over the cap without reading the body', async () => {
+      const { response, state } = endless(1_000_000)
+      await expect(readerFor(() => response).getFile('abc', 100)).rejects.toBeInstanceOf(
+        DriveTooLargeError,
+      )
+      expect(state.pulls).toBeLessThanOrEqual(1) // the stream's initial fill only
+    })
+
+    it('cancels a chunked body the moment it exceeds the cap', async () => {
+      const { response, state } = endless()
+      await expect(readerFor(() => response).getFile('abc', 100)).rejects.toBeInstanceOf(
+        DriveTooLargeError,
+      )
+      // Far below the helper's 1000-pull runaway cap: the stream was cancelled, not drained. The
+      // exact count depends on the runtime's ReadableStream read-ahead, so it is not pinned.
+      expect(state.pulls).toBeGreaterThan(0)
+      expect(state.pulls).toBeLessThan(200)
+    })
+
+    it('preallocates from a valid Content-Length and returns an exact-length view', async () => {
+      const body = new Uint8Array(100).map((_, i) => i)
+      const out = await readerFor(
+        () => new Response(body, { headers: { 'content-length': '100' } }),
+      ).getFile('abc', 1000)
+      expect(out).toEqual(body)
+      expect(out.byteLength).toBe(100)
+    })
+
+    it('handles a body shorter or longer than its Content-Length, bounded by the cap', async () => {
+      const body = new Uint8Array(100).map((_, i) => i)
+      const header = (n: number): Record<string, string> => ({ 'content-length': String(n) })
+      const shorter = await readerFor(() => new Response(body, { headers: header(150) })).getFile(
+        'abc',
+        1000,
+      )
+      expect(shorter).toEqual(body) // exact received length, not the declared one
+      expect(shorter.byteLength).toBe(100)
+      const chunked = (): Response =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(body.subarray(0, 60))
+              controller.enqueue(body.subarray(60))
+              controller.close()
+            },
+          }),
+          { headers: header(40) },
+        )
+      const longer = await readerFor(chunked).getFile('abc', 1000)
+      expect(longer).toEqual(body)
+      await expect(readerFor(chunked).getFile('abc', 90)).rejects.toBeInstanceOf(DriveTooLargeError)
+    })
+
+    it('always returns a buffer of exactly the body length (no hidden zero tail)', async () => {
+      const body = new Uint8Array(100).map((_, i) => i + 1)
+      const header = (n: number): Record<string, string> => ({ 'content-length': String(n) })
+      const exact = (out: Uint8Array): void => {
+        expect(out.byteOffset).toBe(0)
+        expect(out.buffer.byteLength).toBe(out.length)
+      }
+      const shorter = await readerFor(() => new Response(body, { headers: header(150) })).getFile(
+        'abc',
+        1000,
+      )
+      exact(shorter)
+      expect(shorter.length).toBe(100)
+      const same = await readerFor(() => new Response(body, { headers: header(100) })).getFile(
+        'abc',
+        1000,
+      )
+      exact(same)
+      const chunks = (): Response =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(body.subarray(0, 60))
+              controller.enqueue(body.subarray(60))
+              controller.close()
+            },
+          }),
+          { headers: header(40) },
+        )
+      const longer = await readerFor(chunks).getFile('abc', 1000)
+      exact(longer)
+      expect(longer).toEqual(body)
+      const empty = await readerFor(
+        () => new Response(new Uint8Array(0), { headers: header(50) }),
+      ).getFile('abc', 1000)
+      expect(empty.buffer.byteLength).toBe(0)
+    })
+
+    it('grows past the preallocation cap for an honest large body', async () => {
+      const size = 9 * 1024 * 1024
+      const body = new Uint8Array(size).fill(3)
+      const out = await readerFor(
+        () => new Response(body, { headers: { 'content-length': String(size) } }),
+      ).getFile('abc', 20 * 1024 * 1024)
+      expect(out.length).toBe(size)
+      expect(out.buffer.byteLength).toBe(size)
+      expect(out[size - 1]).toBe(3)
+    })
+
+    it('serves a body of exactly the cap and uses 64 MiB when no cap is given', async () => {
+      const body = new Uint8Array(100).fill(7)
+      expect(await readerFor(() => new Response(body)).getFile('abc', 100)).toEqual(body)
+      expect(DEFAULT_MAX_DOWNLOAD_BYTES).toBe(64 * 1024 * 1024)
+      const { response } = endless(DEFAULT_MAX_DOWNLOAD_BYTES + 1)
+      await expect(readerFor(() => response).getFile('abc')).rejects.toBeInstanceOf(
+        DriveTooLargeError,
+      )
+    })
   })
 
   it('takes the bearer token from the injected provider on every attempt', async () => {

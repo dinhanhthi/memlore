@@ -7,6 +7,7 @@ import {
   FOCUS_MIN_AGE_MS,
   INTERVAL_MS,
   MSG_FORMAT_READ_ONLY,
+  MSG_SYNC_DEGRADED,
   configureSyncEnv,
   startSyncSchedule,
   stopSyncSchedule,
@@ -165,6 +166,25 @@ describe('schedule triggers', () => {
       error: null,
     })
     expect(h.last()?.lastSync).toBe(1_800_000_000)
+  })
+
+  it('reports a degraded pull as a synced phase with a message, cleared by a clean pull', async () => {
+    const h = harness()
+    h.outcome = {
+      stale: [],
+      changed: false,
+      degraded: [{ device: 'd1', reason: 'manifest-oversize' }],
+    }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: MSG_SYNC_DEGRADED })
+    await expect(syncHandlers.get_sync_status({})).resolves.toMatchObject({
+      error: MSG_SYNC_DEGRADED,
+    })
+    h.outcome = NOOP
+    await syncHandlers.sync_now({})
+    expect(h.last()).toMatchObject({ state: 'synced', error: null })
+    expect(await syncHandlers.get_sync_status({})).not.toHaveProperty('error')
   })
 
   it('does not pull on start while the tab is hidden, then pulls once it is visible', async () => {

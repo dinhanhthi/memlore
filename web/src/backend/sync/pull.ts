@@ -31,12 +31,14 @@ import {
   DriveHttpError,
   DriveNotFoundError,
   DriveProtocolError,
+  DriveTooLargeError,
   VaultNotReadyError,
   type DriveReader,
 } from '../drive/client'
 import { DEVICE_SLOT_FOLDERS, deviceSlotPath, isSafeComponent } from '../drive/paths'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, isUnlocked, lock, type LockReason } from '../keys'
+import { notifyCacheWrite } from '../storage/evictor'
 import type { WebDb } from '../storage/idb'
 import { buildEntryIndex, newestLive, type IndexEntry, type ManifestEntryRow } from './entryIndex'
 import {
@@ -158,6 +160,16 @@ export interface PullDeps {
   limit?: Limiter
   /** Defaults to the key holder's `isUnlocked`: a locked session stops using the network. */
   isUnlocked?: () => boolean
+  /** Called after an entry payload was cached (the evictor's debounced check). Default `notifyCacheWrite`. */
+  onCacheWrite?: () => void
+}
+
+/** Why a device's manifest could not be read fresh in the last pull. */
+export type DegradedReason = 'manifest-oversize' | 'manifest-unreadable' | 'manifest-missing'
+
+export interface DegradedDevice {
+  device: string
+  reason: DegradedReason
 }
 
 export interface PullResult {
@@ -177,6 +189,7 @@ interface Manifest {
 }
 
 const ACKS_FILE = 'outbox-acks.bin'
+const ENTRY_PAYLOAD = /^[^/]+\/entries\/[^/]+\.bin$/
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
@@ -234,6 +247,7 @@ export class Puller {
   readonly #now: () => number
   readonly #limit: Limiter
   readonly #isUnlocked: () => boolean
+  readonly #onCacheWrite: () => void
   /** Bumped by `#revoke`: a download that started earlier must not re-cache ciphertext. */
   #epoch = 0
   #loadedCore: Core | null = null
@@ -241,6 +255,8 @@ export class Puller {
   #generation: number | null = null
   #index: Map<string, IndexEntry> | null = null
   #refreshing: Promise<PullResult> | null = null
+  #oversizeSkipped = 0
+  #degraded: DegradedDevice[] = []
   readonly #inflight = new Map<string, Promise<Uint8Array | null>>()
 
   constructor(deps: PullDeps) {
@@ -251,11 +267,17 @@ export class Puller {
     this.#now = deps.now ?? Date.now
     this.#limit = deps.limit ?? createLimiter(FETCH_CONCURRENCY)
     this.#isUnlocked = deps.isUnlocked ?? isUnlocked
+    this.#onCacheWrite = deps.onCacheWrite ?? notifyCacheWrite
   }
 
   /** A locked session must not keep using the OAuth token or the network. */
   #assertUnlocked(): void {
     if (!this.#isUnlocked()) throw new VaultLockedError()
+  }
+
+  /** The download limiter (concurrency 4), shared with the media reads of Phase 11.1. */
+  get limit(): Limiter {
+    return this.#limit
   }
 
   /** The current global index (entry id to LWW winner), or null before the first `refresh`. */
@@ -291,15 +313,30 @@ export class Puller {
     this.#assertUnlocked()
     const manifests = new Map<string, Manifest>()
     const warnings: string[] = []
+    const degraded: DegradedDevice[] = []
     for (const device of devices) {
       this.#assertUnlocked()
-      const text = await this.#readOptional(generation, `${device}/metadata.json`)
+      const read = await this.#readOptional(generation, `${device}/metadata.json`)
+      if (read === 'oversize') warnings.push(`${device}: manifest is too large and was ignored`)
+      const text = read === 'oversize' ? null : read
       const normalized =
         text === null ? null : this.#parseManifest(core, device, decoder.decode(text), warnings)
-      const manifest =
-        normalized === null
-          ? await this.#cachedManifest(device, warnings)
-          : this.#toManifest(device, normalized, warnings)
+      let manifest: Manifest | null
+      if (normalized === null) {
+        // Keep-previous: the cached copy is the newest manifest ever read successfully for this
+        // device (a failed read never overwrites it), so a stale manifest cannot advance a winner.
+        manifest = await this.#cachedManifest(device, warnings)
+        const reason: DegradedReason =
+          read === 'oversize'
+            ? 'manifest-oversize'
+            : text === null
+              ? 'manifest-missing'
+              : 'manifest-unreadable'
+        // A device with no manifest at all (the web's own outbox folder) is not degraded.
+        if (manifest !== null || reason !== 'manifest-missing') degraded.push({ device, reason })
+      } else {
+        manifest = this.#toManifest(device, normalized, warnings)
+      }
       if (manifest !== null) manifests.set(device, manifest)
     }
 
@@ -307,13 +344,14 @@ export class Puller {
     const stale = await this.#diffAndCacheManifests(core, manifests)
     for (const device of manifests.keys()) {
       this.#assertUnlocked()
-      await this.#cacheSmallFiles(generation, device)
+      await this.#cacheSmallFiles(generation, device, warnings)
     }
     this.#assertUnlocked()
 
     this.#index = buildEntryIndex(
       [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
     )
+    this.#degraded = degraded
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
   }
 
@@ -412,13 +450,19 @@ export class Puller {
   /**
    * Bytes of a logical device file, or null on a confirmed NotFound or a path the reader refuses
    * (`RangeError`: an unsafe name from untrusted Drive content is "missing", never a failed pull).
-   * Other errors are transient.
+   * A `DriveTooLargeError` (a planted or corrupt file above the default cap) yields `'oversize'`:
+   * it is neither missing nor transient, and retrying cannot help, so one file never aborts the
+   * whole pull; callers skip it and keep whatever they had cached. Other errors are transient.
    */
-  async #readOptional(generation: number, path: string): Promise<Uint8Array | null> {
+  async #readOptional(generation: number, path: string): Promise<Uint8Array | null | 'oversize'> {
     try {
       return await this.#reader.readDeviceFile(generation, path)
     } catch (error) {
       if (error instanceof DriveNotFoundError || error instanceof RangeError) return null
+      if (error instanceof DriveTooLargeError) {
+        this.#oversizeSkipped += 1
+        return 'oversize'
+      }
       throw asTransient(error, path)
     }
   }
@@ -479,36 +523,45 @@ export class Puller {
   }
 
   async #putFile(path: string, bytes: Uint8Array, pinned: boolean): Promise<void> {
-    await this.#db.files.put({
+    const record = {
       path,
       ciphertext: bytes,
       etag: null,
       modifiedTime: null,
       lastAccess: this.#now(),
       pinned,
-    })
+    }
+    // Re-caching a payload must not drop a pin set meanwhile (`warmStart` re-pins only its own set):
+    // the read-preserve-write is one transaction, so a concurrent `setPinned(true)` is not lost.
+    if (!pinned && ENTRY_PAYLOAD.test(path)) await this.#db.files.putPreservingPin(record)
+    else await this.#db.files.put(record)
   }
 
   /** `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin` of one desktop. */
-  async #cacheSmallFiles(generation: number, device: string): Promise<void> {
+  async #cacheSmallFiles(generation: number, device: string, warnings: string[]): Promise<void> {
     const reader = this.#reader
+    const bytesOf = async (path: string): Promise<Uint8Array | null | 'oversize'> => {
+      const bytes = await this.#readOptional(generation, path)
+      if (bytes === 'oversize') warnings.push(`${path}: file is too large and was ignored`)
+      return bytes
+    }
     const acks = `${device}/${ACKS_FILE}`
-    const ackBytes = await this.#readOptional(generation, acks)
+    const ackBytes = await bytesOf(acks)
     if (ackBytes === null) await this.#db.files.delete(acks)
-    else await this.#putFile(acks, ackBytes, false)
+    else if (ackBytes !== 'oversize') await this.#putFile(acks, ackBytes, false) // oversize: keep cached
 
     const names = await guarded(`${device}/journals`, () =>
       reader.listDeviceFiles(generation, device, 'journals'),
     )
     for (const name of names.filter((n) => n.endsWith('.bin'))) {
       const path = `${device}/journals/${name}`
-      const bytes = await this.#readOptional(generation, path)
-      if (bytes !== null) await this.#putFile(path, bytes, false)
+      const bytes = await bytesOf(path)
+      if (bytes !== null && bytes !== 'oversize') await this.#putFile(path, bytes, false)
     }
     for (const file of ['tags.bin', 'templates.bin']) {
       const path = `${device}/${file}`
-      const bytes = await this.#readOptional(generation, path)
-      if (bytes !== null) await this.#putFile(path, bytes, false)
+      const bytes = await bytesOf(path)
+      if (bytes !== null && bytes !== 'oversize') await this.#putFile(path, bytes, false)
     }
   }
 
@@ -552,9 +605,10 @@ export class Puller {
         return cached.ciphertext
       }
       const bytes = await this.#limit(() => this.#readOptional(generation, path))
+      if (bytes === 'oversize') return null // not retryable: the id is treated as missing
       if (bytes !== null && epoch === this.#epoch) {
         // Best effort: a full store must not fail the read.
-        await this.#putFile(path, bytes, false).catch(() => undefined)
+        await this.#putFile(path, bytes, false).then(this.#onCacheWrite, () => undefined)
       }
       return bytes
     })().finally(() => {
@@ -564,12 +618,44 @@ export class Puller {
     return task
   }
 
+  /**
+   * Devices whose manifest the LAST successful pull could not read fresh (its cached copy, the
+   * newest one ever read, was used, or the device is unreadable). Cleared per device by a later
+   * pull that reads its manifest.
+   */
+  getDegradedDevices(): DegradedDevice[] {
+    return this.#degraded.map((d) => ({ ...d }))
+  }
+
+  /**
+   * Files skipped because they exceeded the default download cap (not retryable). */
+  get oversizeSkipped(): number {
+    return this.#oversizeSkipped
+  }
+
   /** Fetches the 5 newest non-deleted entries and nothing else. Returns their ids, newest first. */
   async warmStart(): Promise<string[]> {
     if (this.#index === null) await this.refresh()
     const ids = newestLive(this.#index ?? new Map(), WARM_START_ENTRIES).map((e) => e.entryId)
     await this.fetchEntries(ids)
+    await this.#pinWarmSet(ids).catch(() => undefined) // best effort: pinning never fails a read
     return ids
+  }
+
+  /** The cache evictor keeps exactly the newest warm-start payloads: pin them, unpin older ones. */
+  async #pinWarmSet(ids: readonly string[]): Promise<void> {
+    const index = this.#index
+    const keep = new Set<string>()
+    for (const id of ids) {
+      const winner = index?.get(id)
+      if (winner !== undefined) keep.add(`${winner.authorDevice}/entries/${winner.entryId}.bin`)
+    }
+    for (const meta of await this.#db.files.sizes()) {
+      if (meta.pinned && ENTRY_PAYLOAD.test(meta.path) && !keep.has(meta.path)) {
+        await this.#db.files.setPinned(meta.path, false)
+      }
+    }
+    for (const path of keep) await this.#db.files.setPinned(path, true)
   }
 }
 

@@ -54,6 +54,9 @@ export const BACKOFF_MAX_MS = 5 * 60_000
 export const MSG_FORMAT_READ_ONLY =
   'This vault uses a newer sync format than this app version understands, so it stays read-only. Update the app.'
 
+/** Shown (as the status `error` of a `synced` phase) when a device's data could not be read fully. */
+export const MSG_SYNC_DEGRADED = "sync degraded: a device's data could not be read fully"
+
 export type SyncPhase = 'idle' | 'syncing' | 'synced' | 'error'
 
 export interface SyncStatus {
@@ -131,6 +134,8 @@ let phase: SyncPhase = 'idle'
 let lastError: string | null = null
 /** Unix seconds of the last successful pull. */
 let lastSyncSec: number | null = null
+/** Set while the last successful pull left a device on its cached manifest. */
+let degraded = false
 /** The pull in flight, tagged with the schedule epoch it started under. */
 let inflight: { epoch: number; promise: Promise<PullReport> } | null = null
 let lastAttemptAt = 0
@@ -150,6 +155,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   phase = 'idle'
   lastError = null
   lastSyncSec = null
+  degraded = false
   inflight = null
   lastAttemptAt = 0
   nextAttemptAt = 0
@@ -218,7 +224,8 @@ async function doPull(): Promise<PullReport> {
     nextAttemptAt = 0
     clearRetry()
     lastSyncSec = Math.floor(e.now() / 1000)
-    setPhase('synced', null)
+    degraded = (outcome.degraded?.length ?? 0) > 0
+    setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
     if (outcome.changed) e.emitChanged()
     return { outcome, message: null }
   } catch (error: unknown) {
@@ -298,6 +305,7 @@ export function startSyncSchedule(): void {
   failures = 0
   nextAttemptAt = 0
   lastAttemptAt = 0
+  degraded = false
   if (phase === 'error') setPhase('idle', null)
 
   const onFocus = (): void => request('focus')
@@ -363,8 +371,10 @@ async function syncNow(): Promise<SyncSummary> {
   }
 }
 
-async function getSyncStatus(): Promise<SyncStatus> {
-  return env().isUnlocked() ? snapshot() : LOCKED_STATUS
+async function getSyncStatus(): Promise<SyncStatus & { error?: string }> {
+  if (!env().isUnlocked()) return LOCKED_STATUS
+  // `SyncStatus` has no message field (only the event does): `error` is added only when degraded.
+  return degraded ? { ...snapshot(), error: MSG_SYNC_DEGRADED } : snapshot()
 }
 
 /** Web has no sync scheduler settings to edit; the 5 min pull interval is fixed (see above). */

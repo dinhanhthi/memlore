@@ -2,6 +2,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DB_NAME,
+  CACHE_LIMIT_KEY,
   JOURNAL_SEEN_PREFIX,
   StorageQuotaError,
   StorageUnavailableError,
@@ -90,6 +91,14 @@ describe('files', () => {
 })
 
 describe('blobs', () => {
+  it('touch bumps lastAccess and keeps the bytes; a missing blob resolves false', async () => {
+    await db.blobs.put({ path: 'x', bytes: bytes(10), size: 10, lastAccess: 5 })
+    expect(await db.blobs.touch('x', 99)).toBe(true)
+    const rec = await db.blobs.get('x')
+    expect(rec).toEqual({ path: 'x', bytes: bytes(10), size: 10, lastAccess: 99 })
+    expect(await db.blobs.touch('missing')).toBe(false)
+  })
+
   it('sums size and lists oldest access first', async () => {
     await db.blobs.put({ path: 'x', bytes: bytes(10), size: 10, lastAccess: 5 })
     await db.blobs.put({ path: 'y', bytes: bytes(20), size: 20, lastAccess: 1 })
@@ -175,6 +184,23 @@ describe('clearCache / clearAll', () => {
     expect(await db.meta.get('k')).toBeUndefined()
     await db.clearAll()
     expect(await db.meta.listByPrefix(JOURNAL_SEEN_PREFIX)).toEqual([])
+  })
+
+  it('clearCache keeps the cache limit preference and clearAll wipes it', async () => {
+    await db.meta.put({ key: CACHE_LIMIT_KEY, value: 123 })
+    await db.clearCache()
+    expect((await db.meta.get(CACHE_LIMIT_KEY))?.value).toBe(123)
+    await db.clearAll()
+    expect(await db.meta.get(CACHE_LIMIT_KEY)).toBeUndefined()
+  })
+
+  it('blobs.clear drops only blobs', async () => {
+    await db.blobs.clear()
+    expect(await db.blobs.listByLastAccess()).toEqual([])
+    expect(await db.files.list()).toHaveLength(1)
+    expect(await db.meta.get('k')).toBeDefined()
+    expect(await db.drafts.list()).toHaveLength(1)
+    expect(await db.device.get()).toBeDefined()
   })
 
   it('clearAll wipes everything', async () => {
@@ -275,3 +301,96 @@ function containsMarker(v: unknown): boolean {
   }
   return false
 }
+
+describe('cache metadata helpers', () => {
+  const file = (
+    path: string,
+    n: number,
+    extra: Partial<{ pinned: boolean; lastAccess: number }> = {},
+  ) => ({
+    path,
+    ciphertext: bytes(n),
+    etag: null,
+    modifiedTime: null,
+    lastAccess: extra.lastAccess ?? 1,
+    pinned: extra.pinned ?? false,
+  })
+
+  it('files.sizes lists path, size, lastAccess and pinned without the ciphertext', async () => {
+    await db.files.put(file('a/entries/1.bin', 5, { pinned: true, lastAccess: 9 }))
+    await db.files.put(file('b/x.bin', 3))
+    const sizes = (await db.files.sizes()).sort((x, y) => x.path.localeCompare(y.path))
+    expect(sizes).toEqual([
+      { path: 'a/entries/1.bin', size: 5, lastAccess: 9, pinned: true },
+      { path: 'b/x.bin', size: 3, lastAccess: 1, pinned: false },
+    ])
+    expect(sizes[0]).not.toHaveProperty('ciphertext')
+  })
+
+  it('measures a record written by an older build that has no pinned or size field', async () => {
+    const raw = await new Promise<IDBDatabase>((resolve) => {
+      const req = factory.open(DB_NAME)
+      req.onsuccess = () => resolve(req.result)
+    })
+    await new Promise<void>((resolve) => {
+      const t = raw.transaction('files', 'readwrite')
+      t.objectStore('files').put({ path: 'old/entries/1.bin', ciphertext: bytes(4), lastAccess: 2 })
+      t.oncomplete = () => resolve()
+    })
+    raw.close()
+    expect(await db.files.sizes()).toEqual([
+      { path: 'old/entries/1.bin', size: 4, lastAccess: 2, pinned: false },
+    ])
+  })
+
+  it('blobs.sizes lists size and lastAccess; setPinned flips only cached files', async () => {
+    await db.blobs.put({ path: 'media/m1', bytes: bytes(6), size: 6, lastAccess: 4 })
+    expect(await db.blobs.sizes()).toEqual([
+      { path: 'media/m1', size: 6, lastAccess: 4, pinned: false },
+    ])
+    await db.files.put(file('a/entries/1.bin', 2))
+    expect(await db.files.setPinned('a/entries/1.bin', true)).toBe(true)
+    expect((await db.files.get('a/entries/1.bin'))?.pinned).toBe(true)
+    expect(await db.files.setPinned('missing', true)).toBe(false)
+  })
+
+  it('files.putPreservingPin keeps a pin set concurrently and never unpins', async () => {
+    const path = 'a/entries/1.bin'
+    await db.files.put(file(path, 2))
+    // setPinned lands while the put is in flight: neither order may lose the pin
+    await Promise.all([
+      db.files.putPreservingPin({ ...file(path, 3), pinned: false }),
+      db.files.setPinned(path, true),
+    ])
+    const stored = await db.files.get(path)
+    expect(stored?.pinned).toBe(true)
+    expect(stored?.ciphertext.byteLength).toBe(3)
+    await db.files.putPreservingPin({ ...file(path, 4), pinned: false })
+    expect((await db.files.get(path))?.pinned).toBe(true)
+    await db.files.putPreservingPin({ ...file('b/entries/2.bin', 1), pinned: false })
+    expect((await db.files.get('b/entries/2.bin'))?.pinned).toBe(false)
+  })
+})
+
+describe('exact-size ciphertext', () => {
+  it('refuses a view over a larger buffer in files, blobs and drafts (hidden bytes)', async () => {
+    const big = new Uint8Array(1000).fill(9)
+    const view = big.subarray(0, 10)
+    const offset = big.subarray(990)
+    const file = { etag: null, modifiedTime: null, lastAccess: 1, pinned: false }
+    for (const v of [view, offset]) {
+      expect(() => db.files.put({ path: 'a', ciphertext: v, ...file })).toThrow(TypeError)
+      expect(() => db.files.putPreservingPin({ path: 'a', ciphertext: v, ...file })).toThrow(
+        TypeError,
+      )
+      expect(() =>
+        db.blobs.put({ path: 'media/a', bytes: v, size: v.length, lastAccess: 1 }),
+      ).toThrow(TypeError)
+      expect(() => db.drafts.put({ entryId: 'd', sealed: v, updatedAt: 1 })).toThrow(TypeError)
+    }
+    expect(await db.files.paths()).toEqual([])
+    // a copy is accepted and its stored size is its own length
+    await db.blobs.put({ path: 'media/a', bytes: view.slice(), size: 10, lastAccess: 1 })
+    expect((await db.blobs.sizes()).map((m) => m.size)).toEqual([10])
+  })
+})

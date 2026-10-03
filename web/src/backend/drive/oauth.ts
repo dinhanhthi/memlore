@@ -7,10 +7,11 @@
  * opens a popup (App state is kept) and resolves once the popup reports completion.
  */
 
+import { fetchWriteFlag } from '../config'
+
 const START_URL = '/api/oauth/start'
 const TOKEN_URL = '/api/oauth/token'
 const LOGOUT_URL = '/api/oauth/logout'
-const CONFIG_URL = '/api/config'
 const CHANNEL_NAME = 'memlore-oauth'
 const POPUP_NAME = 'memlore-oauth'
 const POPUP_FEATURES = 'popup,width=500,height=700'
@@ -263,16 +264,8 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
     }
   }
 
-  async function fetchWritesEnabled(): Promise<boolean> {
-    try {
-      const res = await deps.fetchImpl(CONFIG_URL, { cache: 'no-store' })
-      if (!res.ok) return false
-      const body = (await res.json()) as { writes?: unknown } | null
-      return body?.writes === true
-    } catch {
-      return false
-    }
-  }
+  // One fail-closed parser lives in ../config; this only routes it through the injected fetch.
+  const fetchWritesEnabled = (): Promise<boolean> => fetchWriteFlag({ fetchImpl: deps.fetchImpl })
 
   return { connect, getAccessToken, logout, isConnected: () => token !== null, fetchWritesEnabled }
 }

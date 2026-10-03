@@ -1,7 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadCore, type Core } from '../../core/core'
-import { DriveReader, DriveWriter } from '../drive/client'
+import { DriveReader, DriveTooLargeError, DriveWriter } from '../drive/client'
 import {
   FOLDER,
   FakeDrive,
@@ -211,6 +211,58 @@ describe('warmStart', () => {
     env.drive.requests.length = 0
     await env.puller.warmStart()
     expect(entryDownloads(env.drive)).toEqual([])
+  })
+
+  it('pins exactly the warm set (the evictor never drops it) and unpins older pins', async () => {
+    const env = await setup()
+    const ids = await env.puller.warmStart()
+    const payload = (f: { path: string }): boolean => /\/entries\//.test(f.path)
+    const pinned = async (): Promise<string[]> =>
+      (await env.db.files.sizes()).filter((f) => f.pinned && payload(f)).map((f) => f.path)
+    expect(await pinned()).toHaveLength(5)
+    // a stale pin on an older cached payload is released by the next warmStart
+    await env.db.files.put({
+      path: 'dev-x/entries/old.bin',
+      ciphertext: new Uint8Array([1]),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: true,
+    })
+    await env.puller.warmStart()
+    expect(await pinned()).toHaveLength(5)
+    expect((await env.db.files.get('dev-x/entries/old.bin'))?.pinned).toBe(false)
+    expect((await pinned()).sort()).toEqual(
+      ids.map((id) => `${env.desktop}/entries/${id}.bin`).sort(),
+    )
+  })
+
+  it('keeps a pin set while the payload was downloading (re-caching never unpins)', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const [winner] = [...(env.puller.index ?? new Map()).values()]
+    const path = `${winner.authorDevice}/entries/${winner.entryId}.bin`
+    env.drive.interceptors.push((req) => {
+      const id = /\/files\/([^/]+)$/.exec(req.url.pathname)?.[1] ?? ''
+      if (
+        req.url.searchParams.get('alt') === 'media' &&
+        pathOf(env.drive, id).endsWith(`/${path}`)
+      ) {
+        void env.db.files.put({
+          path,
+          ciphertext: new Uint8Array([1]),
+          etag: null,
+          modifiedTime: null,
+          lastAccess: 1,
+          pinned: true,
+        })
+      }
+      return undefined
+    })
+    await env.puller.fetchEntries([winner.entryId])
+    const cached = await env.db.files.get(path)
+    expect(cached?.pinned).toBe(true)
+    expect(cached?.ciphertext.length).toBeGreaterThan(1) // the downloaded payload was stored
   })
 
   it('excludes tombstones from warmStart but keeps them in the index', async () => {
@@ -551,6 +603,64 @@ describe('untrusted manifest content', () => {
   })
 })
 
+describe('oversize files (DriveTooLargeError is not retryable and never aborts a pull)', () => {
+  const oversizeFor = (match: (path: string) => boolean) => {
+    const real = DriveReader.prototype.readDeviceFile
+    return vi.spyOn(DriveReader.prototype, 'readDeviceFile').mockImplementation(function (
+      this: DriveReader,
+      generation,
+      path,
+    ) {
+      if (match(path)) return Promise.reject(new DriveTooLargeError(64))
+      return real.call(this, generation, path)
+    })
+  }
+
+  it('fetchEntries omits an oversize payload, counts it and caches nothing for it', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const [bad, good] = fixture.expected.entries.map((e) => e.entry_id)
+    const spy = oversizeFor((path) => path.includes(`/entries/${bad}.bin`))
+    try {
+      const got = await env.puller.fetchEntries([bad, good])
+      expect([...got.keys()]).toEqual([good])
+      expect(env.puller.oversizeSkipped).toBe(1)
+      expect(await env.db.files.get(`${env.desktop}/entries/${bad}.bin`)).toBeUndefined()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('refresh keeps the cached manifest and acks when they turn oversize, with warnings', async () => {
+    const env = await setup()
+    const folder = env.drive.find(['Memlore', 'generations', 'g-0', env.desktop])
+    if (!folder) throw new Error('no desktop folder')
+    env.drive.addFile('outbox-acks.bin', folder.id, 'ACKS')
+    await env.puller.refresh()
+    const spy = oversizeFor(
+      (path) =>
+        /(metadata\.json|outbox-acks\.bin|tags\.bin)$/.test(path) && path.includes(env.desktop),
+    )
+    try {
+      const result = await env.puller.refresh()
+      expect(result.devices).toEqual([env.desktop])
+      expect(env.puller.index?.size).toBeGreaterThan(0)
+      expect(result.warnings).toEqual(
+        expect.arrayContaining([
+          `${env.desktop}: manifest is too large and was ignored`,
+          `${env.desktop}: manifest unavailable, using the cached copy`,
+          `${env.desktop}/outbox-acks.bin: file is too large and was ignored`,
+          `${env.desktop}/tags.bin: file is too large and was ignored`,
+        ]),
+      )
+      expect(await env.db.files.get(`${env.desktop}/outbox-acks.bin`)).toBeDefined()
+      expect(await env.db.files.get(`${env.desktop}/tags.bin`)).toBeDefined()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
+
 describe('refresh hardening', () => {
   it('keeps the cached manifest of a listed device whose manifest vanished or broke', async () => {
     const env = await setup()
@@ -576,6 +686,75 @@ describe('refresh hardening', () => {
     expect(result.warnings).toContain(
       `${OTHER_DEVICE}: manifest unavailable, using the cached copy`,
     )
+  })
+
+  it('keep-previous never advances: an oversize manifest keeps the last fresh state and is reported', async () => {
+    const env = await setup()
+    const folder = addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    expect((await env.puller.refresh()).warnings).toEqual([])
+    expect(env.puller.getDegradedDevices()).toEqual([])
+    const manifest = env.drive.files.find(
+      (f) => f.parents[0] === folder && f.name === 'metadata.json',
+    )
+    if (!manifest) throw new Error('no second manifest')
+    // pull 1: a fresh manifest that tombstones the entry
+    manifest.content = bytes(
+      JSON.stringify({
+        device_id: OTHER_DEVICE,
+        recovery_generation: 0,
+        entries: [
+          { entry_id: 'second-entry', updated_at: NEWEST + 90, is_deleted: true, local_version: 2 },
+        ],
+        journals: [],
+        generated_at: NEWEST,
+      }),
+    )
+    manifest.version += 1
+    await env.puller.refresh()
+    expect(env.puller.index?.get('second-entry')?.isDeleted).toBe(true)
+    expect(env.puller.getDegradedDevices()).toEqual([])
+    // pull 2: the replacement is oversize: the fresh (deleted) state stays, and it is reported
+    const real = DriveReader.prototype.readDeviceFile
+    const spy = vi.spyOn(DriveReader.prototype, 'readDeviceFile').mockImplementation(function (
+      this: DriveReader,
+      generation,
+      path,
+    ) {
+      if (path === `${OTHER_DEVICE}/metadata.json`) {
+        return Promise.reject(new DriveTooLargeError(64))
+      }
+      return real.call(this, generation, path)
+    })
+    try {
+      await env.puller.refresh()
+      expect(env.puller.index?.get('second-entry')).toMatchObject({
+        isDeleted: true,
+        updatedAt: NEWEST + 90,
+      })
+      expect(env.puller.getDegradedDevices()).toEqual([
+        { device: OTHER_DEVICE, reason: 'manifest-oversize' },
+      ])
+    } finally {
+      spy.mockRestore()
+    }
+    // a later successful read clears the flag
+    await env.puller.refresh()
+    expect(env.puller.getDegradedDevices()).toEqual([])
+    // unreadable and missing manifests are reported with their own reason
+    manifest.content = bytes('not json')
+    manifest.version += 1
+    await env.puller.refresh()
+    expect(env.puller.getDegradedDevices()).toEqual([
+      { device: OTHER_DEVICE, reason: 'manifest-unreadable' },
+    ])
+    env.drive.files = env.drive.files.filter((f) => f.id !== manifest.id)
+    await env.puller.refresh()
+    expect(env.puller.getDegradedDevices()).toEqual([
+      { device: OTHER_DEVICE, reason: 'manifest-missing' },
+    ])
+    expect(env.puller.index?.get('second-entry')?.isDeleted).toBe(true)
   })
 
   it('a refresh on a locked session makes no request', async () => {

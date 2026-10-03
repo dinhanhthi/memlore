@@ -21,6 +21,12 @@ export const STORE_META = 'meta'
  */
 export const JOURNAL_SEEN_PREFIX = 'journal-seen:'
 
+/**
+ * Meta key of the user's media cache limit in bytes (a number; Phase 11.3). A preference, not
+ * cache: it survives `clearCache()`; `clearAll()` wipes it.
+ */
+export const CACHE_LIMIT_KEY = 'cache-limit-bytes'
+
 /** The device store holds a single record under this out-of-line key. */
 const DEVICE_KEY = 'self'
 
@@ -28,6 +34,9 @@ const DEVICE_KEY = 'self'
 export const WRAPPED_MASTER_HEX_LEN = 134
 /** A raw 32-byte master key as hex. Must never be stored. */
 const RAW_KEY_HEX_LEN = 64
+
+const isPreservedMetaKey = (k: string): boolean =>
+  k.startsWith(JOURNAL_SEEN_PREFIX) || k === CACHE_LIMIT_KEY
 
 export class StorageUnavailableError extends Error {
   constructor(message = 'IndexedDB is unavailable (private mode or blocked)') {
@@ -48,6 +57,14 @@ export interface FileRecord {
   ciphertext: Uint8Array
   etag: string | null
   modifiedTime: string | null
+  lastAccess: number
+  pinned: boolean
+}
+
+/** Cache accounting row: everything about a cached record except its bytes. */
+export interface CacheMeta {
+  path: string
+  size: number
   lastAccess: number
   pinned: boolean
 }
@@ -124,6 +141,11 @@ export function assertDeviceRecord(value: unknown): asserts value is DeviceRecor
 
 function assertBytes(v: unknown, what: string): asserts v is Uint8Array {
   if (!(v instanceof Uint8Array)) throw new TypeError(`${what} must be a Uint8Array of ciphertext`)
+  // Structured clone persists the WHOLE backing buffer: a view over a larger one would store hidden
+  // bytes that no size accounting (`byteLength`) sees. Callers must pass an exact-size copy.
+  if (v.byteOffset !== 0 || v.buffer.byteLength !== v.byteLength) {
+    throw new TypeError(`${what} must not be a view over a larger buffer`)
+  }
 }
 
 function assertString(v: unknown, what: string): void {
@@ -309,6 +331,33 @@ export class WebDb {
     })
   }
 
+  /**
+   * Walks a store with a cursor and keeps only the metadata, so at most one record's bytes are
+   * alive at a time (IndexedDB cannot read part of a record). The size is always derived from the
+   * stored bytes, so records written by any earlier build are measured the same way.
+   */
+  private cacheMetas(store: string, measure: (value: Record<string, unknown>) => CacheMeta) {
+    return this.tx(
+      [store],
+      'readonly',
+      ([s]) =>
+        new Promise<CacheMeta[]>((resolve, reject) => {
+          const out: CacheMeta[] = []
+          const req = s.openCursor()
+          req.onerror = () => reject(toStorageError(req.error))
+          req.onsuccess = () => {
+            const cursor = req.result
+            if (cursor === null) {
+              resolve(out)
+              return
+            }
+            out.push(measure(cursor.value as Record<string, unknown>))
+            cursor.continue()
+          }
+        }),
+    )
+  }
+
   private clearStores(names: string[]): Promise<void> {
     return this.tx(names, 'readwrite', async (stores) => {
       await Promise.all(stores.map((s) => requestToPromise(s.clear())))
@@ -321,6 +370,17 @@ export class WebDb {
       assertFileRecord(record)
       return this.put(STORE_FILES, record)
     },
+    /**
+     * Put that keeps an existing `pinned: true`, read and written in ONE transaction so a
+     * concurrent `setPinned(true)` is never overwritten by a stale `false`.
+     */
+    putPreservingPin: (record: FileRecord): Promise<void> => {
+      assertFileRecord(record)
+      return this.tx([STORE_FILES], 'readwrite', async ([s]) => {
+        const rec = (await requestToPromise(s.get(record.path))) as FileRecord | undefined
+        await requestToPromise(s.put({ ...record, pinned: record.pinned || rec?.pinned === true }))
+      })
+    },
     delete: (path: string) => this.del(STORE_FILES, path),
     list: () => this.all<FileRecord>(STORE_FILES),
     /** Every cached path, without reading the ciphertext. */
@@ -330,6 +390,22 @@ export class WebDb {
         'readonly',
         ([s]) => requestToPromise(s.getAllKeys()) as Promise<string[]>,
       ),
+    /** Path, size, lastAccess and pinned of every cached file, without keeping the ciphertext. */
+    sizes: () =>
+      this.cacheMetas(STORE_FILES, (v) => ({
+        path: v.path as string,
+        size: (v.ciphertext as Uint8Array).byteLength,
+        lastAccess: v.lastAccess as number,
+        pinned: v.pinned === true,
+      })),
+    /** Sets `pinned`; resolves false when the file is not cached. */
+    setPinned: (path: string, pinned: boolean): Promise<boolean> =>
+      this.tx([STORE_FILES], 'readwrite', async ([s]) => {
+        const rec = (await requestToPromise(s.get(path))) as FileRecord | undefined
+        if (!rec) return false
+        if (rec.pinned !== pinned) await requestToPromise(s.put({ ...rec, pinned }))
+        return true
+      }),
     /** Bumps `lastAccess`; resolves false when the file is not cached. */
     touch: (path: string, now: number = Date.now()): Promise<boolean> =>
       this.tx([STORE_FILES], 'readwrite', async ([s]) => {
@@ -347,8 +423,29 @@ export class WebDb {
       return this.put(STORE_BLOBS, record)
     },
     delete: (path: string) => this.del(STORE_BLOBS, path),
+    /**
+     * Bumps `lastAccess`; resolves false when the blob is not cached. IndexedDB cannot patch a
+     * field, so this rewrites the whole record (up to 200 MB): callers throttle it.
+     */
+    touch: (path: string, now: number = Date.now()): Promise<boolean> =>
+      this.tx([STORE_BLOBS], 'readwrite', async ([s]) => {
+        const rec = (await requestToPromise(s.get(path))) as BlobRecord | undefined
+        if (!rec) return false
+        await requestToPromise(s.put({ ...rec, lastAccess: now }))
+        return true
+      }),
+    /** Drops every cached media row (the Settings "Clear cache"); no other store is opened. */
+    clear: () => this.clearStores([STORE_BLOBS]),
     totalSize: async (): Promise<number> =>
       (await this.all<BlobRecord>(STORE_BLOBS)).reduce((sum, b) => sum + b.size, 0),
+    /** Path, size, lastAccess of every cached blob, without keeping the bytes. */
+    sizes: () =>
+      this.cacheMetas(STORE_BLOBS, (v) => ({
+        path: v.path as string,
+        size: v.size as number,
+        lastAccess: v.lastAccess as number,
+        pinned: false,
+      })),
     /** Oldest access first (LRU eviction order). */
     listByLastAccess: () => this.all<BlobRecord>(STORE_BLOBS, 'lastAccess'),
   }
@@ -389,8 +486,8 @@ export class WebDb {
   }
 
   /**
-   * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts, the device record and the
-   * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`).
+   * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts, the device record, the
+   * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`) and the `CACHE_LIMIT_KEY` preference.
    */
   clearCache(): Promise<void> {
     return this.tx([STORE_FILES, STORE_BLOBS, STORE_META], 'readwrite', async (stores) => {
@@ -400,7 +497,7 @@ export class WebDb {
         requestToPromise(files.clear()),
         requestToPromise(blobs.clear()),
         ...keys
-          .filter((k) => !(typeof k === 'string' && k.startsWith(JOURNAL_SEEN_PREFIX)))
+          .filter((k) => !(typeof k === 'string' && isPreservedMetaKey(k)))
           .map((k) => requestToPromise(meta.delete(k))),
       ])
     })

@@ -108,6 +108,16 @@ export class DriveProtocolError extends Error {
   }
 }
 
+/** A download is larger than the caller's `maxBytes`; the body was not (fully) read. */
+export class DriveTooLargeError extends Error {
+  readonly maxBytes: number
+  constructor(maxBytes: number) {
+    super(`Drive file is larger than ${maxBytes} bytes`)
+    this.name = 'DriveTooLargeError'
+    this.maxBytes = maxBytes
+  }
+}
+
 /** Writes need the Web Locks API; without it they fail closed instead of running unlocked. */
 export class LockUnavailableError extends Error {
   constructor() {
@@ -216,6 +226,61 @@ async function readJson(response: Response): Promise<unknown> {
   } catch {
     throw new DriveProtocolError('response body is not JSON')
   }
+}
+
+/**
+ * Default cap of a download without an explicit `maxBytes`: far above any entry payload (33 MiB
+ * at the WASM layer), manifest or journal, far below what could crash the tab. Media passes its
+ * own, larger, cap.
+ */
+export const DEFAULT_MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
+
+const PREALLOC_CAP_BYTES = 8 * 1024 * 1024
+const MIN_GROW_BYTES = 64 * 1024
+
+/**
+ * The body bytes, never more than `maxBytes`: a declared `Content-Length` over the cap is refused
+ * before the body is read, and the stream is cancelled the moment the running count exceeds it.
+ *
+ * Memory: one growing buffer the chunks are written straight into. A valid `Content-Length`
+ * (<= the cap) preallocates at most `PREALLOC_CAP_BYTES` of it, and the buffer doubles (up to the
+ * cap, copying) beyond that, so a lying header cannot force a huge zeroed allocation. The running
+ * count enforces the cap whatever the header says. The result is ALWAYS exactly `total` bytes
+ * backed by an `ArrayBuffer` of exactly `total` bytes (a copy when the buffer was larger): a view
+ * over a bigger buffer would let structured clone persist the hidden tail and hide it from size
+ * accounting.
+ */
+async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const declared = response.headers.get('content-length')
+  const length = declared !== null && /^\d+$/.test(declared.trim()) ? Number(declared) : null
+  if (length !== null && length > maxBytes) {
+    await response.body?.cancel().catch(() => undefined)
+    throw new DriveTooLargeError(maxBytes)
+  }
+  const stream = response.body
+  if (stream === null) return new Uint8Array(0)
+  const reader = stream.getReader()
+  let buffer = new Uint8Array(length === null ? 0 : Math.min(length, PREALLOC_CAP_BYTES))
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const end = total + value.byteLength
+    if (end > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      throw new DriveTooLargeError(maxBytes)
+    }
+    if (end > buffer.byteLength) {
+      const grown = new Uint8Array(
+        Math.min(maxBytes, Math.max(end, buffer.byteLength * 2, MIN_GROW_BYTES)),
+      )
+      grown.set(buffer.subarray(0, total))
+      buffer = grown
+    }
+    buffer.set(value, total)
+    total = end
+  }
+  return total === buffer.byteLength ? buffer : buffer.slice(0, total)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -412,8 +477,14 @@ export class DriveReader {
     }
   }
 
-  /** Download a file's bytes (`alt=media`). */
-  async getFile(fileId: string): Promise<Uint8Array> {
+  /**
+   * Download a file's bytes (`alt=media`), at most `maxBytes` (default 64 MiB): a larger body
+   * throws `DriveTooLargeError` without being buffered whole.
+   */
+  async getFile(
+    fileId: string,
+    maxBytes: number = DEFAULT_MAX_DOWNLOAD_BYTES,
+  ): Promise<Uint8Array> {
     assertDriveId(fileId, 'file')
     const response = await send(
       this.#t,
@@ -422,7 +493,9 @@ export class DriveReader {
       true,
     )
     ensureOk(response, fileId)
-    return new Uint8Array(await response.arrayBuffer())
+    const bytes = await readCapped(response, maxBytes)
+    if (bytes.length > maxBytes) throw new DriveTooLargeError(maxBytes)
+    return bytes
   }
 
   /** Read an allowlisted shared file (control.json, keyring files, device slots). */
@@ -519,7 +592,11 @@ export class DriveReader {
    * Read a logical `<device>/[<subfolder>/]<file>`: the generation folder first, then the flat
    * one; the first folder containing the file wins. Throws DriveNotFoundError when absent.
    */
-  async readDeviceFile(generation: number, path: string): Promise<Uint8Array> {
+  async readDeviceFile(
+    generation: number,
+    path: string,
+    maxBytes: number = DEFAULT_MAX_DOWNLOAD_BYTES,
+  ): Promise<Uint8Array> {
     const parsed = parseLogicalPath(path)
     if (parsed === null) throw new RangeError(`invalid logical path: ${JSON.stringify(path)}`)
     const rootId = await this.findRootId()
@@ -529,7 +606,7 @@ export class DriveReader {
         parsed.subfolder === null ? folder : await this.findFolder(parsed.subfolder, folder)
       if (parent === null) continue
       const file = await this.findFile(parsed.filename, parent)
-      if (file !== null) return this.getFile(file.id)
+      if (file !== null) return this.getFile(file.id, maxBytes)
     }
     throw new DriveNotFoundError(path)
   }
