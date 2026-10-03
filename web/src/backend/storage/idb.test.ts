@@ -2,6 +2,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DB_NAME,
+  JOURNAL_SEEN_PREFIX,
   StorageQuotaError,
   StorageUnavailableError,
   WRAPPED_MASTER_HEX_LEN,
@@ -163,6 +164,17 @@ describe('clearCache / clearAll', () => {
     expect(await db.meta.get('k')).toBeUndefined()
     expect(await db.drafts.list()).toHaveLength(1)
     expect(await db.device.get()).toBeDefined()
+  })
+
+  it('clearCache keeps the journal-seen lock hints and clearAll wipes them', async () => {
+    await db.meta.put({ key: `${JOURNAL_SEEN_PREFIX}j1`, value: '20:1:0' })
+    await db.clearCache()
+    expect(await db.meta.listByPrefix(JOURNAL_SEEN_PREFIX)).toEqual([
+      { key: `${JOURNAL_SEEN_PREFIX}j1`, value: '20:1:0' },
+    ])
+    expect(await db.meta.get('k')).toBeUndefined()
+    await db.clearAll()
+    expect(await db.meta.listByPrefix(JOURNAL_SEEN_PREFIX)).toEqual([])
   })
 
   it('clearAll wipes everything', async () => {

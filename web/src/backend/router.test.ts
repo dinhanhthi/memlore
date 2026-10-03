@@ -104,8 +104,15 @@ describe('router coverage of src/ invoke() commands', () => {
 
 describe('route', () => {
   it('resolves query commands to their safe default', async () => {
-    await expect(route('list_journals')).resolves.toEqual([])
+    await expect(route('list_media_for_entry')).resolves.toEqual([])
     await expect(route('get_sync_status')).resolves.toMatchObject({ enabled: false })
+  })
+
+  it('serves the read commands from the handler table, which reject while locked', async () => {
+    for (const cmd of ['list_journals', 'list_all_entries_paged', 'get_entry', 'search_entries']) {
+      expect(implemented.has(cmd)).toBe(true)
+      await expect(route(cmd, {})).rejects.toThrow('vault is locked')
+    }
   })
 
   it('rejects action commands with WebUnsupportedError naming the command', async () => {

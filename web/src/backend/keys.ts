@@ -1,5 +1,6 @@
 import type { Core } from '../core/core'
 import { emitFromBackend } from '../tauri/event'
+import { ERROR_NAMES } from './errorNames'
 
 /** The WASM key ring (its constructor is private in the d.ts, hence the alias). */
 export type KeyRing = ReturnType<Core['KeyRing']['fromRecovery']>
@@ -9,7 +10,7 @@ export type LockReason = 'manual' | 'idle' | 'hidden' | 'revoked' | 'format'
 export class VaultLockedError extends Error {
   constructor() {
     super('vault is locked')
-    this.name = 'VaultLockedError'
+    this.name = ERROR_NAMES.vaultLocked
   }
 }
 

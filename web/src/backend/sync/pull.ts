@@ -1,0 +1,578 @@
+/**
+ * Lazy READ-ONLY pull (Phase 10.1). Uses `DriveReader` only: it never writes to Drive and never
+ * re-uploads the device slot (README contract 9).
+ *
+ * `refresh()`:
+ *  1. Always re-reads `control.json`, `_meta.json` and the own device slot FIRST. Every read of
+ *     these three completes before any decision, so a transient error can never half-apply.
+ *     - recovery generation or master fingerprint differs from the device record, or the slot
+ *       listing SUCCEEDED and lacks `<ownId>.json` (removed on desktop): drop cached ciphertext
+ *       (`clearCache`: files + blobs + meta; drafts and the device record are KEPT), lock with
+ *       reason "revoked", raise the re-onboard flag and throw `ReonboardRequiredError`.
+ *     - a network, 5xx or 401 error is NEVER "missing": `PullTransientError`, nothing dropped.
+ *     - an unknown control/keyring `version` is `FormatUnsupportedError`, nothing dropped.
+ *  2. Lists devices and reads each from the generation folder and the legacy flat folder with the
+ *     reader's desktop precedence. A device without `metadata.json` (the web's own outbox folder, a
+ *     half-created peer) is skipped. Manifest failures other than NotFound abort the whole pull
+ *     (a partial manifest set would make the LWW winners wrong).
+ *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin` and
+ *     `templates.bin` ciphertext. `settings.bin` is skipped (nothing in Phase 10 needs it).
+ *  4. `computeDiff` (WASM) against the previously cached manifest gives the stale set; cached entry
+ *     ciphertext of stale ids is dropped so a changed entry is never served from the cache.
+ *  5. Builds the global entry index (LWW, see entryIndex.ts).
+ *
+ * `fetchEntries` / `warmStart` download entry ciphertext on demand (deduplicated, concurrency 4).
+ * Cached ciphertext lives in the `files` store under its logical path `<device>/<...>`.
+ */
+
+import { loadCore, type Core } from '../../core/core'
+import {
+  DriveAuthError,
+  DriveHttpError,
+  DriveNotFoundError,
+  DriveProtocolError,
+  VaultNotReadyError,
+  type DriveReader,
+} from '../drive/client'
+import { DEVICE_SLOT_FOLDERS, deviceSlotPath, isSafeComponent } from '../drive/paths'
+import { ERROR_NAMES } from '../errorNames'
+import { VaultLockedError, isUnlocked, lock, type LockReason } from '../keys'
+import type { WebDb } from '../storage/idb'
+import { buildEntryIndex, newestLive, type IndexEntry, type ManifestEntryRow } from './entryIndex'
+import {
+  FormatUnsupportedError,
+  VaultCorruptError,
+  readControl,
+  readMeta,
+  readVersions,
+  type Versions,
+} from './onboard'
+
+/** Entries fetched by `warmStart` (user requirement: the 5 most recently updated). */
+export const WARM_START_ENTRIES = 5
+/** Maximum concurrent entry downloads. */
+export const FETCH_CONCURRENCY = 4
+
+// ---------------------------------------------------------------------------------------------
+// Errors and the re-onboard flag
+// ---------------------------------------------------------------------------------------------
+
+export type ReonboardReason =
+  | 'generation-changed'
+  | 'fingerprint-changed'
+  | 'slot-missing'
+  | 'not-enrolled'
+
+/** The vault no longer matches this browser's enrolment. UI (Phase 12): route to onboarding. */
+export class ReonboardRequiredError extends Error {
+  readonly reason: ReonboardReason
+  constructor(reason: ReonboardReason, cause?: unknown) {
+    super(
+      `This browser must be re-enrolled (${reason}). Your unsent drafts are kept; enter the recovery phrase again.`,
+      { cause },
+    )
+    this.name = ERROR_NAMES.reonboardRequired
+    this.reason = reason
+  }
+}
+
+/** A network, 5xx, 401 or other transient failure. Nothing was dropped; retry later. */
+export class PullTransientError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause })
+    this.name = ERROR_NAMES.pullTransient
+  }
+}
+
+let reonboardReason: ReonboardReason | null = null
+
+/** State flag for the router and commands: why the web must go back to onboarding, or null. */
+export const getReonboardReason = (): ReonboardReason | null => reonboardReason
+
+/** Cleared by the onboarding flow (Phase 12) once the browser is enrolled again. */
+export function clearReonboardReason(): void {
+  reonboardReason = null
+}
+
+function asTransient(error: unknown, what: string): unknown {
+  if (
+    error instanceof DriveHttpError ||
+    error instanceof DriveAuthError ||
+    error instanceof DriveProtocolError ||
+    error instanceof VaultNotReadyError
+  ) {
+    return new PullTransientError(`Could not read ${what} from the cloud; retry later`, error)
+  }
+  return error
+}
+
+async function guarded<T>(what: string, task: () => Promise<T>): Promise<T> {
+  try {
+    return await task()
+  } catch (error) {
+    throw asTransient(error, what)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Concurrency limiter
+// ---------------------------------------------------------------------------------------------
+
+export type Limiter = <T>(task: () => Promise<T>) => Promise<T>
+
+/** At most `max` tasks run at once; the rest wait in FIFO order. */
+export function createLimiter(max: number): Limiter {
+  if (!Number.isInteger(max) || max < 1) throw new RangeError('limiter max must be an integer >= 1')
+  let active = 0
+  const waiting: Array<() => void> = []
+  const release = (): void => {
+    active -= 1
+    waiting.shift()?.()
+  }
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve))
+    active += 1
+    try {
+      return await task()
+    } finally {
+      release()
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pull
+// ---------------------------------------------------------------------------------------------
+
+export interface PullDeps {
+  /** Read-only Drive access. */
+  reader: DriveReader
+  db: WebDb
+  /** Defaults to `loadCore()`. */
+  core?: Core
+  /** Defaults to the key holder's `lock`. */
+  lockKeys?: (reason: LockReason) => void
+  /** Unix milliseconds for `lastAccess`. Default `Date.now`. */
+  now?: () => number
+  /** Entry download limiter. Default `createLimiter(FETCH_CONCURRENCY)`. */
+  limit?: Limiter
+  /** Defaults to the key holder's `isUnlocked`: a locked session stops using the network. */
+  isUnlocked?: () => boolean
+}
+
+export interface PullResult {
+  generation: number
+  /** Devices that have a manifest (desktops), sorted. */
+  devices: string[]
+  /** Entry ids whose manifest row changed since the previous pull (`computeDiff`). */
+  stale: string[]
+  /** Non-fatal per-device warnings (unreadable manifest JSON). */
+  warnings: string[]
+}
+
+interface Manifest {
+  /** Normalized manifest JSON from the core (what is cached for the next `computeDiff`). */
+  text: string
+  entries: ManifestEntryRow[]
+}
+
+const ACKS_FILE = 'outbox-acks.bin'
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Year 2100 in Unix seconds: a manifest timestamp beyond it is garbage, not a clock skew. */
+const MAX_UPDATED_AT = 4_102_444_800
+
+/**
+ * `metadata.json` is plaintext and unauthenticated, so a row id is untrusted free text: it ends up
+ * in a Drive path. Only safe path components qualify (desktop ids are UUIDs); a leading dot and
+ * `__proto__` are refused too.
+ */
+function isSafeEntryId(id: string): boolean {
+  return isSafeComponent(id) && !id.startsWith('.') && id !== '__proto__'
+}
+
+const isSaneTimestamp = (n: number): boolean => Number.isFinite(n) && n >= 0 && n <= MAX_UPDATED_AT
+
+/**
+ * Typed rows of a manifest. A structurally wrong row is corruption (throws); a well-typed row with
+ * an unsafe id or an absurd timestamp is dropped and only COUNTED (`dropped`), so one poisoned row
+ * cannot take the whole read path down. Ids are never logged.
+ */
+function entryRows(manifest: unknown): { rows: ManifestEntryRow[]; dropped: number } {
+  const entries = isRecord(manifest) ? manifest.entries : undefined
+  if (!Array.isArray(entries)) throw new VaultCorruptError('manifest has no entries array')
+  const rows: ManifestEntryRow[] = []
+  let dropped = 0
+  for (const row of entries as unknown[]) {
+    if (
+      !isRecord(row) ||
+      typeof row.entry_id !== 'string' ||
+      typeof row.updated_at !== 'number' ||
+      typeof row.is_deleted !== 'boolean'
+    ) {
+      throw new VaultCorruptError('manifest entry row is malformed')
+    }
+    if (!isSafeEntryId(row.entry_id) || !isSaneTimestamp(row.updated_at)) {
+      dropped += 1
+      continue
+    }
+    rows.push({ entry_id: row.entry_id, updated_at: row.updated_at, is_deleted: row.is_deleted })
+  }
+  return { rows, dropped }
+}
+
+export class Puller {
+  readonly #reader: DriveReader
+  readonly #db: WebDb
+  readonly #core: Core | undefined
+  readonly #lockKeys: (reason: LockReason) => void
+  readonly #now: () => number
+  readonly #limit: Limiter
+  readonly #isUnlocked: () => boolean
+  /** Bumped by `#revoke`: a download that started earlier must not re-cache ciphertext. */
+  #epoch = 0
+  #loadedCore: Core | null = null
+  #ownId: string | null = null
+  #generation: number | null = null
+  #index: Map<string, IndexEntry> | null = null
+  #refreshing: Promise<PullResult> | null = null
+  readonly #inflight = new Map<string, Promise<Uint8Array | null>>()
+
+  constructor(deps: PullDeps) {
+    this.#reader = deps.reader
+    this.#db = deps.db
+    this.#core = deps.core
+    this.#lockKeys = deps.lockKeys ?? lock
+    this.#now = deps.now ?? Date.now
+    this.#limit = deps.limit ?? createLimiter(FETCH_CONCURRENCY)
+    this.#isUnlocked = deps.isUnlocked ?? isUnlocked
+  }
+
+  /** A locked session must not keep using the OAuth token or the network. */
+  #assertUnlocked(): void {
+    if (!this.#isUnlocked()) throw new VaultLockedError()
+  }
+
+  /** The current global index (entry id to LWW winner), or null before the first `refresh`. */
+  get index(): ReadonlyMap<string, IndexEntry> | null {
+    return this.#index
+  }
+
+  async #getCore(): Promise<Core> {
+    this.#loadedCore ??= this.#core ?? (await loadCore())
+    return this.#loadedCore
+  }
+
+  /** Concurrent callers share one run. */
+  refresh(): Promise<PullResult> {
+    this.#refreshing ??= this.#refresh().finally(() => {
+      this.#refreshing = null
+    })
+    return this.#refreshing
+  }
+
+  async #refresh(): Promise<PullResult> {
+    const core = await this.#getCore()
+    const versions = readVersions(core)
+    this.#assertUnlocked()
+    const generation = await this.#checkAuthority(core, versions)
+    this.#assertUnlocked()
+    this.#generation = generation
+
+    const reader = this.#reader
+    const devices = (await guarded('the device list', () => reader.listDevices(generation))).filter(
+      (id) => id !== this.#ownId,
+    )
+    this.#assertUnlocked()
+    const manifests = new Map<string, Manifest>()
+    const warnings: string[] = []
+    for (const device of devices) {
+      this.#assertUnlocked()
+      const text = await this.#readOptional(generation, `${device}/metadata.json`)
+      const normalized =
+        text === null ? null : this.#parseManifest(core, device, decoder.decode(text), warnings)
+      const manifest =
+        normalized === null
+          ? await this.#cachedManifest(device, warnings)
+          : this.#toManifest(device, normalized, warnings)
+      if (manifest !== null) manifests.set(device, manifest)
+    }
+
+    this.#assertUnlocked()
+    const stale = await this.#diffAndCacheManifests(core, manifests)
+    for (const device of manifests.keys()) {
+      this.#assertUnlocked()
+      await this.#cacheSmallFiles(generation, device)
+    }
+    this.#assertUnlocked()
+
+    this.#index = buildEntryIndex(
+      [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
+    )
+    return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
+  }
+
+  #toManifest(device: string, normalized: string, warnings: string[]): Manifest {
+    const { rows, dropped } = entryRows(JSON.parse(normalized))
+    if (dropped > 0)
+      warnings.push(`${device}: ${dropped} manifest row(s) with an unsafe id or time ignored`)
+    return { text: normalized, entries: rows }
+  }
+
+  /**
+   * A listed device whose manifest is now missing or unreadable keeps its previously cached
+   * manifest for this pull (dropping it would change the LWW winners); a device never seen before
+   * is skipped.
+   */
+  async #cachedManifest(device: string, warnings: string[]): Promise<Manifest | null> {
+    const cached = await this.#db.files.get(`${device}/metadata.json`)
+    if (cached === undefined) return null
+    try {
+      const manifest = this.#toManifest(device, decoder.decode(cached.ciphertext), warnings)
+      warnings.push(`${device}: manifest unavailable, using the cached copy`)
+      return manifest
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * control + `_meta.json` + own slot, all read before any decision. Returns the generation.
+   * Drops, locks and throws `ReonboardRequiredError` on a generation or fingerprint change or a
+   * confirmed-missing own slot.
+   */
+  async #checkAuthority(core: Core, versions: Versions): Promise<number> {
+    const reader = this.#reader
+    const record = await this.#db.device.get()
+    if (record === undefined) {
+      // Never enrolled in this browser: nothing cached to drop, nothing to lock.
+      reonboardReason = 'not-enrolled'
+      throw new ReonboardRequiredError('not-enrolled')
+    }
+    this.#ownId = record.deviceId
+
+    const control = await guarded('control.json', () => readControl(reader, core, versions))
+    const meta = await guarded('_meta.json', () => readMeta(reader, core, versions))
+    const slotPresent = await guarded('the device slot', () => this.#ownSlotPresent(core))
+
+    let reason: ReonboardReason | null = null
+    if (control.recoveryGeneration !== record.recoveryGeneration) reason = 'generation-changed'
+    else if (meta.masterFingerprint !== record.masterFingerprint) reason = 'fingerprint-changed'
+    else if (!slotPresent) reason = 'slot-missing'
+    if (reason !== null) await this.#revoke(reason)
+    return control.recoveryGeneration
+  }
+
+  /**
+   * True when the devices folder listing succeeded and contains `<ownId>.json` (and the slot
+   * parses). False ONLY for a successful listing without it. Any request error propagates (and is
+   * mapped to a transient error by the caller); a missing devices folder is not proof either.
+   */
+  async #ownSlotPresent(core: Core): Promise<boolean> {
+    const folderId = await this.#reader.findFolderPath(DEVICE_SLOT_FOLDERS)
+    if (folderId === null) throw new VaultNotReadyError(DEVICE_SLOT_FOLDERS.join('/'))
+    const path = deviceSlotPath(this.#ownId ?? '')
+    const listed = await this.#reader.listFolder(folderId, 'files')
+    if (!listed.some((file) => `.meta/keyring/devices/${file.name}` === path)) return false
+    let bytes: Uint8Array
+    try {
+      bytes = await this.#reader.readSharedFile(path)
+    } catch (error) {
+      if (error instanceof DriveNotFoundError) return false
+      throw error
+    }
+    try {
+      core.parseDeviceSlot(decoder.decode(bytes))
+    } catch (error) {
+      throw new VaultCorruptError(`${path}: ${error instanceof Error ? error.message : error}`)
+    }
+    return true
+  }
+
+  async #revoke(reason: ReonboardReason): Promise<never> {
+    this.#epoch += 1
+    this.#index = null
+    this.#inflight.clear()
+    this.#lockKeys('revoked')
+    reonboardReason = reason
+    let cause: unknown
+    try {
+      await this.#db.clearCache()
+    } catch (error) {
+      cause = error // the caller must still be routed to onboarding
+    }
+    throw new ReonboardRequiredError(reason, cause)
+  }
+
+  /**
+   * Bytes of a logical device file, or null on a confirmed NotFound or a path the reader refuses
+   * (`RangeError`: an unsafe name from untrusted Drive content is "missing", never a failed pull).
+   * Other errors are transient.
+   */
+  async #readOptional(generation: number, path: string): Promise<Uint8Array | null> {
+    try {
+      return await this.#reader.readDeviceFile(generation, path)
+    } catch (error) {
+      if (error instanceof DriveNotFoundError || error instanceof RangeError) return null
+      throw asTransient(error, path)
+    }
+  }
+
+  /** Normalized manifest JSON, or null when the device's manifest is unusable (warning). */
+  #parseManifest(core: Core, device: string, raw: string, warnings: string[]): string | null {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      warnings.push(`${device}: manifest is not valid JSON`)
+      return null
+    }
+    // The v1 manifest carries no version field; a future one that adds `schema_version` and
+    // differs from the known payload schema is a format this build cannot read.
+    if (isRecord(parsed) && typeof parsed.schema_version === 'number') {
+      const known = (JSON.parse(core.knownVersions()) as Record<string, unknown>)
+        .payload_schema_version
+      if (parsed.schema_version !== known) {
+        throw new FormatUnsupportedError(`${device}/metadata.json`, parsed.schema_version)
+      }
+    }
+    try {
+      return core.parseManifest(raw)
+    } catch (error) {
+      warnings.push(`${device}: ${error instanceof Error ? error.message : 'bad manifest'}`)
+      return null
+    }
+  }
+
+  /** Stale ids via `computeDiff(cached, new)` per device; stale cached entries are dropped. */
+  async #diffAndCacheManifests(core: Core, manifests: Map<string, Manifest>): Promise<string[]> {
+    const stale = new Set<string>()
+    for (const [device, manifest] of manifests) {
+      const path = `${device}/metadata.json`
+      const cached = await this.#db.files.get(path)
+      const local =
+        cached === undefined
+          ? JSON.stringify({
+              device_id: device,
+              recovery_generation: 0,
+              entries: [],
+              journals: [],
+              generated_at: 0,
+            })
+          : decoder.decode(cached.ciphertext)
+      const diff = JSON.parse(core.computeDiff(local, manifest.text)) as {
+        to_pull: string[]
+        to_delete_locally: Array<[string, number]>
+      }
+      for (const id of [...diff.to_pull, ...diff.to_delete_locally.map(([id]) => id)]) {
+        stale.add(id)
+        await this.#db.files.delete(`${device}/entries/${id}.bin`)
+      }
+      await this.#putFile(path, encoder.encode(manifest.text), false)
+    }
+    return [...stale].sort()
+  }
+
+  async #putFile(path: string, bytes: Uint8Array, pinned: boolean): Promise<void> {
+    await this.#db.files.put({
+      path,
+      ciphertext: bytes,
+      etag: null,
+      modifiedTime: null,
+      lastAccess: this.#now(),
+      pinned,
+    })
+  }
+
+  /** `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin` of one desktop. */
+  async #cacheSmallFiles(generation: number, device: string): Promise<void> {
+    const reader = this.#reader
+    const acks = `${device}/${ACKS_FILE}`
+    const ackBytes = await this.#readOptional(generation, acks)
+    if (ackBytes === null) await this.#db.files.delete(acks)
+    else await this.#putFile(acks, ackBytes, false)
+
+    const names = await guarded(`${device}/journals`, () =>
+      reader.listDeviceFiles(generation, device, 'journals'),
+    )
+    for (const name of names.filter((n) => n.endsWith('.bin'))) {
+      const path = `${device}/journals/${name}`
+      const bytes = await this.#readOptional(generation, path)
+      if (bytes !== null) await this.#putFile(path, bytes, false)
+    }
+    for (const file of ['tags.bin', 'templates.bin']) {
+      const path = `${device}/${file}`
+      const bytes = await this.#readOptional(generation, path)
+      if (bytes !== null) await this.#putFile(path, bytes, false)
+    }
+  }
+
+  /**
+   * Ciphertext of the winning copy of each id (`<authorDevice>/entries/<id>.bin`), from the cache
+   * when present, otherwise downloaded (concurrency-limited; one download per id in flight).
+   * Unknown ids and files that are confirmed missing are omitted. Needs a prior `refresh()`.
+   */
+  async fetchEntries(ids: readonly string[]): Promise<Map<string, Uint8Array>> {
+    const index = this.#index
+    const generation = this.#generation
+    if (index === null || generation === null)
+      throw new Error('fetchEntries needs a prior refresh()')
+    const out = new Map<string, Uint8Array>()
+    await Promise.all(
+      [...new Set(ids)].map(async (id) => {
+        const winner = index.get(id)
+        if (winner === undefined) return
+        let bytes: Uint8Array | null
+        try {
+          bytes = await this.#entryBytes(generation, winner)
+        } catch (error) {
+          if (error instanceof RangeError) return // an unusable id is missing, not a failed batch
+          throw error
+        }
+        if (bytes !== null) out.set(id, bytes)
+      }),
+    )
+    return out
+  }
+
+  #entryBytes(generation: number, winner: IndexEntry): Promise<Uint8Array | null> {
+    const path = `${winner.authorDevice}/entries/${winner.entryId}.bin`
+    const pending = this.#inflight.get(path)
+    if (pending !== undefined) return pending
+    const epoch = this.#epoch
+    const task = (async (): Promise<Uint8Array | null> => {
+      const cached = await this.#db.files.get(path)
+      if (cached !== undefined) {
+        await this.#db.files.touch(path, this.#now())
+        return cached.ciphertext
+      }
+      const bytes = await this.#limit(() => this.#readOptional(generation, path))
+      if (bytes !== null && epoch === this.#epoch) {
+        // Best effort: a full store must not fail the read.
+        await this.#putFile(path, bytes, false).catch(() => undefined)
+      }
+      return bytes
+    })().finally(() => {
+      this.#inflight.delete(path)
+    })
+    this.#inflight.set(path, task)
+    return task
+  }
+
+  /** Fetches the 5 newest non-deleted entries and nothing else. Returns their ids, newest first. */
+  async warmStart(): Promise<string[]> {
+    if (this.#index === null) await this.refresh()
+    const ids = newestLive(this.#index ?? new Map(), WARM_START_ENTRIES).map((e) => e.entryId)
+    await this.fetchEntries(ids)
+    return ids
+  }
+}
+
+export function createPuller(deps: PullDeps): Puller {
+  return new Puller(deps)
+}

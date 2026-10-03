@@ -50,6 +50,7 @@ import {
   type DriveWriter,
 } from '../drive/client'
 import { deviceSlotPath, isValidGeneration, isValidOwnId } from '../drive/paths'
+import { ERROR_NAMES } from '../errorNames'
 import { setKeyRing, type KeyRing } from '../keys'
 import type { DeviceRecord, WebDb } from '../storage/idb'
 
@@ -103,7 +104,7 @@ export class FormatUnsupportedError extends Error {
   readonly version: number
   constructor(path: string, version: number) {
     super(`Unsupported format: ${path} has version ${version}; update the app`)
-    this.name = 'FormatUnsupportedError'
+    this.name = ERROR_NAMES.formatUnsupported
     this.path = path
     this.version = version
   }
@@ -290,14 +291,18 @@ async function readRequired(
   }
 }
 
-interface ControlState {
+export interface ControlState {
   recoveryGeneration: number
   leaseActive: boolean
   /** Canonical JSON from the core, for exact change detection. */
   canonical: string
 }
 
-async function readControl(reader: DriveReader, core: Core, v: Versions): Promise<ControlState> {
+export async function readControl(
+  reader: DriveReader,
+  core: Core,
+  v: Versions,
+): Promise<ControlState> {
   const text = await readRequired(reader, CONTROL_PATH, () => new VaultNotReadyError(CONTROL_PATH))
   assertKnownVersion(CONTROL_PATH, text, v.control)
   let canonical: string

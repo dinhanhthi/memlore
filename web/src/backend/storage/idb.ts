@@ -14,6 +14,13 @@ export const STORE_DEVICE = 'device'
 export const STORE_BLOBS = 'blobs'
 export const STORE_META = 'meta'
 
+/**
+ * Meta keys with this prefix hold the highest-seen lock state of a journal (`journal-seen:<id>`).
+ * They are tiny hints, not content, and survive `clearCache()` so a rollback of a journal file on
+ * the cloud cannot unlock a journal after the cache was dropped. `clearAll()` wipes them.
+ */
+export const JOURNAL_SEEN_PREFIX = 'journal-seen:'
+
 /** The device store holds a single record under this out-of-line key. */
 const DEVICE_KEY = 'self'
 
@@ -316,6 +323,13 @@ export class WebDb {
     },
     delete: (path: string) => this.del(STORE_FILES, path),
     list: () => this.all<FileRecord>(STORE_FILES),
+    /** Every cached path, without reading the ciphertext. */
+    paths: () =>
+      this.tx(
+        [STORE_FILES],
+        'readonly',
+        ([s]) => requestToPromise(s.getAllKeys()) as Promise<string[]>,
+      ),
     /** Bumps `lastAccess`; resolves false when the file is not cached. */
     touch: (path: string, now: number = Date.now()): Promise<boolean> =>
       this.tx([STORE_FILES], 'readwrite', async ([s]) => {
@@ -365,11 +379,31 @@ export class WebDb {
       return this.put(STORE_META, record)
     },
     delete: (key: string) => this.del(STORE_META, key),
+    /** Every record whose key starts with `prefix`. */
+    listByPrefix: (prefix: string): Promise<MetaRecord[]> =>
+      this.tx([STORE_META], 'readonly', async ([s]) =>
+        ((await requestToPromise(s.getAll())) as MetaRecord[]).filter((r) =>
+          r.key.startsWith(prefix),
+        ),
+      ),
   }
 
-  /** Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts and the device record. */
+  /**
+   * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts, the device record and the
+   * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`).
+   */
   clearCache(): Promise<void> {
-    return this.clearStores([STORE_FILES, STORE_BLOBS, STORE_META])
+    return this.tx([STORE_FILES, STORE_BLOBS, STORE_META], 'readwrite', async (stores) => {
+      const [files, blobs, meta] = stores
+      const keys = (await requestToPromise(meta.getAllKeys())) as IDBValidKey[]
+      await Promise.all([
+        requestToPromise(files.clear()),
+        requestToPromise(blobs.clear()),
+        ...keys
+          .filter((k) => !(typeof k === 'string' && k.startsWith(JOURNAL_SEEN_PREFIX)))
+          .map((k) => requestToPromise(meta.delete(k))),
+      ])
+    })
   }
 
   /** Wipes every store, including drafts and the device record. */
