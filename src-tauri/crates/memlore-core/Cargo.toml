@@ -1,0 +1,23 @@
+[package]
+name = "memlore-core"
+version = "0.2.1"
+description = "Memlore core: platform-independent logic shared by the desktop app and the web app"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.88"
+
+[dependencies]
+log = "0.4"
+argon2 = "0.5"
+rand = "0.8"
+aes-gcm = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+zeroize = { version = "1", features = ["derive"] }
+hmac = "0.12"
+hex = "0.4"
+bip39 = { version = "2", default-features = false, features = ["std", "zeroize"] }
+
+# Browser entropy for rand/getrandom on wasm32; never resolved for native targets.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
