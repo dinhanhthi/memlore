@@ -90,6 +90,15 @@ pub enum SyncError {
     CrossModeReject(String),
 }
 
+impl From<memlore_core::CodecError> for SyncError {
+    fn from(e: memlore_core::CodecError) -> Self {
+        match e {
+            memlore_core::CodecError::Serialization(s) => SyncError::Serialization(s),
+            memlore_core::CodecError::Merge(s) => SyncError::Merge(s),
+        }
+    }
+}
+
 /// Result of a revision-aware read ([`SyncProvider::read_file_if_changed`]).
 ///
 /// A provider that can resolve a revision token for a file returns

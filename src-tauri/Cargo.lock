@@ -3794,6 +3794,7 @@ version = "0.2.1"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "bincode",
  "bip39",
  "getrandom 0.2.17",
  "hex",
@@ -3801,7 +3802,9 @@ dependencies = [
  "hmac",
  "log",
  "rand 0.8.5",
+ "serde",
  "sha2 0.10.9",
+ "thiserror 2.0.18",
  "zeroize",
 ]
 
