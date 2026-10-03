@@ -1,0 +1,15 @@
+name = "memlore-web-auth"
+main = "src/index.ts"
+compatibility_date = "2026-09-18"
+
+routes = [{ pattern = "web.memlore.app/api/*", zone_name = "memlore.app" }]
+
+# Secrets (never committed, see README.md): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, COOKIE_KEY.
+[vars]
+# Kill switch for web writes. Anything other than "1" means writes are off.
+WEB_WRITES_ENABLED = "0"
+APP_ORIGIN = "https://web.memlore.app"
+
+[env.dev.vars]
+WEB_WRITES_ENABLED = "0"
+APP_ORIGIN = "http://localhost:5176"
