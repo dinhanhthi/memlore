@@ -139,6 +139,12 @@ pub struct PullStats {
     /// Command layer runs `reconcile_slots_for_preset` after the cycle.
     #[serde(skip)]
     pub changed_endpoint_presets: Vec<String>,
+    #[serde(skip)]
+    pub fetched_manifests: Vec<String>,
+    #[serde(skip)]
+    pub unchanged_peers: Vec<String>,
+    #[serde(skip)]
+    pub pull_clean: bool,
 }
 
 /// Errors + changed endpoint presets from one [`SyncEngine::pull_settings`] pass.
@@ -172,6 +178,12 @@ pub struct SyncSummary {
     /// consumes it to reconcile live provider slots.
     #[serde(skip)]
     pub changed_endpoint_presets: Vec<String>,
+    #[serde(skip)]
+    pub fetched_manifests: Vec<String>,
+    #[serde(skip)]
+    pub unchanged_peers: Vec<String>,
+    #[serde(skip)]
+    pub pull_clean: bool,
 }
 
 /// Why a sync cycle was started.
@@ -4369,6 +4381,8 @@ impl SyncEngine {
                 }
             };
         stats.errors.extend(manifest_errors);
+        stats.fetched_manifests = manifests.iter().map(|(peer, _)| peer.clone()).collect();
+        stats.unchanged_peers = unchanged_peers.clone();
         if include_self {
             let expected_generation =
                 access.with_conn(|conn| db::get_sync_recovery_generation(conn).map_err(sync_io))?;
@@ -5070,6 +5084,7 @@ impl SyncEngine {
             )));
         }
 
+        stats.pull_clean = stats.errors.is_empty();
         Ok(stats)
     }
 
@@ -5113,7 +5128,7 @@ impl SyncEngine {
     /// pre-refactor `pull_remote` behavior of propagating `list_devices` failures
     /// as `Err`). A missing manifest is treated as a half-created peer folder
     /// and skipped; other per-peer failures are collected in `errors`.
-    async fn fetch_manifests(
+    pub(crate) async fn fetch_manifests(
         &self,
         include_self: bool,
     ) -> Result<(Vec<(String, DeviceMetadata)>, Vec<String>), SyncError> {
@@ -5333,6 +5348,9 @@ impl SyncEngine {
                 out.pulled = s.pulled;
                 out.merged = s.merged;
                 out.changed_endpoint_presets = s.changed_endpoint_presets;
+                out.fetched_manifests = s.fetched_manifests;
+                out.unchanged_peers = s.unchanged_peers;
+                out.pull_clean = s.pull_clean && s.errors.is_empty();
                 for e in s.errors {
                     out.errors.push(format!("pull: {e}"));
                 }

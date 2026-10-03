@@ -22,6 +22,9 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
   [#3eec79f](https://github.com/dinhanhthi/memlore/commit/3eec79f)
   [#a59815b](https://github.com/dinhanhthi/memlore/commit/a59815b)
   [#1e6c8bf](https://github.com/dinhanhthi/memlore/commit/1e6c8bf)
+- **Desktop outbox importer for companion web writes.** Desktop sync cycles
+  automatically discover and import encrypted outbox edits and creations from
+  companion devices, merging Yjs entry documents and field changes without clock skew.
 
 ### Notes for maintainers
 

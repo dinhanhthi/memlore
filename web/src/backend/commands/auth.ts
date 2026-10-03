@@ -440,7 +440,8 @@ async function loadContentKeys(
         text = await onboard.readContentFile(reader, e.sleep, { failFastOnTransport: true })
       }
     }
-    if (typeof text === 'string') await onboard.cacheContentText(db, text, e.now()).catch(() => undefined)
+    if (typeof text === 'string')
+      await onboard.cacheContentText(db, text, e.now()).catch(() => undefined)
   } catch (error) {
     // No usable Drive session (signed out, offline) is not an error: the cache answers instead.
     const noSession =

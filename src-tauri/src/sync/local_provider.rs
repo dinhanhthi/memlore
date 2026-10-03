@@ -538,6 +538,16 @@ impl SyncProvider for LocalSyncProvider {
                                 && is_safe_component(name.strip_suffix(".bin").unwrap_or(&name))
                         }
                         FileKind::Media => is_safe_component(&name),
+                        FileKind::Outbox => {
+                            (name.ends_with(".bin")
+                                && is_safe_component(name.strip_suffix(".bin").unwrap_or(&name)))
+                                || (name.starts_with("m-")
+                                    && (is_safe_component(&name)
+                                        || (name.ends_with(".thumb")
+                                            && is_safe_component(
+                                                name.strip_suffix(".thumb").unwrap_or(&name),
+                                            ))))
+                        }
                         FileKind::DeviceRoot => unreachable!("matched Some(subfolder)"),
                     };
                     if !accepted {

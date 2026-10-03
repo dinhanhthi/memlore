@@ -6,14 +6,21 @@
 //! flat root and hide a wrong path.
 
 use super::engine::{SyncEngine, SyncTrigger};
+use super::keyring_v2::io::KeyringV2Io;
 use super::local_provider::LocalSyncProvider;
 use super::media_sync::{fetch_media, fetch_media_thumbnail};
 use super::metadata::{DeviceMetadata, EntryMetadata, SyncMediaItem, SyncedEntrySummary};
+use super::outbox_import::{
+    collect_known_ids_from_manifests, run_outbox_import_cycle, NoopOutboxSink, PendingPlan,
+};
+use super::provider::{FileKind, SyncError, SyncProvider};
 use crate::db;
 use crate::utils::encryption::derive_sync_key;
 use crate::EncryptionKeyState;
+use async_trait::async_trait;
 use memlore_core::envelope::{open_entry, open_media, seal_entry, seal_media, seal_thumb};
 use memlore_core::key_state::ContentKeyList;
+use memlore_core::outbox::{open_outbox_acks, OutboxFieldDecision};
 use rusqlite::Connection;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -773,5 +780,1009 @@ async fn golden_desktop_fixture_decodes() {
     assert_eq!(
         versions[0].preview_text,
         v["preview_text"].as_str().unwrap()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Web outbox golden fixtures: `web-outbox.v1.json`
+// ---------------------------------------------------------------------------
+
+const WEB_OUTBOX_FIXTURE_REL_PATH: &str = "crates/memlore-core/fixtures/web-outbox.v1.json";
+
+fn web_outbox_fixture_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(WEB_OUTBOX_FIXTURE_REL_PATH)
+}
+
+struct GoldenOutboxCloud {
+    dir: TempDir,
+    provider: Arc<LocalSyncProvider>,
+    #[allow(dead_code)]
+    master: Zeroizing<[u8; 32]>,
+    list: ContentKeyList,
+    key_state: EncryptionKeyState,
+    engine_key: Zeroizing<[u8; 32]>,
+    #[allow(dead_code)]
+    desktop_device_id: String,
+    web_device_id: String,
+    #[allow(dead_code)]
+    gen: u64,
+    #[allow(dead_code)]
+    desktop_fixture: serde_json::Value,
+    web_fixture: serde_json::Value,
+    master_fingerprint: String,
+}
+
+fn setup_golden_outbox_cloud() -> GoldenOutboxCloud {
+    use memlore_core::envelope::{
+        load_content_list, unwrap_master_with_recovery, verify_master_fingerprint,
+    };
+    use serde_json::Value;
+
+    let desktop_fixture: Value =
+        serde_json::from_str(&std::fs::read_to_string(fixture_path()).unwrap()).unwrap();
+    let web_fixture: Value =
+        serde_json::from_str(&std::fs::read_to_string(web_outbox_fixture_path()).unwrap()).unwrap();
+
+    let mut all_files = BTreeMap::new();
+    for (k, v) in desktop_fixture["files"].as_object().unwrap() {
+        all_files.insert(k.clone(), unb64(v.as_str().unwrap()));
+    }
+    for (k, v) in web_fixture["files"].as_object().unwrap() {
+        all_files.insert(k.clone(), unb64(v.as_str().unwrap()));
+    }
+
+    let dir = TempDir::new().unwrap();
+    for (rel, bytes) in &all_files {
+        let path = dir.path().join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
+
+    let gen = desktop_fixture["generation"].as_u64().unwrap();
+    let provider =
+        Arc::new(LocalSyncProvider::new(dir.path().to_path_buf()).with_recovery_fence(gen, None));
+
+    let phrase = desktop_fixture["recovery_phrase"].as_str().unwrap();
+    let recovery_json: Value =
+        serde_json::from_slice(&all_files[".meta/keyring/_recovery.json"]).unwrap();
+    let meta_json: Value = serde_json::from_slice(&all_files[".meta/keyring/_meta.json"]).unwrap();
+
+    let master =
+        unwrap_master_with_recovery(phrase, recovery_json["wrapped_master"].as_str().unwrap())
+            .unwrap();
+    let master_fingerprint = meta_json["master_fingerprint"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    verify_master_fingerprint(&master, &master_fingerprint).unwrap();
+
+    let list = load_content_list(
+        std::str::from_utf8(&all_files[".meta/keyring/_content.json"]).unwrap(),
+        &master,
+    )
+    .unwrap();
+
+    let ks = EncryptionKeyState::new();
+    ks.set_content_state(
+        list.keys.clone(),
+        list.latest,
+        Zeroizing::new([0u8; 32]),
+        Zeroizing::new(*master),
+    )
+    .unwrap();
+
+    let key = ks.with_sync_key(|k| Ok(Zeroizing::new(*k))).unwrap();
+    let desktop_device_id = desktop_fixture["device_id"].as_str().unwrap().to_string();
+    let web_device_id = web_fixture["web_device_id"].as_str().unwrap().to_string();
+
+    GoldenOutboxCloud {
+        dir,
+        provider,
+        master,
+        list,
+        key_state: ks,
+        engine_key: key,
+        desktop_device_id,
+        web_device_id,
+        gen,
+        desktop_fixture,
+        web_fixture,
+        master_fingerprint,
+    }
+}
+
+impl GoldenOutboxCloud {
+    async fn list_outbox_files(&self, device_id: &str) -> Result<Vec<String>, SyncError> {
+        SyncProvider::list_files(&*self.provider, device_id, FileKind::Outbox).await
+    }
+    async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
+        SyncProvider::read_file(&*self.provider, path).await
+    }
+    async fn write_file(&self, path: &str, data: &[u8]) -> Result<(), SyncError> {
+        SyncProvider::write_file(&*self.provider, path, data).await
+    }
+    async fn delete_file(&self, path: &str) -> Result<(), SyncError> {
+        SyncProvider::delete_file(&*self.provider, path).await
+    }
+}
+
+async fn run_desktop_sync_and_import(
+    provider: &Arc<LocalSyncProvider>,
+    device_id: &str,
+    conn: &Connection,
+    ks: &EncryptionKeyState,
+    engine_key: &[u8; 32],
+    media_dir: &Path,
+) -> (
+    crate::sync::engine::SyncSummary,
+    crate::sync::outbox_import::OutboxImportSummary,
+) {
+    let engine = SyncEngine::new(provider.clone(), device_id.to_string());
+    let snapshot = ks.snapshot_for_engine().unwrap();
+    let summary = engine
+        .sync_now(conn, engine_key, &snapshot, SyncTrigger::Manual)
+        .await
+        .unwrap();
+
+    let (known_ids, pull_clean) = if summary.pull_clean {
+        match engine.fetch_manifests(true).await {
+            Ok((manifests, errors)) if errors.is_empty() => {
+                (collect_known_ids_from_manifests(&manifests), true)
+            }
+            _ => (std::collections::HashMap::new(), false),
+        }
+    } else {
+        (std::collections::HashMap::new(), false)
+    };
+
+    let key_list = ks.content_key_list().unwrap();
+    let sink = NoopOutboxSink;
+    let import_summary = run_outbox_import_cycle(
+        provider.as_ref(),
+        provider.as_ref(),
+        device_id,
+        &key_list,
+        known_ids,
+        pull_clean,
+        &summary,
+        media_dir,
+        conn,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    (summary, import_summary)
+}
+
+struct CountingOutboxProvider {
+    inner: Arc<LocalSyncProvider>,
+    outbox_calls: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait]
+impl SyncProvider for CountingOutboxProvider {
+    async fn list_devices(&self) -> Result<Vec<String>, SyncError> {
+        SyncProvider::list_devices(&*self.inner).await
+    }
+
+    async fn list_files(&self, device_id: &str, kind: FileKind) -> Result<Vec<String>, SyncError> {
+        if kind == FileKind::Outbox {
+            self.outbox_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        SyncProvider::list_files(&*self.inner, device_id, kind).await
+    }
+
+    async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
+        SyncProvider::read_file(&*self.inner, path).await
+    }
+
+    async fn read_file_if_changed(
+        &self,
+        path: &str,
+        known_revision: Option<&str>,
+    ) -> Result<crate::sync::provider::ConditionalRead, SyncError> {
+        SyncProvider::read_file_if_changed(&*self.inner, path, known_revision).await
+    }
+
+    async fn write_file(&self, path: &str, data: &[u8]) -> Result<(), SyncError> {
+        SyncProvider::write_file(&*self.inner, path, data).await
+    }
+
+    async fn delete_file(&self, path: &str) -> Result<(), SyncError> {
+        SyncProvider::delete_file(&*self.inner, path).await
+    }
+}
+
+#[async_trait]
+impl KeyringV2Io for CountingOutboxProvider {
+    async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
+        KeyringV2Io::read_file(&*self.inner, path).await
+    }
+
+    async fn write_file(&self, path: &str, bytes: &[u8]) -> Result<(), SyncError> {
+        KeyringV2Io::write_file(&*self.inner, path, bytes).await
+    }
+
+    async fn delete_file(&self, path: &str) -> Result<(), SyncError> {
+        KeyringV2Io::delete_file(&*self.inner, path).await
+    }
+
+    async fn list_files(&self, prefix: &str) -> Result<Vec<String>, SyncError> {
+        KeyringV2Io::list_files(&*self.inner, prefix).await
+    }
+
+    fn configure_recovery_fence(
+        &self,
+        generation: u64,
+        permit: Option<crate::sync::recovery::RecoveryOwnerPermit>,
+    ) {
+        self.inner.configure_recovery_fence(generation, permit);
+    }
+}
+
+/// (a) Pull + import created entry with media, edited entry with text merge;
+/// (b) untouched desktop rows unchanged, locked refused, unsupported version skipped_version;
+/// (c) fresh empty desktop produces identical result.
+#[tokio::test]
+async fn golden_outbox_pull_and_import() {
+    let cloud = setup_golden_outbox_cloud();
+    let media_dir_a = TempDir::new().unwrap();
+    let conn_a = fresh_db();
+    let dev_a = "00000000-0000-0000-0000-000000000001";
+
+    let (summary_a, import_summary_a) = run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+
+    assert_eq!(summary_a.pulled, 7, "pulled 7 remote entries");
+    assert_eq!(
+        import_summary_a.intents_applied, 2,
+        "applied created and edited"
+    );
+    assert_eq!(
+        import_summary_a.intents_refused, 2,
+        "refused locked and unsupported"
+    );
+    assert_eq!(
+        import_summary_a.media_downloaded, 1,
+        "downloaded 1 media item"
+    );
+    assert!(import_summary_a.acks_written, "desktop wrote its own acks");
+
+    // (a) Created entry verification
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+    let row_created = db::get_entry_raw(&conn_a, created_id)
+        .unwrap()
+        .expect("created entry exists in DB");
+    assert_eq!(row_created.title.as_deref(), Some("Web Created Entry"));
+    assert_eq!(
+        row_created.content_text.as_deref(),
+        Some("Web created body with image")
+    );
+    assert_eq!(
+        row_created.preview_text.as_deref(),
+        Some("Web created body with image")
+    );
+    assert_eq!(
+        row_created.journal_id,
+        "4fd64221-d0eb-4bc0-84c9-810bce934d16"
+    );
+    let yjs_created = db::get_entry_content(&conn_a, created_id).unwrap().unwrap();
+    assert!(yjs_text(&yjs_created).contains("Web created body with image"));
+
+    // (a) Edited entry verification (text merge + metadata patch)
+    let edited_id = cloud.web_fixture["expected"]["edited_entry_id"]
+        .as_str()
+        .unwrap();
+    let row_edited = db::get_entry_raw(&conn_a, edited_id)
+        .unwrap()
+        .expect("edited entry exists in DB");
+    assert_eq!(
+        row_edited.title.as_deref(),
+        Some("Golden one edited by web")
+    );
+    assert_eq!(row_edited.emotion.as_deref(), Some("good"));
+    assert_eq!(row_edited.is_favorite, true);
+    assert_eq!(
+        row_edited.journal_id,
+        "4fd64221-d0eb-4bc0-84c9-810bce934d16"
+    );
+    let yjs_edited = db::get_entry_content(&conn_a, edited_id).unwrap().unwrap();
+    let merged_text = yjs_text(&yjs_edited);
+    assert!(
+        merged_text.contains("First golden body"),
+        "contains desktop text: {merged_text}"
+    );
+    assert!(
+        merged_text.contains("+ Web append text"),
+        "contains web text: {merged_text}"
+    );
+
+    // (a) Media file and thumbnail verification
+    let media_id = cloud.web_fixture["expected"]["media_id"].as_str().unwrap();
+    assert!(
+        media_dir_a.path().join(format!("{media_id}.png")).exists(),
+        "full media file on disk"
+    );
+    assert!(
+        media_dir_a
+            .path()
+            .join(format!("{media_id}.thumb.jpg"))
+            .exists(),
+        "thumb file on disk"
+    );
+    let media_row = db::get_media(&conn_a, media_id)
+        .unwrap()
+        .expect("media row in DB");
+    assert_eq!(media_row.file_name, format!("{media_id}.png"));
+    assert_eq!(media_row.file_type, "image/png");
+
+    // (b) Locked target refused and unchanged
+    let locked_id = cloud.web_fixture["expected"]["locked_entry_id"]
+        .as_str()
+        .unwrap();
+    let row_locked = db::get_entry_raw(&conn_a, locked_id)
+        .unwrap()
+        .expect("locked entry exists");
+    assert_eq!(
+        row_locked.title.as_deref(),
+        Some("Golden six"),
+        "locked entry title untouched"
+    );
+    let locked_path = format!("{}/outbox/{locked_id}.bin", cloud.web_device_id);
+    let rec_locked = db::queries::outbox_import_get(&conn_a, &locked_path)
+        .unwrap()
+        .expect("locked record exists");
+    assert_eq!(rec_locked.outcome, "refused");
+
+    // (b) Unsupported version skipped_version
+    let unsupported_id = cloud.web_fixture["expected"]["unsupported_entry_id"]
+        .as_str()
+        .unwrap();
+    let unsupp_path = format!("{}/outbox/{unsupported_id}.bin", cloud.web_device_id);
+    let rec_unsupp = db::queries::outbox_import_get(&conn_a, &unsupp_path)
+        .unwrap()
+        .expect("unsupported record exists");
+    assert_eq!(rec_unsupp.outcome, "skipped_version");
+
+    // (b) Untouched desktop rows unchanged
+    let untouched_ids = [
+        "64c4c37b-27b7-48b6-a0b7-ff83545e0c87",
+        "bfd06ad9-bb0f-43e2-9b24-0bee3fbe1fcd",
+        "d572a028-9099-43cb-88a5-3e0b1e6d5573",
+        "80c8978d-6e44-41b6-aabd-d2f828958c62",
+        "1cd8057a-38a2-4883-91cd-a096700ff1b2",
+    ];
+    for uid in &untouched_ids {
+        assert!(
+            db::get_entry_raw(&conn_a, uid).unwrap().is_some(),
+            "untouched entry {uid} survives"
+        );
+    }
+
+    // (c) Fresh empty desktop produces identical result
+    let media_dir_c = TempDir::new().unwrap();
+    let conn_c = fresh_db();
+    let dev_c = "00000000-0000-0000-0000-000000000004";
+    let (_, import_summary_c) = run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_c,
+        &conn_c,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_c.path(),
+    )
+    .await;
+    assert_eq!(import_summary_c.intents_applied, 2);
+    assert_eq!(import_summary_c.intents_refused, 2);
+    let row_c_created = db::get_entry_raw(&conn_c, created_id).unwrap().unwrap();
+    assert_eq!(row_c_created.title, row_created.title);
+    assert_eq!(row_c_created.content_text, row_created.content_text);
+    let row_c_edited = db::get_entry_raw(&conn_c, edited_id).unwrap().unwrap();
+    assert_eq!(row_c_edited.title, row_edited.title);
+    assert_eq!(row_c_edited.emotion, row_edited.emotion);
+}
+
+/// (d) Keyring rotation leaves outbox untouched; web slot deleted by publish_keyring;
+/// (e) Authoritative cloud cleanup deletes outbox.
+#[tokio::test]
+async fn golden_outbox_rotation_and_cleanup() {
+    let cloud = setup_golden_outbox_cloud();
+    let files_before = cloud.list_outbox_files(&cloud.web_device_id).await.unwrap();
+    assert_eq!(files_before.len(), 6, "6 outbox files initially present");
+
+    let (_publish_ctx, app_state, ks) = setup_fixture_vault();
+    {
+        let conn = app_state.lock().unwrap();
+        db::set_setting(
+            &conn,
+            db::CLOUD_MASTER_FINGERPRINT,
+            &cloud.master_fingerprint,
+        )
+        .unwrap();
+    }
+
+    // Run rotation
+    let (rotation_id, rot_ctx, new_epoch) = crate::sync::rotation::rotate::rotate_keys(
+        cloud.provider.as_ref(),
+        &app_state,
+        &ks,
+        FIXTURE_PASSWORD,
+        None,
+        Some(FIXTURE_PHRASE),
+        None,
+    )
+    .await
+    .unwrap();
+
+    crate::sync::rotation::publish::publish_keyring(
+        cloud.provider.as_ref(),
+        &app_state,
+        rotation_id,
+        &rot_ctx,
+        crate::sync::rotation::RecoverySource::Stashed,
+        None,
+        new_epoch,
+    )
+    .await
+    .unwrap();
+
+    // (d) Outbox files untouched by rotation
+    let files_after = cloud.list_outbox_files(&cloud.web_device_id).await.unwrap();
+    assert_eq!(
+        files_before, files_after,
+        "outbox files untouched by keyring rotation"
+    );
+
+    // (d) Web slot deleted by publish_keyring
+    let slots = crate::sync::keyring_v2::io::list_device_slots(cloud.provider.as_ref())
+        .await
+        .unwrap();
+    assert!(
+        !slots.iter().any(|s| s.device_id == cloud.web_device_id),
+        "web slot was deleted by publish_keyring"
+    );
+
+    // (e) Authoritative cloud cleanup deletes outbox
+    let control = crate::sync::sync_control::SyncControlV1 {
+        version: crate::sync::sync_control::SYNC_CONTROL_VERSION,
+        recovery_generation: 0,
+        recovery_lease: None,
+        updated_at: 1,
+    };
+    std::fs::write(
+        cloud.dir.path().join(".meta/control.json"),
+        serde_json::to_vec(&control).unwrap(),
+    )
+    .unwrap();
+
+    cloud
+        .provider
+        .clear_cloud_preserving_control()
+        .await
+        .unwrap();
+
+    let files_cleaned = cloud.list_outbox_files(&cloud.web_device_id).await.unwrap();
+    assert!(
+        files_cleaned.is_empty(),
+        "authoritative cloud cleanup deletes outbox"
+    );
+}
+
+/// (f) A desktop with the importer disabled ignores the web folder entirely.
+#[tokio::test]
+async fn golden_outbox_disabled_importer_ignores_web() {
+    let cloud = setup_golden_outbox_cloud();
+    let conn = fresh_db();
+    let dev = "00000000-0000-0000-0000-000000000005";
+
+    // Legacy / disabled engine: only runs pull_remote, never calls run_outbox_import_cycle
+    let engine = SyncEngine::new(cloud.provider.clone(), dev.to_string());
+    let stats = engine
+        .pull_remote(
+            &conn,
+            &cloud.engine_key,
+            &cloud.key_state.snapshot_for_engine().unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(stats.pulled, 7, "pulled 7 regular desktop entries");
+
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+    let media_id = cloud.web_fixture["expected"]["media_id"].as_str().unwrap();
+    assert!(
+        db::get_entry_raw(&conn, created_id).unwrap().is_none(),
+        "web entry not imported"
+    );
+    assert!(
+        db::get_media(&conn, media_id).unwrap().is_none(),
+        "web media not imported"
+    );
+    assert!(
+        db::queries::outbox_imports_list_all(&conn)
+            .unwrap()
+            .is_empty(),
+        "no import records written"
+    );
+}
+
+/// (g) Double import convergence;
+/// (k) Propagation: importing desktop pushes, second desktop pulls;
+/// (i6) Acks carry applied_updated_at equal to post-import updated_at.
+#[tokio::test]
+async fn golden_outbox_convergence_and_propagation() {
+    let cloud = setup_golden_outbox_cloud();
+    let media_dir_a = TempDir::new().unwrap();
+    let conn_a = fresh_db();
+    let dev_a = "00000000-0000-0000-0000-000000000001";
+
+    // Cycle 1: initial import
+    let (_, imp1) = run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+    assert_eq!(imp1.intents_applied, 2);
+
+    // (g) Cycle 2: unchanged intents skip cleanly, 0 applied; Desktop A pushes imported entries to cloud
+    let (summary2, imp2) = run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+    assert_eq!(imp2.intents_applied, 0, "second import cycle applies 0");
+    assert_eq!(
+        imp2.intents_skipped_unchanged, 3,
+        "3 intents skipped unchanged"
+    );
+    assert_eq!(
+        imp2.intents_refused, 1,
+        "unsupported version intent refused"
+    );
+    assert!(summary2.pushed >= 1, "Desktop A pushed at least 1 entry");
+
+    // (k) Second desktop B pulls the imported entry from Desktop A
+    let conn_b = fresh_db();
+    let dev_b = "00000000-0000-0000-0000-000000000006";
+    let engine_b = SyncEngine::new(cloud.provider.clone(), dev_b.to_string());
+    let pull_stats = engine_b
+        .pull_remote(
+            &conn_b,
+            &cloud.engine_key,
+            &cloud.key_state.snapshot_for_engine().unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        pull_stats.pulled >= 1,
+        "Desktop B pulled propagated entries"
+    );
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+    assert!(
+        db::get_entry_raw(&conn_b, created_id).unwrap().is_some(),
+        "Desktop B has propagated web entry"
+    );
+
+    // (i6) Acks carry applied_updated_at equal to post-import updated_at
+    let acks_bytes = cloud
+        .read_file(&format!("{dev_a}/outbox-acks.bin"))
+        .await
+        .unwrap();
+    let acks = open_outbox_acks(&cloud.list, &acks_bytes).unwrap();
+    let expected_path = format!("{}/outbox/{created_id}.bin", cloud.web_device_id);
+    let ack = acks
+        .acks
+        .iter()
+        .find(|a| a.path == expected_path)
+        .expect("ack exists for created entry");
+    let entry_a = db::get_entry_raw(&conn_a, created_id).unwrap().unwrap();
+    assert_eq!(
+        ack.applied_updated_at,
+        Some(entry_a.updated_at),
+        "applied_updated_at matches published updated_at"
+    );
+}
+
+/// (h) No resurrection through a fresh desktop;
+/// (j) Steady state: tombstone peer unchanged, web re-pushes, D does not create E.
+#[tokio::test]
+async fn golden_outbox_no_resurrection() {
+    let cloud = setup_golden_outbox_cloud();
+    let media_dir_a = TempDir::new().unwrap();
+    let conn_a = fresh_db();
+    let dev_a = "00000000-0000-0000-0000-000000000001";
+
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+    // Desktop A soft deletes E and pushes tombstone
+    db::soft_delete_entry(&conn_a, created_id).unwrap();
+    db::mark_entry_pending(&conn_a, created_id).unwrap();
+    let engine_a = SyncEngine::new(cloud.provider.clone(), dev_a.to_string());
+    engine_a
+        .push_local(
+            &conn_a,
+            &cloud.engine_key,
+            &cloud.key_state,
+            SyncTrigger::Manual,
+        )
+        .await
+        .unwrap();
+
+    // (h) Fresh Desktop B pulls and imports: E stays deleted
+    let conn_b = fresh_db();
+    let media_dir_b = TempDir::new().unwrap();
+    let dev_b = "00000000-0000-0000-0000-000000000006";
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_b,
+        &conn_b,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_b.path(),
+    )
+    .await;
+
+    let entry_b = db::get_entry_raw(&conn_b, created_id).unwrap();
+    assert!(
+        entry_b.is_none() || entry_b.unwrap().is_deleted,
+        "E stays deleted on fresh Desktop B"
+    );
+
+    // (j) Steady state: web re-pushes created-on-web intent for E
+    let outbox_path = format!("{}/outbox/{created_id}.bin", cloud.web_device_id);
+    let bytes = cloud.read_file(&outbox_path).await.unwrap();
+    cloud.write_file(&outbox_path, &bytes).await.unwrap();
+
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_b,
+        &conn_b,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_b.path(),
+    )
+    .await;
+
+    let entry_b_again = db::get_entry_raw(&conn_b, created_id).unwrap();
+    assert!(
+        entry_b_again.is_none() || entry_b_again.unwrap().is_deleted,
+        "E stays deleted in steady state"
+    );
+}
+
+/// (i) Wipe and reimport through real sync order (push -> pull -> import):
+/// own acks prevent resurrection, survives second wipe and new web revision.
+#[tokio::test]
+async fn golden_outbox_wipe_and_reimport() {
+    let cloud = setup_golden_outbox_cloud();
+    let media_dir_a = TempDir::new().unwrap();
+    let conn_a = fresh_db();
+    let dev_a = "00000000-0000-0000-0000-000000000001";
+
+    // 1. Desktop A imports web-created E
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+
+    // 2. Desktop A deletes E
+    db::soft_delete_entry(&conn_a, created_id).unwrap();
+    db::mark_entry_pending(&conn_a, created_id).unwrap();
+
+    // 3. Desktop A runs ReplaceAll restore (hard_wipe_user_data)
+    db::queries::hard_wipe_user_data(&conn_a).unwrap();
+
+    // 4 & 5. The next sync pushes, pulls and imports: E is NOT recreated
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+    assert!(
+        db::get_entry_raw(&conn_a, created_id).unwrap().is_none(),
+        "E not recreated because own acks had created=true"
+    );
+
+    // 6. Run one more cycle, SECOND ReplaceAll, new web revision of E
+    db::queries::hard_wipe_user_data(&conn_a).unwrap();
+    let outbox_path = format!("{}/outbox/{created_id}.bin", cloud.web_device_id);
+    let bytes = cloud.read_file(&outbox_path).await.unwrap();
+    cloud.write_file(&outbox_path, &bytes).await.unwrap();
+
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+    assert!(
+        db::get_entry_raw(&conn_a, created_id).unwrap().is_none(),
+        "E still not recreated after second wipe"
+    );
+}
+
+/// (i2) Behind desktop with pull_clean = false;
+/// (i3) Crash mid-intent resumes from pending row;
+/// (i4) Acks self-heal when deleted in cloud.
+#[tokio::test]
+async fn golden_outbox_behind_desktop_and_crash_recovery() {
+    let cloud = setup_golden_outbox_cloud();
+    let conn = fresh_db();
+    let media_dir = TempDir::new().unwrap();
+    let dev = "00000000-0000-0000-0000-000000000001";
+    let key_list = cloud.key_state.content_key_list().unwrap();
+    let summary = crate::sync::engine::SyncSummary::default();
+
+    // (i2) Behind desktop: pull_clean = false means 0 applied
+    let res_behind = run_outbox_import_cycle(
+        cloud.provider.as_ref(),
+        cloud.provider.as_ref(),
+        dev,
+        &key_list,
+        std::collections::HashMap::new(),
+        false,
+        &summary,
+        media_dir.path(),
+        &conn,
+        &NoopOutboxSink,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res_behind.intents_applied, 0,
+        "behind desktop evaluates zero intents"
+    );
+
+    // (i3) Crash mid-intent: populate local entries, insert pending record
+    let engine = SyncEngine::new(cloud.provider.clone(), dev.to_string());
+    engine
+        .pull_remote(
+            &conn,
+            &cloud.engine_key,
+            &cloud.key_state.snapshot_for_engine().unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let edited_id = cloud.web_fixture["expected"]["edited_entry_id"]
+        .as_str()
+        .unwrap();
+    let edited_path = format!("{}/outbox/{edited_id}.bin", cloud.web_device_id);
+    let mut decided_map = BTreeMap::new();
+    decided_map.insert(
+        "title@10".to_string(),
+        OutboxFieldDecision {
+            field: "title".to_string(),
+            change_seq: 10,
+            decision: "applied".to_string(),
+            decided_updated_at: 1000,
+            reason: None,
+        },
+    );
+    let pending_rec = db::queries::WebOutboxImportRecord {
+        path: edited_path.clone(),
+        revision: Some("rev-crash".to_string()),
+        content_hash: "hash-crash".to_string(),
+        outcome: "pending".to_string(),
+        imported_at: 1000,
+        last_applied_updated_at: None,
+        post_import_fingerprint: None,
+        decided_fields: Some(serde_json::to_string(&decided_map).unwrap()),
+        pending_revision: Some("rev-crash".to_string()),
+        pending_plan: Some(
+            serde_json::to_string(&PendingPlan {
+                is_create: false,
+                local_before: 1700000000,
+            })
+            .unwrap(),
+        ),
+        created: false,
+    };
+    db::queries::outbox_import_record(&conn, &pending_rec).unwrap();
+
+    // Next cycle resumes from pending row
+    let _ = run_outbox_import_cycle(
+        cloud.provider.as_ref(),
+        cloud.provider.as_ref(),
+        dev,
+        &key_list,
+        std::collections::HashMap::new(),
+        true,
+        &summary,
+        media_dir.path(),
+        &conn,
+        &NoopOutboxSink,
+    )
+    .await
+    .unwrap();
+
+    let final_rec = db::queries::outbox_import_get(&conn, &edited_path)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        final_rec.outcome, "applied",
+        "resumed from pending to applied"
+    );
+
+    // (i4) Acks self-heal: delete {dev}/outbox-acks.bin, next cycle rewrites it
+    let acks_cloud_path = format!("{dev}/outbox-acks.bin");
+    cloud.delete_file(&acks_cloud_path).await.unwrap();
+
+    let res_heal = run_outbox_import_cycle(
+        cloud.provider.as_ref(),
+        cloud.provider.as_ref(),
+        dev,
+        &key_list,
+        std::collections::HashMap::new(),
+        true,
+        &summary,
+        media_dir.path(),
+        &conn,
+        &NoopOutboxSink,
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        res_heal.acks_written,
+        "acks file rewritten upon missing cloud file"
+    );
+    assert!(
+        cloud.read_file(&acks_cloud_path).await.is_ok(),
+        "acks file now exists again in cloud"
+    );
+}
+
+/// (i5) Cross-desktop create window: both desktops import web-created entry before pushing;
+/// (l) Discovery: zero outbox calls when desktops are unchanged and no web device.
+#[tokio::test]
+async fn golden_outbox_cross_desktop_create_and_discovery() {
+    let cloud = setup_golden_outbox_cloud();
+    let created_id = cloud.web_fixture["expected"]["created_entry_id"]
+        .as_str()
+        .unwrap();
+
+    // Desktop A imports web-created E
+    let media_dir_a = TempDir::new().unwrap();
+    let conn_a = fresh_db();
+    let dev_a = "00000000-0000-0000-0000-000000000001";
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_a,
+        &conn_a,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_a.path(),
+    )
+    .await;
+
+    // Desktop B imports web-created E in the same window (before A pushes)
+    let media_dir_b = TempDir::new().unwrap();
+    let conn_b = fresh_db();
+    let dev_b = "00000000-0000-0000-0000-000000000006";
+    run_desktop_sync_and_import(
+        &cloud.provider,
+        dev_b,
+        &conn_b,
+        &cloud.key_state,
+        &cloud.engine_key,
+        media_dir_b.path(),
+    )
+    .await;
+
+    // Both converge to one E with no refusal
+    let row_a = db::get_entry_raw(&conn_a, created_id).unwrap().unwrap();
+    let row_b = db::get_entry_raw(&conn_b, created_id).unwrap().unwrap();
+    assert_eq!(row_a.id, row_b.id);
+    assert_eq!(row_a.title, row_b.title);
+    assert_eq!(row_a.content_text, row_b.content_text);
+
+    // (l) Discovery: zero outbox calls when peers are unchanged and no web device
+    let disc_dir = TempDir::new().unwrap();
+    let disc_prov = Arc::new(fenced_provider(disc_dir.path(), 0));
+    let dev1 = "00000000-0000-0000-0000-000000000001";
+    let dev2 = "00000000-0000-0000-0000-000000000006";
+    let slot1 = memlore_core::keyring_types::DeviceSlotV2 {
+        version: memlore_core::keyring_types::KEYRING_V2_VERSION,
+        device_id: dev1.to_string(),
+        name: "Desktop 1".to_string(),
+        created_at: 1000,
+        last_seen_at: 1000,
+    };
+    let slot2 = memlore_core::keyring_types::DeviceSlotV2 {
+        version: memlore_core::keyring_types::KEYRING_V2_VERSION,
+        device_id: dev2.to_string(),
+        name: "Desktop 2".to_string(),
+        created_at: 1000,
+        last_seen_at: 1000,
+    };
+    crate::sync::keyring_v2::io::write_device_slot(&*disc_prov, &slot1)
+        .await
+        .unwrap();
+    crate::sync::keyring_v2::io::write_device_slot(&*disc_prov, &slot2)
+        .await
+        .unwrap();
+
+    let counting = Arc::new(CountingOutboxProvider {
+        inner: disc_prov.clone(),
+        outbox_calls: std::sync::atomic::AtomicUsize::new(0),
+    });
+
+    let mut disc_summary = crate::sync::engine::SyncSummary::default();
+    disc_summary.unchanged_peers = vec![dev2.to_string()];
+    let disc_conn = fresh_db();
+    let disc_media = TempDir::new().unwrap();
+    let disc_key_list = cloud.key_state.content_key_list().unwrap();
+
+    let _ = run_outbox_import_cycle(
+        counting.as_ref(),
+        counting.as_ref(),
+        dev1,
+        &disc_key_list,
+        std::collections::HashMap::new(),
+        true,
+        &disc_summary,
+        disc_media.path(),
+        &disc_conn,
+        &NoopOutboxSink,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        counting
+            .outbox_calls
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "zero list_files(Outbox) calls"
     );
 }

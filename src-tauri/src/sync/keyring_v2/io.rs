@@ -315,7 +315,7 @@ pub async fn delete_device_slot<P: KeyringV2Io>(
 /// `device_id` does not match the filename stem are skipped with a warning
 /// rather than aborting, so a single corrupt slot does not prevent the others
 /// from loading. Returns an empty `Vec` when the directory is absent.
-pub async fn list_device_slots<P: KeyringV2Io>(
+pub async fn list_device_slots<P: KeyringV2Io + ?Sized>(
     provider: &P,
 ) -> Result<Vec<DeviceSlotV2>, SyncError> {
     let paths = provider.list_files(DEVICES_DIR).await?;

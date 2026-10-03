@@ -215,7 +215,7 @@ impl OutboxEntryV1 {
             if !is_safe_id(&j.value) {
                 return Err(OutboxError::InvalidId(j.value.clone()));
             }
-            if !is_safe_id(&j.base) {
+            if !j.base.is_empty() && !is_safe_id(&j.base) {
                 return Err(OutboxError::InvalidId(j.base.clone()));
             }
         }

@@ -11,6 +11,11 @@ const fixturesDir = new URL('../../src-tauri/crates/memlore-core/fixtures/', imp
 const outPath = fileURLToPath(new URL('web-envelopes.v1.json', fixturesDir))
 const vaultPath = fileURLToPath(new URL('desktop-vault.v1.json', fixturesDir))
 
+if (process.argv.includes('--outbox')) {
+  await import('./gen-web-outbox-fixture.ts')
+  process.exit(0)
+}
+
 if (existsSync(outPath) && process.env.MEMLORE_REGEN_FIXTURES !== '1') {
   console.error(
     `Refusing to overwrite ${outPath}: it is a frozen cross-language oracle.\n` +
@@ -63,8 +68,14 @@ const out = {
     expected_metadata_json: JSON.stringify(entryMeta),
     expected_yjs_b64: b64(entryYjs),
   },
-  media: { envelope_b64: b64(core.sealOutboxMedia(ring, mediaPlain)), expected_b64: b64(mediaPlain) },
-  thumb: { envelope_b64: b64(core.sealOutboxThumb(ring, thumbPlain)), expected_b64: b64(thumbPlain) },
+  media: {
+    envelope_b64: b64(core.sealOutboxMedia(ring, mediaPlain)),
+    expected_b64: b64(mediaPlain),
+  },
+  thumb: {
+    envelope_b64: b64(core.sealOutboxThumb(ring, thumbPlain)),
+    expected_b64: b64(thumbPlain),
+  },
 }
 
 function ring_seal_entry(): Uint8Array {

@@ -162,7 +162,7 @@ fn map_set_auto_tags_err(e: rusqlite::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::{self, schema::migrate, Journal};
+    use crate::db::{self, schema::migrate};
     use crate::AppState;
     use rusqlite::Connection;
 

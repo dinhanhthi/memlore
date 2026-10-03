@@ -18,6 +18,7 @@ use zeroize::Zeroizing;
 /// Retained in memory so that biometric unlock can store it in the Keychain
 /// and paths that start from master (biometric, recover) can reconstruct
 /// everything from it without a second password prompt.
+#[derive(Clone)]
 pub struct ContentKeyList {
     /// Epoch → content key map. Keys are `Zeroizing` so they are wiped on drop.
     pub keys: std::collections::BTreeMap<u32, Zeroizing<[u8; 32]>>,
@@ -434,6 +435,27 @@ impl EncryptionKeyState {
             None => Err(
                 "snapshot_for_engine: encryption key not initialized — app is locked".to_string(),
             ),
+        }
+    }
+
+    /// Return a clone of the current `ContentKeyList`.
+    pub fn content_key_list(&self) -> Result<ContentKeyList, String> {
+        let guard = self.lock_key();
+        match guard.as_ref() {
+            Some(list) => Ok(list.clone()),
+            None => Err("Encryption key not initialized — app is locked".to_string()),
+        }
+    }
+
+    /// Execute a closure with a reference to the current `ContentKeyList`.
+    pub fn with_content_key_list<R>(
+        &self,
+        f: impl FnOnce(&ContentKeyList) -> Result<R, String>,
+    ) -> Result<R, String> {
+        let guard = self.lock_key();
+        match guard.as_ref() {
+            Some(list) => f(list),
+            None => Err("Encryption key not initialized — app is locked".to_string()),
         }
     }
 }

@@ -269,7 +269,10 @@ describe('unlock: content keys', () => {
     putMeta(RECORD.masterFingerprint, 0)
     drive.interceptors.push((req) => {
       // The desktop finishes the epoch 0 -> 1 migration just as _meta.json is read.
-      if (req.url.searchParams.get('q')?.includes('_meta.json') && !drive.find(['Memlore', '.meta', 'keyring', '_content.json'])) {
+      if (
+        req.url.searchParams.get('q')?.includes('_meta.json') &&
+        !drive.find(['Memlore', '.meta', 'keyring', '_content.json'])
+      ) {
         putContent()
       }
       return undefined
