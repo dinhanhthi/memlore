@@ -3810,6 +3810,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "memlore-wasm"
+version = "0.2.1"
+dependencies = [
+ "hex",
+ "memlore-core",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "zeroize",
+]
+
+[[package]]
 name = "memoffset"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

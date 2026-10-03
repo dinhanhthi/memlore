@@ -17,6 +17,7 @@
     "format": "prettier --write . && cd src-tauri && cargo fmt --all",
     "format:check": "prettier --check . && cd src-tauri && cargo fmt --all --check",
     "design": "python3 -m http.server 8080 --directory docs/design/project",
+    "web:wasm": "bash scripts/web-wasm.sh",
     "website:dev": "vite --config website/vite.config.ts",
     "website:build": "tsc -p website/tsconfig.json && vite build --config website/vite.config.ts",
     "website:preview": "vite preview --config website/vite.config.ts",

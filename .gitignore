@@ -103,3 +103,7 @@ website/.hallmark/
 
 # Decoded signing assets (provisioning profile) — never commit
 .ci/
+
+# Generated wasm-bindgen output (pnpm web:wasm)
+web/src/core/pkg/
+web/src/core/pkg-test/

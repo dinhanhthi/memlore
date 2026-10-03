@@ -1,0 +1,23 @@
+[package]
+name = "memlore-wasm"
+version = "0.2.1"
+description = "wasm-bindgen exports of memlore-core for the Memlore web app"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Exports sealEntry/sealMedia (test fixtures only). Never enable in production.
+test-sealers = []
+
+[dependencies]
+memlore-core = { path = "../memlore-core" }
+# Pinned with `=`: must equal the wasm-bindgen-cli version (scripts/web-wasm.sh).
+wasm-bindgen = "=0.2.118"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zeroize = { version = "1", features = ["derive"] }
+hex = "0.4"

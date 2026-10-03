@@ -13,3 +13,7 @@ website/src/naturalEarthLand.ts
 # Importer test fixtures are byte-exact inputs; one is deliberately malformed
 # HTML that prettier cannot parse, which aborts the whole run.
 src-tauri/tests/fixtures/
+# Generated wasm-bindgen output and frozen golden JSON must never be reflowed.
+web/src/core/pkg/
+web/src/core/pkg-test/
+src-tauri/crates/memlore-core/fixtures/
