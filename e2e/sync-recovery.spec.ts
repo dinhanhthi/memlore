@@ -1,7 +1,7 @@
 /**
  * Google Drive recovery-wizard E2E.
  *
- * Runs against the web preview harness (`pnpm web:dev`) with mocked Tauri
+ * Runs against the web preview harness (`pnpm mockup:dev`) with mocked Tauri
  * invoke/events — no live Google OAuth required.
  *
  * Setup (once):

@@ -1,5 +1,5 @@
 /* Tell Tailwind v4 to scan src/ for utility classes.
-   Without this, the Vite root is web/ and src/components/ never get scanned,
+   Without this, the Vite root is mockup/ and src/components/ never get scanned,
    so no utility classes (flex, h-screen, bg-elevated, etc.) are generated. */
 @source '../src';
 

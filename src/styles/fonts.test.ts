@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 describe('Shared font entrypoint', () => {
   it('is imported by both the app and web harness', () => {
     const appMain = readFileSync(resolve(__dirname, '../main.tsx'), 'utf8')
-    const webMain = readFileSync(resolve(__dirname, '../../web/main.tsx'), 'utf8')
+    const webMain = readFileSync(resolve(__dirname, '../../mockup/main.tsx'), 'utf8')
 
     expect({
       app: appMain.includes("import './styles/fonts'"),

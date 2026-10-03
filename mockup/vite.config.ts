@@ -19,7 +19,7 @@ function tauriAliasGuard() {
     resolveId(id: string) {
       if (id.startsWith('@tauri-apps/') && !ALIASED_TAURI.has(id)) {
         throw new Error(
-          `[web harness] Unaliased @tauri-apps import: "${id}". Add a mock for it in web/mocks/.`,
+          `[mockup harness] Unaliased @tauri-apps import: "${id}". Add a mock for it in mockup/mocks/.`,
         )
       }
     },
@@ -33,7 +33,7 @@ export default defineConfig({
   // Isolate from the Tauri dev server (port 5173). Both configs alias/pre-bundle
   // differently; sharing node_modules/.vite causes 504 Outdated Optimize Dep on
   // whichever server did not trigger the last re-optimization.
-  cacheDir: fileURLToPath(new URL('../node_modules/.vite-web', import.meta.url)),
+  cacheDir: fileURLToPath(new URL('../node_modules/.vite-mockup', import.meta.url)),
   base: './',
   publicDir: fileURLToPath(new URL('../public', import.meta.url)),
   plugins: [tailwindcss(), react(), tauriAliasGuard()],
@@ -47,7 +47,7 @@ export default defineConfig({
     include: ['recharts', 'leaflet', 'leaflet.heat', 'leaflet.markercluster'],
   },
   resolve: {
-    // web/ is a separate Vite root — without dedupe, react-i18next can resolve a
+    // mockup/ is a separate Vite root — without dedupe, react-i18next can resolve a
     // second React copy and hooks throw "Cannot read properties of null
     // (reading 'useSyncExternalStore')".
     dedupe: ['react', 'react-dom', 'react-i18next'],

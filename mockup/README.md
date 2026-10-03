@@ -1,4 +1,4 @@
-# Memlore Web Preview Harness
+# Memlore Mockup Harness
 
 A browser-based preview of the Tauri app UI that mounts the **exact same** `src/App.tsx`
 with the Tauri backend replaced by a mocked IPC layer and selectable fake-data scenarios.
@@ -6,27 +6,27 @@ with the Tauri backend replaced by a mocked IPC layer and selectable fake-data s
 ## Quick start
 
 ```
-pnpm web:dev   # starts at http://localhost:5175
+pnpm mockup:dev   # starts at http://localhost:5175
 ```
 
 ## The golden rule
 
 **Never edit `src/` components to accommodate the browser.** If a component breaks in the browser,
-fix the mock layer (`web/mocks/`) instead. Any change you see at `localhost:5175` is the exact
+fix the mock layer (`mockup/mocks/`) instead. Any change you see at `localhost:5175` is the exact
 change that ships in the Tauri app.
 
 ## How it works
 
-Every `@tauri-apps/*` import in `src/` is aliased by Vite to a mock in `web/mocks/`:
+Every `@tauri-apps/*` import in `src/` is aliased by Vite to a mock in `mockup/mocks/`:
 
-| Import                   | Mock                                                            |
-| ------------------------ | --------------------------------------------------------------- |
-| `@tauri-apps/api/core`   | `web/mocks/core.ts` — `invoke()` delegates to `invokeRouter.ts` |
-| `@tauri-apps/api/event`  | `web/mocks/event.ts` — in-memory listener registry              |
-| `@tauri-apps/api/window` | `web/mocks/window.ts` — no-op window controls                   |
-| ...                      | ...                                                             |
+| Import                   | Mock                                                               |
+| ------------------------ | ------------------------------------------------------------------ |
+| `@tauri-apps/api/core`   | `mockup/mocks/core.ts` — `invoke()` delegates to `invokeRouter.ts` |
+| `@tauri-apps/api/event`  | `mockup/mocks/event.ts` — in-memory listener registry              |
+| `@tauri-apps/api/window` | `mockup/mocks/window.ts` — no-op window controls                   |
+| ...                      | ...                                                                |
 
-The **scenario registry** (`web/scenarios/index.ts`) lets you declaratively define which IPC
+The **scenario registry** (`mockup/scenarios/index.ts`) lets you declaratively define which IPC
 commands return what data, which Tauri events to fire on load, and any Zustand store seeds.
 
 ## Scenarios
@@ -62,18 +62,18 @@ pnpm exec playwright test e2e/sync-recovery.spec.ts
 
 ## Adding a scenario
 
-1. Add an entry to `scenarios[]` in `web/scenarios/index.ts`
+1. Add an entry to `scenarios[]` in `mockup/scenarios/index.ts`
 2. Set `invoke` overrides for any IPC commands you want to control
-3. Optionally add `emitOnLoad` events (see `web/scenarios/sync.ts` for examples)
+3. Optionally add `emitOnLoad` events (see `mockup/scenarios/sync.ts` for examples)
 4. Optionally add `seedStores` to seed Zustand stores before mount
 
 ## Adding fixtures
 
-Add typed arrays to `web/fixtures/` and import them in `web/fixtures/index.ts`.
-The `web/scenarios/index.ts` `logged-in` scenario's invoke factories reference them.
+Add typed arrays to `mockup/fixtures/` and import them in `mockup/fixtures/index.ts`.
+The `mockup/scenarios/index.ts` `logged-in` scenario's invoke factories reference them.
 
 ## Build gate
 
 ```
-pnpm web:build   # tsc --noEmit + vite build
+pnpm mockup:build   # tsc --noEmit + vite build
 ```

@@ -3063,7 +3063,7 @@ body {
    Audio seek slider (AudioPlayer transport)
    A native <input type="range"> is styled here instead of
    with Tailwind so the track/thumb pseudo-elements render
-   identically in Chromium (dev web/) and WKWebView (the
+   identically in Chromium (dev mockup/) and WKWebView (the
    packaged app) — both honor the -webkit- prefixes. The
    filled portion is driven by the inline --xj-audio-pct var
    the component sets from currentTime/duration.

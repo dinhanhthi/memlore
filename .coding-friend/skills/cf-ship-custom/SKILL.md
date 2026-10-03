@@ -16,7 +16,7 @@ This is a **version bump + changelog + tag** operation for Memlore. Run these st
 
 The fourth row is **promotion**, and it is the one that looks like a bug if you do the arithmetic yourself: the next version drops the suffix and keeps the core. Treating it as a patch bump would ship `0.1.2` and skip `0.1.1` entirely. `bump-info.sh` computes this for you under "Next version" — read that section and use its answer verbatim. Do not compute a version by hand.
 
-Memlore has **one** versioned package — the desktop app. `website/` and `web/` are not separately versioned and never drive a bump.
+Memlore has **one** versioned package — the desktop app. `website/`, `mockup/` and `web/` are not separately versioned and never drive a bump.
 
 ### Step B1: Get bump context
 
@@ -214,7 +214,7 @@ Name the channel explicitly, since a `-beta`/`-rc` tag is published as a prerele
 
 - Published tags on `origin` are the single source of truth. `bump-info.sh` fetches them first.
 - **NEVER bump when the file version is already ahead of the tag** — changelog only.
-- **NEVER count `website/`, `web/`, `docs/` or `e2e/` changes, or `(website)`-scoped commits, toward a bump.** This is the user's explicit requirement.
+- **NEVER count `website/`, `mockup/`, `web/`, `docs/` or `e2e/` changes, or `(website)`-scoped commits, toward a bump.** This is the user's explicit requirement.
 - **PATCH unless both bars for MINOR are met.** One new feature is a patch, however large. MINOR needs several distinct new features and a large change set together. When unsure, PATCH. An `Added` heading is not a reason to bump minor.
 - `HAS APP CHANGES: no` means nothing to release. It does not mean patch.
 - One feature, one changelog bullet. Entries are net changes versus the previous release, never a commit dump.

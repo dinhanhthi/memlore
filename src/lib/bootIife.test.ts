@@ -6,7 +6,7 @@ const REPO_ROOT = resolve(__dirname, '../..')
 
 const HTML_FILES = [
   { label: 'index.html', path: resolve(REPO_ROOT, 'index.html') },
-  { label: 'web/index.html', path: resolve(REPO_ROOT, 'web/index.html') },
+  { label: 'mockup/index.html', path: resolve(REPO_ROOT, 'mockup/index.html') },
 ] as const
 
 function extractBootIife(html: string): string {
@@ -44,7 +44,7 @@ const iifes = HTML_FILES.map(({ label, path }) => ({
 }))
 
 describe('boot IIFE lockstep', () => {
-  it('keeps index.html and web/index.html stamp logic in lockstep', () => {
+  it('keeps index.html and mockup/index.html stamp logic in lockstep', () => {
     expect(normalizeIife(iifes[0].script)).toBe(normalizeIife(iifes[1].script))
   })
 

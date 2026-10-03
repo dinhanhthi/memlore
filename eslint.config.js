@@ -42,7 +42,7 @@ export default defineConfig([
     // App entry points mount the tree and export nothing, which is exactly what
     // the rule reports ("Fast refresh only works when a file has exports").
     // Nothing imports them, so there is no refresh boundary to preserve.
-    files: ['src/main.tsx', 'web/main.tsx', 'website/src/main.tsx'],
+    files: ['src/main.tsx', 'mockup/main.tsx', 'website/src/main.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

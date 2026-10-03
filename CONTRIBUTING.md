@@ -83,15 +83,15 @@ A different feature set stores another copy of that one crate. `cargo clean` (an
 
 After writing the config on a machine that already has a per-project `target/`, delete those directories. They are no longer on Cargo's path, and `cargo clean` will not see them. The next `pnpm tauri dev` fills `~/.cargo/shared-target`.
 
-## UI playground (`web/`)
+## UI playground (`mockup/`)
 
-`web/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.
+`mockup/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.
 
 ```bash
-pnpm web:dev   # http://localhost:5175
+pnpm mockup:dev   # http://localhost:5175
 ```
 
-Pick a scenario from the floating panel (or `?scenario=<id>`). **Never change `src/` components to make the browser happy** — fix `web/mocks/` instead. Details: [`web/README.md`](web/README.md).
+Pick a scenario from the floating panel (or `?scenario=<id>`). **Never change `src/` components to make the browser happy** — fix `mockup/mocks/` instead. Details: [`mockup/README.md`](mockup/README.md).
 
 ## How we work
 

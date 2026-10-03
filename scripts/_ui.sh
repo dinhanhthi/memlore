@@ -49,7 +49,7 @@ stop_memlore_dev_server() {
 }
 
 # Stop the web UI harness if it is still listening on port 5175.
-# `pnpm web:dev` uses strictPort: true in web/vite.config.ts.
-stop_web_harness_dev_server() {
-  stop_port_listeners 5175 "web harness dev server on port 5175"
+# `pnpm mockup:dev` uses strictPort: true in mockup/vite.config.ts.
+stop_mockup_dev_server() {
+  stop_port_listeners 5175 "mockup dev server on port 5175"
 }

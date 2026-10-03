@@ -54,15 +54,15 @@
 
 **Prerequisites:** [Rust](https://rustup.rs/) 1.88+, [Node.js](https://nodejs.org/) 20+, [pnpm](https://pnpm.io/) 9+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. VS Code: install the recommended extensions when prompted (format-on-save + ESLint).
 
-`web/` is the in-browser preview of the Tauri app UI (mocked backend). `website/` is the public marketing site and interactive demo at [memlore.app](https://memlore.app).
+`mockup/` is the in-browser preview of the Tauri app UI (mocked backend). `website/` is the public marketing site and interactive demo at [memlore.app](https://memlore.app).
 
 ```bash
 pnpm install
 pnpm tauri dev                    # native app
 # MEMLORE_REACT_DEVTOOLS=1 pnpm tauri dev   # optional, after `npx react-devtools`
 
-pnpm web:dev                      # app UI preview (web/) — http://localhost:5175
-pnpm web:build && pnpm web:preview
+pnpm mockup:dev                   # app UI preview (mockup/) — http://localhost:5175
+pnpm mockup:build && pnpm mockup:preview
 
 pnpm website:dev                  # marketing site (website/) — http://localhost:5176
 pnpm website:build && pnpm website:preview
@@ -114,7 +114,7 @@ travels with the repo (`.coding-friend/config.json` stays local).
 
 Releases are stable by default; `--rc` / `--beta` opt into a GitHub prerelease,
 which is what keeps a build off the stable update channel. Changes under
-`website/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
+`website/`, `mockup/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
 [`.github/release-setup.md`](.github/release-setup.md) for the signing and
 notarization secrets CI needs.
 

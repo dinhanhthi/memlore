@@ -6,7 +6,7 @@ changelog page.
 
 Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
-`website/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
+`website/`, `mockup/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
 
 ## v0.2.1 (2026-10-01)
 

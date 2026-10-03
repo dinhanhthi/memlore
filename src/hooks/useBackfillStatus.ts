@@ -126,7 +126,7 @@ export function useBackfillStatus(): UseBackfillStatusReturn {
     try {
       const stats = await getEmbeddingIndexStats()
       // The web preview's invoke router returns `null` for unhandled
-      // commands (see web/mocks/invokeRouter.ts); fall back to the idle
+      // commands (see mockup/mocks/invokeRouter.ts); fall back to the idle
       // shape so a null never reaches the store. The real backend always
       // returns a fully-populated struct.
       const next = stats ?? IDLE_INDEX_STATS

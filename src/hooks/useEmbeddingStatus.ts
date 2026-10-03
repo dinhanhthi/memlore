@@ -92,7 +92,7 @@ export function useEmbeddingStatus() {
         getBackfillStatus(),
       ])
       // The web preview's invoke router returns `null` for unhandled
-      // commands (see web/mocks/invokeRouter.ts); guard each payload so a
+      // commands (see mockup/mocks/invokeRouter.ts); guard each payload so a
       // null never throws inside refresh. Real backend responses always
       // carry these fields.
       setBackgroundSettings({

@@ -421,7 +421,7 @@ describe('useBackfillStatus', () => {
   })
 
   // Regression: the web preview's invoke router returns `null` for
-  // unhandled commands (see web/mocks/invokeRouter.ts). The mount-time
+  // unhandled commands (see mockup/mocks/invokeRouter.ts). The mount-time
   // hydration Promise.all and the refresh callbacks must tolerate null
   // payloads from all three commands without throwing — before the
   // null-guards this crashed consumers reading `.indexed` / `.enabled`.

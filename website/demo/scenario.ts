@@ -1,5 +1,5 @@
-import { getScenario } from '../../web/scenarios'
-import { setActiveScenario } from '../../web/mocks/activeScenario'
+import { getScenario } from '../../mockup/scenarios'
+import { setActiveScenario } from '../../mockup/mocks/activeScenario'
 import { useUiStore } from '../../src/stores/uiStore'
 import { makeDefaultTab, markLaunchViewApplied, useTabStore } from '../../src/stores/tabStore'
 import { useOnboardingStore } from '../../src/stores/onboardingStore'
