@@ -1,5 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { titlebarRowHeight } from '../../lib/windowChrome'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useUiStore } from '../../stores/uiStore'
 
 /**
@@ -16,6 +17,7 @@ import { useUiStore } from '../../stores/uiStore'
  */
 export function WindowDragRegion() {
   const designSystem = useUiStore((s) => s.designSystem)
+  const { windowChrome } = useCapabilities()
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     if (target.closest('a, button, input, select, textarea, [role="button"]')) {
@@ -29,6 +31,8 @@ export function WindowDragRegion() {
         }
       })
   }
+
+  if (!windowChrome) return null
 
   return (
     <div

@@ -1,6 +1,7 @@
 import { Cloud, HardDrive } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { isMacOS } from '../../lib/platform'
 import { providerLabel, providerOrder } from '../../lib/providerLabel'
 import type { CloudProviderKind } from '../../lib/tauri'
@@ -38,7 +39,10 @@ export function CloudProviderPicker({
   disabled = false,
 }: CloudProviderPickerProps) {
   const { t } = useTranslation('settings')
-  const entries = providerOrder(isMacOS(), icloudAvailable)
+  const { icloud } = useCapabilities()
+  const entries = providerOrder(isMacOS(), icloudAvailable).filter(
+    (entry) => icloud || entry.kind !== 'icloud',
+  )
 
   return (
     <div

@@ -20,6 +20,47 @@ export function detectPlatform(): 'macos' | 'other' {
   return cached
 }
 
+/** True only in the web.memlore.app build (set by `web/vite.config.ts`). */
+export const isWeb: boolean = import.meta.env.VITE_MEMLORE_PLATFORM === 'web'
+
 export function isMacOS(): boolean {
+  // A Mac browser must not expose the Tauri/Swift Photo Library affordances.
+  if (isWeb) return false
   return detectPlatform() === 'macos'
+}
+
+export interface Capabilities {
+  windowChrome: boolean
+  biometric: boolean
+  icloud: boolean
+  ai: boolean
+  dashboard: boolean
+  maps: boolean
+  chat: boolean
+  reminders: boolean
+  importExport: boolean
+  versions: boolean
+  secondLock: boolean
+  onDeviceModels: boolean
+  updater: boolean
+  writes: boolean
+}
+
+/** Static capabilities: every feature on desktop; none on web. `writes` on web is
+ * overridden at runtime by `capabilitiesStore` (see `useCapabilities`). */
+export const capabilities: Capabilities = {
+  windowChrome: !isWeb,
+  biometric: !isWeb,
+  icloud: !isWeb,
+  ai: !isWeb,
+  dashboard: !isWeb,
+  maps: !isWeb,
+  chat: !isWeb,
+  reminders: !isWeb,
+  importExport: !isWeb,
+  versions: !isWeb,
+  secondLock: !isWeb,
+  onDeviceModels: !isWeb,
+  updater: !isWeb,
+  writes: !isWeb,
 }
