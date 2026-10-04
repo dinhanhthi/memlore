@@ -12,6 +12,42 @@ bumps count `web/`, `workers/web-auth/`, `src/`, `public/`, the `memlore-core`
 and `memlore-wasm` crates and `package.json`. `website/`, `mockup/`, `docs/` and
 `e2e/` count for neither.
 
+## web-v0.1.0 (2026-10-05)
+
+First release of the web companion at web.memlore.app. It opens an existing
+desktop vault in the browser; creating a vault stays on the desktop.
+
+### Added
+
+- **Open your vault in the browser.** Sign in with Google, enter the 24-word
+  recovery phrase, and choose a web password. The browser registers as its own
+  device, which desktop can remove from Settings → Security. Keys live in
+  WebAssembly memory; IndexedDB holds only ciphertext.
+- **Lazy reads from Google Drive.** The five newest entries load first, older
+  ones on demand, and media when an entry is opened. A media cache keeps
+  ciphertext only and cleans itself up.
+- **Edits through an outbox.** The web never writes sync files. Edits
+  (content, title, date, emotion, favorite, journal, tags, photos and videos)
+  are sealed into the browser's own `outbox/` folder, and the desktop imports and
+  merges them with its own sync code. Desktop wins conflicts, and nothing is ever
+  deleted from the web. Writes are behind the `WEB_WRITES_ENABLED` switch and
+  start off.
+- **Desktop outbox importer.** Desktop sync discovers and imports those outbox
+  edits and creations, merging Yjs documents without clock comparisons, and
+  publishes its decisions so the web stops re-sending them.
+- **Safety checks before every write.** The recovery fence, an unknown-format
+  latch that turns the web read-only, a clock-skew limit, and seal-then-verify of
+  every payload.
+- **Pending edits from other browsers** show in the overlay, read-only, before
+  desktop imports them.
+
+### Notes for maintainers
+
+- Version in `web/version.json`; tags are `web-v*` and deploy through
+  `deploy-web.yml`. No GitHub Release is created for a web tag.
+- The OAuth Worker (`workers/web-auth`) only exchanges the Google code.
+  There is no Memlore data server.
+
 ## v0.2.1 (2026-10-01)
 
 ### Added

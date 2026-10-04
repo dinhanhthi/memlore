@@ -30,6 +30,22 @@ export type ChangelogRelease = {
 /** Newest release first. */
 export const releases: ChangelogRelease[] = [
   {
+    version: '0.1.0',
+    date: '2026-10-05',
+    stable: true,
+    platform: 'web',
+    items: [
+      {
+        kind: 'new',
+        text: 'Memlore Web: open your journal in any browser. Sign in with Google, enter your recovery phrase, and read and search your entries and media. Your keys stay in your browser and nothing goes through a Memlore server. You create your vault on the desktop first.',
+      },
+      {
+        kind: 'new',
+        text: 'Edits made on the web are saved to a private outbox on your Google Drive, and your desktop app merges them on its next sync. If you change the same thing on both, your desktop wins, and the web never deletes anything. Editing on the web is switched on separately and starts off.',
+      },
+    ],
+  },
+  {
     version: '0.2.1',
     date: '2026-10-01',
     stable: true,
