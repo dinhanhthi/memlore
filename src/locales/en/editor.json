@@ -455,8 +455,6 @@
   },
   "placeholder": "Write your thoughts…",
   "web": {
-    "readOnlyBanner": "Read-only on the web. Open Memlore on desktop to edit your entries.",
-    "tooLargeForWeb": "This file is too large for the web. Open on desktop.",
-    "unsupported": "Not supported on the web."
+    "readOnlyBanner": "Read-only on the web. Open Memlore on desktop to edit your entries."
   }
 }

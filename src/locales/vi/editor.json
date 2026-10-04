@@ -455,8 +455,6 @@
   },
   "placeholder": "Viết suy nghĩ của bạn…",
   "web": {
-    "readOnlyBanner": "Chỉ đọc trên web. Mở Memlore trên máy tính để chỉnh sửa nhật ký.",
-    "tooLargeForWeb": "Tệp này quá lớn đối với bản web. Hãy mở trên máy tính.",
-    "unsupported": "Không hỗ trợ trên web."
+    "readOnlyBanner": "Chỉ đọc trên web. Mở Memlore trên máy tính để chỉnh sửa nhật ký."
   }
 }
