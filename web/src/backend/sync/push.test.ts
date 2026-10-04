@@ -20,7 +20,14 @@ import {
   type DesktopFixture,
 } from '../drive/fakeDrive'
 import { createDraftManager, resetDraftsAutostartForTest, sha256Hex } from '../drafts'
-import { configureKeysEnv, dispose, setKeyRing, type KeyRing } from '../keys'
+import {
+  VaultLockedError,
+  configureKeysEnv,
+  dispose,
+  lock,
+  setKeyRing,
+  type KeyRing,
+} from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
 import { RecoveryFenceError, resumeWrites } from './fence'
 import { resetFormatGuardLatch } from './formatGuard'
@@ -130,6 +137,19 @@ function uploadedNames(): string[] {
 const folderCreates = () =>
   drive.mutating().filter((r) => r.method === 'POST' && r.url.pathname === '/drive/v3/files')
 
+/** The fixture vault's key ring, as an unlock would build it. */
+function openRing(): KeyRing {
+  const meta = JSON.parse(metaText) as { master_fingerprint: string }
+  const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as { wrapped_master: string }
+  const next = realCore.KeyRing.fromRecovery(
+    fixture.recovery_phrase,
+    recovery.wrapped_master,
+    meta.master_fingerprint,
+  )
+  next.loadContentList(text(fixtureBytes(fixture, CONTENT)))
+  return next
+}
+
 async function isPushed(entryId: string): Promise<boolean> {
   return typeof (await db.drafts.get(entryId))?.pushedHash === 'string'
 }
@@ -178,13 +198,7 @@ beforeEach(async () => {
 
   metaText = text(fixtureBytes(fixture, META_PATH))
   const meta = JSON.parse(metaText) as { master_fingerprint: string }
-  const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as { wrapped_master: string }
-  ring = realCore.KeyRing.fromRecovery(
-    fixture.recovery_phrase,
-    recovery.wrapped_master,
-    meta.master_fingerprint,
-  )
-  ring.loadContentList(text(fixtureBytes(fixture, CONTENT)))
+  ring = openRing()
   setKeyRing(ring)
 
   await db.device.put({
@@ -384,6 +398,59 @@ describe('pushAll', () => {
     expect(drive.requests).toEqual([])
     expect(await isPushed(ENTRY_A)).toBe(false)
   })
+
+  it('is a no-op that never touches Drive while locked', async () => {
+    await putDraft(intent(ENTRY_A), 1)
+    lock('manual')
+    unlocked = false
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 0, skipped: 0, pending: 0 })
+    expect(drive.requests).toEqual([])
+    expect(await isPushed(ENTRY_A)).toBe(false)
+  })
+
+  // With a re-unlock, a ring is installed again: only the run's epoch can stop it.
+  it.each([
+    ['a lock', false],
+    ['a lock and re-unlock', true],
+  ])(
+    '%s between two drafts stops the run: nothing more is written or marked',
+    async (_, reunlock) => {
+      await putDraft(intent(ENTRY_A), 1)
+      await putDraft(intent(ENTRY_B), 2)
+      let writesAtLock = -1
+      let marksAfterLock = 0
+      const markPushed = db.drafts.markPushed
+      vi.spyOn(db.drafts, 'markPushed').mockImplementation(async (...args) => {
+        if (writesAtLock >= 0) marksAfterLock += 1
+        const marked = await markPushed(...args)
+        if (args[0] === ENTRY_A) {
+          expect(outbox(`${ENTRY_A}.bin`)).toBeDefined()
+          writesAtLock = drive.mutating().length
+          lock('manual')
+          unlocked = false
+          if (reunlock) {
+            ring = openRing()
+            setKeyRing(ring)
+            unlocked = true
+          }
+        }
+        return marked
+      })
+
+      const result = await pushAll()
+
+      expect(result.error).toBeInstanceOf(VaultLockedError)
+      expect(result).toMatchObject({ pushed: 1, skipped: 0, pending: 1 })
+      expect(drive.mutating()).toHaveLength(writesAtLock)
+      expect(outbox(`${ENTRY_B}.bin`)).toBeUndefined()
+      expect(marksAfterLock).toBe(0)
+      expect(await isPushed(ENTRY_A)).toBe(true)
+      expect(await isPushed(ENTRY_B)).toBe(false)
+    },
+  )
 
   it('is single-flight: calls during a run share one follow-up run that sees the new save', async () => {
     await putDraft(intent(ENTRY_A), 1)
