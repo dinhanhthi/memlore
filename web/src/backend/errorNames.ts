@@ -8,4 +8,6 @@ export const ERROR_NAMES = {
   reonboardRequired: 'ReonboardRequiredError',
   formatUnsupported: 'FormatUnsupportedError',
   pullTransient: 'PullTransientError',
+  recoveryFence: 'RecoveryFenceError',
+  clockSkew: 'ClockSkewError',
 } as const

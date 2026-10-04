@@ -45,9 +45,10 @@ import {
   DriveHttpError,
   DriveNotFoundError,
   DriveProtocolError,
+  DriveWriter,
   VaultNotReadyError,
   type DriveReader,
-  type DriveWriter,
+  type DriveWriterDeps,
 } from '../drive/client'
 import { deviceSlotPath, isValidGeneration, isValidOwnId } from '../drive/paths'
 import { ERROR_NAMES } from '../errorNames'
@@ -102,8 +103,8 @@ export class GenerationMismatchError extends Error {
 export class FormatUnsupportedError extends Error {
   readonly path: string
   readonly version: number
-  constructor(path: string, version: number) {
-    super(`Unsupported format: ${path} has version ${version}; update the app`)
+  constructor(path: string, version: number, message?: string) {
+    super(message ?? `Unsupported format: ${path} has version ${version}; update the app`)
     this.name = ERROR_NAMES.formatUnsupported
     this.path = path
     this.version = version
@@ -162,8 +163,10 @@ export class InvalidDeviceIdError extends Error {
 export interface OnboardDeps {
   /** Read-only Drive access (also the reader inside `writer`). */
   reader: DriveReader
-  /** Used for exactly one `put`: the device slot. */
-  writer: DriveWriter
+  /** Used for exactly one `put`: the device slot. Created from driveDeps if omitted. */
+  writer?: DriveWriter
+  /** Transport & token deps used to construct DriveWriter when writer is omitted. */
+  driveDeps?: DriveWriterDeps
   db: WebDb
   /** Defaults to `loadCore()`. */
   core?: Core
@@ -208,9 +211,9 @@ const FINGERPRINT_MISMATCH = 'master key fingerprint mismatch'
 const STORAGE_PROBE_KEY = 'onboard-probe'
 const PROBE_FINGERPRINT = '0'.repeat(64)
 
-const CONTROL_PATH = '.meta/control.json'
-const META_PATH = '.meta/keyring/_meta.json'
-const RECOVERY_PATH = '.meta/keyring/_recovery.json'
+export const CONTROL_PATH = '.meta/control.json'
+export const META_PATH = '.meta/keyring/_meta.json'
+export const RECOVERY_PATH = '.meta/keyring/_recovery.json'
 export const CONTENT_PATH = '.meta/keyring/_content.json'
 
 /** Desktop `is_safe_device_id` (`sync/safety.rs:18-23`). */
@@ -578,7 +581,14 @@ export async function onboardComplete(
   input: OnboardInput,
 ): Promise<OnboardResult> {
   const core = deps.core ?? (await loadCore())
-  const { reader, writer, db } = deps
+  const { reader, db } = deps
+  const writer =
+    deps.writer ??
+    (deps.driveDeps
+      ? new DriveWriter(reader, deps.driveDeps)
+      : (() => {
+          throw new Error('OnboardDeps requires either writer or driveDeps')
+        })())
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const v = readVersions(core)
   if (typeof input.password !== 'string' || input.password === '') {

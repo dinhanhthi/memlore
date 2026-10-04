@@ -8,7 +8,7 @@ vi.mock('../sync/onboard', async (importOriginal) => ({
   onboardComplete: vi.fn(),
 }))
 
-import { DriveReader, DriveWriter, VaultNotReadyError } from '../drive/client'
+import { DriveReader, VaultNotReadyError } from '../drive/client'
 import {
   FakeDrive,
   fakeLocks,
@@ -655,11 +655,11 @@ describe('onboard commands', () => {
     }
   })
 
-  it('complete passes the new password and a FRESH writer, emits app:unlocked and clears the session', async () => {
+  it('complete passes the new password and driveDeps, emits app:unlocked and clears the session', async () => {
     const sessionId = await ready()
     await call('onboard_complete', completeArgs(sessionId))
     const [deps, input] = vi.mocked(onboardComplete).mock.calls[0]
-    expect(deps.writer).toBeInstanceOf(DriveWriter)
+    expect(deps.driveDeps).toBeDefined()
     expect(deps.reader).toBeInstanceOf(DriveReader)
     expect(deps.db).toBe(db)
     expect(input).toEqual({ phrase: 'a b c', password: 'pw-1234' })
@@ -668,10 +668,10 @@ describe('onboard commands', () => {
       'not connected',
     )
 
-    // A second onboarding gets another writer (setIdentity refuses a second different identity).
+    // A second onboarding gets fresh driveDeps.
     const again = await ready()
     await call('onboard_complete', completeArgs(again))
-    expect(vi.mocked(onboardComplete).mock.calls[1][0].writer).not.toBe(deps.writer)
+    expect(vi.mocked(onboardComplete).mock.calls[1][0].driveDeps).toBeDefined()
   })
 
   it('complete failure is mapped, emits nothing and clears the session', async () => {

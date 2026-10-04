@@ -228,7 +228,6 @@ import { emitFromBackend } from '../../tauri/event'
 import {
   DriveAuthError,
   DriveReader,
-  DriveWriter,
   VaultNotReadyError,
   type DriveWriterDeps,
 } from '../drive/client'
@@ -677,7 +676,7 @@ const onboardComplete: Handler = async ({ mnemonic, newLocalPassword, sessionId 
     await run(
       {
         reader,
-        writer: new DriveWriter(reader, driveDeps()),
+        driveDeps: driveDeps(),
         db: await getDb(),
         core: await e.loadCore(),
         ...e.onboardDeps,

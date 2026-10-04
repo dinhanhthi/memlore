@@ -38,6 +38,7 @@ import {
   parseLogicalPath,
   splitPath,
 } from './paths'
+import { updateClockOffset } from '../clock'
 
 // ---------------------------------------------------------------------------------------------
 // Errors
@@ -206,6 +207,8 @@ async function send(
     } catch (error) {
       throw new DriveHttpError(0, error instanceof Error ? error.message : 'network error')
     }
+    const dateHeader = response.headers.get('date')
+    if (dateHeader) updateClockOffset(dateHeader)
     const retryable = response.status === 429 || (idempotent && response.status >= 500)
     if (!retryable || attempt >= RETRY_MAX_ATTEMPTS) return response
     await t.sleep(retryDelayMs(response, attempt))
@@ -703,13 +706,31 @@ export class DriveWriter {
     return this.#identity
   }
 
-  async #withLock<T>(task: () => Promise<T>): Promise<T> {
+  #lockDepth = 0
+
+  /**
+   * Acquire the single-writer lock for the given task. Supports re-entrant calls: nested
+   * invocations under an already-acquired writer lock execute immediately without re-requesting.
+   */
+  async withLock<T>(task: () => Promise<T>, overrideLocks?: LockManagerLike | null): Promise<T> {
+    if (this.#lockDepth > 0) {
+      return task()
+    }
     const locks =
-      this.#locks === undefined
-        ? (globalThis.navigator as { locks?: LockManagerLike } | undefined)?.locks
-        : this.#locks
+      overrideLocks !== undefined
+        ? overrideLocks
+        : this.#locks === undefined
+          ? (globalThis.navigator as { locks?: LockManagerLike } | undefined)?.locks
+          : this.#locks
     if (!locks) throw new LockUnavailableError()
-    return locks.request(WRITER_LOCK_NAME, task)
+    return locks.request(WRITER_LOCK_NAME, async () => {
+      this.#lockDepth++
+      try {
+        return await task()
+      } finally {
+        this.#lockDepth--
+      }
+    })
   }
 
   /** Throws unless every ancestor in `chain` exists (shared ancestors are never created). */
@@ -749,7 +770,7 @@ export class DriveWriter {
    */
   async ensureFolder(): Promise<EnsureFolderResult> {
     const { ownId, localGen } = this.#requireIdentity()
-    return this.#withLock(async () => {
+    return this.withLock(async () => {
       await this.#requireChain(DEVICE_SLOT_FOLDERS)
       const genRoot = await this.#requireChain([GENERATIONS_FOLDER, generationFolderName(localGen)])
       const deviceFolderId =
@@ -776,7 +797,7 @@ export class DriveWriter {
     const split = splitPath(path)
     if (split === null) throw new ForbiddenWriteError(`write not allowed: ${JSON.stringify(path)}`)
     const contentType = path.endsWith('.json') ? 'application/json' : 'application/octet-stream'
-    return this.#withLock(async () => {
+    return this.withLock(async () => {
       // Parent folders must already exist: the slot's shared chain, or ensureFolder's outbox.
       const parentId = await this.#requireChain(split.folders)
       const existing = await this.#reader.findFile(split.name, parentId)
