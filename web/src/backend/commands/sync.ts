@@ -80,7 +80,7 @@ export const MSG_FORMAT_READ_ONLY =
 
 /**
  * Shown (as the status `error` of a `synced` phase) when a device's data could not be read fully.
- * An intent-retention notice (`PullOutcome.notices`, the newest one) uses the same channel, once.
+ * Intent-retention notices (`PullOutcome.notices`) use the same channel, merged into one note, once.
  */
 export const MSG_SYNC_DEGRADED = "sync degraded: a device's data could not be read fully"
 
@@ -179,10 +179,19 @@ let lastSyncSec: number | null = null
 /** Set while the last successful pull left a device on its cached manifest. */
 let degraded = false
 /**
- * The newest intent-retention notice of the last pull, until a `synced` status carries it once
- * (in `error`, like `MSG_SYNC_DEGRADED`). Older notices of the same pull are not shown.
+ * Intent-retention notices of every pull, oldest first, until a `synced` status carries them once
+ * (merged into one note in `error`, like `MSG_SYNC_DEGRADED`). An error status leaves them queued.
+ * Memory only: a lock or restart drops them, and they are not shown again after a reload because
+ * retention already persisted them as shown before returning them.
  */
-let pendingNotice: string | null = null
+let pendingNotices: string[] = []
+
+/** The first notice, plus how many more were queued with it. */
+function mergeNotices(notices: string[]): string {
+  const more = notices.length - 1
+  if (more === 0) return notices[0]
+  return `${notices[0]} (and ${more} more ${more === 1 ? 'edit' : 'edits'})`
+}
 /** The pull in flight, tagged with the schedule epoch it started under. */
 let inflight: { epoch: number; promise: Promise<PullReport> } | null = null
 let lastAttemptAt = 0
@@ -215,7 +224,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   lastError = null
   lastSyncSec = null
   degraded = false
-  pendingNotice = null
+  pendingNotices = []
   inflight = null
   lastAttemptAt = 0
   nextAttemptAt = 0
@@ -246,9 +255,9 @@ function setPhase(next: SyncPhase, error: string | null): void {
   lastError = keepPushError ? pushError : error
   // A notice rides on one `synced` status only; `lastError` keeps the note it replaced.
   let shown = lastError
-  if (phase === 'synced' && pendingNotice !== null) {
-    shown = pendingNotice
-    pendingNotice = null
+  if (phase === 'synced' && pendingNotices.length > 0) {
+    shown = mergeNotices(pendingNotices)
+    pendingNotices = []
   }
   const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: shown }
   reportedPending = payload.entriesPending
@@ -302,7 +311,7 @@ async function doPull(): Promise<PullReport> {
     clearRetry()
     lastSyncSec = Math.floor(e.now() / 1000)
     degraded = (outcome.degraded?.length ?? 0) > 0
-    pendingNotice = outcome.notices?.at(-1) ?? pendingNotice
+    pendingNotices.push(...(outcome.notices ?? []))
     setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
     if (outcome.changed) e.emitChanged()
     return { outcome, message: null }
@@ -486,7 +495,7 @@ export function startSyncSchedule(): void {
   nextAttemptAt = 0
   lastAttemptAt = 0
   degraded = false
-  pendingNotice = null
+  pendingNotices = []
   pushFailures = 0
   pushNextAt = 0
   pushError = null

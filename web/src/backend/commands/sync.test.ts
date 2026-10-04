@@ -230,15 +230,46 @@ describe('schedule triggers', () => {
     expect(await syncHandlers.get_sync_status({})).not.toHaveProperty('error')
   })
 
-  it('shows the newest retention notice once as the synced note, then clears it', async () => {
+  it('merges every retention notice of a pull into one synced note, then clears it', async () => {
     const h = harness()
-    h.outcome = { stale: [], changed: false, notices: ['older notice', 'newest notice'] }
+    h.outcome = { stale: [], changed: false, notices: ['first notice', 'second', 'third'] }
     startSyncSchedule()
     await h.settle()
-    expect(h.last()).toMatchObject({ state: 'synced', error: 'newest notice' })
+    expect(h.last()).toMatchObject({ state: 'synced', error: 'first notice (and 2 more edits)' })
     h.outcome = NOOP
     await syncHandlers.sync_now({})
     expect(h.last()).toMatchObject({ state: 'synced', error: null })
+  })
+
+  it('shows a single notice as is', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, notices: ['only notice'] }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: 'only notice' })
+  })
+
+  it('a push error wins over notices; all of them show once the error clears', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = { pushed: 0, skipped: 0, pending: 1, error: new Error('quota') }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+    for (const notice of ['notice a', 'notice b']) {
+      h.outcome = { stale: [], changed: false, notices: [notice] }
+      await h.advance(FOCUS_MIN_AGE_MS + 1)
+      h.focus()
+      await h.settle()
+      expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+    }
+    expect(h.pulls).toBe(3)
+    h.outcome = NOOP
+    h.pushResult = PUSHED_ALL
+    h.online()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: 'notice a (and 1 more edit)' })
   })
 
   it('a notice is shown over the degraded note once, then the degraded note returns', async () => {
