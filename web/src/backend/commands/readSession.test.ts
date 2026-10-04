@@ -4,6 +4,7 @@ import type { Core } from '../../core/core'
 import { setWriteFlagForTest } from '../config'
 import { VaultLockedError } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import { isFormatGuardLatched, latchFormatGuard, resetFormatGuardLatch } from '../sync/formatGuard'
 import { createEmptyOutboxFields, type OutboxEntryV1 } from '../sync/outbox'
 import { entryHandlers } from './entries'
 import { configureReadEnv, createReadSession, type ReadSession } from './readSession'
@@ -15,6 +16,7 @@ const fakes = vi.hoisted(() => ({
   hooks: [] as Array<() => void>,
   puller: null as unknown,
   vault: null as unknown,
+  vaultDeps: null as unknown,
 }))
 
 vi.mock('../keys', async (importOriginal) => ({
@@ -28,7 +30,10 @@ vi.mock('../keys', async (importOriginal) => ({
 vi.mock('../sync/pull', () => ({ createPuller: () => fakes.puller }))
 vi.mock('../vault', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../vault')>()),
-  createVault: () => fakes.vault,
+  createVault: (deps: unknown) => {
+    fakes.vaultDeps = deps
+    return fakes.vault
+  },
 }))
 
 class Gate {
@@ -142,6 +147,33 @@ describe('read session and lock races', () => {
     r.warmGate.current = null
     await r.session.ready()
     expect(r.warmStart).toHaveBeenCalledTimes(2)
+  })
+
+  it('pull() reports a format guard latch so the sync status turns read-only', async () => {
+    resetFormatGuardLatch()
+    const r = await rig()
+    Object.assign(fakes.puller as object, {
+      refresh: async () => ({ stale: [] }),
+      getDegradedDevices: () => [],
+    })
+    expect((await r.session.pull()).formatReadOnly).toBeUndefined()
+    latchFormatGuard('devA/metadata.json', 'Unknown field(s) found: x')
+    expect((await r.session.pull()).formatReadOnly).toBe('Unknown field(s) found: x')
+    resetFormatGuardLatch()
+  })
+
+  it('the vault metadata guard latches on an unknown EntryMetadata field without throwing', async () => {
+    resetFormatGuardLatch()
+    await rig()
+    const { guardMetadata } = fakes.vaultDeps as {
+      guardMetadata: (id: string, json: string) => void
+    }
+    const meta = { entry_id: 'e1', device_id: 'd', updated_at: 1, journal_id: 'j' }
+    guardMetadata('e1', JSON.stringify(meta))
+    expect(isFormatGuardLatched()).toBe(false)
+    expect(() => guardMetadata('e1', JSON.stringify({ ...meta, future_field: 1 }))).not.toThrow()
+    expect(isFormatGuardLatched()).toBe(true)
+    resetFormatGuardLatch()
   })
 
   it('a lock during pull rejects it instead of reporting stale results', async () => {

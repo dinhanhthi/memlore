@@ -28,7 +28,7 @@ interface Fake {
   mergeSpy: ReturnType<typeof vi.fn>
 }
 
-function setup(): Fake {
+function setup(guardMetadata?: (id: string, metadataJson: string) => void): Fake {
   const payloads = new Map<string, { metadataJson: string; yjs: Uint8Array }>()
   const index = new Map<string, IndexEntry>()
   const fetched: string[] = []
@@ -81,6 +81,7 @@ function setup(): Fake {
     },
     puller,
     now: () => 1234,
+    guardMetadata,
   })
   const fullOf = (meta: Partial<EntryMetadata> & { entry_id: string }): EntryMetadata => ({
     device_id: 'dev-a',
@@ -132,6 +133,21 @@ function setup(): Fake {
     },
   }
 }
+
+describe('read-side format guard', () => {
+  it('runs the metadata guard on every opened copy and still shows the entry', async () => {
+    const guard = vi.fn()
+    const f = setup(guard)
+    f.put({ entry_id: 'b', title: 'newer', future_field: 1 })
+    const result = await f.vault.load(['b'])
+    expect(result.loaded).toEqual(['b'])
+    expect(f.vault.getEntry('b').metadata.title).toBe('newer')
+    expect(guard).toHaveBeenCalledTimes(1)
+    const [id, json] = guard.mock.calls[0] as [string, string]
+    expect(id).toBe('b')
+    expect(JSON.parse(json)).toMatchObject({ entry_id: 'b', future_field: 1 })
+  })
+})
 
 describe('load and views', () => {
   it('opens payloads and lists them by entry date, newest first', async () => {

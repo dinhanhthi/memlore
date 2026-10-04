@@ -872,6 +872,46 @@ describe('push status', () => {
     expect(h.log.filter((x) => x === 'push')).toHaveLength(2)
   })
 
+  it('a pull that latched the format guard shows the read-only note; no push, pulls go on', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.outcome = { stale: [], changed: false, formatReadOnly: 'Unknown field(s) found: x' }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull'])
+    expect(h.last()?.state).toBe('synced')
+    expect(h.last()?.error).toContain(MSG_FORMAT_READ_ONLY)
+    expect(h.last()?.error).toContain('Unknown field(s) found: x')
+    const status = (await syncHandlers.get_sync_status({})) as { error?: string }
+    expect(status.error).toContain(MSG_FORMAT_READ_ONLY)
+    h.online()
+    await h.advance(INTERVAL_MS)
+    expect(h.log.filter((x) => x === 'push')).toHaveLength(0)
+    expect(h.log.filter((x) => x === 'pull').length).toBeGreaterThan(1)
+  })
+
+  it('a format-guard push refusal shows the read-only message and stops automatic pushes', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = {
+      pushed: 0,
+      skipped: 0,
+      pending: 1,
+      error: named('FormatUnsupportedError', 'Format guard latched read-only: x'),
+    }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+    expect(h.last()?.state).toBe('error')
+    expect(h.last()?.error).toContain(MSG_FORMAT_READ_ONLY)
+    await h.advance(BACKOFF_BASE_MS * 64)
+    h.online()
+    await h.settle()
+    expect(h.log.filter((x) => x === 'push')).toHaveLength(1)
+  })
+
   it('pushes pending drafts when the write flag arrives after the unlock pull', async () => {
     const h = harness()
     h.pending = 1

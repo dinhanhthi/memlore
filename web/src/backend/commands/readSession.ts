@@ -92,6 +92,11 @@ export interface PullOutcome {
    * is returned once: it is persisted as shown before it is queued.
    */
   notices?: string[]
+  /**
+   * Set while the format guard is latched (an unknown manifest, envelope or metadata format was
+   * read): why. Reads go on; every write is refused until reload. Absent: not latched.
+   */
+  formatReadOnly?: string
 }
 
 /** What the media commands (Phase 11.1) need besides the vault: ciphertext cache, reader, core. */
@@ -235,15 +240,27 @@ export interface ReadSessionDeps {
 /** The session over a given store, Drive reader and core (the default one passes the real ones). */
 export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSession> {
   const { db, reader, core } = deps
-  const [{ createPuller }, { createVault }, { createDraftManager }, { runRetention }] =
-    await Promise.all([
-      import('../sync/pull'),
-      import('../vault'),
-      import('../drafts'),
-      import('../sync/retention'),
-    ])
+  const [
+    { createPuller },
+    { createVault },
+    { createDraftManager },
+    { runRetention },
+    { checkEntryMetadata, getFormatGuardReason, passesFormatGuard },
+  ] = await Promise.all([
+    import('../sync/pull'),
+    import('../vault'),
+    import('../drafts'),
+    import('../sync/retention'),
+    import('../sync/formatGuard'),
+  ])
   const puller = createPuller({ reader, db, core })
-  const vault = createVault({ core, puller })
+  const vault = createVault({
+    core,
+    puller,
+    guardMetadata: (id, json) => {
+      passesFormatGuard(() => checkEntryMetadata(core, `entries/${id}.bin#metadata`, json))
+    },
+  })
 
   let cache: { key: unknown; value: Taxonomy } | null = null
   let warmed: Promise<void> | null = null
@@ -409,11 +426,14 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
         (result.stale.length > 0 || taxonomyChanged || indexDiffers(before, puller.index)))
     const raised = notices
     notices = []
+    // Read after `ready()` and the loads: an entry opened there may have latched the guard.
+    const formatReadOnly = getFormatGuardReason()
     return {
       stale: result.stale,
       changed,
       degraded: puller.getDegradedDevices(),
       ...(raised.length > 0 ? { notices: raised } : {}),
+      ...(formatReadOnly === null ? {} : { formatReadOnly }),
     }
   }
 

@@ -129,10 +129,14 @@ describe('formatGuard', () => {
       expect(isFormatGuardLatched()).toBe(true)
     })
 
-    it('throws if input is not a record', () => {
-      expect(() => assertKnownJsonFields('path.json', null, ['a'])).toThrow()
-      expect(() => assertKnownJsonFields('path.json', 'not an object', ['a'])).toThrow()
-      expect(() => assertKnownJsonFields('path.json', [1, 2, 3], ['a'])).toThrow()
+    it('latches and throws FormatUnsupportedError if input is not a record', () => {
+      for (const value of [null, 'not an object', [1, 2, 3]]) {
+        resetFormatGuardLatch()
+        expect(() => assertKnownJsonFields('path.json', value, ['a'])).toThrow(
+          FormatUnsupportedError,
+        )
+        expect(isFormatGuardLatched()).toBe(true)
+      }
     })
   })
 
@@ -292,25 +296,21 @@ describe('formatGuard', () => {
     }
 
     it('passes for valid device manifest', () => {
-      expect(() =>
-        checkDeviceManifest(fakeCore, 'dev1/metadata.json', validManifest),
-      ).not.toThrow()
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', validManifest)).not.toThrow()
       expect(isFormatGuardLatched()).toBe(false)
     })
 
     it('passes when optional schema_version equals 1', () => {
       const withSchema = { ...validManifest, schema_version: 1 }
-      expect(() =>
-        checkDeviceManifest(fakeCore, 'dev1/metadata.json', withSchema),
-      ).not.toThrow()
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', withSchema)).not.toThrow()
       expect(isFormatGuardLatched()).toBe(false)
     })
 
     it('rejects unknown schema_version in manifest', () => {
       const withSchema = { ...validManifest, schema_version: 2 }
-      expect(() =>
-        checkDeviceManifest(fakeCore, 'dev1/metadata.json', withSchema),
-      ).toThrow(FormatUnsupportedError)
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', withSchema)).toThrow(
+        FormatUnsupportedError,
+      )
       expect(isFormatGuardLatched()).toBe(true)
     })
 

@@ -65,6 +65,12 @@ export interface VaultDeps {
   puller?: VaultSource
   /** Unix milliseconds for `loadedAt`. Default `Date.now`. */
   now?: () => number
+  /**
+   * Read-side format check of each opened entry's decrypted metadata JSON. An unknown field must
+   * LATCH the format guard (writes refused) and NOT throw: the entry is still shown. Injected by
+   * the read session so this module stays out of the WASM-free router bundle. Default: none.
+   */
+  guardMetadata?: (id: string, metadataJson: string) => void
 }
 
 /** Decrypted `EntryMetadata` (memlore-core `metadata.rs`); times are Unix SECONDS. */
@@ -273,6 +279,7 @@ const byEntryDateDesc = (a: Held, b: Held): number =>
 
 export class Vault {
   readonly #core: VaultCore
+  readonly #guardMetadata: (id: string, metadataJson: string) => void
   readonly #keys: VaultKeys
   readonly #puller: VaultSource | undefined
   readonly #now: () => number
@@ -294,6 +301,7 @@ export class Vault {
     this.#keys = deps.keys ?? { getKeyRing, onLock }
     this.#puller = deps.puller
     this.#now = deps.now ?? Date.now
+    this.#guardMetadata = deps.guardMetadata ?? (() => undefined)
     this.#unregister = this.#keys.onLock(() => this.clear())
   }
 
@@ -785,6 +793,7 @@ export class Vault {
   /** Merges an opened copy into RAM (LWW) and returns ITS `updated_at`, whether it won or not. */
   #ingest(id: string, opened: { metadataJson: string; yjs: Uint8Array }): number {
     const incoming = parseMetadata(opened.metadataJson, id)
+    this.#guardMetadata(id, opened.metadataJson)
     const existing = this.#entries.get(id)?.metadata ?? this.#stubs.get(id)?.metadata
     if (existing !== undefined) {
       const merged = parseMetadata(

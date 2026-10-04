@@ -15,9 +15,13 @@ import {
   violations,
   type DesktopFixture,
 } from '../drive/fakeDrive'
-import { configureKeysEnv, dispose, isUnlocked } from '../keys'
+import { resetClock } from '../clock'
+import { configureKeysEnv, dispose, getKeyRing, isUnlocked } from '../keys'
 import { openWebDb, type WebDb } from '../storage/idb'
+import { resumeWrites } from './fence'
+import { isFormatGuardLatched, resetFormatGuardLatch } from './formatGuard'
 import { FormatUnsupportedError, onboardComplete } from './onboard'
+import { safeUpload } from './safeUpload'
 import {
   PullTransientError,
   ReonboardRequiredError,
@@ -38,6 +42,8 @@ let fixture: DesktopFixture
 
 interface Env {
   drive: FakeDrive
+  reader: DriveReader
+  writer: DriveWriter
   db: WebDb
   puller: Puller
   desktop: string
@@ -89,7 +95,7 @@ async function setup(seed: { omit?: (path: string) => boolean } = {}): Promise<E
   )
   drive.requests.length = 0
   const puller = createPuller({ reader, db, core, now: () => 1_800_000_000_000 })
-  return { drive, db, puller, desktop: fixture.device_id, net }
+  return { drive, reader, writer, db, puller, desktop: fixture.device_id, net }
 }
 
 /** Memlore-relative path of a fake file (walks the parent chain below "Memlore"). */
@@ -175,6 +181,7 @@ beforeAll(async () => {
 beforeEach(() => {
   violations.length = 0
   clearReonboardReason()
+  resetFormatGuardLatch()
   configureKeysEnv({
     setTimeout: () => 0,
     clearTimeout: () => {},
@@ -530,13 +537,18 @@ describe('authority checks', () => {
     }
   })
 
-  it('an unknown manifest schema_version aborts as incompatible without dropping', async () => {
+  it('an unknown manifest schema_version latches read-only and keeps the cached manifest', async () => {
     const env = await setup()
     await seedCache(env)
     patchManifest(env.drive, env.desktop, (m) => {
       m.schema_version = 99
     })
-    await expect(env.puller.refresh()).rejects.toBeInstanceOf(FormatUnsupportedError)
+    await env.puller.refresh()
+    expect(isFormatGuardLatched()).toBe(true)
+    expect(env.puller.index?.size).toBe(7)
+    expect(env.puller.getDegradedDevices()).toEqual([
+      { device: env.desktop, reason: 'manifest-format' },
+    ])
     expect((await env.db.files.list()).length).toBeGreaterThan(0)
     expect(isUnlocked()).toBe(true)
   })
@@ -562,6 +574,112 @@ describe('authority checks', () => {
     await env.puller.warmStart()
     expect(env.drive.mutating()).toEqual([])
     expect(env.drive.files.some((f) => f.mimeType === FOLDER && f.name === 'outbox')).toBe(false)
+  })
+})
+
+describe('read-side format guard (unknown formats latch read-only, reads go on)', () => {
+  function uploadDeps(env: Env): Parameters<typeof safeUpload>[1] {
+    const meta = JSON.parse(text(fixtureBytes(fixture, '.meta/keyring/_meta.json'))) as {
+      master_fingerprint: string
+    }
+    return {
+      writer: env.writer,
+      reader: env.reader,
+      core,
+      ring: getKeyRing(),
+      localGen: 0,
+      ownDeviceId: OWN_ID,
+      expectedFence: {
+        recoveryGeneration: 0,
+        masterFingerprint: meta.master_fingerprint,
+        epoch: 1,
+        contentEpoch: 1,
+      },
+      fetchWriteFlagImpl: async () => true,
+      locks: fakeLocks(env.drive),
+    }
+  }
+
+  beforeEach(() => {
+    resetClock()
+    resumeWrites()
+  })
+
+  it('a normal vault never latches, and safeUpload passes its checks', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    await env.puller.fetchEntries(fixture.expected.entries.map((e) => e.entry_id))
+    expect(isFormatGuardLatched()).toBe(false)
+    expect(env.puller.getDegradedDevices()).toEqual([])
+    await expect(safeUpload([], uploadDeps(env))).resolves.toEqual([])
+  })
+
+  it('a manifest with an unknown top-level field latches; the pull still serves the cached one', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    patchManifest(env.drive, env.desktop, (m) => {
+      m.future_field = true
+    })
+    const result = await env.puller.refresh()
+    expect(isFormatGuardLatched()).toBe(true)
+    expect(result.devices).toEqual([env.desktop])
+    expect(env.puller.index?.size).toBe(7)
+    expect(env.puller.getDegradedDevices()).toEqual([
+      { device: env.desktop, reason: 'manifest-format' },
+    ])
+    expect(await env.puller.warmStart()).toHaveLength(5)
+    expect(env.drive.mutating()).toEqual([])
+    await expect(safeUpload([], uploadDeps(env))).rejects.toThrow(/format guard/i)
+  })
+
+  it('a manifest row with an unknown field latches', async () => {
+    const env = await setup()
+    patchManifest(env.drive, env.desktop, (m) => {
+      ;(m.entries as Array<Record<string, unknown>>)[0].future_field = 1
+    })
+    await env.puller.refresh()
+    expect(isFormatGuardLatched()).toBe(true)
+  })
+
+  it('a non-object manifest row latches', async () => {
+    const env = await setup()
+    patchManifest(env.drive, env.desktop, (m) => {
+      ;(m.entries as unknown[]).push('a newer row shape')
+    })
+    await env.puller.refresh()
+    expect(isFormatGuardLatched()).toBe(true)
+  })
+
+  it('an entry payload with an unknown envelope version latches but is still returned', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const id = fixture.expected.entries[0].entry_id
+    const file = env.drive.find([
+      'Memlore',
+      'generations',
+      'g-0',
+      env.desktop,
+      'entries',
+      `${id}.bin`,
+    ])
+    if (!file) throw new Error('no entry file')
+    const patched = new Uint8Array(file.content)
+    patched[4] = 99 // XJS1 then u16 LE schema_version
+    file.content = patched
+    const got = await env.puller.fetchEntries([id])
+    expect(got.get(id)).toEqual(patched)
+    expect(isFormatGuardLatched()).toBe(true)
+    await expect(safeUpload([], uploadDeps(env))).rejects.toThrow(/format guard/i)
+  })
+
+  it('a device slot with an unknown field latches (the core slot parser then refuses it)', async () => {
+    const env = await setup()
+    patchFile(env.drive, ['.meta', 'keyring', 'devices', `${OWN_ID}.json`], (v) => {
+      v.future_field = 1
+    })
+    await expect(env.puller.refresh()).rejects.toMatchObject({ name: 'VaultCorruptError' })
+    expect(isFormatGuardLatched()).toBe(true)
+    expect(isUnlocked()).toBe(true)
   })
 })
 

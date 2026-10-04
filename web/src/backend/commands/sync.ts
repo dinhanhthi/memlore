@@ -34,6 +34,9 @@
  *     unlock: error status with the message, no retries. There is no web UI for re-onboarding yet
  *     (Phase 12), so only the status and the puller's `getReonboardReason()` flag carry the signal;
  *     the desktop's `xj://force-re-pair` event routes to screens whose commands are unsupported.
+ *   - a pull that SUCCEEDS with the format guard latched (`PullOutcome.formatReadOnly`: a newer
+ *     manifest, envelope or entry metadata was read) keeps the schedule running (reads go on) but
+ *     shows `MSG_FORMAT_READ_ONLY` on the `synced` status and stops automatic pushes.
  *
  * PUSH (only while the schedule runs, i.e. unlocked, and only when the cached write flag is on;
  * `safeUpload` re-fetches the flag before any write):
@@ -178,6 +181,11 @@ let lastError: string | null = null
 let lastSyncSec: number | null = null
 /** Set while the last successful pull left a device on its cached manifest. */
 let degraded = false
+/** `MSG_FORMAT_READ_ONLY` with the reason, while the last successful pull reported a latched guard. */
+let formatReadOnly: string | null = null
+
+/** The note a successful pull shows: read-only wins over degraded. */
+const pullNote = (): string | null => formatReadOnly ?? (degraded ? MSG_SYNC_DEGRADED : null)
 /**
  * Intent-retention notices of every pull, oldest first, until a `synced` status carries them once
  * (merged into one note in `error`, like `MSG_SYNC_DEGRADED`). An error status leaves them queued.
@@ -224,6 +232,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   lastError = null
   lastSyncSec = null
   degraded = false
+  formatReadOnly = null
   pendingNotices = []
   inflight = null
   lastAttemptAt = 0
@@ -311,8 +320,14 @@ async function doPull(): Promise<PullReport> {
     clearRetry()
     lastSyncSec = Math.floor(e.now() / 1000)
     degraded = (outcome.degraded?.length ?? 0) > 0
+    formatReadOnly =
+      outcome.formatReadOnly === undefined
+        ? null
+        : `${MSG_FORMAT_READ_ONLY} (${outcome.formatReadOnly})`
+    // Reads go on; every write is refused until reload, so no automatic push is attempted.
+    if (formatReadOnly !== null) pushHalted = true
     pendingNotices.push(...(outcome.notices ?? []))
-    setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
+    setPhase('synced', pullNote())
     if (outcome.changed) e.emitChanged()
     return { outcome, message: null }
   } catch (error: unknown) {
@@ -432,11 +447,15 @@ function reportPush(result: PushResult, startedEpoch: number): void {
     return
   }
   if (startedEpoch !== epoch || !e.isUnlocked() || name === ERROR_NAMES.vaultLocked) return
-  if (name === ERROR_NAMES.missingVaultState) {
-    // Retrying cannot help until the user re-onboards; reads and pulls keep working.
+  if (name === ERROR_NAMES.missingVaultState || name === ERROR_NAMES.formatUnsupported) {
+    // Retrying cannot help until the user re-onboards (or updates the app, for a latched format
+    // guard); reads and pulls keep working.
     pushHalted = true
     resetPushBackoff()
-    pushError = errorText(result.error)
+    pushError =
+      name === ERROR_NAMES.formatUnsupported
+        ? `${MSG_FORMAT_READ_ONLY} (${errorText(result.error)})`
+        : errorText(result.error)
     setPhase('error', pushError)
     return
   }
@@ -454,7 +473,7 @@ function reportPush(result: PushResult, startedEpoch: number): void {
     const shown = lastError === pushError
     pushError = null
     if (shown) {
-      setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
+      setPhase('synced', pullNote())
       return
     }
   }
@@ -495,6 +514,7 @@ export function startSyncSchedule(): void {
   nextAttemptAt = 0
   lastAttemptAt = 0
   degraded = false
+  formatReadOnly = null
   pendingNotices = []
   pushFailures = 0
   pushNextAt = 0
@@ -597,8 +617,10 @@ async function syncNow(): Promise<SyncSummary> {
 
 async function getSyncStatus(): Promise<SyncStatus & { error?: string }> {
   if (!env().isUnlocked()) return LOCKED_STATUS
-  // `SyncStatus` has no message field (only the event does): `error` is added only when degraded.
-  return degraded ? { ...snapshot(), error: MSG_SYNC_DEGRADED } : snapshot()
+  // `SyncStatus` has no message field (only the event does): `error` is added only when degraded
+  // or read-only.
+  const note = pullNote()
+  return note === null ? snapshot() : { ...snapshot(), error: note }
 }
 
 /** Web has no sync scheduler settings to edit; the 5 min pull interval is fixed (see above). */

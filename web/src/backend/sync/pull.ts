@@ -11,10 +11,14 @@
  *       reason "revoked", raise the re-onboard flag and throw `ReonboardRequiredError`.
  *     - a network, 5xx or 401 error is NEVER "missing": `PullTransientError`, nothing dropped.
  *     - an unknown control/keyring `version` is `FormatUnsupportedError`, nothing dropped.
+ *     - an unknown field or version in the own slot LATCHES the format guard (writes refused for
+ *       the session, `formatGuard.ts`); the read goes on.
  *  2. Lists devices and reads each from the generation folder and the legacy flat folder with the
  *     reader's desktop precedence. A device without `metadata.json` (the web's own outbox folder, a
  *     half-created peer) is skipped. Manifest failures other than NotFound abort the whole pull
- *     (a partial manifest set would make the LWW winners wrong).
+ *     (a partial manifest set would make the LWW winners wrong). A manifest with an unknown field,
+ *     row shape or `schema_version` latches the format guard and keeps the previously cached
+ *     manifest for that device (degraded `manifest-format`); the pull still serves.
  *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin` and
  *     `templates.bin` ciphertext. `settings.bin` is skipped (nothing in Phase 10 needs it).
  *  4. `computeDiff` (WASM) against the previously cached manifest gives the stale set; cached entry
@@ -31,6 +35,7 @@
  *     are re-downloaded on every pull (the listing carries no change marker).
  *
  * `fetchEntries` / `warmStart` download entry ciphertext on demand (deduplicated, concurrency 4).
+ * An entry payload with an unknown envelope version latches the format guard and is still returned.
  * Cached ciphertext lives in the `files` store under its logical path `<device>/<...>`.
  */
 
@@ -52,13 +57,12 @@ import { notifyCacheWrite } from '../storage/evictor'
 import type { WebDb } from '../storage/idb'
 import { buildEntryIndex, newestLive, type IndexEntry, type ManifestEntryRow } from './entryIndex'
 import {
-  FormatUnsupportedError,
-  VaultCorruptError,
-  readControl,
-  readMeta,
-  readVersions,
-  type Versions,
-} from './onboard'
+  checkDeviceManifest,
+  checkDeviceSlot,
+  checkEnvelopeBytes,
+  passesFormatGuard,
+} from './formatGuard'
+import { VaultCorruptError, readControl, readMeta, readVersions, type Versions } from './onboard'
 
 /** Entries fetched by `warmStart` (user requirement: the 5 most recently updated). */
 export const WARM_START_ENTRIES = 5
@@ -175,7 +179,11 @@ export interface PullDeps {
 }
 
 /** Why a device's manifest could not be read fresh in the last pull. */
-export type DegradedReason = 'manifest-oversize' | 'manifest-unreadable' | 'manifest-missing'
+export type DegradedReason =
+  | 'manifest-oversize'
+  | 'manifest-unreadable'
+  | 'manifest-missing'
+  | 'manifest-format'
 
 export interface DegradedDevice {
   device: string
@@ -367,8 +375,9 @@ export class Puller {
       const read = await this.#readOptional(generation, `${device}/metadata.json`)
       if (read === 'oversize') warnings.push(`${device}: manifest is too large and was ignored`)
       const text = read === 'oversize' ? null : read
-      const normalized =
+      const parsed =
         text === null ? null : this.#parseManifest(core, device, decoder.decode(text), warnings)
+      const normalized = parsed === 'unsupported' ? null : parsed
       let manifest: Manifest | null
       if (normalized === null) {
         // Keep-previous: the cached copy is the newest manifest ever read successfully for this
@@ -379,7 +388,9 @@ export class Puller {
             ? 'manifest-oversize'
             : text === null
               ? 'manifest-missing'
-              : 'manifest-unreadable'
+              : parsed === 'unsupported'
+                ? 'manifest-format'
+                : 'manifest-unreadable'
         // A device with no manifest at all (the web's own outbox folder) is not degraded.
         if (manifest !== null || reason !== 'manifest-missing') degraded.push({ device, reason })
         else if (this.#listedSlots?.has(device) === true) webPeers.push(device)
@@ -485,7 +496,9 @@ export class Puller {
       throw error
     }
     try {
-      core.parseDeviceSlot(decoder.decode(bytes))
+      const slot = decoder.decode(bytes)
+      passesFormatGuard(() => checkDeviceSlot(core, path, slot)) // unknown: latched, read goes on
+      core.parseDeviceSlot(slot)
     } catch (error) {
       throw new VaultCorruptError(`${path}: ${error instanceof Error ? error.message : error}`)
     }
@@ -528,8 +541,17 @@ export class Puller {
     }
   }
 
-  /** Normalized manifest JSON, or null when the device's manifest is unusable (warning). */
-  #parseManifest(core: Core, device: string, raw: string, warnings: string[]): string | null {
+  /**
+   * Normalized manifest JSON, null when the device's manifest is unusable (warning), or
+   * `'unsupported'` when it has an unknown field, row shape or `schema_version` (the format guard
+   * latched; the caller keeps the cached manifest).
+   */
+  #parseManifest(
+    core: Core,
+    device: string,
+    raw: string,
+    warnings: string[],
+  ): string | null | 'unsupported' {
     let parsed: unknown
     try {
       parsed = JSON.parse(raw)
@@ -537,14 +559,10 @@ export class Puller {
       warnings.push(`${device}: manifest is not valid JSON`)
       return null
     }
-    // The v1 manifest carries no version field; a future one that adds `schema_version` and
-    // differs from the known payload schema is a format this build cannot read.
-    if (isRecord(parsed) && typeof parsed.schema_version === 'number') {
-      const known = (JSON.parse(core.knownVersions()) as Record<string, unknown>)
-        .payload_schema_version
-      if (parsed.schema_version !== known) {
-        throw new FormatUnsupportedError(`${device}/metadata.json`, parsed.schema_version)
-      }
+    const path = `${device}/metadata.json`
+    if (isRecord(parsed) && !passesFormatGuard(() => checkDeviceManifest(core, path, parsed))) {
+      warnings.push(`${device}: manifest uses a newer format; the cached copy is kept`)
+      return 'unsupported'
     }
     try {
       return core.parseManifest(raw)
@@ -703,6 +721,7 @@ export class Puller {
     const generation = this.#generation
     if (index === null || generation === null)
       throw new Error('fetchEntries needs a prior refresh()')
+    const core = await this.#getCore()
     const out = new Map<string, Uint8Array>()
     await Promise.all(
       [...new Set(ids)].map(async (id) => {
@@ -715,7 +734,10 @@ export class Puller {
           if (error instanceof RangeError) return // an unusable id is missing, not a failed batch
           throw error
         }
-        if (bytes !== null) out.set(id, bytes)
+        if (bytes === null) return
+        // An unknown envelope latches the format guard; the bytes are still returned to be opened.
+        passesFormatGuard(() => checkEnvelopeBytes(core, entryPath(winner), bytes))
+        out.set(id, bytes)
       }),
     )
     return out

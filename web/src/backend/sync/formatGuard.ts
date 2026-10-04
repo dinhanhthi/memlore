@@ -25,6 +25,11 @@ export function isFormatGuardLatched(): boolean {
   return isLatched
 }
 
+/** Why the guard latched (for the read-only status), or null while it is not latched. */
+export function getFormatGuardReason(): string | null {
+  return isLatched ? (latchedReason ?? 'unknown format') : null
+}
+
 export function resetFormatGuardLatch(): void {
   isLatched = false
   latchedPath = null
@@ -39,6 +44,20 @@ export function latchFormatGuard(path: string, reason: string): void {
     emitFromBackend(FORMAT_GUARD_LATCHED_EVENT, { path, reason })
   } catch {
     // Best-effort event delivery
+  }
+}
+
+/**
+ * Runs a read-side format check. False when the format is unknown: the check has LATCHED the
+ * guard (every write refused for the session) and the caller's read goes on. Other errors throw.
+ */
+export function passesFormatGuard(check: () => void): boolean {
+  try {
+    check()
+    return true
+  } catch (error) {
+    if (error instanceof FormatUnsupportedError) return false
+    throw error
   }
 }
 
@@ -81,11 +100,7 @@ export function assertKnownVersion(
   }
 }
 
-export function assertKnownEnvelopeVersion(
-  core: Core,
-  path: string,
-  actualVersion: number,
-): void {
+export function assertKnownEnvelopeVersion(core: Core, path: string, actualVersion: number): void {
   const known = parseKnownVersions(core)
   if (!known.envelope_versions.includes(actualVersion)) {
     const reason = `Unknown envelope version ${actualVersion} (known: ${known.envelope_versions.join(', ')})`
@@ -114,7 +129,10 @@ export function assertKnownJsonFields(
   allowedFields: readonly string[],
 ): void {
   if (!isRecord(obj)) {
-    throw new Error(`Expected object in ${path}`)
+    // A structurally different shape (e.g. a string where a row object was) is newer too.
+    const reason = 'Expected a JSON object'
+    latchFormatGuard(path, reason)
+    throw new FormatUnsupportedError(path, 0, `Unsupported format in ${path}: ${reason}`)
   }
   const allowedSet = new Set(allowedFields)
   const unknownKeys = Object.keys(obj).filter((k) => !allowedSet.has(k))
@@ -129,12 +147,7 @@ export function assertKnownJsonFields(
 // Control File (.meta/control.json)
 // -----------------------------------------------------------------------------
 
-const CONTROL_FIELDS = [
-  'version',
-  'recovery_generation',
-  'recovery_lease',
-  'updated_at',
-] as const
+const CONTROL_FIELDS = ['version', 'recovery_generation', 'recovery_lease', 'updated_at'] as const
 
 const RECOVERY_LEASE_FIELDS = [
   'version',
@@ -195,13 +208,7 @@ export function checkKeyringMeta(
 // Device Slot (.meta/keyring/devices/<id>.json)
 // -----------------------------------------------------------------------------
 
-const DEVICE_SLOT_FIELDS = [
-  'version',
-  'device_id',
-  'name',
-  'created_at',
-  'last_seen_at',
-] as const
+const DEVICE_SLOT_FIELDS = ['version', 'device_id', 'name', 'created_at', 'last_seen_at'] as const
 
 export function checkDeviceSlot(
   core: Core,
@@ -265,7 +272,11 @@ export function checkDeviceManifest(
 
   if (Array.isArray(obj.journals)) {
     for (let i = 0; i < obj.journals.length; i++) {
-      assertKnownJsonFields(`${path}#journals[${i}]`, obj.journals[i], SYNCED_JOURNAL_SUMMARY_FIELDS)
+      assertKnownJsonFields(
+        `${path}#journals[${i}]`,
+        obj.journals[i],
+        SYNCED_JOURNAL_SUMMARY_FIELDS,
+      )
     }
   }
 }
@@ -323,10 +334,7 @@ const SYNC_MEDIA_ITEM_FIELDS = [
   'exif_longitude',
 ] as const
 
-const SYNC_DELETED_MEDIA_ITEM_FIELDS = [
-  'id',
-  'deleted_at',
-] as const
+const SYNC_DELETED_MEDIA_ITEM_FIELDS = ['id', 'deleted_at'] as const
 
 export function checkEntryMetadata(
   _core: Core,
@@ -359,11 +367,7 @@ export function checkEntryMetadata(
 
 const XJS1_MAGIC = [0x58, 0x4a, 0x53, 0x31]
 
-export function checkEnvelopeBytes(
-  core: Core,
-  path: string,
-  bytes: Uint8Array,
-): void {
+export function checkEnvelopeBytes(core: Core, path: string, bytes: Uint8Array): void {
   if (bytes.length < 4) {
     const reason = `Envelope in ${path} is too short (${bytes.length} bytes)`
     latchFormatGuard(path, reason)

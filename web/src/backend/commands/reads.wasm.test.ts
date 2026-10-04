@@ -16,6 +16,7 @@ import {
 } from '../drive/fakeDrive'
 import { configureKeysEnv, dispose, isUnlocked, lock } from '../keys'
 import { openWebDb } from '../storage/idb'
+import { isFormatGuardLatched, resetFormatGuardLatch } from '../sync/formatGuard'
 import { onboardComplete } from '../sync/onboard'
 import { clearReonboardReason } from '../sync/pull'
 import { MSG_UNAVAILABLE, entryHandlers } from './entries'
@@ -196,6 +197,7 @@ beforeAll(async () => {
 beforeEach(() => {
   violations.length = 0
   clearReonboardReason()
+  resetFormatGuardLatch()
   configureKeysEnv({
     setTimeout: () => 0,
     clearTimeout: () => {},
@@ -358,6 +360,14 @@ describe('search', () => {
     await whenSearchScanSettled()
     expect(entryDownloads(drive)).toHaveLength(7)
     expect(drive.mutating()).toEqual([])
+  })
+
+  it('opening every fixture entry through the read session never latches the format guard', async () => {
+    await setup()
+    await search('first')
+    await whenSearchScanSettled()
+    expect(titles(await search('first'))).toEqual(['Golden one'])
+    expect(isFormatGuardLatched()).toBe(false)
   })
 
   it('cancel stops further background fetches', async () => {
