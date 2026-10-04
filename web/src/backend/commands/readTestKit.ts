@@ -74,7 +74,7 @@ export class FakeVault implements VaultApi {
 
   readonly load = async (ids: readonly string[]): Promise<LoadResult> => {
     this.loadCalls.push([...ids])
-    const result: LoadResult = { loaded: [], excluded: [], missing: [], failed: [] }
+    const result: LoadResult = { loaded: [], excluded: [], missing: [], failed: [], stale: [] }
     for (const id of new Set(ids)) {
       const spec = this.#specs.get(id)
       if (spec === undefined) result.missing.push(id)

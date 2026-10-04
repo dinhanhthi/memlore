@@ -7,6 +7,9 @@
  *   ring (`keys.getKeyRing()`, `VaultLockedError` when locked) and stores it. When an id is already
  *   in RAM the opened copy is merged with it through the WASM `mergeMetadataLww`, so the desktop
  *   LWW rule (newer `updated_at`, tie: greater device id) decides, never the arrival order.
+ *   A copy that opens OLDER than its index winner (a cached payload that raced a desktop upload)
+ *   has its cached ciphertext dropped and is downloaded again, once per `load`; if it is still
+ *   older it is kept (the newest obtainable) but reported in `stale` and never counted as fresh.
  * - `clear()` is registered as a lock hook: on lock the maps are replaced by empty ones (no
  *   reference to the old ones survives) and in-flight loads discard their result.
  *
@@ -41,6 +44,8 @@ export interface VaultKeys {
 /** The part of the puller the vault needs. */
 export interface VaultSource {
   fetchEntries: (ids: readonly string[]) => Promise<Map<string, Uint8Array>>
+  /** Drops the cached ciphertext of these ids so the next `fetchEntries` downloads them again. */
+  dropCached: (ids: readonly string[]) => Promise<void>
   readonly index: ReadonlyMap<string, IndexEntry> | null
 }
 
@@ -118,6 +123,12 @@ export interface LoadResult {
   missing: string[]
   /** Ids whose payload could not be opened (corrupt, wrong key, mismatched id). */
   failed: Array<{ id: string; message: string }>
+  /**
+   * Ids whose best obtainable copy is still older than the index winner, even after dropping the
+   * cached payload and downloading it again (the desktop's upload lags its manifest row, or the
+   * payload was rolled back). They stay not fresh, so the next `load` retries.
+   */
+  stale: string[]
 }
 
 export interface EntryFilter {
@@ -592,7 +603,7 @@ export class Vault {
     if (puller === undefined) throw new Error('vault has no puller')
     this.#keys.getKeyRing() // VaultLockedError early, before any download
     const epoch = this.#epoch
-    const result: LoadResult = { loaded: [], excluded: [], missing: [], failed: [] }
+    const result: LoadResult = { loaded: [], excluded: [], missing: [], failed: [], stale: [] }
     const index = puller.index
     if (index === null) throw new Error('vault.load needs a prior pull refresh()')
 
@@ -607,8 +618,10 @@ export class Vault {
     if (toFetch.length === 0) return result
 
     const payloads = await puller.fetchEntries(toFetch)
-    if (epoch !== this.#epoch) return { loaded: [], excluded: [], missing: [], failed: [] }
+    if (epoch !== this.#epoch)
+      return { loaded: [], excluded: [], missing: [], failed: [], stale: [] }
     const ring = this.#keys.getKeyRing()
+    const behind: string[] = []
     for (const id of toFetch) {
       const bytes = payloads.get(id)
       if (bytes === undefined) {
@@ -616,11 +629,33 @@ export class Vault {
         continue
       }
       try {
-        this.#ingest(id, this.#core.openEntry(ring, bytes))
-        this.#report(id, result)
+        const updatedAt = this.#ingest(id, this.#core.openEntry(ring, bytes))
+        if (updatedAt < (index.get(id)?.updatedAt ?? 0)) behind.push(id)
+        else this.#report(id, result)
       } catch (error) {
         result.failed.push({ id, message: error instanceof Error ? error.message : 'open failed' })
       }
+    }
+    if (behind.length === 0) return result
+
+    // Older than the winner: drop the cached copy and download it again, once.
+    await puller.dropCached(behind)
+    const again = await puller.fetchEntries(behind)
+    if (epoch !== this.#epoch)
+      return { loaded: [], excluded: [], missing: [], failed: [], stale: [] }
+    const ringAgain = this.#keys.getKeyRing()
+    for (const id of behind) {
+      const bytes = again.get(id)
+      let updatedAt = -1
+      if (bytes !== undefined) {
+        try {
+          updatedAt = this.#ingest(id, this.#core.openEntry(ringAgain, bytes))
+        } catch {
+          // keep the copy opened first
+        }
+      }
+      if (updatedAt < (index.get(id)?.updatedAt ?? 0)) result.stale.push(id)
+      this.#report(id, result)
     }
     return result
   }
@@ -668,7 +703,8 @@ export class Vault {
     result.excluded.push(winner.entryId)
   }
 
-  #ingest(id: string, opened: { metadataJson: string; yjs: Uint8Array }): void {
+  /** Merges an opened copy into RAM (LWW) and returns ITS `updated_at`, whether it won or not. */
+  #ingest(id: string, opened: { metadataJson: string; yjs: Uint8Array }): number {
     const incoming = parseMetadata(opened.metadataJson, id)
     const existing = this.#entries.get(id)?.metadata ?? this.#stubs.get(id)?.metadata
     if (existing !== undefined) {
@@ -678,14 +714,14 @@ export class Vault {
       )
       const incomingWon =
         merged.device_id === incoming.device_id && merged.updated_at === incoming.updated_at
-      if (!incomingWon) return // the copy already in RAM is newer: keep it
+      if (!incomingWon) return incoming.updated_at // the copy already in RAM is newer: keep it
     }
     this.#entries.delete(id)
     this.#stubs.delete(id)
     const reason = this.#exclusionReason(incoming)
     if (reason !== null) {
       this.#stubs.set(id, makeStub(incoming, reason))
-      return
+      return incoming.updated_at
     }
     const contentText = incoming.content_text ?? ''
     this.#entries.set(id, {
@@ -696,6 +732,7 @@ export class Vault {
       loadedAt: this.#now(),
       folded: [foldText(incoming.title ?? ''), foldText(contentText)],
     })
+    return incoming.updated_at
   }
 
   #exclusionReason(metadata: EntryMetadata): ExcludedReason | null {

@@ -18,7 +18,9 @@
  *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin` and
  *     `templates.bin` ciphertext. `settings.bin` is skipped (nothing in Phase 10 needs it).
  *  4. `computeDiff` (WASM) against the previously cached manifest gives the stale set; cached entry
- *     ciphertext of stale ids is dropped so a changed entry is never served from the cache.
+ *     ciphertext of stale ids is dropped so a changed entry is never served from the cache, and an
+ *     in-flight download of a stale path is detached: it never caches, and later callers start a
+ *     fresh download instead of joining it.
  *  5. Builds the global entry index (LWW, see entryIndex.ts).
  *
  * `fetchEntries` / `warmStart` download entry ciphertext on demand (deduplicated, concurrency 4).
@@ -240,6 +242,9 @@ function entryRows(manifest: unknown): { rows: ManifestEntryRow[]; dropped: numb
   return { rows, dropped }
 }
 
+const entryPath = (winner: IndexEntry): string =>
+  `${winner.authorDevice}/entries/${winner.entryId}.bin`
+
 export class Puller {
   readonly #reader: DriveReader
   readonly #db: WebDb
@@ -249,8 +254,6 @@ export class Puller {
   readonly #limit: Limiter
   readonly #isUnlocked: () => boolean
   readonly #onCacheWrite: () => void
-  /** Bumped by `#revoke`: a download that started earlier must not re-cache ciphertext. */
-  #epoch = 0
   #loadedCore: Core | null = null
   #ownId: string | null = null
   #generation: number | null = null
@@ -262,6 +265,10 @@ export class Puller {
   #desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() }
   /** Slot ids listed by the authority check of the refresh in progress. */
   #listedSlots: Set<string> | null = null
+  /**
+   * Entry downloads in progress by path. Only the registered task may cache its bytes: `#revoke`
+   * and a refresh that marks a path stale remove the entry, detaching the old download.
+   */
   readonly #inflight = new Map<string, Promise<Uint8Array | null>>()
 
   constructor(deps: PullDeps) {
@@ -455,10 +462,9 @@ export class Puller {
   }
 
   async #revoke(reason: ReonboardReason): Promise<never> {
-    this.#epoch += 1
     this.#index = null
     this.#desktops = { manifests: [], slots: null, tombstones: new Set() }
-    this.#inflight.clear()
+    this.#inflight.clear() // a download that started earlier must not re-cache ciphertext
     this.#lockKeys('revoked')
     reonboardReason = reason
     let cause: unknown
@@ -538,11 +544,35 @@ export class Puller {
       }
       for (const id of [...diff.to_pull, ...diff.to_delete_locally.map(([id]) => id)]) {
         stale.add(id)
-        await this.#db.files.delete(`${device}/entries/${id}.bin`)
+        await this.#dropPayload(`${device}/entries/${id}.bin`)
       }
       await this.#putFile(path, encoder.encode(manifest.text), false)
     }
     return [...stale].sort()
+  }
+
+  /**
+   * Drops the cached payload at `path` and detaches its in-flight download (if any): that download
+   * may hold bytes read before the change, so it must not cache them, and a later caller must not
+   * join it.
+   */
+  async #dropPayload(path: string): Promise<void> {
+    this.#inflight.delete(path)
+    await this.#db.files.delete(path)
+  }
+
+  /**
+   * Drops the cached ciphertext of the current winner of each id (unknown ids are ignored), so the
+   * next `fetchEntries` downloads it again. The vault uses it when a cached copy opens older than
+   * its index winner.
+   */
+  async dropCached(ids: readonly string[]): Promise<void> {
+    const index = this.#index
+    if (index === null) return
+    for (const id of new Set(ids)) {
+      const winner = index.get(id)
+      if (winner !== undefined) await this.#dropPayload(entryPath(winner))
+    }
   }
 
   async #putFile(path: string, bytes: Uint8Array, pinned: boolean): Promise<void> {
@@ -617,11 +647,13 @@ export class Puller {
   }
 
   #entryBytes(generation: number, winner: IndexEntry): Promise<Uint8Array | null> {
-    const path = `${winner.authorDevice}/entries/${winner.entryId}.bin`
+    const path = entryPath(winner)
     const pending = this.#inflight.get(path)
     if (pending !== undefined) return pending
-    const epoch = this.#epoch
-    const task = (async (): Promise<Uint8Array | null> => {
+    // Still registered under `path` = still current: a revoke or a refresh that marked the path
+    // stale removes it, and its (possibly old) bytes must then not be cached.
+    const isCurrent = (): boolean => this.#inflight.get(path) === task
+    const task: Promise<Uint8Array | null> = (async (): Promise<Uint8Array | null> => {
       const cached = await this.#db.files.get(path)
       if (cached !== undefined) {
         await this.#db.files.touch(path, this.#now())
@@ -629,13 +661,13 @@ export class Puller {
       }
       const bytes = await this.#limit(() => this.#readOptional(generation, path))
       if (bytes === 'oversize') return null // not retryable: the id is treated as missing
-      if (bytes !== null && epoch === this.#epoch) {
+      if (bytes !== null && isCurrent()) {
         // Best effort: a full store must not fail the read.
         await this.#putFile(path, bytes, false).then(this.#onCacheWrite, () => undefined)
       }
       return bytes
     })().finally(() => {
-      this.#inflight.delete(path)
+      if (isCurrent()) this.#inflight.delete(path)
     })
     this.#inflight.set(path, task)
     return task
@@ -671,7 +703,7 @@ export class Puller {
     const keep = new Set<string>()
     for (const id of ids) {
       const winner = index?.get(id)
-      if (winner !== undefined) keep.add(`${winner.authorDevice}/entries/${winner.entryId}.bin`)
+      if (winner !== undefined) keep.add(entryPath(winner))
     }
     for (const meta of await this.#db.files.sizes()) {
       if (meta.pinned && ENTRY_PAYLOAD.test(meta.path) && !keep.has(meta.path)) {

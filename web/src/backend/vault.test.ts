@@ -13,6 +13,9 @@ interface Fake {
   put: (meta: Partial<EntryMetadata> & { entry_id: string }, yjs?: string) => void
   index: Map<string, IndexEntry>
   fetched: string[]
+  /** Registers a copy served from the "cache" before the Drive copy, until `dropCached`. */
+  cache: (meta: Partial<EntryMetadata> & { entry_id: string }) => void
+  dropped: string[]
   lock: () => void
   hooks: Array<() => void>
   unlockState: { locked: boolean }
@@ -23,6 +26,8 @@ function setup(): Fake {
   const payloads = new Map<string, { metadataJson: string; yjs: Uint8Array }>()
   const index = new Map<string, IndexEntry>()
   const fetched: string[] = []
+  const cached = new Map<string, { metadataJson: string; yjs: Uint8Array }>()
+  const dropped: string[] = []
   const hooks: Array<() => void> = []
   const unlockState = { locked: false }
   const mergeSpy = vi.fn((a: string, b: string): string => {
@@ -35,13 +40,24 @@ function setup(): Fake {
     index,
     fetchEntries: async (ids) => {
       fetched.push(...ids)
-      return new Map(ids.filter((id) => payloads.has(id)).map((id) => [id, enc.encode(id)]))
+      return new Map(
+        ids
+          .filter((id) => cached.has(id) || payloads.has(id))
+          .map((id) => [id, enc.encode(cached.has(id) ? `cached:${id}` : id)]),
+      )
+    },
+    dropCached: async (ids) => {
+      dropped.push(...ids)
+      for (const id of ids) cached.delete(id)
     },
   }
   const vault = createVault({
     core: {
       openEntry: (_ring: KeyRing, bytes: Uint8Array) => {
-        const found = payloads.get(new TextDecoder().decode(bytes))
+        const key = new TextDecoder().decode(bytes)
+        const found = key.startsWith('cached:')
+          ? cached.get(key.slice('cached:'.length))
+          : payloads.get(key)
         if (found === undefined) throw new Error('cannot open')
         return found as never
       },
@@ -60,26 +76,27 @@ function setup(): Fake {
     puller,
     now: () => 1234,
   })
+  const fullOf = (meta: Partial<EntryMetadata> & { entry_id: string }): EntryMetadata => ({
+    device_id: 'dev-a',
+    updated_at: 100,
+    entry_date: 1000,
+    created_at: 1000,
+    journal_id: 'j1',
+    journal_name: 'Journal',
+    title: 'Title',
+    preview_text: 'preview',
+    content_text: 'body',
+    emotion: null,
+    is_favorite: false,
+    is_deleted: false,
+    is_locked: false,
+    is_invisible: false,
+    vault_id: null,
+    tag_ids: [],
+    ...meta,
+  })
   const put: Fake['put'] = (meta, yjs = 'yjs') => {
-    const full: EntryMetadata = {
-      device_id: 'dev-a',
-      updated_at: 100,
-      entry_date: 1000,
-      created_at: 1000,
-      journal_id: 'j1',
-      journal_name: 'Journal',
-      title: 'Title',
-      preview_text: 'preview',
-      content_text: 'body',
-      emotion: null,
-      is_favorite: false,
-      is_deleted: false,
-      is_locked: false,
-      is_invisible: false,
-      vault_id: null,
-      tag_ids: [],
-      ...meta,
-    }
+    const full = fullOf(meta)
     payloads.set(full.entry_id, { metadataJson: JSON.stringify(full), yjs: enc.encode(yjs) })
     index.set(full.entry_id, {
       entryId: full.entry_id,
@@ -93,6 +110,13 @@ function setup(): Fake {
     put,
     index,
     fetched,
+    cache: (meta) => {
+      cached.set(meta.entry_id, {
+        metadataJson: JSON.stringify(fullOf(meta)),
+        yjs: enc.encode('old'),
+      })
+    },
+    dropped,
     hooks,
     unlockState,
     mergeSpy,
@@ -133,6 +157,42 @@ describe('load and views', () => {
     await f.vault.load(['a'])
     expect(f.fetched).toEqual(['a', 'a'])
     expect(f.vault.getEntry('a').metadata.title).toBe('edited')
+  })
+
+  it('drops a cached copy older than the index winner and refetches it once', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 200, title: 'fresh' })
+    f.cache({ entry_id: 'a', updated_at: 100, title: 'stale' })
+    const result = await f.vault.load(['a'])
+    expect(f.fetched).toEqual(['a', 'a'])
+    expect(f.dropped).toEqual(['a'])
+    expect(f.vault.getEntry('a').metadata).toMatchObject({ title: 'fresh', updated_at: 200 })
+    expect(result).toMatchObject({ loaded: ['a'], stale: [] })
+    await f.vault.load(['a'])
+    expect(f.fetched).toEqual(['a', 'a']) // fresh now: no more fetches
+  })
+
+  it('reports a copy still older than the winner after one refetch, and retries on the next load', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'old' })
+    f.index.set('a', { entryId: 'a', authorDevice: 'dev-a', updatedAt: 200, isDeleted: false })
+    const result = await f.vault.load(['a'])
+    expect(f.fetched).toEqual(['a', 'a'])
+    expect(result).toMatchObject({ loaded: ['a'], stale: ['a'] })
+    expect(f.vault.getEntry('a').metadata.title).toBe('old') // the best copy obtainable
+    await f.vault.load(['a'])
+    expect(f.fetched).toEqual(['a', 'a', 'a', 'a'])
+  })
+
+  it('an older refetched copy never replaces a newer one already held', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 300, title: 'newest' })
+    await f.vault.load(['a'])
+    f.put({ entry_id: 'a', updated_at: 100, title: 'rolled back' })
+    f.index.set('a', { entryId: 'a', authorDevice: 'dev-a', updatedAt: 400, isDeleted: false })
+    const result = await f.vault.load(['a'])
+    expect(f.vault.getEntry('a').metadata.title).toBe('newest')
+    expect(result).toMatchObject({ loaded: ['a'], stale: ['a'] })
   })
 
   it('reports unknown ids as missing and corrupt payloads as failed', async () => {
@@ -328,8 +388,10 @@ describe('cross-device LWW (mocked core merge)', () => {
     // an older copy of the same entry from another device shows up as the index winner
     f.put({ entry_id: 'a', device_id: 'dev-b', updated_at: 100, title: 'older' })
     f.index.set('a', { entryId: 'a', authorDevice: 'dev-b', updatedAt: 300, isDeleted: false })
-    await f.vault.load(['a'])
-    expect(f.mergeSpy).toHaveBeenCalledTimes(1)
+    const result = await f.vault.load(['a'])
+    // Older than its winner, so it is downloaded again once: both opens merge, neither wins.
+    expect(f.mergeSpy).toHaveBeenCalledTimes(2)
+    expect(result.stale).toEqual(['a'])
     expect(f.vault.getEntry('a').metadata.title).toBe('newer')
   })
 

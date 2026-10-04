@@ -239,7 +239,11 @@ describe('cross-device LWW with the real WASM merge', () => {
     const vault = createVault({
       core: wrapped,
       keys: { getKeyRing, onLock },
-      puller: { fetchEntries: (ids) => env.puller.fetchEntries(ids), index },
+      puller: {
+        fetchEntries: (ids) => env.puller.fetchEntries(ids),
+        dropCached: (ids) => env.puller.dropCached(ids),
+        index,
+      },
     })
     return { vault, index, setTweak: (t: typeof tweak) => (tweak = t) }
   }

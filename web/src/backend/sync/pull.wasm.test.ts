@@ -831,4 +831,65 @@ describe('refresh hardening', () => {
       spy.mockRestore()
     }
   })
+
+  it('a download that read the old payload before a refresh marked it stale never caches it', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const id = fixture.expected.entries[0].entry_id
+    const path = `${env.desktop}/entries/${id}.bin`
+    const file = env.drive.find([
+      'Memlore',
+      'generations',
+      'g-0',
+      env.desktop,
+      'entries',
+      `${id}.bin`,
+    ])
+    if (!file) throw new Error('no entry file')
+    const oldBytes = Uint8Array.from(file.content)
+    let open: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    const real = DriveReader.prototype.readDeviceFile
+    const spy = vi
+      .spyOn(DriveReader.prototype, 'readDeviceFile')
+      .mockImplementation(async function (this: DriveReader, generation, p) {
+        const read = await real.call(this, generation, p)
+        if (p.includes(`/entries/${id}.bin`)) await gate // parked AFTER reading the old bytes
+        return read
+      })
+    try {
+      const before = env.puller.fetchEntries([id])
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      // The desktop uploads a newer payload and its manifest row.
+      const newBytes = bytes('newer payload')
+      file.content = newBytes
+      patchManifest(env.drive, env.desktop, (m) => {
+        for (const e of m.entries as Row[]) if (e.entry_id === id) e.updated_at = NEWEST + 5
+      })
+      expect((await env.puller.refresh()).stale).toEqual([id])
+      const after = env.puller.fetchEntries([id])
+      open()
+      expect((await before).get(id)).toEqual(oldBytes)
+      expect((await after).get(id)).toEqual(newBytes)
+      expect(entryDownloads(env.drive)).toHaveLength(2)
+      expect((await env.db.files.get(path))?.ciphertext).toEqual(newBytes)
+      expect((await env.puller.fetchEntries([id])).get(id)).toEqual(newBytes)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('dropCached removes the cached winner payload so the next fetch downloads again', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const id = fixture.expected.entries[0].entry_id
+    await env.puller.fetchEntries([id])
+    expect(await env.db.files.get(`${env.desktop}/entries/${id}.bin`)).toBeDefined()
+    await env.puller.dropCached([id, 'not-an-entry'])
+    expect(await env.db.files.get(`${env.desktop}/entries/${id}.bin`)).toBeUndefined()
+    await env.puller.fetchEntries([id])
+    expect(entryDownloads(env.drive)).toHaveLength(2)
+  })
 })
