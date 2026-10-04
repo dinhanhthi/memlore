@@ -925,16 +925,21 @@ describe('onboardComplete: device id', () => {
       expect(await readEnv().session()).not.toBe(session)
     })
 
-    // An old-vault draft saved after the first check (here: during the storage probe, the last
-    // step before the slot write and the lock) must not be wiped by the switch.
-    it('another vault: a draft saved right before the lock is refused, not wiped', async () => {
+    // An old-vault draft saved after the first check must not be wiped by the switch. It is saved
+    // during the slot write: the longest window, while the app is still unlocked. A re-check moved
+    // back above the slot write would miss it.
+    it('another vault: a draft saved during the slot write is refused, not wiped', async () => {
       const { env, lockHook } = await unlockedEnv('ef'.repeat(32))
       const old = await env.db.device.get()
       const draft = { entryId: ENTRY_A, sealed: new Uint8Array([1, 2]), updatedAt: 1 }
-      const realPut = env.db.meta.put.bind(env.db.meta)
-      vi.spyOn(env.db.meta, 'put').mockImplementationOnce(async (row) => {
-        await env.db.drafts.put(draft)
-        return realPut(row)
+      let saved = false
+      env.drive.interceptors.push((req) => {
+        if (req.method === 'POST' && !saved) {
+          saved = true
+          // The IndexedDB transaction is created now, so it commits before any later read.
+          void env.db.drafts.put(draft)
+        }
+        return undefined
       })
       await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
       onlySlotWrite(env.drive, FIXED_ID) // the documented orphan slot, nothing else
