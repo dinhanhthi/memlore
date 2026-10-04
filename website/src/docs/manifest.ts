@@ -1,3 +1,4 @@
+import { webAppLive } from '../links'
 export type DiagramName =
   | 'overview'
   | 'privacy'
@@ -148,13 +149,18 @@ export const DOCS_PAGES: readonly DocsPage[] = [
     group: 'features',
     diagram: 'editor',
   },
-  {
-    slug: 'web',
-    title: 'Web companion',
-    description:
-      'How Memlore Web works, how to sign in with your recovery phrase, and what is supported.',
-    group: 'features',
-  },
+  // Built only once the web companion is live (links.ts `webAppLive`), like every other link to it.
+  ...(webAppLive
+    ? [
+        {
+          slug: 'web' as const,
+          title: 'Web companion',
+          description:
+            'How Memlore Web works, how to sign in with your recovery phrase, and what is supported.',
+          group: 'features' as const,
+        },
+      ]
+    : []),
 ]
 
 export function docsPath(slug: DocsSlug): string {

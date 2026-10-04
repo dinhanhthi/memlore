@@ -37,7 +37,7 @@ Sync is off until you turn it on; with no Memlore server or account in between, 
 
 ## On the web
 
-The [Web companion](/docs/web) syncs with Google Drive directly in your browser. Edits made in the browser are written as sealed intents to your own outbox folder, and your desktop app imports and merges them on its next sync. iCloud Drive is not available on the web because Apple provides no web API for iCloud Drive folders.
+The upcoming web companion syncs with Google Drive directly in your browser. When editing on the web is turned on, edits made in the browser are written as sealed intents to your own outbox folder, and your desktop app imports and merges them on its next sync. iCloud Drive is not available on the web because Apple provides no web API for iCloud Drive folders.
 
 ## Turning sync off
 
