@@ -129,11 +129,25 @@ export function getCapabilities(): { writes: boolean } {
   return { writes: cached }
 }
 
+const flagOnListeners = new Set<() => void>()
+
+/** Called each time the cached flag turns from off to on. Returns the unsubscribe function. */
+export function onWriteFlagOn(listener: () => void): () => void {
+  flagOnListeners.add(listener)
+  return () => {
+    flagOnListeners.delete(listener)
+  }
+}
+
 /** Fetches the flag and stores it for display. Returns the fresh value. */
 export async function refreshWriteFlag(options: WriteFlagOptions = {}): Promise<boolean> {
   const gen = generation
   const value = await fetchWriteFlag(options)
-  if (gen === generation) cached = value
+  if (gen === generation) {
+    const turnedOn = value && !cached
+    cached = value
+    if (turnedOn) for (const listener of [...flagOnListeners]) listener()
+  }
   return value
 }
 

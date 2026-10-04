@@ -5,6 +5,7 @@ import {
   fetchWriteFlag,
   getCachedWriteFlag,
   getCapabilities,
+  onWriteFlagOn,
   refreshWriteFlag,
 } from './config'
 import { dispose, lock, setKeyRing, type KeyRing } from './keys'
@@ -185,6 +186,21 @@ describe('cached flag', () => {
     await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
     await refreshWriteFlag({ fetchImpl: () => Promise.reject(new TypeError('offline')) })
     expect(getCachedWriteFlag()).toBe(false)
+  })
+
+  it('notifies onWriteFlagOn only when the cached flag turns on', async () => {
+    const seen = vi.fn()
+    const off = onWriteFlagOn(seen)
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
+    expect(seen).not.toHaveBeenCalled()
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    expect(seen).toHaveBeenCalledTimes(1)
+    off()
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    expect(seen).toHaveBeenCalledTimes(1)
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
   })
 
   it('a bare fetchWriteFlag does not touch the cache', async () => {

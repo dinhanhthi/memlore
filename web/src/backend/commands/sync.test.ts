@@ -59,6 +59,7 @@ function harness() {
   const events: Array<{ event: string; payload: unknown }> = []
   const script: Array<() => Promise<PullOutcome>> = []
   const pushScript: Array<() => Promise<PushResult>> = []
+  const flagListeners = new Set<() => void>()
   const h = {
     pulls: 0,
     outcome: NOOP,
@@ -75,6 +76,11 @@ function harness() {
     pushImpl: null as (() => Promise<PushResult>) | null,
     online: () => {
       for (const fn of [...(winListeners.get('online') ?? [])]) fn()
+    },
+    /** The cached write flag turns on (its first successful fetch after unlock). */
+    flagOn: () => {
+      h.flag = true
+      for (const fn of [...flagListeners]) fn()
     },
     events,
     states: () =>
@@ -140,6 +146,10 @@ function harness() {
       events.push({ event: 'memlore:entries-changed', payload: undefined })
     },
     cachedWriteFlag: () => h.flag,
+    onWriteFlagOn: (fn) => {
+      flagListeners.add(fn)
+      return () => flagListeners.delete(fn)
+    },
     pendingCount: () => h.pending,
     push: async () => {
       h.pushes += 1
@@ -806,6 +816,26 @@ describe('push status', () => {
     startSyncSchedule()
     await h.settle()
     expect(h.log.filter((x) => x === 'push')).toHaveLength(2)
+  })
+
+  it('pushes pending drafts when the write flag arrives after the unlock pull', async () => {
+    const h = harness()
+    h.pending = 1
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull'])
+    h.pushResult = PUSHED_ALL
+    h.flagOn()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+    // Nothing pending: the flag turning on does not push.
+    stopSyncSchedule()
+    h.flag = false
+    startSyncSchedule()
+    await h.settle()
+    h.flagOn()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push', 'pull'])
   })
 
   it('reports a run that several triggers joined once', async () => {

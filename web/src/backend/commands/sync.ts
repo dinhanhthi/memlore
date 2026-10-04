@@ -58,7 +58,7 @@
  */
 
 import { emitFromBackend, listen } from '../../tauri/event'
-import { getCachedWriteFlag } from '../config'
+import { getCachedWriteFlag, onWriteFlagOn } from '../config'
 import { onDraftSaved, unpushedDraftCount } from '../drafts'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, isUnlocked, onLock } from '../keys'
@@ -127,6 +127,8 @@ export interface SyncEnv {
   push: () => Promise<PushResult>
   /** The last fetched write flag. Off: no push at all. */
   cachedWriteFlag: () => boolean
+  /** Subscribes to the cached flag turning on; returns the unsubscribe function. */
+  onWriteFlagOn: (listener: () => void) => () => void
   /** The unpushed draft count, without reading IndexedDB. */
   pendingCount: () => number
   /** Subscribes to every successful `saveDraft`; returns the unsubscribe function. */
@@ -146,6 +148,7 @@ function defaultEnv(): SyncEnv {
     pull: async () => (await readEnv().session()).pull(),
     push: async () => (await import('../sync/push')).pushAll(),
     cachedWriteFlag: getCachedWriteFlag,
+    onWriteFlagOn,
     pendingCount: unpushedDraftCount,
     onDraftSaved,
     document: typeof document === 'undefined' ? null : (document as unknown as DocumentLike),
@@ -498,6 +501,10 @@ export function startSyncSchedule(): void {
   e.window?.addEventListener('online', onOnline)
   e.document?.addEventListener('visibilitychange', onVisibility)
   const unsubscribeSaved = e.onDraftSaved(onSaved)
+  // The flag is fetched on the same unlock event as the first pull and may land after it.
+  const unsubscribeFlag = e.onWriteFlagOn(() => {
+    if (e.pendingCount() > 0) requestPush('start')
+  })
   const unregisterLock = onLock(() => stopSyncSchedule())
   active = {
     stop: () => {
@@ -505,6 +512,7 @@ export function startSyncSchedule(): void {
       e.window?.removeEventListener('online', onOnline)
       e.document?.removeEventListener('visibilitychange', onVisibility)
       unsubscribeSaved()
+      unsubscribeFlag()
       if (timer !== null) e.clearTimeout(timer)
       if (debounce !== null) e.clearTimeout(debounce)
       unregisterLock()
