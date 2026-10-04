@@ -43,6 +43,7 @@ export type DocsSlug =
   | 'customization'
   | 'maps'
   | 'editor'
+  | 'web'
 
 export type DocsPage = {
   slug: DocsSlug
@@ -146,6 +147,13 @@ export const DOCS_PAGES: readonly DocsPage[] = [
       'How each entry is its own page that saves as you write, and how two devices combine those edits.',
     group: 'features',
     diagram: 'editor',
+  },
+  {
+    slug: 'web',
+    title: 'Web companion',
+    description:
+      'How Memlore Web works, how to sign in with your recovery phrase, and what is supported.',
+    group: 'features',
   },
 ]
 

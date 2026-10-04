@@ -93,6 +93,30 @@ pnpm mockup:dev   # http://localhost:5175
 
 Pick a scenario from the floating panel (or `?scenario=<id>`). **Never change `src/` components to make the browser happy** — fix `mockup/mocks/` instead. Details: [`mockup/README.md`](mockup/README.md).
 
+## Web companion (`web/`)
+
+`web/` contains the production browser companion app (`web.memlore.app`). It mounts `src/App.tsx` over a browser-native backend that communicates directly with Google Drive APIs.
+
+### Toolchain Prerequisites
+- Rust `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
+- `wasm-bindgen-cli` locked to the exact version in `src-tauri/Cargo.lock` (currently `0.2.118`):
+  ```bash
+  cargo install wasm-bindgen-cli --version =0.2.118 --locked
+  ```
+  The helper script `scripts/web-wasm.sh --check-only` verifies your installed CLI version against the lockfile.
+
+### Local Development
+```bash
+pnpm web:dev        # Starts web companion Vite dev server at http://localhost:5176
+pnpm web-auth:dev   # Runs Cloudflare Worker OAuth proxy locally via Wrangler
+```
+
+### Web Tests & Conventions
+- Web unit tests run under Vitest: `pnpm web:test` (isolated from desktop `pnpm test`).
+- Tests exercising WebAssembly cryptographic bindings use the `*.wasm.test.ts` naming convention (automatically compiled via `pnpm web:wasm` and executed by `pnpm web:test`).
+- **Golden Fixture Regeneration:** If envelope or outbox schemas evolve, regenerate golden fixtures using `MEMLORE_REGEN_FIXTURES=1 pnpm web:fixture:outbox` and verify both frontend Vitest and desktop `cargo test golden_` pass before committing.
+- **Cargo Build Cache:** The shared target directory in `~/.cargo/config.toml` caches the `wasm32-unknown-unknown` target artifacts alongside desktop builds.
+
 ## How we work
 
 1. Open an issue (or comment on an existing one) before large changes.

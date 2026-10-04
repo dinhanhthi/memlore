@@ -29,6 +29,10 @@ A random master key locks the journal on this computer; your password opens the 
 
 :::
 
+## On the web
+
+In the [Web companion](/docs/web), encryption keys exist strictly inside WebAssembly linear memory and are wiped as soon as you lock the vault or close the tab. The browser's IndexedDB stores only AES-256-GCM encrypted ciphertexts; unencrypted text is never written to disk or browser storage.
+
 ## If you lose access
 
 - Forgot the password? The journal is not thrown away if you still have the recovery words or a keychain unlock you turned on. See [Backup and recovery](/docs/backup-and-recovery).

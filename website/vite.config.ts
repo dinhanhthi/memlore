@@ -146,12 +146,12 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5176,
+    port: 5177,
     strictPort: true,
     host: true,
   },
   preview: {
-    port: 4176,
+    port: 4177,
     strictPort: true,
   },
   build: {
