@@ -33,6 +33,8 @@ export const CACHE_LIMIT_KEY = 'cache-limit-bytes'
  * `clearCache()` like the drafts do; `clearAll()` wipes them.
  */
 export const OUTBOX_META_PREFIX = 'outbox-'
+/** Retention's "first seen pushed" times (`<prefix><entryId>`), reset with `drafts.clearPushed`. */
+export const OUTBOX_PUSHED_AT_PREFIX = `${OUTBOX_META_PREFIX}pushed-at:`
 
 /** The device store holds a single record under this out-of-line key. */
 const DEVICE_KEY = 'self'
@@ -554,19 +556,25 @@ export class WebDb {
       }),
     /**
      * Drops `pushedHash` from every draft in ONE transaction, so each is uploaded again (a
-     * re-onboard: the outbox it was pushed to may be gone). Keeps the bytes and the outbox media.
+     * re-onboard: the outbox it was pushed to may be gone), and forgets when each was first seen
+     * pushed. Keeps the bytes and the outbox media.
      */
     clearPushed: (): Promise<void> =>
-      this.tx([STORE_DRAFTS], 'readwrite', async ([s]) => {
+      this.tx([STORE_DRAFTS, STORE_META], 'readwrite', async ([s, meta]) => {
         const all = (await requestToPromise(s.getAll())) as DraftRecord[]
-        await Promise.all(
-          all
+        // The retention grace windows restart with the re-push, in the new outbox.
+        const keys = (await requestToPromise(meta.getAllKeys())) as IDBValidKey[]
+        await Promise.all([
+          ...all
             .filter((rec) => rec.pushedHash !== undefined)
             .map(({ pushedHash: _pushed, ...rec }) => {
               assertDraftRecord(rec)
               return requestToPromise(s.put(rec))
             }),
-        )
+          ...keys
+            .filter((k) => typeof k === 'string' && k.startsWith(OUTBOX_PUSHED_AT_PREFIX))
+            .map((k) => requestToPromise(meta.delete(k))),
+        ])
       }),
   }
 

@@ -32,6 +32,7 @@ import type { KeyRing } from '../keys'
 import {
   OUTBOX_BLOB_PREFIX,
   OUTBOX_META_PREFIX,
+  OUTBOX_PUSHED_AT_PREFIX,
   type DraftRecord,
   type WebDb,
 } from '../storage/idb'
@@ -49,7 +50,7 @@ export const UNDECIDED_GRACE_SECS = 7 * 86400
 
 const RESOLVED = `${OUTBOX_META_PREFIX}resolved:`
 const REFUSED_AT = `${OUTBOX_META_PREFIX}refused-at:`
-const PUSHED_AT = `${OUTBOX_META_PREFIX}pushed-at:`
+const PUSHED_AT = OUTBOX_PUSHED_AT_PREFIX
 const ACKS_FILE = 'outbox-acks.bin'
 
 /** What the last pull saw of the other devices. */

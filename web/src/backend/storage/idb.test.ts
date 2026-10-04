@@ -4,6 +4,7 @@ import {
   DB_NAME,
   CACHE_LIMIT_KEY,
   JOURNAL_SEEN_PREFIX,
+  OUTBOX_PUSHED_AT_PREFIX,
   OUTBOX_META_PREFIX,
   StorageQuotaError,
   StorageUnavailableError,
@@ -235,6 +236,23 @@ describe('sameBytes', () => {
     expect(sameBytes(new Uint8Array([1, 2]), new Uint8Array([1, 2]))).toBe(true)
     expect(sameBytes(new Uint8Array([1, 2]), new Uint8Array([1, 3]))).toBe(false)
     expect(sameBytes(new Uint8Array([1]), new Uint8Array([1, 0]))).toBe(false)
+  })
+})
+
+describe('drafts.clearPushed', () => {
+  it('unmarks every draft and forgets the first-pushed times, keeping other retention state', async () => {
+    await db.drafts.put({
+      entryId: 'd',
+      sealed: bytes(1),
+      updatedAt: 1,
+      pushedHash: 'ab'.repeat(32),
+    })
+    await db.meta.put({ key: `${OUTBOX_PUSHED_AT_PREFIX}d`, value: `${'ab'.repeat(32)}:5` })
+    await db.meta.put({ key: 'outbox-resolved:d:title@1', value: true })
+    await db.drafts.clearPushed()
+    expect(await db.drafts.get('d')).toEqual({ entryId: 'd', sealed: bytes(1), updatedAt: 1 })
+    expect(await db.meta.get(`${OUTBOX_PUSHED_AT_PREFIX}d`)).toBeUndefined()
+    expect(await db.meta.get('outbox-resolved:d:title@1')).toBeDefined()
   })
 })
 
