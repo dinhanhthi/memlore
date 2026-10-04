@@ -9,8 +9,12 @@ import {
   isIntentPathValid,
   packOutboxUploadIntents,
   resolveField,
+  shouldRetainIntent,
+  type RetainParams,
 } from './outbox'
 import type { EntryMetadata } from '../vault'
+
+const INTENT_PATH = 'web-1/outbox/entry-1.bin'
 
 describe('outbox field resolution', () => {
   const baseEntry: EntryMetadata = {
@@ -48,6 +52,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: synced,
       allAcks: [],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a', 'desktop-b'],
       nowSecs: 1020,
       entryTitleOrId: 'Web Title',
@@ -64,7 +69,7 @@ describe('outbox field resolution', () => {
       desktop_device_id: 'desktop-a',
       acks: [
         {
-          path: 'generations/g-0/web-1/outbox/entry-1.bin',
+          path: INTENT_PATH,
           content_hash: 'hash1',
           applied_updated_at: 2000,
           created: false,
@@ -87,7 +92,7 @@ describe('outbox field resolution', () => {
       desktop_device_id: 'desktop-b',
       acks: [
         {
-          path: 'generations/g-0/web-1/outbox/entry-1.bin',
+          path: INTENT_PATH,
           content_hash: 'hash1',
           applied_updated_at: null,
           created: false,
@@ -112,6 +117,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: syncedBeforePush,
       allAcks: [acksA, acksB],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a', 'desktop-b'],
       nowSecs: 1600,
       entryTitleOrId: 'Original Title',
@@ -128,6 +134,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: syncedAfterPush,
       allAcks: [acksA, acksB],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a', 'desktop-b'],
       nowSecs: 2050,
       entryTitleOrId: 'Web Title',
@@ -143,7 +150,7 @@ describe('outbox field resolution', () => {
       desktop_device_id: 'desktop-a',
       acks: [
         {
-          path: 'generations/g-0/web-1/outbox/entry-1.bin',
+          path: INTENT_PATH,
           content_hash: 'hash1',
           applied_updated_at: 2000,
           created: false,
@@ -172,6 +179,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: supersededSynced,
       allAcks: [acksA],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a'],
       nowSecs: 2600,
       entryTitleOrId: 'Original Title',
@@ -181,6 +189,8 @@ describe('outbox field resolution', () => {
     expect(res.notice).toEqual({
       kind: 'replaced',
       text: 'This edit was replaced by a change from your desktop: title of Original Title',
+      field: 'title',
+      change_seq: 42,
     })
   })
 
@@ -190,7 +200,7 @@ describe('outbox field resolution', () => {
       desktop_device_id: 'desktop-a',
       acks: [
         {
-          path: 'generations/g-0/web-1/outbox/entry-1.bin',
+          path: INTENT_PATH,
           content_hash: 'hash1',
           applied_updated_at: null,
           created: false,
@@ -221,6 +231,7 @@ describe('outbox field resolution', () => {
       change: journalChange,
       syncedEntry: baseEntry,
       allAcks: [acksA],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a'],
       nowSecs: 1200,
       entryTitleOrId: 'Original Title',
@@ -229,7 +240,9 @@ describe('outbox field resolution', () => {
     expect(res.resolved).toBe(true)
     expect(res.notice).toEqual({
       kind: 'refused',
-      text: 'Your desktop could not apply: journal',
+      text: 'Your desktop could not apply: journal (journal)',
+      field: 'journal_id',
+      change_seq: 42,
     })
   })
 
@@ -239,7 +252,7 @@ describe('outbox field resolution', () => {
       desktop_device_id: 'desktop-b',
       acks: [
         {
-          path: 'generations/g-0/web-1/outbox/entry-1.bin',
+          path: INTENT_PATH,
           content_hash: 'hash1',
           applied_updated_at: null,
           created: false,
@@ -263,6 +276,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: baseEntry,
       allAcks: [acksB],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a', 'desktop-b'],
       firstRefusalTimes: new Map([['title@42', 1100]]),
       nowSecs: 1100 + 100,
@@ -276,6 +290,7 @@ describe('outbox field resolution', () => {
       change: titleChange,
       syncedEntry: baseEntry,
       allAcks: [acksB],
+      intentPath: INTENT_PATH,
       capableDesktops: ['desktop-a', 'desktop-b'],
       firstRefusalTimes: new Map([['title@42', 1100]]),
       nowSecs: 1100 + 30 * 86400 + 1,
@@ -475,15 +490,11 @@ describe('upload packing order', () => {
     )
 
     for (const intent of intents) {
-      expect(
-        isIntentPathValid(
-          intent.path,
-          0,
-          '22222222-2222-2222-2222-222222222222',
-        ),
-      ).toBe(true)
+      expect(isIntentPathValid(intent.path, 0, '22222222-2222-2222-2222-222222222222')).toBe(true)
       // Path must be strictly within outbox/
-      expect(intent.path).toMatch(/^generations\/g-0\/22222222-2222-2222-2222-222222222222\/outbox\//)
+      expect(intent.path).toMatch(
+        /^generations\/g-0\/22222222-2222-2222-2222-222222222222\/outbox\//,
+      )
       expect(intent.path.includes('/entries/')).toBe(false)
       expect(intent.path.includes('/metadata.json')).toBe(false)
     }
@@ -530,5 +541,222 @@ describe('upload packing order', () => {
     expect(Number.isInteger(intent.fields.title!.changed_at_secs)).toBe(true)
     expect(intent.fields.title!.changed_at_secs).toBeLessThan(10_000_000_000)
     expect(Number.isInteger(intent.fields.title!.base_updated_at)).toBe(true)
+  })
+})
+
+describe('retention rules (desktop ack format)', () => {
+  const PATH = 'web-1/outbox/e1.bin'
+  const synced: EntryMetadata = {
+    entry_id: 'e1',
+    device_id: 'desk-a',
+    updated_at: 1000,
+    entry_date: 1000,
+    created_at: 1000,
+    journal_id: 'j1',
+    journal_name: null,
+    title: 'Old',
+    preview_text: '',
+    content_text: '',
+    emotion: null,
+    is_favorite: false,
+    is_deleted: false,
+    is_locked: false,
+    is_invisible: false,
+    vault_id: null,
+    tag_ids: [],
+  }
+  const title: FieldChange<string> = {
+    value: 'New',
+    base: 'Old',
+    base_updated_at: 1000,
+    change_seq: 7,
+    changed_at_secs: 5,
+  }
+  const decision = (
+    desktop: string,
+    d: { decision: string; reason?: string | null; at?: number; path?: string; seq?: number },
+  ): OutboxAcksV1 => ({
+    schema_version: 1,
+    desktop_device_id: desktop,
+    acks: [
+      {
+        path: d.path ?? PATH,
+        content_hash: 'h',
+        applied_updated_at: null,
+        created: false,
+        refused_reason: null,
+        decided: [
+          {
+            field: 'title',
+            change_seq: d.seq ?? 7,
+            decision: d.decision,
+            decided_updated_at: d.at ?? 1100,
+            reason: d.reason ?? null,
+          },
+        ],
+      },
+    ],
+  })
+  const resolve = (acks: OutboxAcksV1[], extra: Partial<Parameters<typeof resolveField>[0]> = {}) =>
+    resolveField({
+      fieldName: 'title',
+      change: title,
+      syncedEntry: { ...synced, updated_at: 1200 },
+      allAcks: acks,
+      intentPath: PATH,
+      capableDesktops: ['desk-a'],
+      nowSecs: 10,
+      entryTitleOrId: 'Old',
+      ...extra,
+    })
+
+  it("ignores decisions recorded for another web device's intent path", () => {
+    const other = decision('desk-a', { decision: 'refused', path: 'web-2/outbox/e1.bin' })
+    expect(resolve([other]).resolved).toBe(false)
+  })
+
+  it('treats an empty refusal reason (what the desktop writes) as a conflict', () => {
+    const res = resolve([decision('desk-a', { decision: 'refused', reason: null })])
+    expect(res).toEqual({
+      resolved: true,
+      notice: {
+        kind: 'replaced',
+        text: 'This edit was replaced by a change from your desktop: title of Old',
+        field: 'title',
+        change_seq: 7,
+      },
+    })
+  })
+
+  it('a conflict refusal stays pending while the synced entry is still at base', () => {
+    const res = resolve([decision('desk-a', { decision: 'refused' })], { syncedEntry: synced })
+    expect(res.resolved).toBe(false)
+  })
+
+  it('any other refusal reason is deterministic and final once every desktop decided', () => {
+    const a = decision('desk-a', { decision: 'refused', reason: 'tag_not_found' })
+    const pending = resolve([a], { capableDesktops: ['desk-a', 'desk-b'], syncedEntry: synced })
+    expect(pending.resolved).toBe(false)
+    const b = decision('desk-b', { decision: 'refused', reason: 'tag_not_found' })
+    const final = resolve([a, b], { capableDesktops: ['desk-a', 'desk-b'], syncedEntry: synced })
+    expect(final.notice?.kind).toBe('refused')
+    expect(final.notice?.text).toBe('Your desktop could not apply: title (tag_not_found)')
+  })
+
+  function docBytes(text: string, base?: Uint8Array): Uint8Array {
+    const doc = new Y.Doc()
+    if (base) Y.applyUpdate(doc, base)
+    doc.getText('t').insert(0, text)
+    return Y.encodeStateAsUpdate(doc)
+  }
+
+  const intentOf = (over: Partial<OutboxEntryV1> = {}): OutboxEntryV1 => ({
+    schema_version: 1,
+    entry_id: 'e1',
+    web_device_id: 'web-1',
+    created_on_web: false,
+    web_updated_at_secs: 5,
+    base_state_vector: [],
+    yjs_full_state: [],
+    content_text: null,
+    preview_text: null,
+    fields: createEmptyOutboxFields(),
+    media: [],
+    ...over,
+  })
+
+  const retain = (over: Partial<RetainParams>) =>
+    shouldRetainIntent({
+      intent: intentOf(),
+      intentPath: PATH,
+      contentHash: 'h',
+      syncedEntry: synced,
+      syncedContent: null,
+      tombstoned: false,
+      allAcks: [],
+      capableDesktops: ['desk-a'],
+      nowSecs: 10,
+      ...over,
+    })
+
+  it('keeps an intent whose Yjs edit the synced doc does not contain yet, drops it once merged', () => {
+    const base = docBytes('desktop ')
+    const edit = docBytes('web ', base)
+    const intent = intentOf({ yjs_full_state: Array.from(edit) })
+    expect(retain({ intent, syncedContent: base }).retain).toBe(true)
+    // The desktop merged it and added text of its own after: no clock is compared.
+    const merged = docBytes('more ', edit)
+    expect(retain({ intent, syncedContent: merged }).retain).toBe(false)
+  })
+
+  it('keeps an intent until every media id is in the synced metadata', () => {
+    const intent = intentOf({
+      media: [
+        { media_id: 'm1', file_name: 'a', file_type: 'image/jpeg', size: 1, has_thumb: false },
+      ],
+    })
+    expect(retain({ intent }).retain).toBe(true)
+    expect(retain({ intent, syncedEntry: { ...synced, media: [{ id: 'm1' }] } }).retain).toBe(false)
+  })
+
+  it('drops on a tombstone in any manifest, and on a locked or invisible synced entry', () => {
+    const intent = intentOf({ fields: { ...createEmptyOutboxFields(), title } })
+    expect(retain({ intent }).retain).toBe(true)
+    expect(retain({ intent, tombstoned: true, syncedEntry: null }).retain).toBe(false)
+    expect(retain({ intent, syncedEntry: { ...synced, is_locked: true } }).retain).toBe(false)
+    expect(retain({ intent, syncedEntry: { ...synced, is_invisible: true } }).retain).toBe(false)
+  })
+
+  it('omits fields resolved earlier (persisted keys) without a second notice', () => {
+    const intent = intentOf({ fields: { ...createEmptyOutboxFields(), title } })
+    const res = retain({ intent, resolvedKeys: new Set(['title@7']) })
+    expect(res.cleanedFields.title).toBeNull()
+    expect(res.fieldNotices).toEqual([])
+    expect(res.retain).toBe(false)
+  })
+
+  describe('create refused', () => {
+    const created = intentOf({ created_on_web: true })
+    const ack = (desktop: string, hash: string, refused: string | null, isCreated = false) => ({
+      schema_version: 1,
+      desktop_device_id: desktop,
+      acks: [
+        {
+          path: PATH,
+          content_hash: hash,
+          applied_updated_at: null,
+          created: isCreated,
+          refused_reason: refused,
+          decided: [],
+        },
+      ],
+    })
+    const base = { intent: created, syncedEntry: null, capableDesktops: ['desk-a', 'desk-b'] }
+
+    it('drops with a notice once every capable desktop refused the current revision', () => {
+      const one = retain({ ...base, allAcks: [ack('desk-a', 'h', 'no_journal')] })
+      expect(one.retain).toBe(true)
+      const both = retain({
+        ...base,
+        allAcks: [ack('desk-a', 'h', 'no_journal'), ack('desk-b', 'h', 'no_journal')],
+      })
+      expect(both).toMatchObject({
+        retain: false,
+        notice: 'This entry could not be added on your desktop: no_journal',
+      })
+    })
+
+    it('ignores refusals of an older revision and is overridden by any created: true', () => {
+      const stale = retain({
+        ...base,
+        allAcks: [ack('desk-a', 'old', 'no_journal'), ack('desk-b', 'old', 'no_journal')],
+      })
+      expect(stale.retain).toBe(true)
+      const createdElsewhere = retain({
+        ...base,
+        allAcks: [ack('desk-a', 'h', 'no_journal'), ack('desk-b', 'old', 'absent', true)],
+      })
+      expect(createdElsewhere.retain).toBe(true)
+    })
   })
 })

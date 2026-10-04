@@ -315,6 +315,25 @@ describe('refresh', () => {
     expect(env.drive.mutating()).toEqual([])
   })
 
+  it('exposes the manifest devices, listed slot ids and every tombstone row for retention', async () => {
+    const env = await setup()
+    expect(env.puller.desktops.slots).toBeNull()
+    const gone = 'aaaaaaaa-0000-4000-8000-000000000001'
+    patchManifest(env.drive, env.desktop, (v) => {
+      ;(v.entries as Row[]).push({
+        entry_id: gone,
+        updated_at: 5,
+        is_deleted: true,
+        local_version: 1,
+      })
+    })
+    await env.puller.refresh()
+    const { manifests, slots, tombstones } = env.puller.desktops
+    expect(manifests).toEqual([env.desktop])
+    expect([...(slots ?? [])].sort()).toEqual([OWN_ID, env.desktop].sort())
+    expect(tombstones.has(gone)).toBe(true)
+  })
+
   it('computes the stale set against the cached manifest and drops stale entry ciphertext', async () => {
     const env = await setup()
     const [changed] = await env.puller.warmStart()

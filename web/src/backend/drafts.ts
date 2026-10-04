@@ -4,7 +4,7 @@
  *  - Stores sealed ciphertext in IndexedDB (`db.drafts`).
  *  - A draft is KEPT after its upload and marked pushed (`pushedHash`): the overlay is rebuilt
  *    from every draft after a reload, so a pushed-but-unimported edit is never rebuilt from synced
- *    state. Dropping pushed drafts is the deferred 16.1 retention rule (docs/LATER.md).
+ *    state. Pushed drafts are dropped by the 16.1 retention rule (`sync/retention.ts`).
  *  - "Dirty" = some draft whose `pushedHash` is missing or is not the hash of its `sealed`.
  *  - Provides `beforeunload` warning when there are unpushed drafts.
  *  - Notifies `onDraftSaved` listeners after every stored draft (the debounced push trigger in

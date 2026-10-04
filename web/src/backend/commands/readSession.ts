@@ -10,7 +10,8 @@
  *   3. once per unlock, every draft in IndexedDB is opened and fed to `vault.setOutboxIntents`
  *      (Phase 16.5), so the overlay and the next write's `priorIntent` see the web edits saved
  *      before a reload. Every write command awaits `ready()` first, so none runs on an empty
- *      overlay,
+ *      overlay. Intent retention (`sync/retention.ts`) then runs once, and again after every
+ *      `pull()`; its notices are returned by the next `pull()`,
  *   4. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
  * Every read handler first checks the key holder and rejects with `VaultLockedError` when locked.
  *
@@ -23,6 +24,7 @@ import type { Journal, Tag } from '../../../../src/types/journal'
 import type { Template } from '../../../../src/types/template'
 import { PAGE_SIZE } from '../../../../src/types/pagination'
 import { emitFromBackend } from '../../tauri/event'
+import { nowSecs } from '../clock'
 import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '../keys'
 import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
@@ -46,6 +48,7 @@ export type VaultApi = Pick<
   | 'setOutboxIntents'
   | 'getOutboxIntents'
   | 'getOutboxIntent'
+  | 'getSynced'
 >
 
 export interface Taxonomy {
@@ -77,6 +80,11 @@ export interface PullOutcome {
   changed: boolean
   /** Devices whose manifest could not be read fresh (the cached one was used). Empty or absent: none. */
   degraded?: ReadonlyArray<{ device: string; reason: string }>
+  /**
+   * Intent-retention notices raised since the previous pull, oldest first (Phase 16.6.8). Each
+   * is returned once: it is persisted as shown before it is queued.
+   */
+  notices?: string[]
 }
 
 /** What the media commands (Phase 11.1) need besides the vault: ciphertext cache, reader, core. */
@@ -209,11 +217,13 @@ export interface ReadSessionDeps {
 /** The session over a given store, Drive reader and core (the default one passes the real ones). */
 export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSession> {
   const { db, reader, core } = deps
-  const [{ createPuller }, { createVault }, { createDraftManager }] = await Promise.all([
-    import('../sync/pull'),
-    import('../vault'),
-    import('../drafts'),
-  ])
+  const [{ createPuller }, { createVault }, { createDraftManager }, { runRetention }] =
+    await Promise.all([
+      import('../sync/pull'),
+      import('../vault'),
+      import('../drafts'),
+      import('../sync/retention'),
+    ])
   const puller = createPuller({ reader, db, core })
   const vault = createVault({ core, puller })
 
@@ -228,9 +238,41 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     cache = null
     warmed = null
     hydrated = null
+    notices = []
   })
   const assertSameEpoch = (started: number): void => {
     if (started !== epoch) throw new VaultLockedError()
+  }
+
+  // Intent retention (sync/retention.ts): one pass at a time; its notices wait for the next pull.
+  let notices: string[] = []
+  let retaining: Promise<unknown> = Promise.resolve()
+  const retain = (): Promise<boolean> => {
+    const started = epoch
+    const run = retaining.then(async () => {
+      try {
+        const result = await runRetention({
+          db,
+          core,
+          ring: getKeyRing(),
+          nowSecs: () => nowSecs(),
+          desktops: puller.desktops,
+          vault,
+        })
+        if (started !== epoch) return false
+        notices.push(...result.notices)
+        return result.changed
+      } catch (error) {
+        // Fail safe: nothing was dropped that should not be; keep everything until next time.
+        if (started === epoch) {
+          const reason = error instanceof Error ? error.name : typeof error
+          console.warn(`Intent retention skipped (${reason})`)
+        }
+        return false
+      }
+    })
+    retaining = run
+    return run
   }
 
   const taxonomy = async (): Promise<Taxonomy> => {
@@ -257,6 +299,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const current = vault.getOutboxIntents()
     const set = new Set(current.map((i) => i.entry_id))
     vault.setOutboxIntents([...opened.filter((i) => !set.has(i.entry_id)), ...current])
+    await retain()
+    assertSameEpoch(started)
   }
 
   const ready = async (): Promise<Taxonomy> => {
@@ -302,11 +346,21 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     // stub), so a changed entry is never served from RAM.
     await vault.load(result.stale.filter((id) => vault.status(id) !== 'not-loaded'))
     assertSameEpoch(started)
+    const retained = await retain()
+    assertSameEpoch(started)
     const taxonomyChanged = taxonomyBefore !== null && taxonomyBefore !== JSON.stringify(value)
     const changed =
-      before !== null &&
-      (result.stale.length > 0 || taxonomyChanged || indexDiffers(before, puller.index))
-    return { stale: result.stale, changed, degraded: puller.getDegradedDevices() }
+      retained ||
+      (before !== null &&
+        (result.stale.length > 0 || taxonomyChanged || indexDiffers(before, puller.index)))
+    const raised = notices
+    notices = []
+    return {
+      stale: result.stale,
+      changed,
+      degraded: puller.getDegradedDevices(),
+      ...(raised.length > 0 ? { notices: raised } : {}),
+    }
   }
 
   return { vault, media: { db, reader, core, limit: puller.limit }, db, core, ready, pull }

@@ -90,6 +90,15 @@ export interface VaultEntry {
 export type ExcludedReason = 'locked' | 'invisible' | 'deleted' | 'journal'
 export type EntryStatus = 'visible' | ExcludedReason | 'not-loaded'
 
+/** `Vault.getSynced`: synced state only, no overlay. */
+export interface SyncedView {
+  status: EntryStatus
+  /** Full metadata when visible, the stub (ids, timestamps, flags) when excluded. */
+  metadata: EntryMetadata | null
+  /** Yjs full state when visible. */
+  content: Uint8Array | null
+}
+
 /** Thrown by `getEntry` / `getContentBytes` for locked, invisible, deleted or not-loaded ids. */
 export class EntryUnavailableError extends Error {
   readonly reason: Exclude<EntryStatus, 'visible'>
@@ -259,6 +268,22 @@ export class Vault {
     return this.#outboxIntents.get(entryId)
   }
 
+  /**
+   * The SYNCED state of an entry, never the outbox overlay (intent retention compares against it):
+   * a loaded entry's metadata and Yjs bytes, an excluded entry's stub (flags kept), or
+   * `not-loaded` with nulls.
+   */
+  getSynced(id: string): SyncedView {
+    const held = this.#entries.get(id)
+    if (held !== undefined) {
+      return { status: 'visible', metadata: { ...held.metadata }, content: held.content }
+    }
+    const stub = this.#stubs.get(id)
+    if (stub !== undefined)
+      return { status: stub.reason, metadata: { ...stub.metadata }, content: null }
+    return { status: 'not-loaded', metadata: null, content: null }
+  }
+
   /** Visible (non-excluded) entries in RAM (including web-created ones). */
   get size(): number {
     return this.#getAllVisibleHeld().length
@@ -374,10 +399,7 @@ export class Vault {
       const f = fields.entry_date
       const valTs = Number(f.value)
       const baseTs = Number(f.base)
-      if (
-        base.metadata.updated_at === f.base_updated_at ||
-        base.metadata.entry_date === baseTs
-      ) {
+      if (base.metadata.updated_at === f.base_updated_at || base.metadata.entry_date === baseTs) {
         m.entry_date = valTs
       }
     }
@@ -404,10 +426,7 @@ export class Vault {
 
     if (fields.journal_id) {
       const f = fields.journal_id
-      if (
-        base.metadata.updated_at === f.base_updated_at ||
-        base.metadata.journal_id === f.base
-      ) {
+      if (base.metadata.updated_at === f.base_updated_at || base.metadata.journal_id === f.base) {
         m.journal_id = f.value
       }
     }

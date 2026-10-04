@@ -7,6 +7,8 @@ import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
 import { createEmptyOutboxFields, type OutboxEntryV1 } from '../sync/outbox'
 import { entryHandlers } from './entries'
 import { configureReadEnv, createReadSession, type ReadSession } from './readSession'
+import { sha256Hex } from '../drafts'
+import type { RetentionDesktops } from '../sync/retention'
 import { FakeVault } from './readTestKit'
 
 const fakes = vi.hoisted(() => ({
@@ -187,15 +189,20 @@ describe('drafts rehydrate the outbox overlay', () => {
     ...over,
   })
 
-  async function hydrationRig(drafts: Array<{ entryId: string; sealed: Uint8Array }>) {
+  async function hydrationRig(
+    drafts: Array<{ entryId: string; sealed: Uint8Array; pushedHash?: string }>,
+    desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() },
+  ) {
     const vault = Object.assign(new FakeVault([{ id: 'e1', updatedAt: 1 }]), {
       setExcludedJournalIds: vi.fn(),
     })
     fakes.vault = vault
     fakes.puller = {
       index: new Map(),
-      refresh: async () => ({}),
+      refresh: async () => ({ stale: [] }),
       warmStart: async () => [] as string[],
+      getDegradedDevices: () => [],
+      desktops,
     }
     const db = await openWebDb({ factory: new IDBFactory() })
     await db.device.put({
@@ -215,6 +222,7 @@ describe('drafts rehydrate the outbox overlay', () => {
     const core = {
       openDeviceBin: (_r: unknown, b: Uint8Array) => b,
       openOutboxEntry,
+      openOutboxAcks: (_r: unknown, b: Uint8Array) => dec.decode(b),
       sealOutboxEntry: (_r: unknown, json: string) => enc.encode(json),
     } as unknown as Core
     const session = await createReadSession({ db, reader: {} as never, core })
@@ -299,5 +307,115 @@ describe('drafts rehydrate the outbox overlay', () => {
     await r.session.ready()
 
     expect(r.vault.getOutboxIntent('e1')).toEqual(newer)
+  })
+
+  describe('intent retention', () => {
+    const pushedDraft = async (i: OutboxEntryV1) => {
+      const sealed = enc.encode(JSON.stringify(i))
+      return { entryId: i.entry_id, sealed, pushedHash: await sha256Hex(sealed) }
+    }
+
+    it('runs once the drafts hydrate: a pushed draft of a tombstoned entry is dropped', async () => {
+      const r = await hydrationRig([await pushedDraft(intent())], {
+        manifests: ['desk-a'],
+        slots: new Set(['desk-a']),
+        tombstones: new Set(['e1']),
+      })
+      await r.session.ready()
+      expect(r.vault.getOutboxIntent('e1')).toBeUndefined()
+      expect(await r.db.drafts.get('e1')).toBeUndefined()
+    })
+
+    it('a resolved field leaves the overlay at once and the stored draft at the next rewrite', async () => {
+      const draft = { entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) } // unpushed
+      const r = await hydrationRig([draft], {
+        manifests: ['desk-a'],
+        slots: new Set(['desk-a']),
+        tombstones: new Set(),
+      })
+      const refused = {
+        field: 'title',
+        change_seq: 1,
+        decision: 'refused',
+        decided_updated_at: 50,
+        reason: 'journal',
+      }
+      const acks = {
+        schema_version: 1,
+        desktop_device_id: 'desk-a',
+        acks: [
+          {
+            path: 'web-1234/outbox/e1.bin',
+            content_hash: 'x',
+            applied_updated_at: null,
+            created: false,
+            refused_reason: null,
+            decided: [refused],
+          },
+        ],
+      }
+      await r.db.files.put({
+        path: 'desk-a/outbox-acks.bin',
+        ciphertext: enc.encode(JSON.stringify(acks)),
+        etag: null,
+        modifiedTime: null,
+        lastAccess: 0,
+        pinned: false,
+      })
+      configureReadEnv({ isUnlocked: () => true, session: async () => r.session })
+      setWriteFlagForTest(true)
+
+      await r.session.ready()
+      expect(r.vault.getOutboxIntent('e1')?.fields.title).toBeNull()
+      expect((await r.db.drafts.get('e1'))?.sealed).toEqual(draft.sealed)
+
+      await entryHandlers.toggle_favorite({ id: 'e1' })
+      const stored = await r.db.drafts.get('e1')
+      const persisted = JSON.parse(dec.decode(stored?.sealed)) as OutboxEntryV1
+      expect(persisted.fields.title).toBeNull()
+      expect(persisted.fields.is_favorite?.value).toBe(true)
+    })
+
+    it('pull() returns its notices once and reports the change', async () => {
+      const created = intent({ entry_id: 'e9', created_on_web: true })
+      const draft = await pushedDraft(created)
+      const r = await hydrationRig([draft], {
+        manifests: ['desk-a'],
+        slots: new Set(['desk-a']),
+        tombstones: new Set(),
+      })
+      const acks = {
+        schema_version: 1,
+        desktop_device_id: 'desk-a',
+        acks: [
+          {
+            path: 'web-1234/outbox/e9.bin',
+            content_hash: draft.pushedHash,
+            applied_updated_at: null,
+            created: false,
+            refused_reason: 'no_journal',
+            decided: [],
+          },
+        ],
+      }
+      expect(await r.session.pull()).toMatchObject({ changed: false })
+      expect(await r.db.drafts.get('e9')).toBeDefined()
+      await r.db.files.put({
+        path: 'desk-a/outbox-acks.bin',
+        ciphertext: enc.encode(JSON.stringify(acks)),
+        etag: null,
+        modifiedTime: null,
+        lastAccess: 0,
+        pinned: false,
+      })
+
+      const second = await r.session.pull()
+      expect(second).toMatchObject({
+        changed: true,
+        notices: ['This entry could not be added on your desktop: no_journal'],
+      })
+      expect(await r.db.drafts.get('e9')).toBeUndefined()
+      expect((await r.session.pull()).notices).toBeUndefined()
+    })
   })
 })

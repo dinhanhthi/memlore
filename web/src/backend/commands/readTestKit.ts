@@ -6,6 +6,7 @@ import {
   EntryUnavailableError,
   type EntryMetadata,
   type LoadResult,
+  type SyncedView,
   type VaultEntry,
 } from '../vault'
 import type { OutboxEntryV1 } from '../sync/outbox'
@@ -165,6 +166,26 @@ export class FakeVault implements VaultApi {
   }
 
   readonly getContentBytes = (id: string): Uint8Array => this.getEntry(id).content
+
+  /** Synced state only (no overlay): a loaded spec, or a stub carrying the spec's flags. */
+  readonly getSynced = (id: string): SyncedView => {
+    const entry = this.#entries.get(id)
+    if (entry !== undefined) {
+      return { status: 'visible', metadata: { ...entry.metadata }, content: entry.content }
+    }
+    const reason = this.#stubs.get(id)
+    const spec = this.#specs.get(id)
+    if (reason === undefined || spec === undefined) {
+      return { status: 'not-loaded', metadata: null, content: null }
+    }
+    const metadata: EntryMetadata = {
+      ...toVaultEntry(spec).metadata,
+      is_deleted: spec.tombstone === true,
+      is_locked: spec.locked === true,
+      is_invisible: spec.invisible === true,
+    }
+    return { status: reason as SyncedView['status'], metadata, content: null }
+  }
 
   readonly listLoaded: VaultApi['listLoaded'] = (filter = {}) =>
     [...this.#entries.values()]

@@ -4,6 +4,7 @@ import {
   DB_NAME,
   CACHE_LIMIT_KEY,
   JOURNAL_SEEN_PREFIX,
+  OUTBOX_META_PREFIX,
   StorageQuotaError,
   StorageUnavailableError,
   WRAPPED_MASTER_HEX_LEN,
@@ -157,6 +158,22 @@ describe('drafts and meta', () => {
       pushedHash: hash,
     })
   })
+
+  it('dropPushed deletes a draft and its media only while it is still the pushed bytes', async () => {
+    const hash = 'cd'.repeat(32)
+    const media = ['outbox/m-1', 'outbox/m-1.thumb']
+    for (const path of [...media, 'outbox/m-2']) {
+      await db.blobs.put({ path, bytes: bytes(1), size: 1, lastAccess: 1 })
+    }
+    await db.drafts.put({ entryId: 'e1', sealed: bytes(4, 1), updatedAt: 3 })
+    expect(await db.drafts.dropPushed('e1', bytes(4, 1), hash, media)).toBe(false) // unpushed
+    await db.drafts.markPushed('e1', bytes(4, 1), hash)
+    expect(await db.drafts.dropPushed('e1', bytes(4, 2), hash, media)).toBe(false) // changed
+    expect(await db.blobs.get('outbox/m-1')).toBeDefined()
+    expect(await db.drafts.dropPushed('e1', bytes(4, 1), hash, media)).toBe(true)
+    expect(await db.drafts.get('e1')).toBeUndefined()
+    expect((await db.blobs.sizes()).map((b) => b.path)).toEqual(['outbox/m-2'])
+  })
 })
 
 describe('device', () => {
@@ -272,6 +289,14 @@ describe('clearCache / clearAll', () => {
     expect(await db.meta.get('k')).toBeUndefined()
     await db.clearAll()
     expect(await db.meta.listByPrefix(JOURNAL_SEEN_PREFIX)).toEqual([])
+  })
+
+  it("clearCache keeps the drafts' outbox retention state and clearAll wipes it", async () => {
+    await db.meta.put({ key: `${OUTBOX_META_PREFIX}resolved:e1:title@7`, value: true })
+    await db.clearCache()
+    expect(await db.meta.listByPrefix(OUTBOX_META_PREFIX)).toHaveLength(1)
+    await db.clearAll()
+    expect(await db.meta.listByPrefix(OUTBOX_META_PREFIX)).toEqual([])
   })
 
   it('clearCache keeps the cache limit preference and clearAll wipes it', async () => {

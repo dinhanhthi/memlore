@@ -27,6 +27,13 @@ export const JOURNAL_SEEN_PREFIX = 'journal-seen:'
  */
 export const CACHE_LIMIT_KEY = 'cache-limit-bytes'
 
+/**
+ * Meta keys with this prefix hold the intent-retention state of drafts (Phase 16.6.8: first-seen
+ * push and refusal times, resolved fields). They belong with the drafts, so they survive
+ * `clearCache()` like the drafts do; `clearAll()` wipes them.
+ */
+export const OUTBOX_META_PREFIX = 'outbox-'
+
 /** The device store holds a single record under this out-of-line key. */
 const DEVICE_KEY = 'self'
 
@@ -36,7 +43,7 @@ export const WRAPPED_MASTER_HEX_LEN = 134
 const RAW_KEY_HEX_LEN = 64
 
 const isPreservedMetaKey = (k: string): boolean =>
-  k.startsWith(JOURNAL_SEEN_PREFIX) || k === CACHE_LIMIT_KEY
+  k.startsWith(JOURNAL_SEEN_PREFIX) || k.startsWith(OUTBOX_META_PREFIX) || k === CACHE_LIMIT_KEY
 
 export class StorageUnavailableError extends Error {
   constructor(message = 'IndexedDB is unavailable (private mode or blocked)') {
@@ -521,6 +528,31 @@ export class WebDb {
         return true
       }),
     /**
+     * Deletes a PUSHED draft and its outbox media `blobPaths` in ONE transaction, only while the
+     * stored bytes are still `sealed` and marked pushed with `pushedHash` (a draft saved again
+     * meanwhile is unpushed and stays). Resolves false when nothing was deleted.
+     */
+    dropPushed: (
+      entryId: string,
+      sealed: Uint8Array,
+      pushedHash: string,
+      blobPaths: readonly string[],
+    ): Promise<boolean> =>
+      this.tx([STORE_DRAFTS, STORE_BLOBS], 'readwrite', async ([s, blobs]) => {
+        const rec = (await requestToPromise(s.get(entryId))) as DraftRecord | undefined
+        if (
+          !rec ||
+          !(rec.sealed instanceof Uint8Array) ||
+          !sameBytes(rec.sealed, sealed) ||
+          rec.pushedHash !== pushedHash
+        ) {
+          return false
+        }
+        await requestToPromise(s.delete(entryId))
+        await Promise.all(blobPaths.map((p) => requestToPromise(blobs.delete(p))))
+        return true
+      }),
+    /**
      * Drops `pushedHash` from every draft in ONE transaction, so each is uploaded again (a
      * re-onboard: the outbox it was pushed to may be gone). Keeps the bytes and the outbox media.
      */
@@ -577,7 +609,8 @@ export class WebDb {
 
   /**
    * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts and their `outbox/` media, the device record, the
-   * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`) and the `CACHE_LIMIT_KEY` preference.
+   * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`), the drafts' `outbox-` retention
+   * state and the `CACHE_LIMIT_KEY` preference.
    */
   clearCache(): Promise<void> {
     return this.tx([STORE_FILES, STORE_BLOBS, STORE_META], 'readwrite', async (stores) => {

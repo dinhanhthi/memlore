@@ -78,7 +78,10 @@ export const PUSH_DEBOUNCE_MS = 2_000
 export const MSG_FORMAT_READ_ONLY =
   'This vault uses a newer sync format than this app version understands, so it stays read-only. Update the app.'
 
-/** Shown (as the status `error` of a `synced` phase) when a device's data could not be read fully. */
+/**
+ * Shown (as the status `error` of a `synced` phase) when a device's data could not be read fully.
+ * An intent-retention notice (`PullOutcome.notices`, the newest one) uses the same channel, once.
+ */
 export const MSG_SYNC_DEGRADED = "sync degraded: a device's data could not be read fully"
 
 export type SyncPhase = 'idle' | 'syncing' | 'synced' | 'error'
@@ -175,6 +178,11 @@ let lastError: string | null = null
 let lastSyncSec: number | null = null
 /** Set while the last successful pull left a device on its cached manifest. */
 let degraded = false
+/**
+ * The newest intent-retention notice of the last pull, until a `synced` status carries it once
+ * (in `error`, like `MSG_SYNC_DEGRADED`). Older notices of the same pull are not shown.
+ */
+let pendingNotice: string | null = null
 /** The pull in flight, tagged with the schedule epoch it started under. */
 let inflight: { epoch: number; promise: Promise<PullReport> } | null = null
 let lastAttemptAt = 0
@@ -207,6 +215,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   lastError = null
   lastSyncSec = null
   degraded = false
+  pendingNotice = null
   inflight = null
   lastAttemptAt = 0
   nextAttemptAt = 0
@@ -235,7 +244,13 @@ function setPhase(next: SyncPhase, error: string | null): void {
   const keepPushError = next === 'synced' && pushError !== null
   phase = keepPushError ? 'error' : next
   lastError = keepPushError ? pushError : error
-  const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: lastError }
+  // A notice rides on one `synced` status only; `lastError` keeps the note it replaced.
+  let shown = lastError
+  if (phase === 'synced' && pendingNotice !== null) {
+    shown = pendingNotice
+    pendingNotice = null
+  }
+  const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: shown }
   reportedPending = payload.entriesPending
   env().emit(STATUS_EVENT, payload)
 }
@@ -287,6 +302,7 @@ async function doPull(): Promise<PullReport> {
     clearRetry()
     lastSyncSec = Math.floor(e.now() / 1000)
     degraded = (outcome.degraded?.length ?? 0) > 0
+    pendingNotice = outcome.notices?.at(-1) ?? pendingNotice
     setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
     if (outcome.changed) e.emitChanged()
     return { outcome, message: null }
@@ -470,6 +486,7 @@ export function startSyncSchedule(): void {
   nextAttemptAt = 0
   lastAttemptAt = 0
   degraded = false
+  pendingNotice = null
   pushFailures = 0
   pushNextAt = 0
   pushError = null

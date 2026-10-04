@@ -35,6 +35,7 @@ import {
   VaultNotReadyError,
   type DriveReader,
 } from '../drive/client'
+import type { RetentionDesktops } from './retention'
 import { DEVICE_SLOT_FOLDERS, deviceSlotPath, isSafeComponent } from '../drive/paths'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, isUnlocked, lock, type LockReason } from '../keys'
@@ -257,6 +258,10 @@ export class Puller {
   #refreshing: Promise<PullResult> | null = null
   #oversizeSkipped = 0
   #degraded: DegradedDevice[] = []
+  /** Retention view of the last refresh: manifest devices, slot ids, tombstoned entry ids. */
+  #desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() }
+  /** Slot ids listed by the authority check of the refresh in progress. */
+  #listedSlots: Set<string> | null = null
   readonly #inflight = new Map<string, Promise<Uint8Array | null>>()
 
   constructor(deps: PullDeps) {
@@ -273,6 +278,15 @@ export class Puller {
   /** A locked session must not keep using the OAuth token or the network. */
   #assertUnlocked(): void {
     if (!this.#isUnlocked()) throw new VaultLockedError()
+  }
+
+  /**
+   * What intent retention needs from the last refresh: the devices with a manifest, the listed
+   * device slot ids (null before a refresh) and every entry id with a tombstone row in ANY
+   * manifest (not only LWW winners).
+   */
+  get desktops(): RetentionDesktops {
+    return this.#desktops
   }
 
   /** The download limiter (concurrency 4), shared with the media reads of Phase 11.1. */
@@ -352,6 +366,11 @@ export class Puller {
       [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
     )
     this.#degraded = degraded
+    const tombstones = new Set<string>()
+    for (const manifest of manifests.values()) {
+      for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
+    }
+    this.#desktops = { manifests: [...manifests.keys()], slots: this.#listedSlots, tombstones }
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
   }
 
@@ -416,6 +435,9 @@ export class Puller {
     if (folderId === null) throw new VaultNotReadyError(DEVICE_SLOT_FOLDERS.join('/'))
     const path = deviceSlotPath(this.#ownId ?? '')
     const listed = await this.#reader.listFolder(folderId, 'files')
+    this.#listedSlots = new Set(
+      listed.filter((f) => f.name.endsWith('.json')).map((f) => f.name.slice(0, -'.json'.length)),
+    )
     if (!listed.some((file) => `.meta/keyring/devices/${file.name}` === path)) return false
     let bytes: Uint8Array
     try {
@@ -435,6 +457,7 @@ export class Puller {
   async #revoke(reason: ReonboardReason): Promise<never> {
     this.#epoch += 1
     this.#index = null
+    this.#desktops = { manifests: [], slots: null, tombstones: new Set() }
     this.#inflight.clear()
     this.#lockKeys('revoked')
     reonboardReason = reason

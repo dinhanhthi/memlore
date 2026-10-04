@@ -230,6 +230,29 @@ describe('schedule triggers', () => {
     expect(await syncHandlers.get_sync_status({})).not.toHaveProperty('error')
   })
 
+  it('shows the newest retention notice once as the synced note, then clears it', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, notices: ['older notice', 'newest notice'] }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: 'newest notice' })
+    h.outcome = NOOP
+    await syncHandlers.sync_now({})
+    expect(h.last()).toMatchObject({ state: 'synced', error: null })
+  })
+
+  it('a notice is shown over the degraded note once, then the degraded note returns', async () => {
+    const h = harness()
+    const degraded: PullOutcome['degraded'] = [{ device: 'd1', reason: 'manifest-oversize' }]
+    h.outcome = { stale: [], changed: false, degraded, notices: ['a notice'] }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: 'a notice' })
+    h.outcome = { stale: [], changed: false, degraded }
+    await syncHandlers.sync_now({})
+    expect(h.last()).toMatchObject({ state: 'synced', error: MSG_SYNC_DEGRADED })
+  })
+
   it('does not pull on start while the tab is hidden, then pulls once it is visible', async () => {
     const h = harness()
     h.setVisible('hidden')
