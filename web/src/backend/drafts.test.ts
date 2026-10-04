@@ -12,7 +12,11 @@ import {
   unpushedDraftCount,
 } from './drafts'
 
-const mocks = vi.hoisted(() => ({ safeUpload: vi.fn(async () => undefined) }))
+const mocks = vi.hoisted(() => ({
+  safeUpload: vi.fn(
+    async (_intents: unknown, _deps: SafeUploadDeps): Promise<unknown> => undefined,
+  ),
+}))
 vi.mock('./sync/safeUpload', () => ({ safeUpload: mocks.safeUpload }))
 
 const UPLOAD_DEPS = {} as SafeUploadDeps
@@ -199,5 +203,40 @@ describe('DraftManager', () => {
     expect(unpushedDraftCount()).toBe(2)
     await manager.flush('e1', [], UPLOAD_DEPS, new Uint8Array([1]))
     expect(unpushedDraftCount()).toBe(1)
+  })
+
+  it('flush writes nothing and leaves the draft unmarked when it changed before the lock', async () => {
+    const older = new Uint8Array([1])
+    const newer = new Uint8Array([2])
+    await manager.saveDraft('e1', older)
+    let checked: boolean | undefined
+    mocks.safeUpload.mockImplementationOnce(async (_intents, deps) => {
+      // Another tab saves while this batch waits on the writer lock.
+      await createDraftManager({ db }).saveDraft('e1', newer)
+      checked = await deps.beforeWrite?.()
+      if (checked === false) throw new Error('stale')
+      return undefined
+    })
+
+    expect(await manager.flush('e1', [], UPLOAD_DEPS, older)).toBe('stale')
+
+    expect(checked).toBe(false)
+    const rec = await db.drafts.get('e1')
+    expect(rec?.sealed).toEqual(newer)
+    expect(rec?.pushedHash).toBeUndefined()
+    expect(isAnyDraftDirty()).toBe(true)
+  })
+
+  it('flush reports pushed when the stored draft still holds the uploaded bytes', async () => {
+    const sealed = new Uint8Array([3])
+    await manager.saveDraft('e1', sealed)
+    let checked: boolean | undefined
+    mocks.safeUpload.mockImplementationOnce(async (_intents, deps) => {
+      checked = await deps.beforeWrite?.()
+      return undefined
+    })
+
+    expect(await manager.flush('e1', [], UPLOAD_DEPS, sealed)).toBe('pushed')
+    expect(checked).toBe(true)
   })
 })

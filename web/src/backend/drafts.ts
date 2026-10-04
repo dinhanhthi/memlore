@@ -25,6 +25,10 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.byteLength === b.byteLength && a.every((byte, i) => byte === b[i])
+}
+
 async function isUnpushed(rec: DraftRecord): Promise<boolean> {
   const hash: unknown = rec.pushedHash
   return typeof hash !== 'string' || hash !== (await sha256Hex(rec.sealed))
@@ -121,18 +125,34 @@ export class DraftManager {
    * `saveDraft` during the upload stays unpushed. The caller passes `sealed` rather than this
    * re-reading the record so the recorded hash is the hash of what was actually packed. The draft
    * is never deleted. A rejected upload changes nothing and rethrows.
+   *
+   * Under the writer lock, right before the first write, the stored draft is re-read: if it is no
+   * longer `sealed` (another tab saved, and may already have pushed, a newer one) or is gone,
+   * nothing is written, the draft is not marked, and this returns `'stale'`.
    */
   async flush(
     entryId: string,
     intents: SafeUploadIntent[],
     uploadDeps: SafeUploadDeps,
     sealed: Uint8Array,
-  ): Promise<void> {
+  ): Promise<'pushed' | 'stale'> {
     const startGen = saveGen
     const hash = await sha256Hex(sealed)
-    await safeUpload(intents, uploadDeps)
+    let stale = false
+    const beforeWrite = async (): Promise<boolean> => {
+      const rec = await this.#db.drafts.get(entryId)
+      stale = rec === undefined || !sameBytes(rec.sealed, sealed)
+      return !stale
+    }
+    try {
+      await safeUpload(intents, { ...uploadDeps, beforeWrite })
+    } catch (error) {
+      if (stale) return 'stale'
+      throw error
+    }
     const marked = await this.#db.drafts.markPushed(entryId, sealed, hash)
     if (marked && !savedSince(entryId, startGen)) unpushedIds.delete(entryId)
+    return 'pushed'
   }
 
   async #refresh(): Promise<{ all: DraftRecord[]; unpushed: DraftRecord[] }> {

@@ -16,7 +16,9 @@
  * A run, for each unpushed draft (oldest `updatedAt` first): open it, open its outbox media and
  * thumbs from `blobs` (the seal-then-verify plaintext), pack, `DraftManager.flush`.
  *  - Draft or media that cannot be opened, or missing outbox media: that entry is skipped (logged,
- *    kept). Seal-then-verify failure (`SealVerifyError`): that entry is skipped.
+ *    kept). Seal-then-verify failure (`SealVerifyError`): that entry is skipped. A draft whose
+ *    stored bytes changed before its batch got the lock (another tab saved it): skipped, unmarked,
+ *    nothing written; the newer draft is pushed by the run its save triggered.
  *  - Anything else (write flag, fence, clock, format guard, Drive errors, a lock): the run stops,
  *    every remaining draft stays unpushed, and the error is returned as `error`.
  *
@@ -47,7 +49,7 @@ import {
 export interface PushResult {
   /** Drafts uploaded by this run. */
   pushed: number
-  /** Drafts this run skipped (cannot be opened, missing media, seal-then-verify). Kept. */
+  /** Drafts this run skipped (cannot be opened, missing media, seal-then-verify, stale). Kept. */
   skipped: number
   /** Unpushed drafts after the run. */
   pending: number
@@ -338,8 +340,18 @@ async function pushOnce(): Promise<PushResult> {
         continue
       }
       try {
-        await s.drafts.flush(draft.entryId, intents, uploadDeps(s, p, ring), draft.sealed)
-        pushed += 1
+        const outcome = await s.drafts.flush(
+          draft.entryId,
+          intents,
+          uploadDeps(s, p, ring),
+          draft.sealed,
+        )
+        if (outcome === 'pushed') {
+          pushed += 1
+        } else {
+          console.warn(`Skipping draft ${draft.entryId}: it changed before its upload`)
+          skipped += 1
+        }
       } catch (error) {
         if (!(error instanceof SealVerifyError)) throw error
         console.warn(`Skipping draft ${draft.entryId}: seal-then-verify failed`, error)

@@ -2,7 +2,12 @@ import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadCore, type Core } from '../../core/core'
 import { resetClock } from '../clock'
-import { DriveProtocolError, DriveReader, type DriveWriterDeps } from '../drive/client'
+import {
+  DriveProtocolError,
+  DriveReader,
+  type DriveWriterDeps,
+  type LockManagerLike,
+} from '../drive/client'
 import {
   FakeDrive,
   bytes,
@@ -14,14 +19,15 @@ import {
   violations,
   type DesktopFixture,
 } from '../drive/fakeDrive'
-import { resetDraftsAutostartForTest } from '../drafts'
+import { createDraftManager, resetDraftsAutostartForTest, sha256Hex } from '../drafts'
 import { configureKeysEnv, dispose, setKeyRing, type KeyRing } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
 import { RecoveryFenceError, resumeWrites } from './fence'
 import { resetFormatGuardLatch } from './formatGuard'
-import { META_PATH } from './onboard'
-import type { OutboxEntryV1, OutboxMediaRef } from './outbox'
+import { META_PATH, parseMetaText, readVersions } from './onboard'
+import { packOutboxUploadIntents, type OutboxEntryV1, type OutboxMediaRef } from './outbox'
 import { MissingVaultStateError, configurePushEnv, pushAll } from './push'
+import { createOutboxWriter, type SafeUploadDeps } from './safeUpload'
 
 const WEB_ID = 'cccccccc-1111-4222-8333-dddddddddddd'
 const CONTROL = '.meta/control.json'
@@ -39,6 +45,11 @@ let ring: KeyRing
 let drive: FakeDrive
 let db: WebDb
 let locks: ReturnType<typeof fakeLocks>
+let reader: DriveReader
+let driveDeps: DriveWriterDeps
+let metaText: string
+/** Runs before the push session's n-th lock request (1-based) is forwarded to `locks`. */
+let beforeLockRequest: ((n: number) => Promise<void>) | null
 let freshFlag: boolean
 let cachedFlag: boolean
 let unlocked: boolean
@@ -147,16 +158,25 @@ beforeEach(async () => {
   drive = new FakeDrive()
   seedFromFixture(drive, fixture)
   locks = fakeLocks(drive)
-  const driveDeps: DriveWriterDeps = {
+  beforeLockRequest = null
+  let lockRequests = 0
+  const sessionLocks: LockManagerLike = {
+    request: async (name, callback) => {
+      lockRequests += 1
+      await beforeLockRequest?.(lockRequests)
+      return locks.request(name, callback)
+    },
+  }
+  driveDeps = {
     getToken: async () => 'tok',
     fetchImpl: drive.fetch,
     sleep: async () => {},
-    locks,
+    locks: sessionLocks,
   }
-  const reader = new DriveReader(driveDeps)
+  reader = new DriveReader(driveDeps)
   db = await openWebDb({ factory: new IDBFactory() })
 
-  const metaText = text(fixtureBytes(fixture, META_PATH))
+  metaText = text(fixtureBytes(fixture, META_PATH))
   const meta = JSON.parse(metaText) as { master_fingerprint: string }
   const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as { wrapped_master: string }
   ring = realCore.KeyRing.fromRecovery(
@@ -380,5 +400,72 @@ describe('pushAll', () => {
     expect(r2.pending).toBe(0)
     expect(locks.maxActive).toBe(1)
     expect(uploadedNames().sort()).toEqual([`${ENTRY_A}.bin`, `${ENTRY_B}.bin`])
+  })
+
+  it('skips an entry another tab re-saved and pushed while this run waited on the lock', async () => {
+    const older = intent(ENTRY_A)
+    const sealedX = await putDraft(older, 1)
+    await putDraft(intent(ENTRY_B), 2)
+    const newer = intent(ENTRY_A)
+    newer.content_text = 'the newer edit'
+    const sealedY = realCore.sealOutboxEntry(ring, JSON.stringify(newer))
+
+    // Tab A: saves Y, then pushes it through its own DraftManager and the same serializing lock.
+    const tabA = async (): Promise<void> => {
+      const manager = createDraftManager({ db })
+      await manager.saveDraft(ENTRY_A, sealedY)
+      const meta = parseMetaText(realCore, readVersions(realCore), metaText)
+      const deps: SafeUploadDeps = {
+        writer: createOutboxWriter(reader, driveDeps, { ownId: WEB_ID, localGen: 0 }),
+        reader,
+        core: realCore,
+        ring,
+        localGen: 0,
+        ownDeviceId: WEB_ID,
+        expectedFence: {
+          recoveryGeneration: meta.recoveryGeneration,
+          masterFingerprint: meta.masterFingerprint,
+          epoch: meta.epoch,
+          contentEpoch: meta.contentEpoch,
+        },
+        fetchWriteFlagImpl: async () => true,
+        locks,
+      }
+      const intents = packOutboxUploadIntents({
+        localGen: 0,
+        ownDeviceId: WEB_ID,
+        entry: newer,
+        sealedEntryBytes: sealedY,
+        sealedMediaMap: new Map(),
+        plainMediaMap: new Map(),
+        sealedThumbMap: new Map(),
+        plainThumbMap: new Map(),
+      })
+      await manager.flush(ENTRY_A, intents, deps, sealedY)
+    }
+    // Run B: request 1 is the folder, request 2 is A's batch, already packed from X.
+    beforeLockRequest = async (n) => {
+      if (n !== 2) return
+      expect(drive.mutating()).toHaveLength(2)
+      expect(outbox(`${ENTRY_A}.bin`)).toBeUndefined()
+      expect((await db.drafts.get(ENTRY_A))?.sealed).toEqual(sealedX)
+      await tabA()
+    }
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 1, skipped: 1, pending: 0 })
+    expect(outbox(`${ENTRY_A}.bin`)?.content).toEqual(sealedY)
+    // Run B wrote nothing for A: the only write to A.bin is tab A's create.
+    const writesOfA = drive.mutating().filter((r) =>
+      Buffer.from(r.body ?? [])
+        .toString('latin1')
+        .includes(`${ENTRY_A}.bin`),
+    )
+    expect(writesOfA).toHaveLength(1)
+    expect(drive.mutating().filter((r) => r.method === 'PATCH')).toEqual([])
+    expect((await db.drafts.get(ENTRY_A))?.pushedHash).toBe(await sha256Hex(sealedY))
+    expect(await isPushed(ENTRY_B)).toBe(true)
+    expect(locks.maxActive).toBe(1)
   })
 })

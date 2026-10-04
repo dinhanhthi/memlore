@@ -21,6 +21,7 @@ import { resumeWrites } from './fence'
 import { latchFormatGuard, resetFormatGuardLatch } from './formatGuard'
 import {
   SealVerifyError,
+  StaleWriteError,
   safeUpload,
   type SafeUploadIntent,
   type SafeUploadDeps,
@@ -225,6 +226,74 @@ describe('safeUpload: the only write path', () => {
     await expect(upload).rejects.toThrow(/seal.*verify/i)
     await expect(upload).rejects.toBeInstanceOf(SealVerifyError)
     expect(drive.mutating().length).toBe(mutatingBefore)
+  })
+
+  function entryIntent(entryId: string): SafeUploadIntent {
+    const entryObj = {
+      schema_version: 1,
+      entry_id: entryId,
+      web_device_id: WEB_DEVICE_ID,
+      created_on_web: true,
+      web_updated_at_secs: 1700000000,
+      base_state_vector: [],
+      yjs_full_state: [],
+      content_text: 'Text',
+      preview_text: 'Text',
+      fields: {
+        title: null,
+        entry_date: null,
+        emotion: null,
+        is_favorite: null,
+        journal_id: null,
+        tags_add: {},
+        tags_remove: {},
+      },
+      media: [],
+    }
+    return {
+      path: outboxEntryPath(WEB_DEVICE_ID, localGen, entryId),
+      bytes: core.sealOutboxEntry(ring, JSON.stringify(entryObj)),
+      intended: { kind: 'entry', entry: entryObj },
+    }
+  }
+
+  it('writes nothing and throws StaleWriteError when beforeWrite returns false', async () => {
+    const intent = entryIntent('00000000-0000-0000-0000-000000000013')
+    const beforeWrite = vi.fn(async () => false)
+
+    const upload = safeUpload([intent], makeDeps({ beforeWrite }))
+
+    await expect(upload).rejects.toBeInstanceOf(StaleWriteError)
+    expect(beforeWrite).toHaveBeenCalledTimes(1)
+    expect(drive.mutating()).toEqual([])
+  })
+
+  it('runs beforeWrite under the lock, after every other check, right before the writes', async () => {
+    const intent = entryIntent('00000000-0000-0000-0000-000000000014')
+    const order: string[] = []
+    const serial = fakeLocks(drive)
+    const beforeWrite = vi.fn(async () => {
+      order.push(`check@${drive.mutating().length}:${serial.events.join(',')}`)
+      return true
+    })
+
+    // Refused by an earlier check: never asked.
+    writeFlag = false
+    await expect(safeUpload([intent], makeDeps({ beforeWrite, locks: serial }))).rejects.toThrow()
+    const corrupt = { ...intent, bytes: new Uint8Array(intent.bytes) }
+    corrupt.bytes[corrupt.bytes.length - 1] ^= 0x01
+    writeFlag = true
+    await expect(
+      safeUpload([corrupt], makeDeps({ beforeWrite, locks: serial })),
+    ).rejects.toBeInstanceOf(SealVerifyError)
+    expect(beforeWrite).not.toHaveBeenCalled()
+
+    serial.events.length = 0
+    await safeUpload([intent], makeDeps({ beforeWrite, locks: serial }))
+
+    expect(order).toEqual([`check@0:${serial.events[0]}`])
+    expect(serial.events[0]).toMatch(/^enter@/)
+    expect(drive.mutating().length).toBeGreaterThan(0)
   })
 
   it('stops the second batch when write flag flips OFF between batches', async () => {

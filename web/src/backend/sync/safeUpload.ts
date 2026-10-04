@@ -12,7 +12,9 @@
  *  5. every target path matches the outbox allowlist (`generations/g-<localGen>/<webId>/outbox/…`);
  *  6. seal-then-verify: re-open the sealed bytes with WASM (`openOutboxEntry` / `openMedia`) and
  *     require an exact match with the intended content. A failure is a `SealVerifyError`, so a
- *     caller can skip that one batch; every other refusal concerns the whole vault.
+ *     caller can skip that one batch; every other refusal concerns the whole vault;
+ *  7. the caller's optional `beforeWrite` freshness check (still under the lock): `false` is a
+ *     `StaleWriteError`, so the caller can skip that one batch, nothing written.
  *
  * Only then does it write each intent through the lock-scoped `put` handed to the batch by
  * `DriveWriter.withLock` (update-in-place).
@@ -43,6 +45,14 @@ export class SealVerifyError extends Error {
   }
 }
 
+/** The caller's `beforeWrite` (check 7) refused this batch: its source changed. Nothing written. */
+export class StaleWriteError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'StaleWriteError'
+  }
+}
+
 export interface SafeUploadIntent {
   path: string
   bytes: Uint8Array
@@ -63,6 +73,11 @@ export interface SafeUploadDeps {
   fetchWriteFlagImpl?: () => Promise<boolean>
   locks?: LockManagerLike | null
   revalidatePull?: () => Promise<void> | void
+  /**
+   * Check 7, run under the lock after checks 1-6 and before the first write: is the source of
+   * these intents still current? `false` aborts with `StaleWriteError`.
+   */
+  beforeWrite?: () => Promise<boolean>
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -212,7 +227,12 @@ export async function safeUpload(
       }
     }
 
-    // All 6 checks passed: perform mutating writes in place through the lock-scoped handle (it
+    // 7. The caller's freshness check, under the same lock as the writes
+    if (deps.beforeWrite !== undefined && !(await deps.beforeWrite())) {
+      throw new StaleWriteError('The source of this batch changed before it was written')
+    }
+
+    // All 7 checks passed: perform mutating writes in place through the lock-scoped handle (it
     // does not re-acquire the lock this batch holds, and re-runs the writer's own path checks).
     const results: PutResult[] = []
     for (const intent of intents) {
