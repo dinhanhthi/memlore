@@ -675,13 +675,16 @@ export async function onboardComplete(
     if (salt.length !== KEK_SALT_BYTES) throw new RangeError('KEK salt must be 16 bytes')
     const wrappedMasterHex = ring.wrapLocal(input.password, salt)
 
-    // 8b. Existing device record: a different vault's record may only be replaced when no unsent
-    // drafts (sealed under the old master) would be orphaned. Checked before ANY write.
+    // 8b. Existing device record: a different vault's record may only be replaced when no UNSENT
+    // drafts (sealed under the old master) would be orphaned. Pushed drafts are already in the old
+    // vault's outbox, which its desktops import. Checked before ANY write.
+    // Dynamic: drafts -> safeUpload -> fence imports this module.
+    const { createDraftManager } = await import('../drafts')
     const existing = await db.device.get()
     const replacesOtherVault =
       existing !== undefined && existing.masterFingerprint !== meta.masterFingerprint
     const drafts = await db.drafts.list()
-    if (replacesOtherVault && drafts.length > 0) {
+    if (replacesOtherVault && (await createDraftManager({ db }).listUnpushedDrafts()).length > 0) {
       throw new DeviceRecordConflictError()
     }
     // No record to tell which vault the drafts belong to: they are this vault's only if every one
@@ -729,8 +732,6 @@ export async function onboardComplete(
     if (!replacesOtherVault) {
       await db.drafts.clearPushed()
       // Recounts the page-wide dirty set now: the unlock pull may fail before it hydrates.
-      // Dynamic: drafts -> safeUpload -> fence imports this module.
-      const { createDraftManager } = await import('../drafts')
       await createDraftManager({ db }).listUnpushedDrafts()
     }
     await db.device.put(record)

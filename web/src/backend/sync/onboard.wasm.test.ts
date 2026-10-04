@@ -593,12 +593,27 @@ describe('onboardComplete: device id', () => {
     onlySlotWrite(env.drive, FIXED_ID)
   })
 
+  it('different vault + pushed drafts only: they are in the old outbox; replaced and cleared', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord('ef'.repeat(32)))
+    const sealed = new Uint8Array([1, 2])
+    await env.db.drafts.put({
+      entryId: 'e1',
+      sealed,
+      updatedAt: 1,
+      pushedHash: await sha256Hex(sealed),
+    })
+    await run(env)
+    expect(await env.db.drafts.list()).toEqual([])
+    expect((await env.db.device.get())?.masterFingerprint).toBe(vaultFingerprint())
+  })
+
   it('different vault + unsent drafts: refused with ZERO writes (cloud and IndexedDB)', async () => {
     const env = await setup()
     const old = storedRecord('ef'.repeat(32))
     await env.db.device.put(old)
     const sealed = new Uint8Array([1, 2])
-    const pushedHash = await sha256Hex(sealed)
+    const pushedHash = 'ab'.repeat(32) // a hash of other bytes: this revision was never pushed
     await env.db.drafts.put({ entryId: 'e1', sealed, updatedAt: 1, pushedHash })
     await env.db.files.put({
       path: 'x',
