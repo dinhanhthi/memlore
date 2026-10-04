@@ -63,6 +63,8 @@ let drive: FakeDrive
 let events: string[]
 let clock: number
 let rings: FakeRing[]
+/** A content list text the fake ring refuses (as a fingerprint mismatch would). */
+let rejectedContent: string | null
 let connect: (signal?: AbortSignal) => Promise<void>
 let logout: ReturnType<typeof vi.fn<() => Promise<void>>>
 let tokenFails: boolean
@@ -76,7 +78,9 @@ const fakeCore = {
       if (password !== GOOD) throw new Error('bad tag')
       const ring: FakeRing = {
         lock: vi.fn(),
-        loadContentList: vi.fn(),
+        loadContentList: vi.fn((text: string) => {
+          if (text === rejectedContent) throw new Error('content key fingerprint mismatch')
+        }),
         loadMasterOnly: vi.fn(),
       }
       rings.push(ring)
@@ -96,6 +100,7 @@ beforeEach(async () => {
   events = []
   clock = 1_000_000
   rings = []
+  rejectedContent = null
   tokenFails = false
   connect = async () => undefined
   logout = vi.fn(async () => undefined)
@@ -214,6 +219,17 @@ describe('unlock: content keys', () => {
     const cached = await db.files.get(CONTENT)
     expect(new TextDecoder().decode(cached?.ciphertext)).toBe(CONTENT_TEXT)
     expect(events).toEqual(['app:unlocked'])
+  })
+
+  it('never caches a Drive content list the ring refuses: the good cached copy survives', async () => {
+    await putCache()
+    const bad = JSON.stringify({ version: 2, latest_epoch: 9, entries: [], created_at: 2 })
+    rejectedContent = bad
+    putContent(bad)
+    await expect(unlock()).rejects.toThrow()
+    expect(isUnlocked()).toBe(false)
+    const cached = await db.files.get(CONTENT)
+    expect(new TextDecoder().decode(cached?.ciphertext)).toBe(CONTENT_TEXT)
   })
 
   it('falls back to the cached copy when there is no Drive session', async () => {

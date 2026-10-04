@@ -439,8 +439,6 @@ async function loadContentKeys(
         text = await onboard.readContentFile(reader, e.sleep, { failFastOnTransport: true })
       }
     }
-    if (typeof text === 'string')
-      await onboard.cacheContentText(db, text, e.now()).catch(() => undefined)
   } catch (error) {
     // No usable Drive session (signed out, offline) is not an error: the cache answers instead.
     const noSession =
@@ -450,6 +448,7 @@ async function loadContentKeys(
     if (!noSession && !(error instanceof onboard.TransientReadError)) throw error
     driveError = noSession ? undefined : error
   }
+  const fromDrive = typeof text === 'string'
   if (text === undefined) {
     const cached = await db.files.get(onboard.CONTENT_PATH)
     if (!cached) throw driveError ?? new Error(MSG_NO_KEYS)
@@ -460,6 +459,10 @@ async function loadContentKeys(
     if (cached) text = new TextDecoder().decode(cached.ciphertext)
   }
   onboard.applyContentText(ring, text, v)
+  // Cached only once the ring accepted it: a corrupt or foreign live list must never replace the
+  // copy an offline unlock falls back to.
+  if (fromDrive && typeof text === 'string')
+    await onboard.cacheContentText(db, text, e.now()).catch(() => undefined)
 }
 
 type OnboardModule = Awaited<ReturnType<typeof onboardModule>>
