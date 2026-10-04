@@ -75,7 +75,7 @@ The app may request GitHub release metadata so it can tell you when an update is
 
 ## Memlore Web (web.memlore.app)
 
-Memlore Web is an optional browser companion that allows you to read your existing Memlore journal from a web browser and, once editing is turned on, to make edits that your desktop app imports.
+Memlore Web is an upcoming, optional browser companion. When it is available, it will let you read your existing Memlore journal from a web browser and, once editing is turned on, make edits that your desktop app imports.
 
 - **What is stored locally in the browser:** Memlore Web stores only an encrypted cache in your browser's IndexedDB. The master encryption keys are kept strictly in WebAssembly memory and are wiped as soon as you lock the vault or close the tab. Your journal entries are stored on disk only as AES-256-GCM encrypted ciphertexts; unencrypted text is never stored in browser storage.
 - **The Cloudflare Worker:** An ephemeral Cloudflare Worker at `web.memlore.app/api/*` handles the OAuth 2.0 PKCE token exchange with Google so client secrets stay protected. The Worker never sees, parses, or logs your master recovery phrase, encryption keys, or journal content, and maintains no persistent database or access logs of tokens.
