@@ -175,6 +175,8 @@ interface Owner {
   width: number | null
   height: number | null
   isOutbox?: boolean
+  /** For web media: the web device whose `outbox/` holds it (it may not own the entry). */
+  outboxDevice?: string
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -212,6 +214,7 @@ function ownerIn(entry: VaultEntry, mediaId: string): Owner | null {
       width: num(row.width),
       height: num(row.height),
       isOutbox: row.is_outbox === true,
+      ...(typeof row.outbox_device === 'string' ? { outboxDevice: row.outbox_device } : {}),
     }
   }
   return null
@@ -274,7 +277,12 @@ async function downloadCiphertext(
   const generation = record.recoveryGeneration
   const name = `${mediaId}${thumb ? '.thumb' : ''}`
   const devices = isPayloadDeviceFolderName(owner.deviceId) ? [owner.deviceId] : []
-  devices.push(...(await otherDevices(backend, owner.deviceId)))
+  // Web media lives in the outbox of the browser that added it, which is not the entry's owner when
+  // another browser added it to a desktop entry: try that folder first.
+  if (owner.outboxDevice !== undefined && isPayloadDeviceFolderName(owner.outboxDevice)) {
+    devices.unshift(owner.outboxDevice)
+  }
+  devices.push(...(await otherDevices(backend, owner.deviceId)).filter((d) => !devices.includes(d)))
   let mismatch: Error | null = null // a stale copy on one device must not hide a good one elsewhere
   for (const device of devices) {
     const candidatePath = owner.isOutbox

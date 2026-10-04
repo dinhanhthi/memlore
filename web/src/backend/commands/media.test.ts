@@ -53,6 +53,7 @@ interface Spec {
   fileSize?: number | null
   createdAt?: number
   isOutbox?: boolean
+  outboxDevice?: string
 }
 
 function entryWith(spec: Spec, extra: Record<string, unknown> = {}): VaultEntry {
@@ -84,6 +85,7 @@ function entryWith(spec: Spec, extra: Record<string, unknown> = {}): VaultEntry 
         width: 4,
         height: 3,
         ...(spec.isOutbox ? { is_outbox: true } : {}),
+        ...(spec.outboxDevice ? { outbox_device: spec.outboxDevice } : {}),
       },
     ],
     ...extra,
@@ -274,6 +276,15 @@ describe('resolution', () => {
     const bytes = await call<number[]>('read_media_bytes', MID)
     expect(Uint8Array.from(bytes)).toEqual(PLAIN)
     expect(r.reader.calls).toEqual([`3:${OWNER}/outbox/m-${MID}`])
+  })
+
+  it("reads web media on a synced entry from the uploading browser's outbox first", async () => {
+    // A desktop-owned entry (device_id = OWNER) overlaid with media another browser (OTHER) added.
+    const r = await rig([entryWith({ isOutbox: true, outboxDevice: OTHER })])
+    r.reader.files.set(`${OTHER}/outbox/m-${MID}`, seal(PLAIN))
+    const bytes = await call<number[]>('read_media_bytes', MID)
+    expect(Uint8Array.from(bytes)).toEqual(PLAIN)
+    expect(r.reader.calls[0]).toBe(`3:${OTHER}/outbox/m-${MID}`)
   })
 
   it('falls back to the full media when no thumbnail exists', async () => {

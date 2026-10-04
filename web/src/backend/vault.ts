@@ -557,6 +557,7 @@ export class Vault {
             has_thumb: mRef.has_thumb,
             created_at: intent.web_updated_at_secs,
             is_outbox: true,
+            outbox_device: intent.web_device_id,
           })
         }
       }
@@ -594,6 +595,7 @@ export class Vault {
       has_thumb: mRef.has_thumb,
       created_at: intent.web_updated_at_secs,
       is_outbox: true,
+      outbox_device: intent.web_device_id,
     }))
     const entryDate = intent.fields.entry_date
       ? Number(intent.fields.entry_date.value)
