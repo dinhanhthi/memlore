@@ -22,6 +22,8 @@ const ERROR_TYPE = 'memlore-oauth-error'
 export const REFRESH_MARGIN_MS = 60_000
 const POPUP_POLL_MS = 500
 const CONNECT_TIMEOUT_MS = 5 * 60_000
+/** Longest a connect waits for a logout still in flight before starting the sign-in anyway. */
+const LOGOUT_WAIT_MS = 5_000
 
 /** The refresh cookie is missing or revoked: the user must connect again. */
 export class ReauthRequiredError extends Error {
@@ -58,6 +60,7 @@ export function isSignInCancelled(error: unknown): boolean {
 export interface PopupHandle {
   readonly closed: boolean
   close?: () => void
+  location: { href: string }
 }
 
 export interface ChannelHandle {
@@ -119,6 +122,8 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
   let inFlight: { gen: number; promise: Promise<string> } | null = null
   // Bumped by logout/reauth/connect so a stale in-flight refresh cannot resurrect a cleared token.
   let generation = 0
+  // The worker's logout clears the refresh cookie: a connect must not let it land after its sign-in.
+  let pendingLogout: Promise<void> | null = null
 
   // A bump also drops the in-flight request: it was made with the old (or absent) cookie, so a
   // refresh started after the bump must not coalesce onto it.
@@ -184,6 +189,19 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
     return refresh()
   }
 
+  /** Resolves once `logout` settled, or after LOGOUT_WAIT_MS so a hung POST cannot block sign-in. */
+  function settleLogout(inFlight: Promise<void>): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const cap = deps.setTimeoutImpl(resolve, LOGOUT_WAIT_MS)
+      inFlight
+        .catch(() => undefined)
+        .then(() => {
+          deps.clearTimeoutImpl(cap)
+          resolve()
+        })
+    })
+  }
+
   /** `signal` aborts the flow: the popup closes, listeners go, a late "done" stores nothing. */
   function connect(signal?: AbortSignal): Promise<void> {
     return new Promise<void>((resolve, reject) => {
@@ -199,6 +217,9 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
       let timer: unknown = null
       let channel: ChannelHandle | null = null
       let popup: PopupHandle | null = null
+      const logoutBefore = pendingLogout
+      // False while the popup waits blank for that logout: a "done" then can only be stale.
+      let signingIn = logoutBefore === null
 
       const finish = (error: Error | null): void => {
         if (settled) return
@@ -232,13 +253,17 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
           // The channel is same-origin but not authenticated: never trust "done" on its own, only a
           // session the token endpoint actually grants. A forged "error" can merely abort a connect.
           if (type === DONE_TYPE) {
+            if (!signingIn) return
             refresh().then(
               () => finish(null),
               () => finish(new OAuthConnectError('Sign-in did not complete')),
             )
           } else if (type === ERROR_TYPE) finish(new OAuthConnectError('Sign-in failed'))
         }
-        popup = deps.openPopup(START_URL, POPUP_NAME, POPUP_FEATURES)
+        // Opened now, inside the click gesture (a popup opened after an await is blocked). While a
+        // logout is in flight it starts blank and reaches START_URL only once that logout landed,
+        // so the stale POST cannot clear the cookie this sign-in sets.
+        popup = deps.openPopup(logoutBefore ? 'about:blank' : START_URL, POPUP_NAME, POPUP_FEATURES)
       } catch {
         finish(new OAuthConnectError('Could not start sign-in'))
         return
@@ -249,26 +274,52 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
       }
 
       const handle = popup
-      poll = deps.setIntervalImpl(() => {
-        if (settled || !handle.closed) return
-        // Popup closed without a message (or the message is still in flight): check for a session once.
-        deps.clearIntervalImpl(poll)
-        poll = null
-        refresh().then(
-          () => finish(null),
-          () => finish(new OAuthConnectError(SIGN_IN_CANCELLED_MESSAGE)),
-        )
-      }, POPUP_POLL_MS)
-      timer = deps.setTimeoutImpl(() => {
-        handle.close?.()
-        finish(new OAuthConnectError('Sign-in timed out'))
-      }, CONNECT_TIMEOUT_MS)
+      if (logoutBefore === null) watch(handle)
+      else {
+        void settleLogout(logoutBefore).then(() => {
+          if (settled) return // aborted while waiting: the popup is already closed
+          try {
+            handle.location.href = START_URL
+          } catch {
+            // The user closed the blank popup: the poll below reports the cancel.
+          }
+          signingIn = true
+          watch(handle)
+        })
+      }
+
+      // Started only once the popup heads to sign-in: a closed blank popup must not refresh on the
+      // old cookie the pending logout is about to clear.
+      function watch(handle: PopupHandle): void {
+        poll = deps.setIntervalImpl(() => {
+          if (settled || !handle.closed) return
+          // Popup closed without a message (or the message is still in flight): check for a session once.
+          deps.clearIntervalImpl(poll)
+          poll = null
+          refresh().then(
+            () => finish(null),
+            () => finish(new OAuthConnectError(SIGN_IN_CANCELLED_MESSAGE)),
+          )
+        }, POPUP_POLL_MS)
+        timer = deps.setTimeoutImpl(() => {
+          handle.close?.()
+          finish(new OAuthConnectError('Sign-in timed out'))
+        }, CONNECT_TIMEOUT_MS)
+      }
     })
   }
 
-  async function logout(): Promise<void> {
+  function logout(): Promise<void> {
     bumpGeneration()
     token = null
+    const done: Promise<void> = postLogout().finally(() => {
+      if (pendingLogout === done) pendingLogout = null
+    })
+    pendingLogout = done
+    return done
+  }
+
+  async function postLogout(): Promise<void> {
     try {
       await deps.fetchImpl(LOGOUT_URL, {
         method: 'POST',

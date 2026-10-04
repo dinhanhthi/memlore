@@ -24,7 +24,7 @@ interface Harness {
   client: ReturnType<typeof createOAuthClient>
   fetchImpl: ReturnType<typeof vi.fn>
   clock: { t: number }
-  popup: { closed: boolean; close: ReturnType<typeof vi.fn> }
+  popup: { closed: boolean; close: ReturnType<typeof vi.fn>; location: { href: string } }
   channel: ChannelHandle & { emit: (data: unknown) => void }
   openPopup: ReturnType<typeof vi.fn>
   tick: () => void
@@ -33,7 +33,7 @@ interface Harness {
 
 function makeHarness(fetchImpl: ReturnType<typeof vi.fn> = vi.fn()): Harness {
   const clock = { t: 1_000_000 }
-  const popup = { closed: false, close: vi.fn() }
+  const popup = { closed: false, close: vi.fn(), location: { href: '' } }
   const channel = {
     onmessage: null as ChannelHandle['onmessage'],
     close: vi.fn(),
@@ -386,6 +386,123 @@ describe('connect', () => {
     h.fireTimeout()
     await expect(p).rejects.toThrow(/timed out/)
     expect(h.popup.close).toHaveBeenCalled()
+  })
+})
+
+describe('connect after a logout still in flight', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0))
+
+  /** Logout POST held until released; the token endpoint grants a session. */
+  function heldLogout(): { h: Harness; release: () => void } {
+    let release: () => void = () => {}
+    const fetchImpl = vi.fn((url: string) =>
+      url === '/api/oauth/logout'
+        ? new Promise<Response>((r) => (release = () => r(jsonResponse({ ok: true }))))
+        : Promise.resolve(tokenResponse('fresh')),
+    )
+    return { h: makeHarness(fetchImpl), release: () => release() }
+  }
+
+  it('opens the popup synchronously and navigates only once the logout settled', async () => {
+    const { h, release } = heldLogout()
+    void h.client.logout()
+    const p = h.client.connect()
+    expect(h.openPopup).toHaveBeenCalledWith(
+      'about:blank',
+      'memlore-oauth',
+      'popup,width=500,height=700',
+    )
+    await flush()
+    expect(h.popup.location.href).toBe('')
+    release()
+    await flush()
+    expect(h.popup.location.href).toBe('/api/oauth/start')
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await expect(p).resolves.toBeUndefined()
+    expect(h.client.isConnected()).toBe(true)
+  })
+
+  it('a closed popup during the wait is only checked after the logout landed', async () => {
+    const { h, release } = heldLogout()
+    void h.client.logout()
+    const p = h.client.connect()
+    h.popup.closed = true
+    h.tick()
+    await flush()
+    expect(h.fetchImpl).toHaveBeenCalledTimes(1) // the logout only: no refresh on the old cookie
+    release()
+    await flush()
+    h.tick()
+    await expect(p).resolves.toBeUndefined()
+  })
+
+  it('a done message during the wait is stale and ignored', async () => {
+    const { h, release } = heldLogout()
+    void h.client.logout()
+    const p = h.client.connect()
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await flush()
+    expect(h.fetchImpl).toHaveBeenCalledTimes(1) // the logout only
+    release()
+    await flush()
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await expect(p).resolves.toBeUndefined()
+  })
+
+  it('a hanging logout delays the sign-in only up to the cap', async () => {
+    const { h } = heldLogout()
+    void h.client.logout()
+    const p = h.client.connect()
+    await flush()
+    h.fireTimeout() // the logout wait cap
+    await flush()
+    expect(h.popup.location.href).toBe('/api/oauth/start')
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await expect(p).resolves.toBeUndefined()
+    expect(h.client.isConnected()).toBe(true)
+  })
+
+  it('a failed logout does not block the sign-in', async () => {
+    const fetchImpl = vi.fn((url: string) =>
+      url === '/api/oauth/logout'
+        ? Promise.reject(new TypeError('offline'))
+        : Promise.resolve(tokenResponse()),
+    )
+    const h = makeHarness(fetchImpl)
+    void h.client.logout()
+    const p = h.client.connect()
+    await flush()
+    expect(h.popup.location.href).toBe('/api/oauth/start')
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await expect(p).resolves.toBeUndefined()
+  })
+
+  it('abort during the wait closes the popup and never navigates it', async () => {
+    const { h, release } = heldLogout()
+    void h.client.logout()
+    const controller = new AbortController()
+    const p = h.client.connect(controller.signal)
+    controller.abort()
+    release()
+    expect(isSignInCancelled(await p.catch((e: unknown) => e))).toBe(true)
+    await flush()
+    expect(h.popup.close).toHaveBeenCalled()
+    expect(h.popup.location.href).toBe('')
+  })
+
+  it('a settled logout no longer delays the next connect', async () => {
+    const { h, release } = heldLogout()
+    const out = h.client.logout()
+    release()
+    await out
+    const p = h.client.connect()
+    expect(h.openPopup).toHaveBeenCalledWith(
+      '/api/oauth/start',
+      expect.any(String),
+      expect.any(String),
+    )
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    await p
   })
 })
 

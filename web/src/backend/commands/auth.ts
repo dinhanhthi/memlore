@@ -574,8 +574,12 @@ const isExpired = (session: PendingSession): boolean =>
 
 const gdriveBeginConnect: Handler = async () => {
   const e = env()
-  // Abort only: a logout racing this new popup could clear the cookie its sign-in sets.
-  for (const old of pending.values()) stopPopup(old)
+  // Abort only: a logout racing this new popup could clear the cookie its sign-in sets. Marked
+  // logged out first, or the replaced session's failing complete would abandon() and log out.
+  for (const old of pending.values()) {
+    old.loggedOut = true
+    stopPopup(old)
+  }
   pending.clear()
   const sessionId = e.randomUUID()
   let rejectCancelled!: (error: Error) => void

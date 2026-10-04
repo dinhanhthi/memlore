@@ -684,6 +684,9 @@ describe('gdrive connect', () => {
     const inFlight = call('gdrive_complete_connect', { sessionId: first.sessionId })
     await begin()
     expect(await message(inFlight)).toContain('OAUTH_CANCELLED')
+    // The replaced session's failed complete must not log out: that POST would race the new
+    // popup's sign-in and clear the cookie it sets.
+    expect(logout).not.toHaveBeenCalled()
   })
 })
 
