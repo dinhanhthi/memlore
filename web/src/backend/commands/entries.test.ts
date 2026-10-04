@@ -498,6 +498,33 @@ describe('write commands', () => {
     }
   })
 
+  it('create_entry writes initial content in the desktop editor shape (XmlFragment default)', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { db } = installFakeSession([], { taxonomy: TAXONOMY })
+
+    const created = await call<Entry>('create_entry', {
+      journalId: 'j1',
+      contentText: 'First line\nSecond line',
+      previewText: 'First line',
+    })
+
+    const draft = await db.drafts.get(created.id)
+    const intent = JSON.parse(new TextDecoder().decode(draft?.sealed)) as {
+      yjs_full_state: number[]
+    }
+    const doc = new Y.Doc()
+    Y.applyUpdate(doc, new Uint8Array(intent.yjs_full_state))
+    const paragraphs = doc.getXmlFragment('default').toArray()
+    expect(paragraphs.map((p) => (p as Y.XmlElement).nodeName)).toEqual(['paragraph', 'paragraph'])
+    expect(paragraphs.map((p) => (p as Y.XmlElement).toArray().join(''))).toEqual([
+      'First line',
+      'Second line',
+    ])
+    // Never the sync-test-only shape: the desktop editor would show an empty body.
+    expect(doc.getText('content').toString()).toBe('')
+  })
+
   it('create_entry rejects when journalId is missing or unknown', async () => {
     setWriteFlagForTest(true)
     setKeyRing({ lock: () => undefined } as unknown as KeyRing)

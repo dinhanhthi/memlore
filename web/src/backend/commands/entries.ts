@@ -466,9 +466,18 @@ const createEntry: Handler = async (args) => {
     }
   }
 
+  // The desktop editor's shape (src-tauri/src/yjs_doc.rs): XmlFragment "default" of paragraphs,
+  // one per line. Never `Y.Text('content')`, which the editor renders as an empty body.
   const doc = new Y.Doc()
   if (contentText) {
-    doc.getText('content').insert(0, contentText)
+    doc.getXmlFragment('default').insert(
+      0,
+      contentText.split('\n').map((line) => {
+        const paragraph = new Y.XmlElement('paragraph')
+        paragraph.insert(0, [new Y.XmlText(line)])
+        return paragraph
+      }),
+    )
   }
   const yjsBytes = Y.encodeStateAsUpdate(doc)
 
