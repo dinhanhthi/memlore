@@ -58,6 +58,9 @@ let metaText: string
 /** Runs before the push session's n-th lock request (1-based) is forwarded to `locks`. */
 let beforeLockRequest: ((n: number) => Promise<void>) | null
 let freshFlag: boolean
+/** Called on every fresh write-flag fetch (folder creation and each batch), with the call count. */
+let onFreshFlag: ((call: number) => void) | null
+let freshFlagCalls: number
 let cachedFlag: boolean
 let unlocked: boolean
 
@@ -219,6 +222,8 @@ beforeEach(async () => {
   })
 
   freshFlag = true
+  onFreshFlag = null
+  freshFlagCalls = 0
   cachedFlag = true
   unlocked = true
   configurePushEnv({
@@ -229,7 +234,11 @@ beforeEach(async () => {
       reader,
       core,
       driveDeps,
-      fetchWriteFlagImpl: async () => freshFlag,
+      fetchWriteFlagImpl: async () => {
+        freshFlagCalls += 1
+        onFreshFlag?.(freshFlagCalls)
+        return freshFlag
+      },
     }),
   })
 })
@@ -451,6 +460,25 @@ describe('pushAll', () => {
       expect(await isPushed(ENTRY_B)).toBe(false)
     },
   )
+
+  it('a lock inside a draft upload stops the run as locked, not as a skipped draft', async () => {
+    await putDraft(intent(ENTRY_A), 1)
+    // Call 1 is the outbox folder creation; call 2 opens the draft's batch. Locking there zeroizes
+    // the ring before seal-then-verify, which then fails.
+    onFreshFlag = (call) => {
+      if (call === 2) {
+        lock('manual')
+        unlocked = false
+      }
+    }
+
+    const result = await pushAll()
+
+    expect(result.error).toBeInstanceOf(VaultLockedError)
+    expect(result).toMatchObject({ pushed: 0, skipped: 0 })
+    expect(outbox(`${ENTRY_A}.bin`)).toBeUndefined()
+    expect(await isPushed(ENTRY_A)).toBe(false)
+  })
 
   it('is single-flight: calls during a run share one follow-up run that sees the new save', async () => {
     await putDraft(intent(ENTRY_A), 1)

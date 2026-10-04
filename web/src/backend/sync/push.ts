@@ -338,6 +338,7 @@ async function pushOnce(): Promise<PushResult> {
       const ring = getKeyRing()
       const intents = await packDraft(s, p, ring, draft)
       if (intents === null) {
+        assertSameEpoch() // a lock zeroizes the ring, so the open failed: stop, do not skip
         skipped += 1
         continue
       }
@@ -356,6 +357,7 @@ async function pushOnce(): Promise<PushResult> {
         }
       } catch (error) {
         if (!(error instanceof SealVerifyError)) throw error
+        assertSameEpoch() // a lock mid-batch zeroizes the ring: report locked, not a bad draft
         console.warn(`Skipping draft ${draft.entryId}: seal-then-verify failed`)
         skipped += 1
       }
