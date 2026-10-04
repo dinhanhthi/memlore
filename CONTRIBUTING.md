@@ -1,10 +1,10 @@
 # Contributing to Memlore
 
-Thanks for helping. Memlore is a local-first, privacy-first journal. Keep those constraints in mind: no telemetry, no developer-hosted user data, no “phone-home” features.
+Thanks for helping. Memlore is a local-first, privacy-first journal: no telemetry, no developer-hosted user data, no "phone-home" features.
 
 ## Setup
 
-Prerequisites: Rust 1.77+, Node.js 20+, pnpm 9+, and [Tauri’s native deps](https://tauri.app/start/prerequisites/).
+Prerequisites: Rust 1.88+, Node.js 20+, pnpm 9+, and [Tauri's native deps](https://tauri.app/start/prerequisites/).
 
 ```bash
 git clone https://github.com/dinhanhthi/memlore.git
@@ -13,128 +13,112 @@ pnpm install
 pnpm tauri dev
 ```
 
-Optional: copy `.env.example` to `.env` if you need Google Drive OAuth in development.
+Optional: copy `.env.example` to `.env` for Google Drive OAuth in development.
 
-### Building a bundle locally
-
-`pnpm tauri dev` needs nothing extra. Producing a **bundle** does, because the
-release configuration is signing-aware and two of its inputs are deliberately
-not in the repository:
-
-- `bundle.createUpdaterArtifacts` is on, so the CLI refuses to bundle without an
-  updater signing key: _"A public key has been found, but no private key."_
-- `bundle.macOS.files` embeds `.ci/memlore.provisionprofile`, which is gitignored
-  because it is a signing asset. Without that file the build hard-fails.
-
-So an unprivileged local bundle needs both flags:
+### Local bundle
 
 ```bash
 pnpm tauri build --no-sign --bundles app
 ```
 
-Fully signed bundles are produced by CI on a `v*` tag, and by
-`scripts/build-signed-app.sh` for maintainers who hold the certificate and the
-Developer ID provisioning profile. That script is also the only way to exercise
-Touch ID unlock — `pnpm tauri dev` never can, because the
-`keychain-access-groups` entitlement it needs is provisioning-profile
-restricted. Read that script's header before touching anything signing-related.
+Both flags are needed: the release config wants an updater signing key and a provisioning profile, which are not in the repo. Signed bundles come from CI on a `v*` tag, or from `scripts/build-signed-app.sh` for maintainers with the certificate. That script is also the only way to test Touch ID unlock; read its header before touching signing.
 
 ## Cargo build cache
 
-`pnpm tauri dev` and `cargo test` write the `dev` profile to `debug/`. `pnpm tauri build` writes `release/`. On macOS that dev profile defaults to `split-debuginfo = "unpacked"` while debug info is enabled, and each codegen unit drops a `.o` into `target/debug/deps`. That is the bulk of a debug target past 10 GB. `src-tauri/Cargo.toml` sets:
+`src-tauri/Cargo.toml` keeps debug builds small (a default macOS debug target grows past 10 GB):
 
 ```toml
 [profile.dev]
 opt-level = 1
-split-debuginfo = "off"
+split-debuginfo = "off"     # no per-codegen-unit .o files
 
 [profile.dev.package."*"]
-debug = "line-tables-only"
-incremental = false
+debug = "line-tables-only"  # dependencies keep file:line backtraces
+incremental = false         # dependencies only; memlore stays incremental
 ```
 
-`split-debuginfo = "off"` stops those object files. Dependency crates keep line tables, enough for a backtrace to name a file and a line. The `memlore` package keeps full debug info, and incremental compilation stays on for it. `incremental = false` under `package."*"` applies only to dependencies. Changing the profile does not shrink a target that already exists.
+To share one cache across Rust projects, create `~/.cargo/config.toml` once per machine (outside git) with `target-dir = ".cargo/shared-target"` under `[build]` (relative to `$HOME`) and the **same** profile as above. Profiles that differ make Cargo build every dependency twice.
 
-Share one cache across Rust projects by creating `~/.cargo/config.toml` once per machine. The file is outside git. Cargo does not expand `~`. A relative path in that file is resolved from `$HOME`, so the value below is `~/.cargo/shared-target`:
-
-```toml
-[build]
-target-dir = ".cargo/shared-target"
-
-[profile.dev]
-opt-level = 1
-split-debuginfo = "off"
-
-[profile.dev.package."*"]
-debug = "line-tables-only"
-incremental = false
-```
-
-Copy the profile from `src-tauri/Cargo.toml` and keep the two identical. Profile keys in Cargo's config override the same keys in every `Cargo.toml`. You set this once. A project that leaves `opt-level` at the default `0` compiles a second copy of every dependency next to Memlore's `opt-level = 1` copies. The build still succeeds. The disk holds both.
-
-What lands in the shared directory:
-
-- Dependency artifacts in `debug/deps` when the crate version, features, `rustc`, these profile flags, and the target triple match. Two apps then reuse the same `tauri`, `tokio`, `serde`, and `objc2` builds.
-- Each app's own binary, side by side (`debug/memlore` next to another app's binary).
-
-A different feature set stores another copy of that one crate. `cargo clean` (and `pnpm cargo:clean`) deletes the whole shared directory, every project included. Cargo locks the directory, so build one project at a time.
-
-`scripts/dev.sh` does not set `CARGO_TARGET_DIR`. Neither does `pnpm tauri dev` or `cargo test`, so they follow this config. With no config and no environment variable they still use `src-tauri/target`. `scripts/tauri.sh` exports `CARGO_TARGET_DIR` to `src-tauri/target` when the subcommand is `build`, which is what `pnpm tauri build` runs. Leave that pin. It keeps the release bundle at `src-tauri/target/release/bundle/macos/Memlore.app` (and the `.dmg` next to it). `scripts/build-signed-app.sh` exports the same variable so its debug bundle stays at `src-tauri/target/debug/bundle/macos/Memlore.app`. Leave that pin too. An exported `CARGO_TARGET_DIR` still overrides `~/.cargo/config.toml` for dev commands, because the environment outranks the config.
-
-After writing the config on a machine that already has a per-project `target/`, delete those directories. They are no longer on Cargo's path, and `cargo clean` will not see them. The next `pnpm tauri dev` fills `~/.cargo/shared-target`.
+- `pnpm tauri dev` and `cargo test` then use `~/.cargo/shared-target`; `pnpm tauri build` and `scripts/build-signed-app.sh` still pin `src-tauri/target` so bundles stay in the repo.
+- Delete the old `src-tauri/target` after switching.
+- Build one project at a time (Cargo locks the directory).
+- Never run `cargo clean` / `pnpm cargo:clean`: it wipes the cache of every project.
 
 ## UI playground (`mockup/`)
 
-`mockup/` is a browser-only preview of the real app UI. It mounts the same `src/App.tsx` with a mocked Tauri IPC layer and selectable fake-data scenarios — useful for iterating on screens without compiling Rust.
+The real app UI over a mocked Tauri backend and fake-data scenarios, without compiling Rust:
 
 ```bash
-pnpm mockup:dev   # http://localhost:5175
+pnpm mockup:dev   # http://localhost:5175, pick a scenario or use ?scenario=<id>
 ```
 
-Pick a scenario from the floating panel (or `?scenario=<id>`). **Never change `src/` components to make the browser happy** — fix `mockup/mocks/` instead. Details: [`mockup/README.md`](mockup/README.md).
+Never change `src/` to make the mockup happy; fix `mockup/mocks/` instead. See [`mockup/README.md`](mockup/README.md).
 
 ## Web companion (`web/`)
 
-`web/` contains the production browser companion app (`web.memlore.app`). It mounts `src/App.tsx` over a browser-native backend that communicates directly with Google Drive APIs.
+`web.memlore.app`: the same `src/App.tsx` over a browser backend that talks to Google Drive directly, plus a small OAuth Worker in `workers/web-auth/`.
 
-### Toolchain Prerequisites
-- Rust `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
-- `wasm-bindgen-cli` locked to the exact version in `src-tauri/Cargo.lock` (currently `0.2.118`):
-  ```bash
-  cargo install wasm-bindgen-cli --version =0.2.118 --locked
-  ```
-  The helper script `scripts/web-wasm.sh --check-only` verifies your installed CLI version against the lockfile.
+Extra toolchain:
 
-### Local Development
 ```bash
-pnpm web:dev        # Starts web companion Vite dev server at http://localhost:5176
-pnpm web-auth:dev   # Runs Cloudflare Worker OAuth proxy locally via Wrangler
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version =0.2.118 --locked   # must match Cargo.lock
 ```
 
-### Web Tests & Conventions
-- Web unit tests run under Vitest: `pnpm web:test` (isolated from desktop `pnpm test`).
-- Tests exercising WebAssembly cryptographic bindings use the `*.wasm.test.ts` naming convention (automatically compiled via `pnpm web:wasm` and executed by `pnpm web:test`).
-- **Golden Fixture Regeneration:** If envelope or outbox schemas evolve, regenerate golden fixtures using `MEMLORE_REGEN_FIXTURES=1 pnpm web:fixture:outbox` and verify both frontend Vitest and desktop `cargo test golden_` pass before committing.
-- **Cargo Build Cache:** The shared target directory in `~/.cargo/config.toml` caches the `wasm32-unknown-unknown` target artifacts alongside desktop builds.
+`scripts/web-wasm.sh --check-only` verifies the installed version.
+
+### Run it locally
+
+One-time: create `workers/web-auth/.dev.vars` (gitignored) with the Web OAuth client's credentials and a cookie key, and make sure that client allows `http://localhost:5176` (origin) and `http://localhost:5176/api/oauth/callback` (redirect):
+
+```
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+COOKIE_KEY=...        # openssl rand -base64 32
+```
+
+Then, in two terminals:
+
+```bash
+pnpm web-auth:dev                      # OAuth Worker on :8787 (add --var WEB_WRITES_ENABLED:1 for writes)
+pnpm web:build && pnpm web:preview     # production bundle + production headers on :5176
+```
+
+Open `http://localhost:5176` in Chrome or Firefox (not `127.0.0.1`). This is the production setup: the built bundle, the CSP from `web/static/_headers`, and the Worker on the same origin under `/api`. For hot reload while coding, run `pnpm web:dev` instead of the second command (no CSP headers, so test with the preview before shipping).
+
+Signing in with your real Google account opens your real vault; test writes with a throwaway account and vault.
+
+### Web tests
+
+```bash
+pnpm web:test                 # isolated from the desktop `pnpm test`
+cd src-tauri && cargo test golden_
+```
+
+- `*.wasm.test.ts` files run against the real WASM core.
+- If the envelope or outbox format changes, regenerate the golden fixtures (`MEMLORE_REGEN_FIXTURES=1 pnpm web:fixture:envelopes`, `pnpm web:fixture:outbox`) and make sure both commands above pass.
+
+## Releasing
+
+Maintainers ship with `/cf-ship --mac` (desktop, `v*` tags) or `/cf-ship --web` (web companion, `web-v*` tags). The web is deployed only from a `web-v*` tag. See [`.coding-friend/skills/cf-ship-custom/README.md`](.coding-friend/skills/cf-ship-custom/README.md).
 
 ## How we work
 
-1. Open an issue (or comment on an existing one) before large changes.
+1. Open an issue (or comment on one) before large changes.
 2. Branch from `main`: `feat/…`, `fix/…`, or `docs/…`.
-3. Keep PRs focused. One concern per PR.
-4. Fill in the PR description: what changed, why, and how you tested it.
+3. One concern per PR. Describe what changed, why, and how you tested it.
 
 ## Code
 
-- **TypeScript / React:** functional components, no `any`. Components do not call Tauri `invoke()` — use hooks in `src/hooks/`.
+- **TypeScript / React:** functional components, no `any`. Components never call Tauri `invoke()` directly; use hooks in `src/hooks/`.
 - **Rust:** one command, one job. All DB access goes through `src-tauri/src/db/`. Commands return `Result<T, String>`.
-- **UI:** semantic Tailwind tokens (`bg-panel-1`, `text-fg`, …). Do not hardcode hex colors. Use `<Button>`, `<Modal>`, and `<Tooltip>` from `src/components/common/`. Lucide icons with `className="size-*"` — no `width`/`height` props.
-- **i18n:** user-facing strings live in `src/locales/{en,vi}/`. Add or remove keys in **both** locales.
-- **Privacy:** never send journal content to a server we control. AI stays user-configured (their key, their host, or on-device).
+- **UI:** semantic Tailwind tokens (`bg-panel-1`, `text-fg`, …), never hex colors. Use `<Button>`, `<Modal>` and `<Tooltip>` from `src/components/common/`. Lucide icons sized with `className="size-*"`.
+- **i18n:** strings live in `src/locales/{en,vi}/`. Add or remove keys in **both** locales.
+- **Privacy:** never send journal content to a server we control. AI stays user-configured.
 
 ## Tests
 
-Do not add `.test.tsx` component tests. Cover hooks, stores, utilities, and Rust commands.
+No `.test.tsx` component tests. Cover hooks, stores, utilities and Rust commands.
 
 ```bash
 pnpm test
@@ -142,18 +126,12 @@ cd src-tauri && cargo test
 pnpm exec playwright test    # e2e, when the change needs it
 ```
 
-- Frontend tests mock Tauri `invoke()` — they must not call a real backend.
-- Rust DB tests use in-memory SQLite.
-- Video thumbnail tests need `ffmpeg` (`brew install ffmpeg`).
+Frontend tests mock `invoke()`; Rust DB tests use in-memory SQLite; video thumbnail tests need `ffmpeg` (`brew install ffmpeg`).
 
 ## Commits
 
-One conventional line, no body:
-
-`feat: …` · `fix: …` · `docs: …` · `style: …` · `refactor: …` · `test: …` · `chore: …`
-
-Optional scope: `fix(sync): …`.
+One conventional line, no body: `feat: …`, `fix: …`, `docs: …`, `style: …`, `refactor: …`, `test: …`, `chore: …`, with an optional scope (`fix(sync): …`).
 
 ## License
 
-By contributing you agree that your work is licensed under [AGPL-3.0-or-later](LICENSE), the same as the rest of the project.
+By contributing you agree that your work is licensed under [AGPL-3.0-or-later](LICENSE).
