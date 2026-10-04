@@ -17,6 +17,12 @@ import {
   type SeedFixtureOptions,
 } from '../drive/fakeDrive'
 import { isValidOwnId } from '../drive/paths'
+import {
+  createDraftManager,
+  resetDraftsAutostartForTest,
+  sha256Hex,
+  unpushedDraftCount,
+} from '../drafts'
 import { configureKeysEnv, dispose, getKeyRing, isUnlocked } from '../keys'
 import {
   StorageUnavailableError,
@@ -183,6 +189,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   violations.length = 0
+  resetDraftsAutostartForTest()
   // No real timers or events from the key holder's idle watchers.
   configureKeysEnv({
     setTimeout: () => 0,
@@ -590,7 +597,9 @@ describe('onboardComplete: device id', () => {
     const env = await setup()
     const old = storedRecord('ef'.repeat(32))
     await env.db.device.put(old)
-    await env.db.drafts.put({ entryId: 'e1', sealed: new Uint8Array([1, 2]), updatedAt: 1 })
+    const sealed = new Uint8Array([1, 2])
+    const pushedHash = await sha256Hex(sealed)
+    await env.db.drafts.put({ entryId: 'e1', sealed, updatedAt: 1, pushedHash })
     await env.db.files.put({
       path: 'x',
       ciphertext: new Uint8Array([1]),
@@ -603,7 +612,9 @@ describe('onboardComplete: device id', () => {
     await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
     expectNothingWritten(env, before)
     expect(await env.db.device.get()).toEqual(old)
-    expect(await env.db.drafts.list()).toHaveLength(1)
+    expect(await env.db.drafts.list()).toEqual([
+      { entryId: 'e1', sealed, updatedAt: 1, pushedHash },
+    ])
     expect(await env.db.files.get('x')).toBeDefined()
     expect(isUnlocked()).toBe(false)
   })
@@ -642,6 +653,44 @@ describe('onboardComplete: device id', () => {
     expect(result.reusedDeviceId).toBe(true)
     expect(await env.db.drafts.list()).toHaveLength(1)
     expect(await env.db.files.get('keep')).toBeDefined()
+  })
+
+  // A re-onboard may follow a recovery-generation change (new `g-<gen>` outbox) or a Cloud cleanup
+  // (outbox deleted): drafts pushed before it must be pushed again (contract §9).
+  const seedPushedDrafts = async (env: Env) => {
+    const drafts = [
+      { entryId: 'e1', sealed: new Uint8Array([1, 2]), updatedAt: 1 },
+      { entryId: 'e2', sealed: new Uint8Array([3, 4, 5]), updatedAt: 2 },
+    ]
+    for (const d of drafts) await env.db.drafts.put({ ...d, pushedHash: await sha256Hex(d.sealed) })
+    const media = { path: 'outbox/m-1', bytes: new Uint8Array([9]), size: 1, lastAccess: 1 }
+    await env.db.blobs.put(media)
+    return { drafts, media }
+  }
+
+  it('same vault: drafts pushed before the re-onboard are unpushed again, media kept', async () => {
+    const env = await setup()
+    await env.db.device.put(storedRecord(vaultFingerprint()))
+    const { drafts, media } = await seedPushedDrafts(env)
+    expect(await createDraftManager({ db: env.db }).listUnpushedDrafts()).toEqual([])
+    expect(unpushedDraftCount()).toBe(0)
+    await run(env)
+    const unpushed = await env.db.drafts.list()
+    expect(unpushed).toEqual(drafts)
+    expect(unpushedDraftCount()).toBe(2)
+    expect(await createDraftManager({ db: env.db }).listUnpushedDrafts()).toEqual(drafts)
+    expect(await env.db.blobs.get(media.path)).toEqual(media)
+  })
+
+  it('same vault: a failed draft reset fails the onboarding before the new record lands', async () => {
+    const env = await setup()
+    const old = storedRecord(vaultFingerprint())
+    await env.db.device.put(old)
+    await seedPushedDrafts(env)
+    vi.spyOn(env.db.drafts, 'clearPushed').mockRejectedValueOnce(new StorageUnavailableError())
+    await expect(run(env)).rejects.toBeInstanceOf(StorageUnavailableError)
+    expect(await env.db.device.get()).toEqual(old)
+    expect(isUnlocked()).toBe(false)
   })
 
   it('probes IndexedDB before the cloud write: a storage failure leaves no orphan slot', async () => {

@@ -705,6 +705,18 @@ export async function onboardComplete(
       masterFingerprint: meta.masterFingerprint,
       name: deviceName,
     }
+    // Same vault: drafts pushed before this re-onboard may sit in an outbox that is gone (a new
+    // recovery generation writes to `g-<gen>`, a Cloud cleanup deletes it), so every draft is
+    // pushed again (contract §9; import is idempotent). Cleared BEFORE the record lands: a failed
+    // clear fails the onboarding with the old record kept (a retry clears again), while a clear
+    // after it could leave the new record with drafts still marked pushed. Never deletes a draft.
+    if (!replacesOtherVault) {
+      await db.drafts.clearPushed()
+      // Recounts the page-wide dirty set now: the unlock pull may fail before it hydrates.
+      // Dynamic: drafts -> safeUpload -> fence imports this module.
+      const { createDraftManager } = await import('../drafts')
+      await createDraftManager({ db }).listUnpushedDrafts()
+    }
     await db.device.put(record)
     // Best effort: a full or blocked store must not fail an otherwise complete onboarding, but a
     // stale cached copy from an older state must not survive either (absence was verified above).

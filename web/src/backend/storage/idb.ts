@@ -519,6 +519,22 @@ export class WebDb {
         await requestToPromise(s.put(updated))
         return true
       }),
+    /**
+     * Drops `pushedHash` from every draft in ONE transaction, so each is uploaded again (a
+     * re-onboard: the outbox it was pushed to may be gone). Keeps the bytes and the outbox media.
+     */
+    clearPushed: (): Promise<void> =>
+      this.tx([STORE_DRAFTS], 'readwrite', async ([s]) => {
+        const all = (await requestToPromise(s.getAll())) as DraftRecord[]
+        await Promise.all(
+          all
+            .filter((rec) => rec.pushedHash !== undefined)
+            .map(({ pushedHash: _pushed, ...rec }) => {
+              assertDraftRecord(rec)
+              return requestToPromise(s.put(rec))
+            }),
+        )
+      }),
   }
 
   readonly device = {
