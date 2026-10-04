@@ -490,6 +490,8 @@ mod tests {
         }
         async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
             if path == self.fail_path {
+                // `try_update` (the new name) is newer than our MSRV 1.88.
+                #[allow(deprecated)]
                 let prev = self.fail_calls_remaining.fetch_update(
                     Ordering::SeqCst,
                     Ordering::SeqCst,

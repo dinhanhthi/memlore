@@ -562,13 +562,15 @@ pub(crate) mod test_support {
             path: &str,
             expected_revision: &str,
         ) -> Result<ConditionalMutationResult, SyncError> {
-            if self
+            // `try_update` (the new name) is newer than our MSRV 1.88.
+            #[allow(deprecated)]
+            let inject_failure = self
                 .fail_conditional_deletes
                 .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
                     remaining.checked_sub(1)
                 })
-                .is_ok()
-            {
+                .is_ok();
+            if inject_failure {
                 return Err(SyncError::Network(
                     "injected conditional delete failure".to_string(),
                 ));
