@@ -15,6 +15,7 @@ import {
 } from '../drive/client'
 import {
   FakeDrive,
+  fakeLocks,
   fixtureBytes,
   loadDesktopFixture,
   seedFromFixture,
@@ -371,6 +372,80 @@ describe('safeUpload: the only write path', () => {
     ]
 
     await expect(safeUpload(intents, makeDeps())).rejects.toThrow(/recovery/i)
+  })
+
+  it('serializes two concurrent batches: each acquires the lock, critical sections never overlap', async () => {
+    const serial = fakeLocks(drive)
+    const serialWriter = new DriveWriter(reader, {
+      getToken: async () => 'test-token',
+      fetchImpl: drive.fetch,
+      locks: serial,
+    })
+    serialWriter.setIdentity({ ownId: WEB_DEVICE_ID, localGen })
+    const intentFor = (entryId: string): SafeUploadIntent => {
+      const entryObj = {
+        schema_version: 1,
+        entry_id: entryId,
+        web_device_id: WEB_DEVICE_ID,
+        created_on_web: true,
+        web_updated_at_secs: 1700000000,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: 'Concurrent',
+        preview_text: 'Concurrent',
+        fields: {
+          title: null,
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      }
+      return {
+        path: outboxEntryPath(WEB_DEVICE_ID, localGen, entryId),
+        bytes: core.sealOutboxEntry(ring, JSON.stringify(entryObj)),
+        intended: { kind: 'entry', entry: entryObj },
+      }
+    }
+    const first = [intentFor('00000000-0000-0000-0000-000000000030')]
+    const second = [intentFor('00000000-0000-0000-0000-000000000031')]
+
+    const mutatingAtStart = drive.mutating().length
+    const mutatingAtSecondCheck: number[] = []
+    const started: Array<Promise<unknown>> = []
+    const deps = makeDeps({
+      writer: serialWriter,
+      locks: serial,
+      fetchWriteFlagImpl: async () => {
+        if (started.length === 0) {
+          // Start the second batch while the first one holds the lock.
+          started.push(
+            safeUpload(
+              second,
+              makeDeps({
+                writer: serialWriter,
+                locks: serial,
+                fetchWriteFlagImpl: async () => {
+                  mutatingAtSecondCheck.push(drive.mutating().length)
+                  return true
+                },
+              }),
+            ),
+          )
+        }
+        return true
+      },
+    })
+
+    await expect(safeUpload(first, deps)).resolves.toHaveLength(1)
+    await expect(Promise.all(started)).resolves.toBeDefined()
+    expect(serial.maxActive).toBe(1)
+    expect(serial.events.map((e) => e.split('@')[0])).toEqual(['enter', 'exit', 'enter', 'exit'])
+    // The second batch's first check ran only after the first batch's write landed.
+    expect(mutatingAtSecondCheck).toEqual([mutatingAtStart + 1])
   })
 
   it('fails closed when navigator.locks is unavailable', async () => {

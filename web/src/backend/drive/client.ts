@@ -121,8 +121,10 @@ export class DriveTooLargeError extends Error {
 
 /** Writes need the Web Locks API; without it they fail closed instead of running unlocked. */
 export class LockUnavailableError extends Error {
-  constructor() {
-    super('navigator.locks is unavailable; refusing to write without the single-writer lock')
+  constructor(
+    message = 'navigator.locks is unavailable; refusing to write without the single-writer lock',
+  ) {
+    super(message)
     this.name = 'LockUnavailableError'
   }
 }
@@ -640,6 +642,15 @@ export interface EnsureFolderResult {
   outboxFolderId: string
 }
 
+/**
+ * Writes available to a `withLock` task. They run under the lock the task already holds and do
+ * not re-acquire it; they refuse once the task has settled (the lock is released).
+ */
+export interface WriterLockHandle {
+  put(path: string, bytes: Uint8Array): Promise<PutResult>
+  ensureFolder(): Promise<EnsureFolderResult>
+}
+
 export interface DriveWriterDeps extends DriveDeps {
   /**
    * Lock manager. Omitted: `navigator.locks` is read at call time. `null`, or no
@@ -674,6 +685,12 @@ function multipartBody(
   return body
 }
 
+interface CheckedWritePath {
+  folders: readonly string[]
+  name: string
+  contentType: string
+}
+
 export class DriveWriter {
   readonly #reader: DriveReader
   readonly #t: Transport
@@ -706,16 +723,16 @@ export class DriveWriter {
     return this.#identity
   }
 
-  #lockDepth = 0
-
   /**
-   * Acquire the single-writer lock for the given task. Supports re-entrant calls: nested
-   * invocations under an already-acquired writer lock execute immediately without re-requesting.
+   * Acquire the single-writer lock for `task`. Every call requests the lock, so concurrent calls in
+   * the same tab are serialized like calls from other tabs. Writes inside `task` must go through
+   * the handle it receives: calling the public `put` / `ensureFolder` there would wait on the lock
+   * the task holds.
    */
-  async withLock<T>(task: () => Promise<T>, overrideLocks?: LockManagerLike | null): Promise<T> {
-    if (this.#lockDepth > 0) {
-      return task()
-    }
+  async withLock<T>(
+    task: (handle: WriterLockHandle) => Promise<T>,
+    overrideLocks?: LockManagerLike | null,
+  ): Promise<T> {
     const locks =
       overrideLocks !== undefined
         ? overrideLocks
@@ -724,11 +741,24 @@ export class DriveWriter {
           : this.#locks
     if (!locks) throw new LockUnavailableError()
     return locks.request(WRITER_LOCK_NAME, async () => {
-      this.#lockDepth++
+      let held = true
+      const requireHeld = (): void => {
+        if (!held) throw new LockUnavailableError('writer lock handle used after release')
+      }
+      const handle: WriterLockHandle = {
+        put: async (path, bytes) => {
+          requireHeld()
+          return this.#putUnlocked(path, bytes)
+        },
+        ensureFolder: async () => {
+          requireHeld()
+          return this.#ensureFolderUnlocked()
+        },
+      }
       try {
-        return await task()
+        return await task(handle)
       } finally {
-        this.#lockDepth--
+        held = false
       }
     })
   }
@@ -769,18 +799,21 @@ export class DriveWriter {
    * VaultNotReadyError before any create call. Idempotent.
    */
   async ensureFolder(): Promise<EnsureFolderResult> {
+    this.#requireIdentity()
+    return this.withLock(() => this.#ensureFolderUnlocked())
+  }
+
+  /** ensureFolder's body; the caller holds the writer lock. */
+  async #ensureFolderUnlocked(): Promise<EnsureFolderResult> {
     const { ownId, localGen } = this.#requireIdentity()
-    return this.withLock(async () => {
-      await this.#requireChain(DEVICE_SLOT_FOLDERS)
-      const genRoot = await this.#requireChain([GENERATIONS_FOLDER, generationFolderName(localGen)])
-      const deviceFolderId =
-        (await this.#reader.findFolder(ownId, genRoot)) ??
-        (await this.#createFolder(ownId, genRoot))
-      const outboxFolderId =
-        (await this.#reader.findFolder(OUTBOX_FOLDER, deviceFolderId)) ??
-        (await this.#createFolder(OUTBOX_FOLDER, deviceFolderId))
-      return { deviceFolderId, outboxFolderId }
-    })
+    await this.#requireChain(DEVICE_SLOT_FOLDERS)
+    const genRoot = await this.#requireChain([GENERATIONS_FOLDER, generationFolderName(localGen)])
+    const deviceFolderId =
+      (await this.#reader.findFolder(ownId, genRoot)) ?? (await this.#createFolder(ownId, genRoot))
+    const outboxFolderId =
+      (await this.#reader.findFolder(OUTBOX_FOLDER, deviceFolderId)) ??
+      (await this.#createFolder(OUTBOX_FOLDER, deviceFolderId))
+    return { deviceFolderId, outboxFolderId }
   }
 
   /**
@@ -790,6 +823,17 @@ export class DriveWriter {
    * taking the lock suffices.
    */
   async put(path: string, bytes: Uint8Array): Promise<PutResult> {
+    const target = this.#checkWritePath(path)
+    return this.withLock(() => this.#writeChecked(target, bytes))
+  }
+
+  /** put's body; the caller holds the writer lock. Runs the same path checks first. */
+  async #putUnlocked(path: string, bytes: Uint8Array): Promise<PutResult> {
+    return this.#writeChecked(this.#checkWritePath(path), bytes)
+  }
+
+  /** Identity, allowlist and split checks, before any network call. */
+  #checkWritePath(path: string): CheckedWritePath {
     const { ownId, localGen } = this.#requireIdentity()
     if (!isAllowedWritePath(path, ownId, localGen)) {
       throw new ForbiddenWriteError(`write not allowed: ${JSON.stringify(path)}`)
@@ -797,16 +841,18 @@ export class DriveWriter {
     const split = splitPath(path)
     if (split === null) throw new ForbiddenWriteError(`write not allowed: ${JSON.stringify(path)}`)
     const contentType = path.endsWith('.json') ? 'application/json' : 'application/octet-stream'
-    return this.withLock(async () => {
-      // Parent folders must already exist: the slot's shared chain, or ensureFolder's outbox.
-      const parentId = await this.#requireChain(split.folders)
-      const existing = await this.#reader.findFile(split.name, parentId)
-      if (existing !== null) {
-        await this.#update(existing.id, bytes, contentType)
-        return { fileId: existing.id, created: false, adoptedOther: false }
-      }
-      return this.#createAndAdopt(split.name, parentId, bytes, contentType)
-    })
+    return { folders: split.folders, name: split.name, contentType }
+  }
+
+  async #writeChecked(target: CheckedWritePath, bytes: Uint8Array): Promise<PutResult> {
+    // Parent folders must already exist: the slot's shared chain, or ensureFolder's outbox.
+    const parentId = await this.#requireChain(target.folders)
+    const existing = await this.#reader.findFile(target.name, parentId)
+    if (existing !== null) {
+      await this.#update(existing.id, bytes, target.contentType)
+      return { fileId: existing.id, created: false, adoptedOther: false }
+    }
+    return this.#createAndAdopt(target.name, parentId, bytes, target.contentType)
   }
 
   async #update(fileId: string, bytes: Uint8Array, contentType: string): Promise<void> {

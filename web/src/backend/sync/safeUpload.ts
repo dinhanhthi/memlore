@@ -11,7 +11,8 @@
  *  6. seal-then-verify: re-open the sealed bytes with WASM (`openOutboxEntry` / `openMedia`) and
  *     require an exact match with the intended content.
  *
- * Only then does it call `DriveWriter.put` (update-in-place).
+ * Only then does it write each intent through the lock-scoped `put` handed to the batch by
+ * `DriveWriter.withLock` (update-in-place).
  */
 
 import type { Core } from '../../core/core'
@@ -104,7 +105,7 @@ export async function safeUpload(
   intents: readonly SafeUploadIntent[],
   deps: SafeUploadDeps,
 ): Promise<PutResult[]> {
-  return deps.writer.withLock(async () => {
+  return deps.writer.withLock(async (locked) => {
     // 1. Fresh fetchWriteFlag (fail-closed)
     const fetchFlag = deps.fetchWriteFlagImpl ?? fetchWriteFlag
     const writeAllowed = await fetchFlag()
@@ -173,10 +174,11 @@ export async function safeUpload(
       }
     }
 
-    // All 6 checks passed: perform mutating writes in place via writer.put
+    // All 6 checks passed: perform mutating writes in place through the lock-scoped handle (it
+    // does not re-acquire the lock this batch holds, and re-runs the writer's own path checks).
     const results: PutResult[] = []
     for (const intent of intents) {
-      const result = await deps.writer.put(intent.path, intent.bytes)
+      const result = await locked.put(intent.path, intent.bytes)
       results.push(result)
     }
     return results

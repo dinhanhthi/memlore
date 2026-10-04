@@ -26,6 +26,8 @@ import {
   LockUnavailableError,
   VaultNotReadyError,
   type DriveWriterDeps,
+  type EnsureFolderResult,
+  type PutResult,
 } from './client'
 
 // ---------------------------------------------------------------------------------------------
@@ -511,6 +513,71 @@ describe('single writer lock', () => {
     expect(marks[2].at).toBe(marks[1].at)
     expect(marks[1].at).toBeGreaterThan(marks[0].at)
     expect(h.drive.requests.length).toBeGreaterThan(marks[1].at)
+  })
+
+  it('a put started while ensureFolder holds the lock acquires it again and never overlaps', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    const started: Array<Promise<PutResult>> = []
+    // Fires on ensureFolder's first request, i.e. while it holds the lock.
+    h.drive.interceptors.push(() => {
+      if (started.length === 0) started.push(h.writer.put(`${outbox()}/${UUID_A}.bin`, bytes('a')))
+      return undefined
+    })
+    await h.writer.ensureFolder()
+    const [put] = await Promise.allSettled(started)
+    expect(put.status).toBe('fulfilled')
+    expect(h.locks.maxActive).toBe(1)
+    expect(h.locks.events.map((e) => e.split('@')[0])).toEqual(['enter', 'exit', 'enter', 'exit'])
+  })
+
+  it('an ensureFolder started while a put holds the lock acquires it again', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    await h.writer.ensureFolder()
+    h.locks.events.length = 0
+    const started: Array<Promise<EnsureFolderResult>> = []
+    h.drive.interceptors.push(() => {
+      if (started.length === 0) started.push(h.writer.ensureFolder())
+      return undefined
+    })
+    await h.writer.put(`${outbox()}/${UUID_A}.bin`, bytes('a'))
+    await Promise.all(started)
+    expect(h.locks.maxActive).toBe(1)
+    expect(h.locks.events.map((e) => e.split('@')[0])).toEqual(['enter', 'exit', 'enter', 'exit'])
+  })
+
+  it('the lock-scoped handle writes without re-acquiring the lock', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    const result = await h.writer.withLock(async (handle) => {
+      await handle.ensureFolder()
+      return handle.put(`${outbox()}/${UUID_A}.bin`, bytes('a'))
+    })
+    expect(result.created).toBe(true)
+    expect(h.locks.events.filter((e) => e.startsWith('enter'))).toHaveLength(1)
+  })
+
+  it('the lock-scoped handle keeps the allowlist (zero network on refusal)', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    h.drive.requests.length = 0
+    await expect(
+      h.writer.withLock((handle) => handle.put('.meta/control.json', bytes('x'))),
+    ).rejects.toBeInstanceOf(ForbiddenWriteError)
+    expect(h.drive.requests).toHaveLength(0)
+  })
+
+  it('the lock-scoped handle refuses use after the lock is released', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    const handle = await h.writer.withLock(async (lockHandle) => lockHandle)
+    h.drive.requests.length = 0
+    await expect(handle.put(`${outbox()}/${UUID_A}.bin`, bytes('x'))).rejects.toBeInstanceOf(
+      LockUnavailableError,
+    )
+    await expect(handle.ensureFolder()).rejects.toBeInstanceOf(LockUnavailableError)
+    expect(h.drive.requests).toHaveLength(0)
   })
 
   it('ensureFolder also takes the lock', async () => {
