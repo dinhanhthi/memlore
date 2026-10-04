@@ -293,7 +293,9 @@ async function packDraft(
       plainThumbMap,
     })
   } catch (error) {
-    console.warn(`Skipping draft ${draft.entryId}: it cannot be pushed yet`, error)
+    // Log the error name only: a JSON.parse message can quote decrypted text.
+    const reason = error instanceof Error ? error.name : typeof error
+    console.warn(`Skipping draft ${draft.entryId}: it cannot be pushed yet (${reason})`)
     return null
   }
 }
@@ -354,7 +356,7 @@ async function pushOnce(): Promise<PushResult> {
         }
       } catch (error) {
         if (!(error instanceof SealVerifyError)) throw error
-        console.warn(`Skipping draft ${draft.entryId}: seal-then-verify failed`, error)
+        console.warn(`Skipping draft ${draft.entryId}: seal-then-verify failed`)
         skipped += 1
       }
     }

@@ -329,7 +329,9 @@ function openDraft(
     }
     return [parsed as unknown as OutboxEntryV1]
   } catch (error) {
-    console.warn(`Skipping draft ${entryId}: it could not be opened`, error)
+    // Log the error name only: a JSON.parse message can quote decrypted text.
+    const reason = error instanceof Error ? error.name : typeof error
+    console.warn(`Skipping draft ${entryId}: it could not be opened (${reason})`)
     return []
   }
 }

@@ -267,6 +267,8 @@ describe('drafts rehydrate the outbox overlay', () => {
     expect(r.vault.getOutboxIntent('e1')).toEqual(intent())
     expect((await r.db.drafts.get('bad'))?.sealed).toEqual(corrupt)
     expect(warn).toHaveBeenCalled()
+    // Only strings: an error object (e.g. a JSON.parse SyntaxError) can quote decrypted text.
+    expect(warn.mock.calls.flat().every((arg) => typeof arg === 'string')).toBe(true)
   })
 
   it('a lock during hydration discards the result; the next unlock hydrates again', async () => {
