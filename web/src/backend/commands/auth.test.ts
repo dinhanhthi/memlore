@@ -63,7 +63,8 @@ let drive: FakeDrive
 let events: string[]
 let clock: number
 let rings: FakeRing[]
-let connect: () => Promise<void>
+let connect: (signal?: AbortSignal) => Promise<void>
+let logout: ReturnType<typeof vi.fn<() => Promise<void>>>
 let tokenFails: boolean
 
 const fakeCore = {
@@ -97,6 +98,7 @@ beforeEach(async () => {
   rings = []
   tokenFails = false
   connect = async () => undefined
+  logout = vi.fn(async () => undefined)
   drive = new FakeDrive()
   seedVault(drive)
   db = await openWebDb({ factory: new IDBFactory() })
@@ -115,7 +117,11 @@ beforeEach(async () => {
     randomUUID: () => `session-${++uuid}`,
     openDb: async () => db,
     loadCore: async () => fakeCore,
-    oauth: { connect: () => connect(), getAccessToken: async () => 'tok' },
+    oauth: {
+      connect: (signal) => connect(signal),
+      getAccessToken: async () => 'tok',
+      logout: () => logout(),
+    },
     driveDeps: () => ({
       getToken: async () => {
         if (tokenFails) throw new ReauthRequiredError()
@@ -581,6 +587,79 @@ describe('gdrive connect', () => {
         call('onboard_validate_passphrase', { mnemonic: 'x', sessionId: first.sessionId }),
       ),
     ).toContain('not connected')
+  })
+
+  it('cancel aborts the in-flight popup flow and ends the Drive session', async () => {
+    let seen: AbortSignal | undefined
+    connect = (signal) => {
+      seen = signal
+      return new Promise<void>(() => undefined)
+    }
+    const { sessionId } = await begin()
+    const inFlight = call('gdrive_complete_connect', { sessionId, password: '' })
+    await call('gdrive_cancel_connect', { sessionId })
+    expect(seen?.aborted).toBe(true)
+    expect(await message(inFlight)).toContain('OAUTH_CANCELLED')
+    expect(logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('an expired session ends the Drive session', async () => {
+    seedFromFixture(drive, loadDesktopFixture())
+    const { sessionId } = await begin()
+    clock += PENDING_SESSION_TTL_MS + 1
+    await call('gdrive_complete_connect', { sessionId }).catch(() => undefined)
+    expect(logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('an expired ready session ends the Drive session', async () => {
+    seedFromFixture(drive, loadDesktopFixture())
+    const { sessionId } = await begin()
+    await call('gdrive_complete_connect', { sessionId })
+    clock += PENDING_SESSION_TTL_MS + 1
+    await call('onboard_validate_passphrase', { mnemonic: 'x', sessionId }).catch(() => undefined)
+    expect(logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('a no-vault or incomplete keyring failure ends the Drive session', async () => {
+    const first = await begin()
+    expect(await message(call('gdrive_complete_connect', { sessionId: first.sessionId }))).toBe(
+      MSG_NO_VAULT,
+    )
+    expect(logout).toHaveBeenCalledTimes(1)
+    drive.addFile('_meta.json', drive.chain('Memlore', '.meta', 'keyring'), '{}')
+    const second = await begin()
+    await call('gdrive_complete_connect', { sessionId: second.sessionId }).catch(() => undefined)
+    expect(logout).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed logout is swallowed: the complete error still surfaces', async () => {
+    logout.mockRejectedValueOnce(new Error('offline'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { sessionId } = await begin()
+    expect(await message(call('gdrive_complete_connect', { sessionId }))).toBe(MSG_NO_VAULT)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warn).toHaveBeenCalledWith(expect.any(String), 'Error')
+    warn.mockRestore()
+  })
+
+  it('a successful connect and onboarding keep the Drive session', async () => {
+    seedFromFixture(drive, loadDesktopFixture())
+    const { sessionId } = await begin()
+    await call('gdrive_complete_connect', { sessionId })
+    await call('onboard_complete', { mnemonic: 'x', newLocalPassword: GOOD, sessionId })
+    expect(logout).not.toHaveBeenCalled()
+  })
+
+  it('a new begin aborts the previous popup flow without logging out', async () => {
+    let seen: AbortSignal | undefined
+    connect = (signal) => {
+      seen ??= signal
+      return new Promise<void>(() => undefined)
+    }
+    await begin()
+    await begin()
+    expect(seen?.aborted).toBe(true)
+    expect(logout).not.toHaveBeenCalled()
   })
 
   it('a new begin abandons the previous pending session', async () => {

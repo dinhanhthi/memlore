@@ -341,6 +341,45 @@ describe('connect', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
+  it('abort closes the popup, stops listening and ignores a late done message', async () => {
+    const fetchImpl = vi.fn(async () => tokenResponse())
+    const h = makeHarness(fetchImpl)
+    const controller = new AbortController()
+    const p = h.client.connect(controller.signal)
+    controller.abort()
+    expect(isSignInCancelled(await p.catch((e: unknown) => e))).toBe(true)
+    expect(h.popup.close).toHaveBeenCalled()
+    expect(h.channel.close).toHaveBeenCalled()
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    h.popup.closed = true
+    h.tick()
+    await Promise.resolve()
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(h.client.isConnected()).toBe(false)
+  })
+
+  it('abort after done drops the token of the refresh already in flight', async () => {
+    let release: (r: Response) => void = () => {}
+    const fetchImpl = vi.fn(() => new Promise<Response>((r) => (release = r)))
+    const h = makeHarness(fetchImpl)
+    const controller = new AbortController()
+    const p = h.client.connect(controller.signal)
+    h.channel.emit({ type: 'memlore-oauth-done' })
+    controller.abort()
+    release(tokenResponse())
+    expect(isSignInCancelled(await p.catch((e: unknown) => e))).toBe(true)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(h.client.isConnected()).toBe(false)
+  })
+
+  it('an already aborted signal never opens the popup', async () => {
+    const h = makeHarness()
+    const controller = new AbortController()
+    controller.abort()
+    expect(isSignInCancelled(await h.client.connect(controller.signal).catch((e) => e))).toBe(true)
+    expect(h.openPopup).not.toHaveBeenCalled()
+  })
+
   it('times out, closing the popup', async () => {
     const h = makeHarness()
     const p = h.client.connect()

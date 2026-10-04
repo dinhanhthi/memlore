@@ -292,7 +292,7 @@ export interface AuthEnv {
   randomUUID: () => string
   openDb: () => Promise<WebDb>
   loadCore: () => Promise<Core>
-  oauth: Pick<OAuthClient, 'connect' | 'getAccessToken'>
+  oauth: Pick<OAuthClient, 'connect' | 'getAccessToken' | 'logout'>
   /** Drive transport. Default: bearer tokens from `oauth.getAccessToken`, real fetch. */
   driveDeps: (() => DriveWriterDeps) | null
   /** Extra `onboardComplete` deps (tests only). */
@@ -333,7 +333,7 @@ export function configureAuthEnv(partial: Partial<AuthEnv>): void {
 
 /** Tests only: forget pending connect sessions and the wrong-password backoff. */
 export function resetAuthState(): void {
-  for (const session of pending.values()) abandon(session)
+  for (const session of pending.values()) stopPopup(session)
   pending.clear()
   failures = 0
   blockedUntil = 0
@@ -536,21 +536,43 @@ interface PendingSession {
   cancel: () => void
   reader: DriveReader | null
   createdAt: number
+  /** Set once `logout` was requested, so cancel + the failed complete do not log out twice. */
+  loggedOut: boolean
 }
 
 const pending = new Map<string, PendingSession>()
 
-function abandon(session: PendingSession): void {
+/** Aborts the popup flow (closes it, drops its listeners) and drops the Drive reader. */
+function stopPopup(session: PendingSession): void {
   if (session.phase === 'connecting') session.cancel()
   session.reader = null // a ready session's Drive reader is dropped too
 }
+
+/**
+ * A connect that ends without reaching onboarding must not leave a Drive session behind (the
+ * user may have signed in before cancelling): best-effort logout clears the RAM token and the
+ * worker's refresh cookie.
+ */
+function abandon(session: PendingSession): void {
+  stopPopup(session)
+  if (session.loggedOut) return
+  session.loggedOut = true
+  env()
+    .oauth.logout()
+    .catch((error: unknown) => {
+      console.warn('Drive logout after an abandoned connect failed', errorName(error))
+    })
+}
+
+const errorName = (error: unknown): string => (error instanceof Error ? error.name : 'Error')
 
 const isExpired = (session: PendingSession): boolean =>
   env().now() - session.createdAt > PENDING_SESSION_TTL_MS
 
 const gdriveBeginConnect: Handler = async () => {
   const e = env()
-  for (const old of pending.values()) abandon(old)
+  // Abort only: a logout racing this new popup could clear the cookie its sign-in sets.
+  for (const old of pending.values()) stopPopup(old)
   pending.clear()
   const sessionId = e.randomUUID()
   let rejectCancelled!: (error: Error) => void
@@ -558,15 +580,20 @@ const gdriveBeginConnect: Handler = async () => {
     rejectCancelled = reject
   })
   cancelled.catch(() => undefined)
-  const connect = e.oauth.connect()
+  const abort = new AbortController()
+  const connect = e.oauth.connect(abort.signal)
   connect.catch(() => undefined) // surfaced through complete; never an unhandled rejection
   pending.set(sessionId, {
     phase: 'connecting',
     connect,
     cancelled,
-    cancel: () => rejectCancelled(new Error(OAUTH_CANCELLED)),
+    cancel: () => {
+      abort.abort()
+      rejectCancelled(new Error(OAUTH_CANCELLED))
+    },
     reader: null,
     createdAt: e.now(),
+    loggedOut: false,
   })
   // The popup is already open (opened here, inside the click gesture). The UI still calls
   // openUrl(authUrl); the sign-in itself is the popup, so this is a state-free same-origin JSON URL.
@@ -607,6 +634,7 @@ const gdriveCompleteConnect: Handler = async ({ sessionId }) => {
     session.phase = 'ready'
     return { outcome: 'needs_onboarding' }
   } catch (error) {
+    abandon(session)
     pending.delete(id)
     throw error
   }
@@ -615,7 +643,7 @@ const gdriveCompleteConnect: Handler = async ({ sessionId }) => {
 const gdriveCancelConnect: Handler = async ({ sessionId }) => {
   const session = pending.get(String(sessionId))
   if (!session || session.phase !== 'connecting') return false
-  session.cancel()
+  abandon(session)
   return true
 }
 

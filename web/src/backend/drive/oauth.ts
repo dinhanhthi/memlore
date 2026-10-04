@@ -77,7 +77,7 @@ export interface OAuthClientDeps {
 }
 
 export interface OAuthClient {
-  connect: () => Promise<void>
+  connect: (signal?: AbortSignal) => Promise<void>
   getAccessToken: () => Promise<string>
   logout: () => Promise<void>
   isConnected: () => boolean
@@ -184,11 +184,16 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
     return refresh()
   }
 
-  function connect(): Promise<void> {
+  /** `signal` aborts the flow: the popup closes, listeners go, a late "done" stores nothing. */
+  function connect(signal?: AbortSignal): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       // The popup is a fresh login: drop any cached token so the next read uses the new cookie.
       bumpGeneration()
       token = null
+      if (signal?.aborted) {
+        reject(new OAuthConnectError(SIGN_IN_CANCELLED_MESSAGE))
+        return
+      }
       let settled = false
       let poll: unknown = null
       let timer: unknown = null
@@ -204,9 +209,20 @@ export function createOAuthClient(overrides: Partial<OAuthClientDeps> = {}): OAu
           channel.onmessage = null
           channel.close()
         }
+        signal?.removeEventListener('abort', onAbort)
         if (error) reject(error)
         else resolve()
       }
+
+      function onAbort(): void {
+        if (settled) return
+        // A refresh already started by "done" must not store its token once the user cancelled.
+        bumpGeneration()
+        token = null
+        popup?.close?.()
+        finish(new OAuthConnectError(SIGN_IN_CANCELLED_MESSAGE))
+      }
+      signal?.addEventListener('abort', onAbort)
 
       try {
         // Subscribe before opening so the popup's message cannot be missed.

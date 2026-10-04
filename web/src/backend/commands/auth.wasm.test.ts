@@ -81,7 +81,11 @@ beforeEach(async () => {
     emit: (event) => events.push(event),
     openDb: async () => db,
     loadCore: async () => core,
-    oauth: { connect: async () => undefined, getAccessToken: async () => 'tok' },
+    oauth: {
+      connect: async () => undefined,
+      getAccessToken: async () => 'tok',
+      logout: async () => undefined,
+    },
     driveDeps: () => ({
       getToken: async () => {
         if (offline) throw new ReauthRequiredError()
