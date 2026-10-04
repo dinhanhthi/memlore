@@ -32,6 +32,7 @@ import type { Entry, EmotionKey } from '../../../../src/types/entry'
 import type { EntrySort, EntryTimeRange, PagedResult } from '../../../../src/types/pagination'
 import { EntryUnavailableError, type VaultEntry } from '../vault'
 import type { Handler } from '../router'
+import { nowSecs as correctedNowSecs } from '../clock'
 import { getCachedWriteFlag } from '../config'
 import { createDraftManager } from '../drafts'
 import { getKeyRing } from '../keys'
@@ -443,7 +444,7 @@ const createEntry: Handler = async (args) => {
 
   const entryId = crypto.randomUUID()
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
   const entryDateSecs =
     typeof args.entryDate === 'number' && Number.isFinite(args.entryDate)
       ? Math.floor(args.entryDate)
@@ -567,7 +568,7 @@ const saveEntryContent: Handler = async (args) => {
 
   const contentText = typeof args.contentText === 'string' ? args.contentText : null
   const previewText = typeof args.previewText === 'string' ? args.previewText : null
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   const updatedIntent = buildOutboxIntent({
     entryId: id,
@@ -609,7 +610,7 @@ const updateEntry: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -682,7 +683,7 @@ const updateEntryDate: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -756,7 +757,7 @@ const updateEntryEmotion: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -828,7 +829,7 @@ const toggleFavorite: Handler = async (args) => {
   const targetFav = !currentFav
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -898,7 +899,7 @@ const moveEntryToJournal: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -967,7 +968,7 @@ const addTagToEntry: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -1041,7 +1042,7 @@ const removeTagFromEntry: Handler = async (args) => {
   if (!device) throw new Error('Device record missing')
 
   const changeSeq = await db.device.allocateChangeSeq()
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -1176,7 +1177,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
@@ -1278,7 +1279,7 @@ const savePastedImage: Handler = async (args) => {
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
-  const nowSecs = Math.floor(Date.now() / 1000)
+  const nowSecs = correctedNowSecs()
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {

@@ -13,6 +13,7 @@ import {
 import { configureReadEnv, type Taxonomy } from './readSession'
 import { installFakeSession, type FakeSpec } from './readTestKit'
 import { setWriteFlagForTest } from '../config'
+import { resetClock, updateClockOffset } from '../clock'
 import { lock, setKeyRing, type KeyRing } from '../keys'
 
 afterEach(() => {
@@ -473,6 +474,28 @@ describe('write commands', () => {
     expect(drafts[0].entryId).toBe(created.id)
 
     expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('stamps intents with the Drive-corrected clock, not the browser clock', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { db } = installFakeSession(many(2), { taxonomy: TAXONOMY })
+    const browserNow = Date.now()
+    // Drive says the time is one hour ahead of this browser.
+    updateClockOffset(new Date(browserNow + 3_600_000).toUTCString(), browserNow)
+    try {
+      await call('toggle_favorite', { id: id(1) })
+      const draft = await db.drafts.get(id(1))
+      const intent = JSON.parse(new TextDecoder().decode(draft?.sealed)) as {
+        web_updated_at_secs: number
+        fields: { is_favorite: { changed_at_secs: number } }
+      }
+      const expected = Math.floor(browserNow / 1000) + 3600
+      expect(Math.abs(intent.web_updated_at_secs - expected)).toBeLessThanOrEqual(5)
+      expect(Math.abs(intent.fields.is_favorite.changed_at_secs - expected)).toBeLessThanOrEqual(5)
+    } finally {
+      resetClock()
+    }
   })
 
   it('create_entry rejects when journalId is missing or unknown', async () => {
