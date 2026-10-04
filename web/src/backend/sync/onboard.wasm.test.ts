@@ -23,12 +23,13 @@ import {
   sha256Hex,
   unpushedDraftCount,
 } from '../drafts'
-import { configureReadEnv, readEnv } from '../commands/readSession'
+import { configureReadEnv, readEnv, resetReadSession } from '../commands/readSession'
 import {
   configureKeysEnv,
   dispose,
   getKeyRing,
   isUnlocked,
+  lock,
   onLock,
   setKeyRing,
   type KeyRing,
@@ -783,6 +784,7 @@ describe('onboardComplete: device id', () => {
   // 401). The old session must not outlive the ring it was built for.
   describe('re-onboard while unlocked', () => {
     const ENTRY_A = 'aaaaaaaa-2222-4333-8444-555555555555'
+    const FOREIGN_ID = 'bbbbbbbb-2222-4333-8444-555555555555'
     const intent = (entryId: string): OutboxEntryV1 => ({
       schema_version: 1,
       entry_id: entryId,
@@ -825,7 +827,7 @@ describe('onboardComplete: device id', () => {
       setKeyRing(oldRing)
       const session = await readEnv().session()
       session.vault.setOutboxIntents([intent(ENTRY_A)])
-      session.vault.setForeignIntents([intent('bbbbbbbb-2222-4333-8444-555555555555')])
+      session.vault.setForeignIntents([intent(FOREIGN_ID)])
       const lockHook = vi.fn()
       onLock(lockHook)
       return { env, oldRing, session, lockHook }
@@ -833,6 +835,8 @@ describe('onboardComplete: device id', () => {
 
     it('another vault: locks first, drops the session, no old intent stays reachable', async () => {
       const { env, oldRing, session, lockHook } = await unlockedEnv('ef'.repeat(32))
+      // The foreign intent of vault A is overlaid before the switch.
+      expect(session.vault.status(FOREIGN_ID)).toBe('visible')
       await run(env)
       expect(lockHook).toHaveBeenCalledTimes(1)
       expect(isUnlocked()).toBe(true)
@@ -845,6 +849,8 @@ describe('onboardComplete: device id', () => {
       expect(fresh).not.toBe(session)
       expect(fresh.vault.getOutboxIntents()).toEqual([])
       expect(fresh.vault.getOutboxIntent(ENTRY_A)).toBeUndefined()
+      expect(session.vault.status(FOREIGN_ID)).toBe('not-loaded')
+      expect(fresh.vault.status(FOREIGN_ID)).toBe('not-loaded')
       // Nothing of vault A is left to push.
       expect(await env.db.drafts.list()).toEqual([])
     })
@@ -872,6 +878,81 @@ describe('onboardComplete: device id', () => {
       expect(isUnlocked()).toBe(true)
       expect(getKeyRing()).toBe(oldRing)
       expect(await readEnv().session()).toBe(session)
+      expect(session.vault.getOutboxIntent(ENTRY_A)).toEqual(intent(ENTRY_A))
+    })
+
+    // The slot write is the only network step: it runs BEFORE the lock, so a Drive failure (or a
+    // reauth) leaves the user exactly as they were.
+    it('a failed slot write while unlocked: still unlocked, same session, nothing wiped', async () => {
+      const { env, oldRing, session, lockHook } = await unlockedEnv('ef'.repeat(32))
+      const old = await env.db.device.get()
+      env.drive.interceptors.push((req) =>
+        req.method === 'POST' ? json({ error: 'boom' }, 500) : undefined,
+      )
+      await expect(run(env)).rejects.toThrow()
+      expect(lockHook).not.toHaveBeenCalled()
+      expect(isUnlocked()).toBe(true)
+      expect(getKeyRing()).toBe(oldRing)
+      expect(await readEnv().session()).toBe(session)
+      expect(session.vault.getOutboxIntent(ENTRY_A)).toEqual(intent(ENTRY_A))
+      expect(await env.db.device.get()).toEqual(old)
+    })
+
+    // After the lock only IndexedDB steps remain: a failure there leaves the app locked (a reload
+    // recovers: same vault -> the old record unlocks; other vault -> onboarding).
+    it('same vault: a failed record write after the lock leaves it locked, record and drafts kept', async () => {
+      const { env, lockHook } = await unlockedEnv(vaultFingerprint())
+      const old = await env.db.device.get()
+      const draft = { entryId: ENTRY_A, sealed: new Uint8Array([1, 2]), updatedAt: 1 }
+      await env.db.drafts.put(draft)
+      vi.spyOn(env.db.device, 'put').mockRejectedValueOnce(new StorageUnavailableError())
+      await expect(run(env)).rejects.toBeInstanceOf(StorageUnavailableError)
+      onlySlotWrite(env.drive, REUSED_ID)
+      expect(lockHook).toHaveBeenCalledTimes(1)
+      expect(isUnlocked()).toBe(false)
+      expect(await env.db.device.get()).toEqual(old)
+      expect(await env.db.drafts.list()).toEqual([draft])
+    })
+
+    it('another vault: a failed record write after the lock leaves it locked, old vault wiped', async () => {
+      const { env, session, lockHook } = await unlockedEnv('ef'.repeat(32))
+      vi.spyOn(env.db.device, 'put').mockRejectedValueOnce(new StorageUnavailableError())
+      await expect(run(env)).rejects.toBeInstanceOf(StorageUnavailableError)
+      onlySlotWrite(env.drive, FIXED_ID)
+      expect(lockHook).toHaveBeenCalledTimes(1)
+      expect(isUnlocked()).toBe(false)
+      expect(await env.db.device.get()).toBeUndefined()
+      expect(await readEnv().session()).not.toBe(session)
+    })
+
+    // An old-vault draft saved after the first check (here: during the storage probe, the last
+    // step before the slot write and the lock) must not be wiped by the switch.
+    it('another vault: a draft saved right before the lock is refused, not wiped', async () => {
+      const { env, lockHook } = await unlockedEnv('ef'.repeat(32))
+      const old = await env.db.device.get()
+      const draft = { entryId: ENTRY_A, sealed: new Uint8Array([1, 2]), updatedAt: 1 }
+      const realPut = env.db.meta.put.bind(env.db.meta)
+      vi.spyOn(env.db.meta, 'put').mockImplementationOnce(async (row) => {
+        await env.db.drafts.put(draft)
+        return realPut(row)
+      })
+      await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
+      onlySlotWrite(env.drive, FIXED_ID) // the documented orphan slot, nothing else
+      expect(lockHook).toHaveBeenCalledTimes(1)
+      expect(isUnlocked()).toBe(false)
+      expect(await env.db.drafts.list()).toEqual([draft])
+      expect(await env.db.device.get()).toEqual(old)
+    })
+
+    it('resetReadSession unregisters the old session lock hooks', async () => {
+      const { session } = await unlockedEnv(vaultFingerprint())
+      lock('manual')
+      resetReadSession()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      setKeyRing(openRingForTest())
+      session.vault.setOutboxIntents([intent(ENTRY_A)])
+      lock('manual')
+      // The old vault's hook no longer runs: its intents are not cleared by the second lock.
       expect(session.vault.getOutboxIntent(ENTRY_A)).toEqual(intent(ENTRY_A))
     })
   })

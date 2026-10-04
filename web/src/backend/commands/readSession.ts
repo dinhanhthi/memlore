@@ -127,6 +127,8 @@ export interface ReadSession {
    * and reloads the entries that are already in RAM and changed on the server.
    */
   pull: () => Promise<PullOutcome>
+  /** Unregisters the session's lock hooks (its own and the vault's). Absent in test doubles. */
+  dispose?: () => void
 }
 
 export interface ReadEnv {
@@ -174,7 +176,13 @@ export function configureReadEnv(partial: Partial<ReadEnv>): void {
  * it while locked (its lock hooks have already cleared the RAM caches).
  */
 export function resetReadSession(): void {
+  const dropped = sessionPromise
   sessionPromise = null
+  // Its lock hooks would otherwise stay registered for the life of the page.
+  void dropped?.then(
+    (session) => session.dispose?.(),
+    () => undefined,
+  )
 }
 
 function getDefaultSession(): Promise<ReadSession> {
@@ -281,7 +289,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   // Bumped by the lock hook. Every step that awaits captures it first and discards its result
   // (writes no cache, no exclusions, no warm-start state) when a lock landed in between.
   let epoch = 0
-  onLock(() => {
+  const offLock = onLock(() => {
     epoch += 1
     cache = null
     warmed = null
@@ -454,6 +462,10 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     ready,
     acquireOutboxLock,
     pull,
+    dispose: () => {
+      offLock()
+      vault.dispose()
+    },
   }
 }
 

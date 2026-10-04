@@ -616,8 +616,8 @@ async function defaultPersist(): Promise<boolean> {
  * Join the vault. Resolves with the key LEFT LOADED in `keys.ts` (desktop `onboard_complete`
  * leaves the app unlocked). On any failure the ring is zeroized and nothing is installed; the
  * only possible cloud write is the single device slot, and it happens after every vault check.
- * A ring already loaded is locked once every check has passed (a refusal leaves it untouched), so
- * a failure after that point leaves the app locked.
+ * A ring already loaded is locked right after the slot write (a refusal or a failed write leaves
+ * it untouched), so a failure after that point (IndexedDB only) leaves the app locked.
  */
 export async function onboardComplete(
   deps: OnboardDeps,
@@ -699,17 +699,14 @@ export async function onboardComplete(
     // leave an orphan slot (the retry generates a new id).
     await db.meta.put({ key: STORAGE_PROBE_KEY, value: true })
     await db.meta.delete(STORAGE_PROBE_KEY)
-    // Every refusal is behind us. A browser still unlocked (Settings opens onboarding after a
-    // reconnect) locks now, BEFORE any wipe or reset: the lock hooks tear down the read and push
-    // sessions, the sync schedule and the caches, and an entry command still holding the old ring
-    // fails with VaultLockedError. `app:unlocked` (auth.ts) restarts them under the new ring.
-    lock('manual')
-    // The read session's puller keeps its index across a lock: another vault needs a new session.
-    if (replacesOtherVault) resetReadSession()
-    // The old vault's cached ciphertext must never mix with the new vault.
-    if (replacesOtherVault) await db.clearAll()
 
-    // Device id, then the ONE cloud write: the device slot.
+    // Device id, then the ONE cloud write: the device slot. Every refusal is behind us, and the slot
+    // is written while a browser still unlocked (Settings opens onboarding after a reconnect) STAYS
+    // unlocked: a Drive failure or a reauth here leaves the user exactly as they were. The id does
+    // not depend on the wipe below: a record of another vault has another fingerprint, so its id is
+    // never reused. A slot whose local finish then fails is an orphan the retry handles: same vault,
+    // the record is intact and its id is reused (the slot is updated in place); another vault, a new
+    // id is generated and the old slot stays behind.
     const { deviceId, reused } = await pickDeviceId(
       db,
       meta.masterFingerprint,
@@ -724,6 +721,24 @@ export async function onboardComplete(
     const slot = core.buildDeviceSlot(deviceId, deviceName, nowSeconds, nowSeconds)
     writer.setIdentity({ ownId: deviceId, localGen: control.recoveryGeneration })
     await writer.put(deviceSlotPath(deviceId), new TextEncoder().encode(slot))
+
+    // Lock now, BEFORE any wipe or reset: the lock hooks tear down the read and push sessions, the
+    // sync schedule and the caches, and an entry command still holding the old ring fails with
+    // VaultLockedError. `app:unlocked` (auth.ts) restarts them under the new ring. From here on only
+    // IndexedDB steps remain; a failure leaves the app LOCKED, and a reload recovers it (same vault:
+    // the old record unlocks; another vault: the wiped browser shows onboarding).
+    lock('manual')
+    if (replacesOtherVault) {
+      // A draft of the old vault saved since the check above (none can be sealed after the lock)
+      // must not be wiped. Refusing here leaves the app locked with an orphan slot, but loses no data.
+      if ((await createDraftManager({ db }).listUnpushedDrafts()).length > 0) {
+        throw new DeviceRecordConflictError()
+      }
+      // The read session's puller keeps its index across a lock: another vault needs a new session.
+      resetReadSession()
+      // The old vault's cached ciphertext must never mix with the new vault.
+      await db.clearAll()
+    }
 
     // 9. Persist the wrapped master (never a raw key, never the phrase).
     const record: DeviceRecord = {
