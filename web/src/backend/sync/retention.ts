@@ -123,16 +123,6 @@ function canonical(value: unknown): string {
   )
 }
 
-/** Web-clock seconds this revision was first seen pushed (recorded now when new). */
-async function pushedAt(deps: RetentionDeps, entryId: string, hash: string, now: number) {
-  const key = `${PUSHED_AT}${entryId}`
-  const value = (await deps.db.meta.get(key))?.value
-  const m = typeof value === 'string' ? /^([0-9a-f]{64}):(\d+)$/.exec(value) : null
-  if (m !== null && m[1] === hash) return Number(m[2])
-  await deps.db.meta.put({ key, value: `${hash}:${now}` })
-  return now
-}
-
 /** `<field>@<seq>` -> web-clock seconds of the first refusal seen (recorded now when new). */
 async function refusalTimes(
   deps: RetentionDeps,
@@ -248,8 +238,11 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
     if (synced.status === 'journal') continue // its metadata is hidden: cannot tell, keep
     const now = deps.nowSecs()
     const hash = await sha256Hex(draft.sealed)
-    const pushed = draft.pushedHash === hash
-    const since = pushed ? await pushedAt(deps, id, hash, now) : null
+    const since =
+      draft.pushedHash === hash ? await deps.db.drafts.recordPushedAt(id, hash, now) : null
+    // Read as pushed but unmarked meanwhile (a re-onboard's `clearPushed`): keep it, say nothing.
+    if (draft.pushedHash === hash && since === null) continue
+    const pushed = since !== null
     const capable = slotDesktops.filter(
       (d) => acksByDevice.has(d) || since === null || now - since < UNDECIDED_GRACE_SECS,
     )

@@ -345,6 +345,55 @@ describe('intent retention', () => {
     expect((await r.run()).dropped).toEqual(['e1'])
   })
 
+  describe('a re-onboard (clearPushed) racing a pass', () => {
+    const setup = async (): Promise<void> => {
+      r = await rig([{ id: 'e1', updatedAt: 1000, title: 'Old' }], ['desk-a', 'desk-b'])
+      await r.draft(intent('e1'))
+      await r.acks('desk-a', [ack('e1', { decision: 'refused', reason: 'journal' })])
+    }
+    /** A pass whose draft list was read just before `clearPushed` committed. */
+    const racingRun = () =>
+      runRetention({
+        db: {
+          files: r.db.files,
+          meta: r.db.meta,
+          device: r.db.device,
+          drafts: {
+            ...r.db.drafts,
+            list: async () => {
+              const drafts = await r.db.drafts.list()
+              await r.db.drafts.clearPushed()
+              return drafts
+            },
+          },
+        },
+        core,
+        ring,
+        nowSecs: () => r.now.secs,
+        desktops: r.desktops,
+        vault: r.vault,
+      })
+
+    it('writes no first-pushed time back and keeps the draft, silently', async () => {
+      await setup()
+      expect(await racingRun()).toEqual({ dropped: [], notices: [], changed: false })
+      expect(await r.db.meta.get('outbox-pushed-at:e1')).toBeUndefined()
+      expect(await r.db.drafts.get('e1')).toBeDefined()
+    })
+
+    it('restarts the undecided grace from the re-push', async () => {
+      await setup()
+      await racingRun()
+      r.now.secs = T0 + UNDECIDED_GRACE_SECS + DAY
+      const draft = await r.db.drafts.get('e1')
+      if (draft === undefined) throw new Error('draft missing')
+      await r.db.drafts.markPushed('e1', draft.sealed, await sha256Hex(draft.sealed))
+      expect((await r.run()).dropped).toEqual([])
+      r.now.secs += UNDECIDED_GRACE_SECS
+      expect((await r.run()).dropped).toEqual(['e1'])
+    })
+  })
+
   describe('resolved fields', () => {
     const pending = (): OutboxEntryV1 =>
       intent('e1', {

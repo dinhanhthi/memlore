@@ -256,6 +256,59 @@ describe('drafts.clearPushed', () => {
   })
 })
 
+describe('drafts.recordPushedAt', () => {
+  const H1 = 'ab'.repeat(32)
+  const H2 = 'cd'.repeat(32)
+  const KEY = `${OUTBOX_PUSHED_AT_PREFIX}d`
+  const pushed = (pushedHash?: string) =>
+    db.drafts.put({
+      entryId: 'd',
+      sealed: bytes(1),
+      updatedAt: 1,
+      ...(pushedHash === undefined ? {} : { pushedHash }),
+    })
+
+  it('records now on first sight and returns the same time on later passes', async () => {
+    await pushed(H1)
+    expect(await db.drafts.recordPushedAt('d', H1, 100)).toBe(100)
+    expect(await db.drafts.recordPushedAt('d', H1, 200)).toBe(100)
+    expect((await db.meta.get(KEY))?.value).toBe(`${H1}:100`)
+  })
+
+  it('records a new time for a different hash', async () => {
+    await pushed(H1)
+    await db.drafts.recordPushedAt('d', H1, 100)
+    await pushed(H2)
+    expect(await db.drafts.recordPushedAt('d', H2, 300)).toBe(300)
+    expect((await db.meta.get(KEY))?.value).toBe(`${H2}:300`)
+  })
+
+  it('writes nothing and resolves null when the draft is missing, unpushed or pushed with another hash', async () => {
+    expect(await db.drafts.recordPushedAt('d', H1, 100)).toBeNull()
+    await pushed()
+    expect(await db.drafts.recordPushedAt('d', H1, 100)).toBeNull()
+    await pushed(H2)
+    expect(await db.drafts.recordPushedAt('d', H1, 100)).toBeNull()
+    expect(await db.meta.get(KEY)).toBeUndefined()
+  })
+
+  it('resolves null after clearPushed, so a stale pass cannot restore the forgotten time', async () => {
+    await pushed(H1)
+    await db.drafts.recordPushedAt('d', H1, 100)
+    await db.drafts.clearPushed()
+    expect(await db.drafts.recordPushedAt('d', H1, 200)).toBeNull()
+    expect(await db.meta.get(KEY)).toBeUndefined()
+  })
+
+  it('restarts from the new now after a re-push of the same bytes', async () => {
+    await pushed(H1)
+    await db.drafts.recordPushedAt('d', H1, 100)
+    await db.drafts.clearPushed()
+    expect(await db.drafts.markPushed('d', bytes(1), H1)).toBe(true)
+    expect(await db.drafts.recordPushedAt('d', H1, 900)).toBe(900)
+  })
+})
+
 describe('clearCache / clearAll', () => {
   beforeEach(async () => {
     await db.files.put({

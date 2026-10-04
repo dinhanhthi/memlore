@@ -555,6 +555,26 @@ export class WebDb {
         return true
       }),
     /**
+     * Web-clock seconds this draft revision was first seen pushed, in ONE transaction with the
+     * draft read: the stored time when the `OUTBOX_PUSHED_AT_PREFIX` key already holds `hash`,
+     * else `now` (recorded as `<hash>:<now>`). Resolves null and writes nothing when the draft is
+     * missing or not pushed with `hash` (any more), so a retention pass racing `clearPushed`
+     * cannot restore a time it just forgot.
+     */
+    recordPushedAt: (entryId: string, hash: string, now: number): Promise<number | null> =>
+      this.tx([STORE_DRAFTS, STORE_META], 'readwrite', async ([s, meta]) => {
+        const rec = (await requestToPromise(s.get(entryId))) as DraftRecord | undefined
+        if (!rec || rec.pushedHash !== hash) return null
+        const key = `${OUTBOX_PUSHED_AT_PREFIX}${entryId}`
+        const value = ((await requestToPromise(meta.get(key))) as MetaRecord | undefined)?.value
+        const m = typeof value === 'string' ? /^([0-9a-f]{64}):(\d+)$/.exec(value) : null
+        if (m !== null && m[1] === hash) return Number(m[2])
+        const record: MetaRecord = { key, value: `${hash}:${now}` }
+        assertMetaRecord(record)
+        await requestToPromise(meta.put(record))
+        return now
+      }),
+    /**
      * Drops `pushedHash` from every draft in ONE transaction, so each is uploaded again (a
      * re-onboard: the outbox it was pushed to may be gone), and forgets when each was first seen
      * pushed. Keeps the bytes and the outbox media.
