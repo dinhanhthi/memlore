@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# bump.sh — set the app version across every file that carries it.
+# bump.sh — set ONE platform's version across every file that carries it.
 #
-# Usage: bash bump.sh <new_version>
-#   e.g. bash bump.sh 0.2.0
-#        bash bump.sh 0.2.0-beta.1
+# Usage: bash bump.sh --mac|--web <new_version>
+#   e.g. bash bump.sh --mac 0.2.0
+#        bash bump.sh --mac 0.2.0-beta.1
+#        bash bump.sh --web 0.1.1
 #
-# FOUR files, not three. Forgetting Cargo.lock leaves `cargo build --locked`
-# and CI drifting against Cargo.toml.
+# --mac (desktop app): FOUR files, not three. Forgetting Cargo.lock leaves
+#   `cargo build --locked` and CI drifting against Cargo.toml.
+# --web (web companion): ONE file, web/version.json. deploy-web.yml refuses a
+#   web-v* tag that does not match it.
+# Each platform's files are the only ones touched: a --web bump never changes the
+# desktop version and vice versa.
 #
 # Prerelease suffixes are accepted on purpose: the release workflow turns a
 # `-beta.N` or `-rc.N` tag into a GitHub prerelease, which is the whole
@@ -18,12 +23,14 @@ set -euo pipefail
 
 # scripts -> cf-ship-custom -> skills -> .coding-friend -> repo root = four levels.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-NEW_VERSION="${1:-}"
+PLATFORM="${1:-}"
+NEW_VERSION="${2:-}"
 
-if [[ -z "$NEW_VERSION" ]]; then
-  echo "Usage: bash bump.sh <new_version>    e.g. 0.2.0 or 0.2.0-beta.1"
+if [[ "$PLATFORM" != "--mac" && "$PLATFORM" != "--web" ]] || [[ -z "$NEW_VERSION" ]]; then
+  echo "Usage: bash bump.sh --mac|--web <new_version>    e.g. --mac 0.2.0, --web 0.1.1-rc.1"
   exit 1
 fi
+PLATFORM="${PLATFORM#--}"
 
 # Core semver, optionally -beta.N / -rc.N. Deliberately narrower than full
 # semver: the updater's tag validator (src-tauri/src/commands/updater.rs,
@@ -38,7 +45,7 @@ cd "$REPO_ROOT"
 
 # Guard the path arithmetic above rather than letting a wrong REPO_ROOT surface
 # as a bare FileNotFoundError from python three functions later.
-for required in package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml; do
+for required in package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml web/version.json; do
   if [[ ! -f "$required" ]]; then
     echo "Error: $required not found under REPO_ROOT=$REPO_ROOT"
     echo "The relative path from this script to the repository root is wrong."
@@ -98,7 +105,28 @@ print(f"  {path}: -> {version}")
 PY
 }
 
-echo "Bumping Memlore to ${NEW_VERSION}…"
+# ─── --web: web/version.json only ────────────────────────────────────────────
+
+if [[ "$PLATFORM" == "web" ]]; then
+  echo "Bumping the Memlore web companion to ${NEW_VERSION}…"
+  bump_json "web/version.json"
+  pnpm exec prettier --write web/version.json > /dev/null 2>&1 \
+    || echo "  WARNING: prettier did not run on web/version.json — check 'git diff'."
+  ACTUAL="$(python3 -c 'import json;print(json.load(open("web/version.json"))["version"])')"
+  if [[ "$ACTUAL" != "$NEW_VERSION" ]]; then
+    echo "  FAIL  web/version.json = $ACTUAL (expected $NEW_VERSION)"
+    exit 1
+  fi
+  echo "  ok    web/version.json = $ACTUAL"
+  echo ""
+  echo "Done. Next: update CHANGELOG.md and changelogData.ts (platform 'web'), commit,"
+  echo "then tag web-v$NEW_VERSION."
+  exit 0
+fi
+
+# ─── --mac: the desktop app's four files ─────────────────────────────────────
+
+echo "Bumping the Memlore desktop app to ${NEW_VERSION}…"
 bump_json "package.json"
 bump_json "src-tauri/tauri.conf.json"
 bump_cargo_toml
@@ -168,4 +196,5 @@ if [[ "$FAILED" -ne 0 ]]; then
 fi
 
 echo ""
-echo "Done. Next: update CHANGELOG.md, commit, then tag v$NEW_VERSION."
+echo "Done. Next: update CHANGELOG.md and changelogData.ts (platform 'mac'), commit,"
+echo "then tag v$NEW_VERSION."

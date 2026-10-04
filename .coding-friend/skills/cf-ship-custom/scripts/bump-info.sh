@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # bump-info.sh — print everything needed to choose a version bump and write a
-# changelog entry for Memlore. Read by an LLM, so the output is deliberately
-# explicit: every state is named, the legend is printed every run, and the
-# path→package mapping is stated rather than left to be inferred.
+# changelog entry for ONE Memlore platform. Read by an LLM, so the output is
+# deliberately explicit: every state is named, the legend is printed every run,
+# and the path→platform mapping is stated rather than left to be inferred.
 #
-# Usage: bash bump-info.sh [patch|minor|major] [--rc|--beta]
+# Usage: bash bump-info.sh --mac|--web [patch|minor|major] [--rc|--beta]
+#   The platform is REQUIRED. Each platform has its own version and its own tags:
+#     --mac  desktop app   src-tauri/tauri.conf.json   tags v<semver>
+#     --web  web companion web/version.json            tags web-v<semver>
+#   `/cf-ship --all` runs this once per platform.
 #   The level is optional. Omit it and the model picks one from the commits.
 #
 #   Releases are STABLE by default. `--rc` / `--beta` are opt-in: pass one only
@@ -18,7 +22,7 @@
 #   ordinary patch bump would ship 0.1.2 and skip 0.1.1 entirely.
 #
 # Test hooks. Never set either during a real release.
-#   BUMP_INFO_VERSION=0.1.1-rc.2  -> pretend tauri.conf.json says that, so the
+#   BUMP_INFO_VERSION=0.1.1-rc.2  -> pretend the platform's version file says that, so the
 #     promote / iterate / kind-switch branches are reachable without editing the
 #     real config.
 # BUMP_INFO_TAG overrides the tag discovered on origin.
@@ -32,10 +36,18 @@ set -euo pipefail
 # scripts -> cf-ship-custom -> skills -> .coding-friend -> repo root = four levels.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 
+PLATFORM=""
 REQUESTED_LEVEL=""
 PRERELEASE_KIND=""
 for arg in "$@"; do
   case "$arg" in
+    --mac | --web)
+      if [[ -n "$PLATFORM" ]]; then
+        echo "Error: platform given twice. Run once per platform (/cf-ship --all does that)."
+        exit 1
+      fi
+      PLATFORM="${arg#--}"
+      ;;
     patch | minor | major)
       if [[ -n "$REQUESTED_LEVEL" ]]; then
         echo "Error: level given twice ('$REQUESTED_LEVEL' and '$arg')"
@@ -47,27 +59,48 @@ for arg in "$@"; do
     --beta) PRERELEASE_KIND="beta" ;;
     *)
       echo "Error: unknown argument '$arg'"
-      echo "Usage: bash bump-info.sh [patch|minor|major] [--rc|--beta]"
+      echo "Usage: bash bump-info.sh --mac|--web [patch|minor|major] [--rc|--beta]"
       exit 1
       ;;
   esac
 done
 
+if [[ -z "$PLATFORM" ]]; then
+  echo "Error: no platform. Pass --mac (desktop app) or --web (web companion)."
+  echo "They are versioned and tagged separately; ask the user which one to ship."
+  exit 1
+fi
+
+# Per-platform settings. Bump-relevant paths: anything not listed cannot
+# influence the bump — that is the whole exclusion mechanism, so keep each list in
+# sync with the mapping printed at the end of the output. src/ and public/ are the
+# shared UI, so a change there counts for both platforms.
+if [[ "$PLATFORM" == "mac" ]]; then
+  PLATFORM_LABEL="desktop app (macOS)"
+  TAG_PREFIX="v"
+  VERSION_FILE="src-tauri/tauri.conf.json"
+  APP_PATHS=(src/ src-tauri/ public/ index.html vite.config.ts package.json)
+  EXCLUDED_PATHS="web/ workers/ website/ mockup/ docs/ e2e/"
+  # Conventional-commit scopes that never count toward this platform's bump.
+  EXCLUDED_SCOPES="website|web|web-auth|release"
+else
+  PLATFORM_LABEL="web companion (web.memlore.app)"
+  TAG_PREFIX="web-v"
+  VERSION_FILE="web/version.json"
+  APP_PATHS=(web/ workers/web-auth/ src/ public/ src-tauri/crates/memlore-core/ src-tauri/crates/memlore-wasm/ package.json)
+  EXCLUDED_PATHS="src-tauri/ (except crates/memlore-core and crates/memlore-wasm), index.html, vite.config.ts, website/, mockup/, docs/, e2e/"
+  EXCLUDED_SCOPES="website|release"
+fi
+
 # Guard the path arithmetic above instead of letting a wrong REPO_ROOT surface
 # as a bare python traceback further down.
-TAURI_CONF="$REPO_ROOT/src-tauri/tauri.conf.json"
-if [[ ! -f "$TAURI_CONF" ]]; then
-  echo "Error: src-tauri/tauri.conf.json not found under REPO_ROOT=$REPO_ROOT"
+if [[ ! -f "$REPO_ROOT/$VERSION_FILE" ]]; then
+  echo "Error: $VERSION_FILE not found under REPO_ROOT=$REPO_ROOT"
   echo "The relative path from this script to the repository root is wrong."
   exit 1
 fi
 
 cd "$REPO_ROOT"
-
-# Bump-relevant paths. Anything not listed here cannot influence the bump —
-# that is the whole exclusion mechanism, so keep the two lists in sync with the
-# mapping printed at the end of the output.
-APP_PATHS=(src/ src-tauri/ public/ index.html vite.config.ts package.json)
 # Resolved here so the changelog links are printed ready-made below. Leaving the
 # model to build "[#hash](url)" from a bare base URL is how v0.1.0 shipped with
 # no commit links at all — the instruction said "append commit links" and never
@@ -75,10 +108,10 @@ APP_PATHS=(src/ src-tauri/ public/ index.html vite.config.ts package.json)
 REPO_URL="$(git remote get-url origin 2>/dev/null \
   | sed 's|git@github.com:|https://github.com/|' \
   | sed 's|\.git$||')"
-EXCLUDED_PATHS="website/ mockup/ web/ docs/ e2e/"
-# Conventional-commit scopes that never count toward a bump, however many app
-# files the commit touched.
-EXCLUDED_SCOPE_RE='^[0-9a-f]+ [a-z]+\(website\)!?:'
+# Commits with an excluded scope never count, however many app files they touched.
+# `release` covers the version-bump commits of either platform (chore(release): …):
+# a desktop bump edits package.json, which the web list includes.
+EXCLUDED_SCOPE_RE="^[0-9a-f]+ [a-z]+\\(($EXCLUDED_SCOPES)\\)!?:"
 
 # ─── Latest published tag ─────────────────────────────────────────────────────
 #
@@ -97,9 +130,11 @@ else
     exit 1
   fi
   # `^{}` lines are annotated-tag dereferences, not tag names.
+  # `^v[0-9]` never matches `web-v…`, and `^web-v[0-9]` never matches `v…`, so each
+  # platform only ever sees its own tags.
   TAG_CANDIDATES="$(printf '%s\n' "$REMOTE_REFS" \
     | sed 's|.*refs/tags/||' \
-    | grep -E '^v[0-9]' \
+    | grep -E "^${TAG_PREFIX}[0-9]" \
     | grep -v '\^{}' || true)"
   TAG_SOURCE="origin"
 fi
@@ -113,10 +148,10 @@ fi
 # The tag list goes in as an argument, not on stdin: the heredoc below already
 # occupies stdin, so a piped list would be silently swallowed and every run
 # would report first-release.
-TAG_INFO="$(python3 - "$TAURI_CONF" "$TAG_CANDIDATES" "${BUMP_INFO_VERSION:-}" <<'PY'
+TAG_INFO="$(python3 - "$VERSION_FILE" "$TAG_CANDIDATES" "${BUMP_INFO_VERSION:-}" "$TAG_PREFIX" <<'PY'
 import json, re, sys
 
-TAG_RE = re.compile(r"^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)$")
+TAG_RE = re.compile(r"^" + re.escape(sys.argv[4]) + r"(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)$")
 
 
 def key(version):
@@ -133,14 +168,14 @@ def key(version):
 candidates = [t for t in (line.strip() for line in sys.argv[2].splitlines()) if t]
 parsed = [(m.group(0), m.group(1)) for m in map(TAG_RE.match, candidates) if m]
 if candidates and not parsed:
-    sys.exit("Error: no candidate tag matched vX.Y.Z[-pre]: %s" % ", ".join(candidates))
+    sys.exit("Error: no candidate tag matched %sX.Y.Z[-pre]: %s" % (sys.argv[4], ", ".join(candidates)))
 
 # argv[3] is the BUMP_INFO_VERSION test hook. It has to be applied here, before
 # the comparison below — patching the version afterwards left the state computed
 # from the real file and reported BROKEN-tag-ahead-of-file.
-file_version = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else json.load(open(sys.argv[1]))["version"]
-if not TAG_RE.match("v" + file_version):
-    sys.exit("Error: tauri.conf.json version %r is not X.Y.Z[-pre]" % file_version)
+file_version = sys.argv[3] if sys.argv[3] else json.load(open(sys.argv[1]))["version"]
+if not TAG_RE.match(sys.argv[4] + file_version):
+    sys.exit("Error: %s version %r is not X.Y.Z[-pre]" % (sys.argv[1], file_version))
 
 if not parsed:
     print("")  # no tag
@@ -284,11 +319,12 @@ print_commits() {
 
 # ─── Output ───────────────────────────────────────────────────────────────────
 
-echo "=== Bump Info — memlore (single package) ==="
+echo "=== Bump Info — memlore --$PLATFORM: $PLATFORM_LABEL ==="
 echo ""
 echo "Latest published tag:  ${LATEST_TAG:-(none)}"
 echo "Tag source:            $TAG_SOURCE"
-echo "File version:          $FILE_VERSION  (src-tauri/tauri.conf.json)"
+echo "Tag format:            ${TAG_PREFIX}<version>   (this platform only)"
+echo "File version:          $FILE_VERSION  ($VERSION_FILE)"
 echo "State:                 $STATE"
 echo "Commit range:          $RANGE_LABEL"
 if [[ -n "$REQUESTED_LEVEL" ]]; then
@@ -346,20 +382,21 @@ echo "  BROKEN-tag-ahead-of-file  A tag is NEWER than the version in the file, i
 echo "                            something was tagged without bumping. STOP and tell"
 echo "                            the user; do not release from this state."
 echo ""
-echo "--- Path→package mapping (authoritative — do not infer another) ---"
-echo "One package: memlore, the desktop app. There is nothing else to version."
-echo "  Bump-relevant:  ${APP_PATHS[*]}  → memlore"
-echo "  NOT relevant:   $EXCLUDED_PATHS  → no bump, no version of their own"
+echo "--- Path→platform mapping (authoritative — do not infer another) ---"
+echo "Two platforms, versioned and tagged separately: --mac (v<semver>, desktop app)"
+echo "and --web (web-v<semver>, web companion). This report is for --$PLATFORM only."
+echo "  Bump-relevant:  ${APP_PATHS[*]}  → $PLATFORM"
+echo "  NOT relevant:   $EXCLUDED_PATHS  → no $PLATFORM bump"
 echo "                  (docs/ and .coding-friend/ are gitignored here, so they never"
 echo "                   appear in git log anyway — listed for clarity)"
-echo "  Also excluded:  any commit whose conventional scope is (website), even when"
-echo "                  it touched bump-relevant paths. A release that only changes"
-echo "                  the marketing site has NO app changes."
+echo "  Also excluded:  any commit whose conventional scope is one of ($EXCLUDED_SCOPES),"
+echo "                  even when it touched bump-relevant paths. (release) is a version"
+echo "                  bump of either platform; (website) is the marketing site."
 echo ""
 echo "--- Change summary ---"
 echo "Commits in range (all):            $(count "$ALL_COMMITS")"
 echo "  touching bump-relevant paths:    $(count "$PATH_COMMITS")   [path filter]"
-echo "  of those, (website)-scoped:      $(count "$SCOPE_EXCLUDED")   [scope filter — excluded]"
+echo "  of those, excluded by scope:     $(count "$SCOPE_EXCLUDED")   [scope filter — excluded]"
 echo "Release-relevant commits:          $(count "$RELEVANT")"
 echo "Files changed under those paths:   $(count "$CHANGED_FILES")"
 echo "HAS APP CHANGES:                   $HAS_APP_CHANGES"
@@ -374,7 +411,7 @@ echo ""
 echo "[data] Release-relevant commits (path filter passed, scope filter passed):"
 print_commits "$RELEVANT"
 echo ""
-echo "[data] Excluded by scope — (website)-scoped despite touching app paths."
+echo "[data] Excluded by scope — ($EXCLUDED_SCOPES)-scoped despite touching app paths."
 echo "       These do NOT count toward the bump. Judge whether any is genuinely"
 echo "       an app change that was mis-scoped:"
 print_commits "$SCOPE_EXCLUDED"
@@ -383,4 +420,4 @@ echo "##########################################################################
 echo "# END OF UNTRUSTED DATA"
 echo "############################################################################"
 echo ""
-echo "Next: bash .coding-friend/skills/cf-ship-custom/scripts/bump.sh <new_version>"
+echo "Next: bash .coding-friend/skills/cf-ship-custom/scripts/bump.sh --$PLATFORM <new_version>"
