@@ -1369,7 +1369,7 @@ function PageActions({
       />
       {webAppLive && (
         <a className="button" data-variant="secondary" href={webAppUrl}>
-          <Globe className="size-4" /> Web version
+          <Globe className="size-4" /> Web
         </a>
       )}
       <a className="button" href="#demo" data-variant="secondary">

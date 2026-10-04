@@ -26,4 +26,4 @@ export const webAppUrl = 'https://web.memlore.app'
 // This flag MUST stay false until the web companion has been deployed to Cloudflare Pages
 // and the read-only smoke test passes (setup-guide.md §5). While false, the marketing site
 // displays "Coming soon" without active links to web.memlore.app.
-export const webAppLive = false
+export const webAppLive = true

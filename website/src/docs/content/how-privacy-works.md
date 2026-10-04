@@ -35,7 +35,7 @@ Your journal lives on your device, and Memlore has no server that stores it.
 
 ## On the web
 
-The upcoming web companion operates under the exact same zero-knowledge, zero-telemetry rules. It talks directly to Google Drive over HTTPS, with no Memlore intermediate server. The Cloudflare Worker handles OAuth token exchange only, never sees your encryption keys or journal data, and keeps no logs.
+The [Web companion](/docs/web) operates under the exact same zero-knowledge, zero-telemetry rules. It talks directly to Google Drive over HTTPS, with no Memlore intermediate server. The Cloudflare Worker handles OAuth token exchange only, never sees your encryption keys or journal data, and keeps no logs.
 
 ## Update check
 
