@@ -574,7 +574,14 @@ describe('retention rules (desktop ack format)', () => {
   }
   const decision = (
     desktop: string,
-    d: { decision: string; reason?: string | null; at?: number; path?: string; seq?: number },
+    d: {
+      decision: string
+      reason?: string | null
+      at?: number
+      path?: string
+      seq?: number
+      field?: string
+    },
   ): OutboxAcksV1 => ({
     schema_version: 1,
     desktop_device_id: desktop,
@@ -587,7 +594,7 @@ describe('retention rules (desktop ack format)', () => {
         refused_reason: null,
         decided: [
           {
-            field: 'title',
+            field: d.field ?? 'title',
             change_seq: d.seq ?? 7,
             decision: d.decision,
             decided_updated_at: d.at ?? 1100,
@@ -641,6 +648,25 @@ describe('retention rules (desktop ack format)', () => {
     const final = resolve([a, b], { capableDesktops: ['desk-a', 'desk-b'], syncedEntry: synced })
     expect(final.notice?.kind).toBe('refused')
     expect(final.notice?.text).toBe('Your desktop could not apply: title (tag_not_found)')
+  })
+
+  it('names tag fields in plain words, never the raw tag_add:<id> key', () => {
+    const field = 'tag_add:7f9c2d1e-0000-4000-8000-000000000001'
+    const res = resolve(
+      [decision('desk-a', { decision: 'refused', reason: 'tag_not_found', field })],
+      {
+        fieldName: field,
+        change: {
+          value: true,
+          base: false,
+          base_updated_at: 1000,
+          change_seq: 7,
+          changed_at_secs: 5,
+        },
+        syncedEntry: synced,
+      },
+    )
+    expect(res.notice?.text).toBe('Your desktop could not apply: added tag (tag_not_found)')
   })
 
   function docBytes(text: string, base?: Uint8Array): Uint8Array {

@@ -215,7 +215,13 @@ export function resolveField<T>(params: ResolveFieldParams<T>): FieldResolution 
     nowSecs,
     entryTitleOrId,
   } = params
-  const label = FIELD_LABELS[fieldName] ?? fieldName
+  const label =
+    FIELD_LABELS[fieldName] ??
+    (fieldName.startsWith('tag_add:')
+      ? 'added tag'
+      : fieldName.startsWith('tag_remove:')
+        ? 'removed tag'
+        : fieldName)
   const notice = (kind: FieldNotice['kind'], text: string): FieldResolution => ({
     resolved: true,
     notice: { kind, text, field: fieldName, change_seq: change.change_seq },
