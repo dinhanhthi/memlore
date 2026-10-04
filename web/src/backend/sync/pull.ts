@@ -22,6 +22,13 @@
  *     in-flight download of a stale path is detached: it never caches, and later callers start a
  *     fresh download instead of joining it.
  *  5. Builds the global entry index (LWW, see entryIndex.ts).
+ *  6. Other web devices (Phase 16.2): a listed device with a slot and NO manifest (never this
+ *     browser's own folder, which is not listed) is another browser of the vault. Its
+ *     `outbox/<entryId>.bin` intents are downloaded (limiter, default size cap) and cached as
+ *     ciphertext under `<device>/outbox/<entryId>.bin`; cached intents that left the cloud are
+ *     dropped. Its media is not fetched here. `foreignIntents` exposes the cached set: the read
+ *     session opens and validates them for the read-only overlay. Like the other small files they
+ *     are re-downloaded on every pull (the listing carries no change marker).
  *
  * `fetchEntries` / `warmStart` download entry ciphertext on demand (deduplicated, concurrency 4).
  * Cached ciphertext lives in the `files` store under its logical path `<device>/<...>`.
@@ -192,6 +199,15 @@ interface Manifest {
 }
 
 const ACKS_FILE = 'outbox-acks.bin'
+/** A cached intent of another web device: `<device>/outbox/<entryId>.bin`. */
+const FOREIGN_INTENT = /^([^/]+)\/outbox\/([^/]+)\.bin$/
+
+/** One intent file of another web device, as ciphertext (opened by the read session). */
+export interface ForeignIntentFile {
+  device: string
+  entryId: string
+  bytes: Uint8Array
+}
 const ENTRY_PAYLOAD = /^[^/]+\/entries\/[^/]+\.bin$/
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -263,6 +279,8 @@ export class Puller {
   #degraded: DegradedDevice[] = []
   /** Retention view of the last refresh: manifest devices, slot ids, tombstoned entry ids. */
   #desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() }
+  /** Other web devices' intent ciphertext from the last refresh. */
+  #foreignIntents: ForeignIntentFile[] = []
   /** Slot ids listed by the authority check of the refresh in progress. */
   #listedSlots: Set<string> | null = null
   /**
@@ -294,6 +312,14 @@ export class Puller {
    */
   get desktops(): RetentionDesktops {
     return this.#desktops
+  }
+
+  /**
+   * Intent ciphertext of every OTHER web device of the vault (a device with a slot and no
+   * manifest), from the last refresh. Never this browser's own outbox.
+   */
+  get foreignIntents(): readonly ForeignIntentFile[] {
+    return this.#foreignIntents
   }
 
   /** The download limiter (concurrency 4), shared with the media reads of Phase 11.1. */
@@ -335,6 +361,7 @@ export class Puller {
     const manifests = new Map<string, Manifest>()
     const warnings: string[] = []
     const degraded: DegradedDevice[] = []
+    const webPeers: string[] = []
     for (const device of devices) {
       this.#assertUnlocked()
       const read = await this.#readOptional(generation, `${device}/metadata.json`)
@@ -355,6 +382,7 @@ export class Puller {
               : 'manifest-unreadable'
         // A device with no manifest at all (the web's own outbox folder) is not degraded.
         if (manifest !== null || reason !== 'manifest-missing') degraded.push({ device, reason })
+        else if (this.#listedSlots?.has(device) === true) webPeers.push(device)
       } else {
         manifest = this.#toManifest(device, normalized, warnings)
       }
@@ -368,11 +396,14 @@ export class Puller {
       await this.#cacheSmallFiles(generation, device, warnings)
     }
     this.#assertUnlocked()
+    const foreignIntents = await this.#cacheForeignIntents(generation, webPeers, warnings)
+    this.#assertUnlocked()
 
     this.#index = buildEntryIndex(
       [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
     )
     this.#degraded = degraded
+    this.#foreignIntents = foreignIntents
     const tombstones = new Set<string>()
     for (const manifest of manifests.values()) {
       for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
@@ -463,6 +494,7 @@ export class Puller {
 
   async #revoke(reason: ReonboardReason): Promise<never> {
     this.#index = null
+    this.#foreignIntents = []
     this.#desktops = { manifests: [], slots: null, tombstones: new Set() }
     this.#inflight.clear() // a download that started earlier must not re-cache ciphertext
     this.#lockKeys('revoked')
@@ -616,6 +648,49 @@ export class Puller {
       const bytes = await bytesOf(path)
       if (bytes !== null && bytes !== 'oversize') await this.#putFile(path, bytes, false)
     }
+  }
+
+  /**
+   * Downloads the `outbox/<entryId>.bin` intents of each other web device (concurrency-limited)
+   * and caches them; an oversize one keeps its cached copy. Every cached intent of a device or an
+   * entry that is no longer listed is dropped. Read-only: nothing is written to Drive.
+   */
+  async #cacheForeignIntents(
+    generation: number,
+    peers: readonly string[],
+    warnings: string[],
+  ): Promise<ForeignIntentFile[]> {
+    const listed: Array<{ device: string; entryId: string; path: string }> = []
+    for (const device of peers) {
+      this.#assertUnlocked()
+      const names = await guarded(`${device}/outbox`, () =>
+        this.#reader.listDeviceFiles(generation, device, 'outbox'),
+      )
+      for (const name of names) {
+        const entryId = name.endsWith('.bin') ? name.slice(0, -'.bin'.length) : ''
+        if (entryId.startsWith('m-') || !isSafeEntryId(entryId)) continue
+        listed.push({ device, entryId, path: `${device}/outbox/${name}` })
+      }
+    }
+    const found = await Promise.all(
+      listed.map(async ({ device, entryId, path }): Promise<ForeignIntentFile | null> => {
+        const read = await this.#limit(() => this.#readOptional(generation, path))
+        if (read === null) return null
+        if (read === 'oversize') {
+          warnings.push(`${path}: file is too large and was ignored`)
+          const cached = await this.#db.files.get(path)
+          return cached === undefined ? null : { device, entryId, bytes: cached.ciphertext }
+        }
+        await this.#putFile(path, read, false)
+        return { device, entryId, bytes: read }
+      }),
+    )
+    const kept = found.filter((f): f is ForeignIntentFile => f !== null)
+    const keep = new Set(kept.map((f) => `${f.device}/outbox/${f.entryId}.bin`))
+    for (const path of await this.#db.files.paths()) {
+      if (FOREIGN_INTENT.test(path) && !keep.has(path)) await this.#db.files.delete(path)
+    }
+    return kept
   }
 
   /**

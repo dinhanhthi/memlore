@@ -578,7 +578,7 @@ const saveEntryContent = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -586,7 +586,7 @@ const saveEntryContent = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -636,7 +636,7 @@ const updateEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -647,7 +647,7 @@ const updateEntry = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -710,7 +710,7 @@ const updateEntryDate = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -721,7 +721,7 @@ const updateEntryDate = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -785,7 +785,7 @@ const updateEntryEmotion = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -796,7 +796,7 @@ const updateEntryEmotion = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -855,7 +855,7 @@ const toggleFavorite = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -869,7 +869,7 @@ const toggleFavorite = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -929,7 +929,7 @@ const moveEntryToJournal = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getEntry(id)
+  const syncedEntry = vault.getWriteView(id)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -940,7 +940,7 @@ const moveEntryToJournal = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(id)
+    const rawBase = vault.getWriteView(id).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -999,7 +999,7 @@ const addTagToEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getEntry(entryId)
+  const syncedEntry = vault.getWriteView(entryId)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -1010,7 +1010,7 @@ const addTagToEntry = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(entryId)
+    const rawBase = vault.getWriteView(entryId).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -1074,7 +1074,7 @@ const removeTagFromEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getEntry(entryId)
+  const syncedEntry = vault.getWriteView(entryId)
   if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
 
   const device = await db.device.get()
@@ -1085,7 +1085,7 @@ const removeTagFromEntry = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(entryId)
+    const rawBase = vault.getWriteView(entryId).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -1152,7 +1152,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler =>
   const ring = getKeyRing()
 
   await ensureLoaded(vault, entryId)
-  if (!vault.getEntry(entryId) && !vault.getOutboxIntent(entryId)) {
+  if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
     throw new EntryNotAvailableError()
   }
 
@@ -1198,7 +1198,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler =>
   // a retention pass may have dropped it meanwhile.
   await lock()
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  if (!vault.getEntry(entryId) && !priorIntent) throw new EntryNotAvailableError()
+  if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
   await db.blobs.put({
     path: `outbox/m-${mediaId}`,
     bytes: sealedMedia,
@@ -1226,7 +1226,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler =>
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(entryId)
+    const rawBase = vault.getWriteView(entryId).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
@@ -1278,7 +1278,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, entryId)
-  if (!vault.getEntry(entryId) && !vault.getOutboxIntent(entryId)) {
+  if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
     throw new EntryNotAvailableError()
   }
 
@@ -1305,7 +1305,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   // a retention pass may have dropped it meanwhile.
   await lock()
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  if (!vault.getEntry(entryId) && !priorIntent) throw new EntryNotAvailableError()
+  if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
   await db.blobs.put({
     path: `outbox/m-${mediaId}`,
     bytes: sealedMedia,
@@ -1333,7 +1333,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
 
   let baseDocBytes: Uint8Array | null = null
   if (!priorIntent?.created_on_web) {
-    const rawBase = await vault.getContentBytes(entryId)
+    const rawBase = vault.getWriteView(entryId).content
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 

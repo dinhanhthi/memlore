@@ -893,3 +893,71 @@ describe('refresh hardening', () => {
     expect(entryDownloads(env.drive)).toHaveLength(2)
   })
 })
+
+describe('other web devices outbox (read-only)', () => {
+  const FOREIGN = 'eeeeeeee-3333-4444-8555-ffffffffffff'
+  const ENTRY = 'aaaaaaaa-0000-4000-8000-0000000000aa'
+
+  function addSlot(drive: FakeDrive, device: string): void {
+    const slots = drive.chain('Memlore', '.meta', 'keyring', 'devices')
+    drive.addFile(`${device}.json`, slots, '{}')
+  }
+
+  function addForeignOutbox(drive: FakeDrive, device: string, files: Record<string, string>) {
+    const outbox = drive.chain('Memlore', 'generations', 'g-0', device, 'outbox')
+    for (const [name, content] of Object.entries(files)) drive.addFile(name, outbox, content)
+  }
+
+  it('caches the intents of another web device, never its media or the own outbox', async () => {
+    const env = await setup()
+    addSlot(env.drive, FOREIGN)
+    addForeignOutbox(env.drive, FOREIGN, {
+      [`${ENTRY}.bin`]: 'SEALED',
+      'm-bbbbbbbb-0000-4000-8000-000000000001': 'MEDIA',
+      'm-bbbbbbbb-0000-4000-8000-000000000001.thumb': 'THUMB',
+    })
+    addForeignOutbox(env.drive, OWN_ID, { [`${ENTRY}.bin`]: 'OWN' })
+
+    const result = await env.puller.refresh()
+
+    expect(result.devices).toEqual([env.desktop])
+    expect(env.puller.foreignIntents.map((f) => [f.device, f.entryId, text(f.bytes)])).toEqual([
+      [FOREIGN, ENTRY, 'SEALED'],
+    ])
+    expect(
+      text((await env.db.files.get(`${FOREIGN}/outbox/${ENTRY}.bin`))?.ciphertext ?? bytes('')),
+    ).toBe('SEALED')
+    const fetched = downloads(env.drive)
+    expect(fetched).toContain(`generations/g-0/${FOREIGN}/outbox/${ENTRY}.bin`)
+    expect(fetched.some((p) => p.includes(`${OWN_ID}/outbox`))).toBe(false)
+    expect(fetched.some((p) => p.includes('/outbox/m-'))).toBe(false)
+    expect(env.puller.getDegradedDevices()).toEqual([])
+    expect(env.drive.mutating()).toEqual([])
+  })
+
+  it('ignores a device folder without a slot and drops intents that left the cloud', async () => {
+    const env = await setup()
+    const unslotted = 'ffffffff-4444-4555-8666-000000000000'
+    addSlot(env.drive, FOREIGN)
+    addForeignOutbox(env.drive, FOREIGN, { [`${ENTRY}.bin`]: 'SEALED' })
+    addForeignOutbox(env.drive, unslotted, { [`${ENTRY}.bin`]: 'NOSLOT' })
+    await env.puller.refresh()
+    expect(env.puller.foreignIntents.map((f) => f.device)).toEqual([FOREIGN])
+
+    const intent = env.drive.find([
+      'Memlore',
+      'generations',
+      'g-0',
+      FOREIGN,
+      'outbox',
+      `${ENTRY}.bin`,
+    ])
+    if (!intent) throw new Error('layout')
+    intent.parents = ['trash']
+    await env.puller.refresh()
+
+    expect(env.puller.foreignIntents).toEqual([])
+    expect(await env.db.files.get(`${FOREIGN}/outbox/${ENTRY}.bin`)).toBeUndefined()
+    expect(env.drive.mutating()).toEqual([])
+  })
+})

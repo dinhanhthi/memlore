@@ -15,6 +15,9 @@
  *      outbox-writing entry commands share one per-session mutex (`acquireOutboxLock`), so a pass
  *      never drops a draft (and its media) that a write is rebuilding from `priorIntent`,
  *   4. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
+ * After every `puller.refresh()`, the intents the pull read from OTHER web devices' outboxes are
+ * opened, validated and fed to `vault.setForeignIntents` (read-only overlay, Phase 16.2); one that
+ * fails is skipped and logged by error name only.
  * Every read handler first checks the key holder and rejects with `VaultLockedError` when locked.
  *
  * Heavy modules (WASM core, puller, vault, Drive client, IndexedDB) are imported lazily by the
@@ -32,7 +35,7 @@ import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1 } from '../sync/outbox'
-import type { Limiter } from '../sync/pull'
+import type { ForeignIntentFile, Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 
 /** The part of the vault the read commands use. */
@@ -50,6 +53,8 @@ export type VaultApi = Pick<
   | 'setOutboxIntents'
   | 'getOutboxIntents'
   | 'getOutboxIntent'
+  | 'setForeignIntents'
+  | 'getWriteView'
   | 'getSynced'
 >
 
@@ -243,6 +248,10 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   let cache: { key: unknown; value: Taxonomy } | null = null
   let warmed: Promise<void> | null = null
   let hydrated: Promise<void> | null = null
+  /** The puller's foreign intent set last fed to the vault (a refresh makes a new array). */
+  let foreignSeen: readonly ForeignIntentFile[] | null = null
+  /** `<device>/<entry>@<web_updated_at_secs>` of the foreign intents shown, for `changed`. */
+  let foreignKey = ''
   // Bumped by the lock hook. Every step that awaits captures it first and discards its result
   // (writes no cache, no exclusions, no warm-start state) when a lock landed in between.
   let epoch = 0
@@ -251,6 +260,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     cache = null
     warmed = null
     hydrated = null
+    foreignSeen = null
+    foreignKey = ''
     notices = []
   })
   const assertSameEpoch = (started: number): void => {
@@ -327,12 +338,29 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     assertSameEpoch(started)
   }
 
+  // Re-opened only when a refresh produced a new set; the vault drops them on lock.
+  const applyForeign = (): void => {
+    const files = puller.foreignIntents
+    if (files === foreignSeen) return
+    if (files.length > 0 || foreignKey !== '') {
+      const ring = getKeyRing()
+      const opened = files.flatMap((f) => openForeignIntent(core, ring, f))
+      vault.setForeignIntents(opened)
+      foreignKey = opened
+        .map((i) => `${i.web_device_id}/${i.entry_id}@${i.web_updated_at_secs}`)
+        .sort()
+        .join('\n')
+    }
+    foreignSeen = files
+  }
+
   const ready = async (): Promise<Taxonomy> => {
     const started = epoch
     if (puller.index === null) await puller.refresh()
     assertSameEpoch(started)
     const value = await taxonomy()
     assertSameEpoch(started)
+    applyForeign()
     if (hydrated === null) {
       const run = hydrate()
       hydrated = run
@@ -360,6 +388,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const started = epoch
     const before = puller.index
     const taxonomyBefore = cache === null ? null : JSON.stringify(cache.value)
+    const foreignBefore = foreignKey
     const result = await puller.refresh()
     assertSameEpoch(started)
     const value = await ready()
@@ -375,6 +404,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const taxonomyChanged = taxonomyBefore !== null && taxonomyBefore !== JSON.stringify(value)
     const changed =
       retained ||
+      (before !== null && foreignKey !== foreignBefore) ||
       (before !== null &&
         (result.stale.length > 0 || taxonomyChanged || indexDiffers(before, puller.index)))
     const raised = notices
@@ -420,6 +450,50 @@ function openDraft(
     console.warn(`Skipping draft ${entryId}: it could not be opened (${reason})`)
     return []
   }
+}
+
+/**
+ * One foreign intent, or nothing when it cannot be opened or is not a v1 intent of `file.device`
+ * for `file.entryId` (an unknown version is skipped, never an error). Logged by error name only.
+ */
+function openForeignIntent(core: Core, ring: KeyRing, file: ForeignIntentFile): OutboxEntryV1[] {
+  try {
+    const parsed = JSON.parse(core.openOutboxEntry(ring, file.bytes)) as unknown
+    if (!isForeignIntent(parsed, file)) throw new Error('not an outbox intent for this file')
+    return [parsed]
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : typeof error
+    console.warn(`Skipping an intent from another browser (${reason})`)
+    return []
+  }
+}
+
+const isFieldOrNull = (v: unknown): boolean => v === null || (isRecord(v) && 'value' in v)
+const isFieldMap = (v: unknown): boolean =>
+  isRecord(v) && Object.values(v).every((f) => isRecord(f) && 'value' in f)
+
+/**
+ * Identity and shape checks on an opened intent. Field TYPES are already guaranteed: the core
+ * deserializes into its typed `OutboxEntryV1` and re-serializes it. This checks what the core
+ * cannot: the intent belongs to the folder and file it was read from (no spoofed device id).
+ */
+function isForeignIntent(value: unknown, file: ForeignIntentFile): value is OutboxEntryV1 {
+  if (!isRecord(value) || !isRecord(value.fields)) return false
+  const f = value.fields
+  return (
+    value.schema_version === 1 &&
+    value.entry_id === file.entryId &&
+    value.web_device_id === file.device &&
+    typeof value.created_on_web === 'boolean' &&
+    typeof value.web_updated_at_secs === 'number' &&
+    Array.isArray(value.yjs_full_state) &&
+    Array.isArray(value.media) &&
+    ['title', 'entry_date', 'emotion', 'is_favorite', 'journal_id'].every((k) =>
+      isFieldOrNull(f[k]),
+    ) &&
+    isFieldMap(f.tags_add) &&
+    isFieldMap(f.tags_remove)
+  )
 }
 
 function indexDiffers(

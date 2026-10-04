@@ -167,6 +167,14 @@ export class FakeVault implements VaultApi {
 
   readonly getContentBytes = (id: string): Uint8Array => this.getEntry(id).content
 
+  /** The fake holds no foreign intents, so the write view is the overlaid entry. */
+  readonly getWriteView = (id: string): VaultEntry => this.getEntry(id)
+
+  readonly foreignIntents: OutboxEntryV1[] = []
+  readonly setForeignIntents = (intents: OutboxEntryV1[]): void => {
+    this.foreignIntents.splice(0, this.foreignIntents.length, ...intents)
+  }
+
   /** Synced state only (no overlay): a loaded spec, or a stub carrying the spec's flags. */
   readonly getSynced = (id: string): SyncedView => {
     const entry = this.#entries.get(id)

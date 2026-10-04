@@ -25,6 +25,14 @@
  * entry metadata; journal flags live in the journal channel, so Phase 10.3 feeds them through
  * `setExcludedJournalIds`. Ids that are only in the index (not loaded yet) are listed by
  * `listIndex()` because their flags are unknown until opened; the page logic loads before it shows.
+ *
+ * OVERLAY (Phase 16.2): own intents (`setOutboxIntents`, from this browser's drafts) and FOREIGN
+ * intents (`setForeignIntents`, the outbox of OTHER web devices of the vault, read by the pull)
+ * are shown on top of synced state with the desktop importer's field rules. Per entry exactly one
+ * intent applies: the own one when present, otherwise the foreign winner. Foreign intents are
+ * read-only: `getOutboxIntent(s)` (drafts, retention, push) never return them, `getWriteView`
+ * ignores them, and a foreign `created_on_web` entry no synced manifest knows yet refuses writes
+ * (`ForeignEntryReadOnlyError`).
  */
 
 import * as Y from 'yjs'
@@ -112,6 +120,27 @@ export class EntryUnavailableError extends Error {
     this.name = 'EntryUnavailableError'
     this.reason = reason
   }
+}
+
+/** Writes refuse an entry known only from ANOTHER web device's outbox (plan 16.1). */
+export class ForeignEntryReadOnlyError extends Error {
+  constructor() {
+    super(
+      'This entry was created in another browser. It is read-only here until your desktop has synced it.',
+    )
+    this.name = 'ForeignEntryReadOnlyError'
+  }
+}
+
+/**
+ * The foreign intent shown for one entry when several web devices have one: the greater
+ * `web_updated_at_secs` (the newest edit), then the greater `web_device_id` (desktop LWW's tie
+ * rule). Deterministic whatever the listing order.
+ */
+function foreignWins(a: OutboxEntryV1, b: OutboxEntryV1): boolean {
+  if (a.web_updated_at_secs !== b.web_updated_at_secs)
+    return a.web_updated_at_secs > b.web_updated_at_secs
+  return a.web_device_id > b.web_device_id
 }
 
 export interface LoadResult {
@@ -255,6 +284,8 @@ export class Vault {
   #knownJournals: Set<string> | null = null
   /** Pending outbox intents overlaid on top of synced state. */
   #outboxIntents = new Map<string, OutboxEntryV1>()
+  /** Other web devices' intents (read-only), one winner per entry (`foreignWins`). */
+  #foreignIntents = new Map<string, OutboxEntryV1>()
   /** Bumped by `clear()`; a load that started under an older epoch discards its result. */
   #epoch = 0
 
@@ -269,6 +300,37 @@ export class Vault {
   /** Sets the active outbox intents to overlay on top of synced state. */
   setOutboxIntents(intents: OutboxEntryV1[]): void {
     this.#outboxIntents = new Map(intents.map((i) => [i.entry_id, i]))
+  }
+
+  /**
+   * Sets the intents read from OTHER web devices' outboxes. Read-only: they are overlaid but never
+   * returned by `getOutboxIntent(s)`, so they never reach drafts, retention or push.
+   */
+  setForeignIntents(intents: OutboxEntryV1[]): void {
+    const winners = new Map<string, OutboxEntryV1>()
+    for (const intent of intents) {
+      const current = winners.get(intent.entry_id)
+      if (current === undefined || foreignWins(intent, current))
+        winners.set(intent.entry_id, intent)
+    }
+    this.#foreignIntents = winners
+  }
+
+  /** The intent overlaid on an entry: this browser's own draft wins over any foreign one. */
+  #intentFor(id: string): OutboxEntryV1 | undefined {
+    return this.#outboxIntents.get(id) ?? this.#foreignIntents.get(id)
+  }
+
+  /**
+   * A `created_on_web` intent shown on its own (no synced copy, no stub). A foreign one only while
+   * no synced manifest knows the id: once one does, the entry is loaded like any other.
+   */
+  #webCreated(id: string): OutboxEntryV1 | undefined {
+    const own = this.#outboxIntents.get(id)
+    if (own !== undefined) return own.created_on_web ? own : undefined
+    const foreign = this.#foreignIntents.get(id)
+    if (foreign?.created_on_web !== true || this.#puller?.index?.has(id) === true) return undefined
+    return foreign
   }
 
   getOutboxIntents(): OutboxEntryV1[] {
@@ -308,6 +370,7 @@ export class Vault {
     this.#excludedJournals = new Set()
     this.#knownJournals = null
     this.#outboxIntents = new Map()
+    this.#foreignIntents = new Map()
   }
 
   /** Unregisters the lock hook and clears. */
@@ -325,16 +388,16 @@ export class Vault {
    * over an outbox intent, and the overlaid journal is subject to journal exclusion.
    */
   status(id: string): EntryStatus {
-    const intent = this.#outboxIntents.get(id)
     const held = this.#entries.get(id)
     if (held !== undefined) {
-      const journalId = this.#overlaidJournalId(held.metadata, intent)
+      const journalId = this.#overlaidJournalId(held.metadata, this.#intentFor(id))
       return this.#journalExcluded(journalId) ? 'journal' : 'visible'
     }
     const stub = this.#stubs.get(id)
     if (stub !== undefined) return stub.reason
-    if (intent?.created_on_web) {
-      const journalId = intent.fields.journal_id?.value ?? ''
+    const created = this.#webCreated(id)
+    if (created !== undefined) {
+      const journalId = created.fields.journal_id?.value ?? ''
       return this.#journalExcluded(journalId) ? 'journal' : 'visible'
     }
     return 'not-loaded'
@@ -350,12 +413,27 @@ export class Vault {
     return this.#held(id).content
   }
 
+  /**
+   * The view a write builds on: synced state with only THIS browser's draft overlaid, never a
+   * foreign intent (the write's `base` must be the synced value). Same errors as `getEntry`, plus
+   * `ForeignEntryReadOnlyError` for an entry known only from another web device's outbox.
+   */
+  getWriteView(id: string): VaultEntry {
+    const status = this.status(id)
+    if (status !== 'visible') throw new EntryUnavailableError(id, status)
+    const held = this.#entries.get(id)
+    const own = this.#outboxIntents.get(id)
+    if (held !== undefined) return own === undefined ? held : this.#computeOverlaidHeld(held, own)
+    if (own !== undefined) return this.#syntheticHeldFromIntent(own)
+    throw new ForeignEntryReadOnlyError()
+  }
+
   #held(id: string): Held {
     const status = this.status(id)
     if (status !== 'visible') throw new EntryUnavailableError(id, status)
     const held = this.#entries.get(id)
     if (held !== undefined) return this.#applyOverlay(held)
-    const intent = this.#outboxIntents.get(id)
+    const intent = this.#webCreated(id)
     if (intent !== undefined) return this.#syntheticHeldFromIntent(intent)
     throw new EntryUnavailableError(id, 'not-loaded')
   }
@@ -368,7 +446,7 @@ export class Vault {
   }
 
   #applyOverlay(base: Held): Held {
-    const intent = this.#outboxIntents.get(base.metadata.entry_id)
+    const intent = this.#intentFor(base.metadata.entry_id)
     if (!intent) return base
     return this.#computeOverlaidHeld(base, intent)
   }
@@ -554,8 +632,9 @@ export class Vault {
       if (!this.#journalExcluded(view.metadata.journal_id)) list.push(view)
     }
 
-    for (const [id, intent] of this.#outboxIntents) {
-      if (!seenIds.has(id) && !this.#stubs.has(id) && intent.created_on_web) {
+    for (const id of new Set([...this.#outboxIntents.keys(), ...this.#foreignIntents.keys()])) {
+      const intent = seenIds.has(id) || this.#stubs.has(id) ? undefined : this.#webCreated(id)
+      if (intent !== undefined) {
         const journalId = intent.fields.journal_id?.value ?? ''
         if (!this.#journalExcluded(journalId)) {
           list.push(this.#syntheticHeldFromIntent(intent))

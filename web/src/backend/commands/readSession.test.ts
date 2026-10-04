@@ -74,7 +74,7 @@ async function rig(): Promise<Rig> {
   const index = new Map([
     ['e1', { entryId: 'e1', authorDevice: 'devA', updatedAt: 1, isDeleted: false }],
   ])
-  fakes.puller = { index, refresh: async () => ({}), warmStart }
+  fakes.puller = { index, refresh: async () => ({}), warmStart, foreignIntents: [] }
   fakes.vault = {
     setExcludedJournalIds: setExcluded,
     load: async () => ({}),
@@ -203,6 +203,7 @@ describe('drafts rehydrate the outbox overlay', () => {
       warmStart: async () => [] as string[],
       getDegradedDevices: () => [],
       desktops,
+      foreignIntents: [],
     }
     const db = await openWebDb({ factory: new IDBFactory() })
     await db.device.put({

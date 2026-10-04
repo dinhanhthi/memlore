@@ -3,7 +3,13 @@ import type { KeyRing } from './keys'
 import { VaultLockedError } from './keys'
 import type { IndexEntry } from './sync/entryIndex'
 import type { OutboxEntryV1 } from './sync/outbox'
-import { EntryUnavailableError, createVault, type EntryMetadata, type VaultSource } from './vault'
+import {
+  EntryUnavailableError,
+  ForeignEntryReadOnlyError,
+  createVault,
+  type EntryMetadata,
+  type VaultSource,
+} from './vault'
 
 const enc = new TextEncoder()
 
@@ -731,5 +737,205 @@ describe('a stub and the overlaid journal win over outbox intents', () => {
     expect(f.vault.getEntry('w1').metadata.title).toBe('Draft')
     expect(f.vault.search('draft').map((e) => e.metadata.entry_id)).toEqual(['w1'])
     expect(f.vault.count()).toBe(1)
+  })
+})
+
+describe('foreign intents (other web devices of this vault, read-only)', () => {
+  const titleChange = (value: string, base: string, baseUpdatedAt: number) => ({
+    title: { value, base, base_updated_at: baseUpdatedAt, change_seq: 1, changed_at_secs: 150 },
+  })
+
+  it('overlays a foreign intent on a synced entry', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'Base' })
+    await f.vault.load(['a'])
+
+    f.vault.setForeignIntents([
+      webIntent('a', {
+        created_on_web: false,
+        web_device_id: 'web-2',
+        fields: titleChange('Other browser', 'Base', 100),
+      }),
+    ])
+
+    expect(f.vault.getEntry('a').metadata.title).toBe('Other browser')
+    expect(f.vault.search('browser').map((e) => e.metadata.entry_id)).toEqual(['a'])
+    expect(f.vault.getOutboxIntents()).toEqual([])
+    expect(f.vault.getOutboxIntent('a')).toBeUndefined()
+  })
+
+  it('never masks a later desktop edit (updated_at moved on and the field left its base)', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 200, title: 'Desktop newer' })
+    await f.vault.load(['a'])
+
+    f.vault.setForeignIntents([
+      webIntent('a', {
+        created_on_web: false,
+        web_device_id: 'web-2',
+        fields: titleChange('Other browser', 'Base', 100),
+      }),
+    ])
+
+    expect(f.vault.getEntry('a').metadata.title).toBe('Desktop newer')
+  })
+
+  it('an own draft beats a foreign intent for the same entry', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'Base', emotion: null })
+    await f.vault.load(['a'])
+
+    f.vault.setForeignIntents([
+      webIntent('a', {
+        created_on_web: false,
+        web_device_id: 'web-2',
+        web_updated_at_secs: 999,
+        fields: {
+          ...titleChange('Foreign', 'Base', 100),
+          emotion: {
+            value: 'bad',
+            base: null,
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 999,
+          },
+        },
+      }),
+    ])
+    f.vault.setOutboxIntents([
+      webIntent('a', { created_on_web: false, fields: titleChange('Mine', 'Base', 100) }),
+    ])
+
+    const shown = f.vault.getEntry('a').metadata
+    expect(shown.title).toBe('Mine')
+    expect(shown.emotion).toBeNull()
+  })
+
+  it('orders two foreign devices by web_updated_at_secs, then by the greater device id', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'Base' })
+    await f.vault.load(['a'])
+    const from = (device: string, at: number) =>
+      webIntent('a', {
+        created_on_web: false,
+        web_device_id: device,
+        web_updated_at_secs: at,
+        fields: titleChange(device, 'Base', 100),
+      })
+
+    f.vault.setForeignIntents([from('web-9', 300), from('web-2', 400)])
+    expect(f.vault.getEntry('a').metadata.title).toBe('web-2')
+    f.vault.setForeignIntents([from('web-2', 400), from('web-9', 300)])
+    expect(f.vault.getEntry('a').metadata.title).toBe('web-2')
+
+    f.vault.setForeignIntents([from('web-9', 400), from('web-2', 400)])
+    expect(f.vault.getEntry('a').metadata.title).toBe('web-9')
+    f.vault.setForeignIntents([from('web-2', 400), from('web-9', 400)])
+    expect(f.vault.getEntry('a').metadata.title).toBe('web-9')
+  })
+
+  it('shows a foreign web-created entry but refuses it as a write base', () => {
+    const f = setup()
+    f.vault.setForeignIntents([webIntent('w2', { web_device_id: 'web-2' })])
+
+    expect(f.vault.status('w2')).toBe('visible')
+    expect(f.vault.getEntry('w2').metadata.title).toBe('Draft')
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).toEqual(['w2'])
+    expect(() => f.vault.getWriteView('w2')).toThrow(ForeignEntryReadOnlyError)
+  })
+
+  it('a foreign web-created entry that a synced manifest knows is loaded, not synthesized', async () => {
+    const f = setup()
+    f.put({ entry_id: 'w2', updated_at: 300, title: 'Imported' })
+    f.vault.setForeignIntents([webIntent('w2', { web_device_id: 'web-2' })])
+
+    expect(f.vault.status('w2')).toBe('not-loaded')
+    await f.vault.load(['w2'])
+    expect(f.vault.getWriteView('w2').metadata.title).toBe('Imported')
+  })
+
+  it('the write view of a synced entry ignores foreign intents (base stays the synced value)', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'Base' }, 'synced-yjs')
+    await f.vault.load(['a'])
+    f.vault.setForeignIntents([
+      webIntent('a', {
+        created_on_web: false,
+        web_device_id: 'web-2',
+        fields: titleChange('Foreign', 'Base', 100),
+      }),
+    ])
+
+    expect(f.vault.getEntry('a').metadata.title).toBe('Foreign')
+    expect(f.vault.getWriteView('a').metadata.title).toBe('Base')
+  })
+
+  it.each([
+    ['locked', { is_locked: true }],
+    ['invisible', { is_invisible: true }],
+    ['deleted', { is_deleted: true }],
+  ] as const)('a %s stub beats a foreign intent', async (reason, flags) => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 300, title: 'Secret', ...flags })
+    await f.vault.load(['a'])
+    f.vault.setForeignIntents([
+      webIntent('a', { web_device_id: 'web-2' }),
+      webIntent('b', { created_on_web: false, web_device_id: 'web-2' }),
+    ])
+
+    expect(f.vault.status('a')).toBe(reason)
+    expect(() => f.vault.getEntry('a')).toThrow(EntryUnavailableError)
+    expect(f.vault.listLoaded()).toEqual([])
+    // A foreign intent that is not created_on_web and has no synced copy shows nothing.
+    expect(f.vault.status('b')).toBe('not-loaded')
+  })
+
+  it('applies journal exclusion to the overlaid journal of a foreign intent', async () => {
+    const f = setup()
+    f.put({ entry_id: 'e1', journal_id: 'j1', title: 'Moved' })
+    await f.vault.load(['e1'])
+    f.vault.setForeignIntents([
+      webIntent('e1', {
+        created_on_web: false,
+        web_device_id: 'web-2',
+        fields: {
+          title: null,
+          journal_id: {
+            value: 'j2',
+            base: 'j1',
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+        },
+      }),
+      webIntent('w2', {
+        web_device_id: 'web-2',
+        fields: {
+          journal_id: {
+            value: 'j2',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+        },
+      }),
+    ])
+    f.vault.setExcludedJournalIds(['j2'])
+
+    expect(f.vault.status('e1')).toBe('journal')
+    expect(f.vault.status('w2')).toBe('journal')
+    expect(f.vault.listLoaded()).toEqual([])
+  })
+
+  it('drops foreign intents on lock', async () => {
+    const f = setup()
+    f.vault.setForeignIntents([webIntent('w2', { web_device_id: 'web-2' })])
+    f.lock()
+    f.unlockState.locked = false
+
+    expect(f.vault.status('w2')).toBe('not-loaded')
+    expect(f.vault.listLoaded()).toEqual([])
   })
 })
