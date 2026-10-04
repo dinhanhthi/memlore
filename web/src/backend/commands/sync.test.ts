@@ -778,6 +778,36 @@ describe('push status', () => {
     expect(h.last()).toMatchObject({ state: 'synced', error: null, entriesPending: 0 })
   })
 
+  it('a re-onboard-required push error stops automatic pushes; pulls keep running', async () => {
+    const h = harness()
+    h.flag = true
+    const drafts = await draftManager()
+    h.pending = 1
+    const message = 'Cannot push web edits: no cached vault state. Re-onboard this browser.'
+    h.pushResult = {
+      pushed: 0,
+      skipped: 0,
+      pending: 1,
+      error: named('MissingVaultStateError', message),
+    }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+    expect(h.last()).toMatchObject({ state: 'error', error: message })
+    // No retry timer, and no other automatic trigger pushes again.
+    await h.advance(BACKOFF_BASE_MS * 64)
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.online()
+    await h.settle()
+    expect(h.log.filter((x) => x === 'push')).toHaveLength(1)
+    expect(h.log.filter((x) => x === 'pull').length).toBeGreaterThan(1)
+    // A new unlock (schedule restart) tries again.
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log.filter((x) => x === 'push')).toHaveLength(2)
+  })
+
   it('reports a run that several triggers joined once', async () => {
     const h = harness()
     h.flag = true

@@ -33,6 +33,7 @@ import type { Core } from '../../core/core'
 import { getCachedWriteFlag } from '../config'
 import type { DriveReader, DriveWriterDeps } from '../drive/client'
 import { createDraftManager, type DraftManager } from '../drafts'
+import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '../keys'
 import { OUTBOX_BLOB_PREFIX, type DraftRecord, type WebDb } from '../storage/idb'
 import type { ExpectedVaultState } from './fence'
@@ -64,7 +65,7 @@ export class MissingVaultStateError extends Error {
       `Cannot push web edits: ${detail}. Reconnect Google Drive and re-onboard this browser with the recovery phrase.`,
       { cause },
     )
-    this.name = 'MissingVaultStateError'
+    this.name = ERROR_NAMES.missingVaultState
   }
 }
 

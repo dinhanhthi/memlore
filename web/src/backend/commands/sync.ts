@@ -178,6 +178,8 @@ let lastAttemptAt = 0
 let nextAttemptAt = 0
 let failures = 0
 let halted = false
+/** Pushes need a re-onboard (`MissingVaultStateError`): no automatic push until the next unlock. */
+let pushHalted = false
 let active: { stop: () => void } | null = null
 let retryTimer: unknown = null
 /** Bumped on stop: a pull that finishes under an older epoch reports nothing. */
@@ -371,7 +373,7 @@ type PushTrigger = 'start' | 'save' | 'visible' | 'online' | 'retry'
 /** An automatic push. `online` skips the backoff wait: the network being back is the point. */
 function requestPush(trigger: PushTrigger): void {
   const e = env()
-  if (active === null || halted || !e.isUnlocked() || !e.cachedWriteFlag()) return
+  if (active === null || halted || pushHalted || !e.isUnlocked() || !e.cachedWriteFlag()) return
   if (trigger !== 'online' && e.now() < pushNextAt) return
   void runPush()
 }
@@ -402,6 +404,14 @@ function reportPush(result: PushResult, startedEpoch: number): void {
     return
   }
   if (startedEpoch !== epoch || !e.isUnlocked() || name === ERROR_NAMES.vaultLocked) return
+  if (name === ERROR_NAMES.missingVaultState) {
+    // Retrying cannot help until the user re-onboards; reads and pulls keep working.
+    pushHalted = true
+    resetPushBackoff()
+    pushError = errorText(result.error)
+    setPhase('error', pushError)
+    return
+  }
   if (result.error !== undefined) {
     pushFailures += 1
     const delay = backoffMs(pushFailures)
@@ -452,6 +462,7 @@ export function startSyncSchedule(): void {
   stopSyncSchedule()
   const e = env()
   halted = false
+  pushHalted = false
   failures = 0
   nextAttemptAt = 0
   lastAttemptAt = 0

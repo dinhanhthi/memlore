@@ -10,4 +10,5 @@ export const ERROR_NAMES = {
   pullTransient: 'PullTransientError',
   recoveryFence: 'RecoveryFenceError',
   clockSkew: 'ClockSkewError',
+  missingVaultState: 'MissingVaultStateError',
 } as const
