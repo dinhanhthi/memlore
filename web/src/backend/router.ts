@@ -6,6 +6,7 @@ import { searchHandlers } from './commands/search'
 import { installSyncAutostart, syncHandlers } from './commands/sync'
 import { taxonomyHandlers } from './commands/taxonomy'
 import { installConfigAutostart } from './config'
+import { installDraftsAutostart } from './drafts'
 import { installEvictorAutostart } from './storage/evictor'
 import { unsupported } from './unsupported'
 
@@ -41,6 +42,7 @@ registerHandlers(searchHandlers)
 registerHandlers(syncHandlers)
 installSyncAutostart()
 installEvictorAutostart()
+installDraftsAutostart()
 installConfigAutostart()
 installCacheStatsEmitter()
 

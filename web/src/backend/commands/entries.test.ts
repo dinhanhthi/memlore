@@ -1,17 +1,26 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import * as Y from 'yjs'
 import type { Entry } from '../../../../src/types/entry'
 import type { PagedResult } from '../../../../src/types/pagination'
 import {
   MAX_LOAD_ROUNDS,
   MSG_UNAVAILABLE,
   entryHandlers,
+  setCustomMediaPicker,
   timeRangeBounds,
   toEntry,
 } from './entries'
-import { configureReadEnv } from './readSession'
+import { configureReadEnv, type Taxonomy } from './readSession'
 import { installFakeSession, type FakeSpec } from './readTestKit'
+import { setWriteFlagForTest } from '../config'
+import { lock, setKeyRing, type KeyRing } from '../keys'
 
-afterEach(() => configureReadEnv({}))
+afterEach(() => {
+  configureReadEnv({})
+  setWriteFlagForTest(false)
+  setCustomMediaPicker(null)
+  lock('manual')
+})
 
 const PAGE_ARGS = {
   sort: 'newest',
@@ -359,5 +368,336 @@ describe('locked vault', () => {
       await expect(call(name, args), name).rejects.toThrow('vault is locked')
     }
     expect(vault.loadCalls).toEqual([])
+  })
+})
+
+describe('write commands', () => {
+  const TAXONOMY: Taxonomy = {
+    journals: [
+      {
+        id: 'j1',
+        name: 'Daily',
+        color: null,
+        sort_order: 1,
+        created_at: 1000,
+        updated_at: 1000,
+        is_deleted: false,
+        is_locked: false,
+        is_invisible: false,
+        vault_id: null,
+        is_initial_placeholder: false,
+      },
+      {
+        id: 'j2',
+        name: 'Work',
+        color: null,
+        sort_order: 2,
+        created_at: 2000,
+        updated_at: 2000,
+        is_deleted: false,
+        is_locked: false,
+        is_invisible: false,
+        vault_id: null,
+        is_initial_placeholder: false,
+      },
+    ],
+    autoTagIds: { j1: ['t1', 't2'] },
+    excludedJournalIds: [],
+    knownJournalIds: ['j1', 'j2'],
+    tags: [
+      { id: 't1', name: 'Work', color: null },
+      { id: 't2', name: 'Ideas', color: null },
+    ],
+    templates: [],
+  }
+
+  it('rejects every write command with read_only when write flag is disabled', async () => {
+    setWriteFlagForTest(false)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession(many(2), { taxonomy: TAXONOMY })
+
+    const writeCalls: Array<[string, Record<string, unknown>]> = [
+      ['create_entry', { journalId: 'j1', title: 'New' }],
+      ['save_entry_content', { id: id(1), yjsDoc: [], contentText: '', previewText: '' }],
+      ['update_entry', { id: id(1), title: 'Updated' }],
+      ['update_entry_date', { id: id(1), entryDate: 12345 }],
+      ['update_entry_emotion', { id: id(1), emotion: 'good' }],
+      ['toggle_favorite', { id: id(1) }],
+      ['move_entry_to_journal', { id: id(1), journalId: 'j2' }],
+      ['add_tag_to_entry', { entryId: id(1), tagId: 't1' }],
+      ['remove_tag_from_entry', { entryId: id(1), tagId: 't1' }],
+      ['pick_image', { entryId: id(1) }],
+      ['pick_video', { entryId: id(1) }],
+      ['save_pasted_image', { entryId: id(1), bytes: [1, 2, 3], mime: 'image/png' }],
+    ]
+
+    for (const [name, args] of writeCalls) {
+      await expect(call(name, args), name).rejects.toThrow('read_only')
+    }
+  })
+
+  it('get_media_upload_limits returns default caps even when write flag is disabled', async () => {
+    setWriteFlagForTest(false)
+    const limits = await call<{ photoBytes: number; videoBytes: number }>('get_media_upload_limits', {})
+    expect(limits.photoBytes).toBe(5 * 1024 * 1024)
+    expect(limits.videoBytes).toBe(100 * 1024 * 1024)
+  })
+
+  it('create_entry generates UUID, applies auto-tags, saves draft, and overlays into vault', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted, db } = installFakeSession([], { taxonomy: TAXONOMY })
+
+    const created = await call<Entry>('create_entry', {
+      journalId: 'j1',
+      title: 'First web entry',
+      contentText: 'Hello web companion',
+      previewText: 'Hello web companion',
+      entryDate: 1700000000,
+    })
+
+    expect(created.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(created.title).toBe('First web entry')
+    expect(created.journal_id).toBe('j1')
+    expect(created.content_text).toBe('Hello web companion')
+    expect(created.entry_date).toBe(1700000000)
+
+    // Verify overlaid in vault
+    const fromVault = vault.getEntry(created.id)
+    expect(fromVault.metadata.title).toBe('First web entry')
+    expect(fromVault.metadata.tag_ids).toEqual(['t1', 't2']) // auto tags
+
+    // Verify draft saved
+    const drafts = await db.drafts.list()
+    expect(drafts.length).toBe(1)
+    expect(drafts[0].entryId).toBe(created.id)
+
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('create_entry rejects when journalId is missing or unknown', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession([], { taxonomy: TAXONOMY })
+
+    await expect(call('create_entry', { journalId: '' })).rejects.toThrow('journalId is required')
+    await expect(call('create_entry', { journalId: 'unknown_j' })).rejects.toThrow('Journal not found')
+  })
+
+  it('save_entry_content updates Yjs doc, contentText, and draft', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted, db } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    await call('save_entry_content', {
+      id: id(1),
+      yjsDoc: [1, 2, 3, 4],
+      contentText: 'Updated body text',
+      previewText: 'Updated preview text',
+    })
+
+    const fromVault = vault.getEntry(id(1))
+    expect(fromVault.contentText).toBe('Updated body text')
+    expect(fromVault.previewText).toBe('Updated preview text')
+
+    const drafts = await db.drafts.list()
+    expect(drafts.length).toBe(1)
+    expect(drafts[0].entryId).toBe(id(1))
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('update_entry updates title and preserves metadata', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const updated = await call<Entry>('update_entry', {
+      id: id(1),
+      title: 'Renamed entry',
+    })
+
+    expect(updated.title).toBe('Renamed entry')
+    expect(vault.getEntry(id(1)).metadata.title).toBe('Renamed entry')
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('update_entry_date updates date and emits changed', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    await call('update_entry_date', {
+      id: id(1),
+      entryDate: 1711111111,
+    })
+
+    expect(vault.getEntry(id(1)).metadata.entry_date).toBe(1711111111)
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('update_entry_emotion updates emotion or clears to null, rejecting invalid values', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const withGood = await call<Entry>('update_entry_emotion', { id: id(1), emotion: 'good' })
+    expect(withGood.emotion).toBe('good')
+    expect(vault.getEntry(id(1)).metadata.emotion).toBe('good')
+
+    const withNull = await call<Entry>('update_entry_emotion', { id: id(1), emotion: null })
+    expect(withNull.emotion).toBe(null)
+    expect(vault.getEntry(id(1)).metadata.emotion).toBe(null)
+
+    await expect(call('update_entry_emotion', { id: id(1), emotion: 'ecstatic' })).rejects.toThrow('invalid emotion')
+  })
+
+  it('toggle_favorite flips is_favorite and returns new boolean', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(many(1, () => ({ favorite: false })), { taxonomy: TAXONOMY })
+
+    const first = await call<boolean>('toggle_favorite', { id: id(1) })
+    expect(first).toBe(true)
+    expect(vault.getEntry(id(1)).metadata.is_favorite).toBe(true)
+
+    const second = await call<boolean>('toggle_favorite', { id: id(1) })
+    expect(second).toBe(false)
+    expect(vault.getEntry(id(1)).metadata.is_favorite).toBe(false)
+  })
+
+  it('move_entry_to_journal moves entry to visible journal, rejecting unknown journals', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(many(1, () => ({ journal: 'j1' })), { taxonomy: TAXONOMY })
+
+    await call('move_entry_to_journal', { id: id(1), journalId: 'j2' })
+    expect(vault.getEntry(id(1)).metadata.journal_id).toBe('j2')
+
+    await expect(call('move_entry_to_journal', { id: id(1), journalId: 'bad_j' })).rejects.toThrow('Journal not found')
+  })
+
+  it('add_tag_to_entry and remove_tag_from_entry modify existing tags only', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(many(1, () => ({ tags: [] })), { taxonomy: TAXONOMY })
+
+    await call('add_tag_to_entry', { entryId: id(1), tagId: 't1' })
+    expect(vault.getEntry(id(1)).metadata.tag_ids).toContain('t1')
+
+    await call('remove_tag_from_entry', { entryId: id(1), tagId: 't1' })
+    expect(vault.getEntry(id(1)).metadata.tag_ids).not.toContain('t1')
+
+    await expect(call('add_tag_to_entry', { entryId: id(1), tagId: 'nonexistent' })).rejects.toThrow('Tag not found')
+  })
+
+  it('pick_image returns null when user cancels file picker', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession(many(1), { taxonomy: TAXONOMY })
+    setCustomMediaPicker(async () => null) // user cancelled
+
+    const result = await call('pick_image', { entryId: id(1) })
+    expect(result).toBeNull()
+  })
+
+  it('pick_image enforces photo size limit', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const oversized = new File([new Uint8Array(6 * 1024 * 1024)], 'big.png', { type: 'image/png' })
+    setCustomMediaPicker(async () => oversized)
+
+    await expect(call('pick_image', { entryId: id(1) })).rejects.toThrow('IMAGE_TOO_LARGE')
+  })
+
+  it('pick_image saves media and thumbnail into outbox blobs and updates intent', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { emitted, db } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const file = new File([new Uint8Array([10, 20, 30])], 'photo.jpg', { type: 'image/jpeg' })
+    setCustomMediaPicker(async () => file)
+
+    const res = await call<{ mediaId: string; localPath: string }>('pick_image', { entryId: id(1) })
+    expect(res.mediaId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(res.localPath).toBe(`memlore-web://media/${res.mediaId}`)
+
+    // Check media blob stored in db.blobs
+    const blob = await db.blobs.get(`outbox/m-${res.mediaId}`)
+    expect(blob).toBeDefined()
+    const thumbBlob = await db.blobs.get(`outbox/m-${res.mediaId}.thumb`)
+    expect(thumbBlob).toBeDefined()
+
+    expect(emitted).toContain('media-changed')
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('save_pasted_image saves pasted bytes, generates thumbnail, and returns mediaId', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { db } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const res = await call<{ mediaId: string; localPath: string }>('save_pasted_image', {
+      entryId: id(1),
+      bytes: [50, 60, 70],
+      mime: 'image/png',
+    })
+
+    expect(res.mediaId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(res.localPath).toBe(`memlore-web://media/${res.mediaId}`)
+
+    const blob = await db.blobs.get(`outbox/m-${res.mediaId}`)
+    expect(blob).toBeDefined()
+  })
+
+  it('pick_image and save_pasted_image reject unsupported or dangerous MIME types', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    const badFile = new File([new Uint8Array([1, 2, 3])], 'attack.html', { type: 'text/html' })
+    setCustomMediaPicker(async () => badFile)
+    await expect(call('pick_image', { entryId: id(1) })).rejects.toThrow('unsupported mime type')
+
+    await expect(
+      call('save_pasted_image', {
+        entryId: id(1),
+        bytes: [1, 2, 3],
+        mime: 'text/html',
+      }),
+    ).rejects.toThrow('unsupported mime type')
+  })
+
+  it('preserves content_text and preview_text across metadata updates', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(
+      many(1, () => ({ text: 'My precious journal content' })),
+      { taxonomy: TAXONOMY },
+    )
+
+    // First save content
+    const doc = new Y.Doc()
+    doc.getText('content').insert(0, 'My updated journal content')
+    await call('save_entry_content', {
+      id: id(1),
+      yjsDoc: Array.from(Y.encodeStateAsUpdate(doc)),
+      contentText: 'My updated journal content',
+      previewText: 'My updated journal content',
+    })
+
+    const intentAfterContent = vault.getOutboxIntent(id(1))
+    expect(intentAfterContent?.content_text).toBe('My updated journal content')
+
+    // Now do metadata-only updates
+    await call('toggle_favorite', { id: id(1) })
+    const intentAfterFav = vault.getOutboxIntent(id(1))
+    expect(intentAfterFav?.content_text).toBe('My updated journal content')
+    expect(intentAfterFav?.preview_text).toBe('My updated journal content')
+
+    await call('update_entry_emotion', { id: id(1), emotion: 'good' })
+    const intentAfterEmotion = vault.getOutboxIntent(id(1))
+    expect(intentAfterEmotion?.content_text).toBe('My updated journal content')
   })
 })

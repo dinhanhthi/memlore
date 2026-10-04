@@ -52,6 +52,7 @@ interface Spec {
   fileType?: string
   fileSize?: number | null
   createdAt?: number
+  isOutbox?: boolean
 }
 
 function entryWith(spec: Spec, extra: Record<string, unknown> = {}): VaultEntry {
@@ -82,6 +83,7 @@ function entryWith(spec: Spec, extra: Record<string, unknown> = {}): VaultEntry 
         created_at: spec.createdAt ?? 5,
         width: 4,
         height: 3,
+        ...(spec.isOutbox ? { is_outbox: true } : {}),
       },
     ],
     ...extra,
@@ -263,6 +265,14 @@ describe('resolution', () => {
     const bytes = await call<number[]>('read_media_bytes', MID)
     expect(Uint8Array.from(bytes)).toEqual(PLAIN)
     expect(r.reader.calls).toEqual([`3:${OWNER}/media/${MID}`])
+  })
+
+  it('routes media read to outbox/m-<id> when present', async () => {
+    const r = await rig([entryWith({ isOutbox: true })])
+    r.reader.files.set(`${OWNER}/outbox/m-${MID}`, seal(PLAIN))
+    const bytes = await call<number[]>('read_media_bytes', MID)
+    expect(Uint8Array.from(bytes)).toEqual(PLAIN)
+    expect(r.reader.calls).toEqual([`3:${OWNER}/outbox/m-${MID}`])
   })
 
   it('falls back to the full media when no thumbnail exists', async () => {

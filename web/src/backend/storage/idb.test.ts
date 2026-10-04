@@ -146,7 +146,31 @@ describe('device', () => {
       /shorter/,
     )
     expect(() => assertDeviceRecord(device({ recoveryGeneration: '1' }))).toThrow(/integer/)
+    expect(() => assertDeviceRecord(device({ nextChangeSeq: 0 }))).toThrow(/positive integer/)
+    expect(() => assertDeviceRecord(device({ nextChangeSeq: -5 }))).toThrow(/positive integer/)
+    expect(() => assertDeviceRecord(device({ nextChangeSeq: 1.5 }))).toThrow(/positive integer/)
+    expect(() => assertDeviceRecord(device({ nextChangeSeq: '1' }))).toThrow(/positive integer/)
+    expect(() => assertDeviceRecord(device({ nextChangeSeq: 1 }))).not.toThrow()
     expect(() => assertDeviceRecord(null)).toThrow(/object/)
+  })
+
+  it('allocates monotonically increasing change_seq starting at 1', async () => {
+    await db.device.put(device())
+    const seq1 = await db.device.allocateChangeSeq()
+    expect(seq1).toBe(1)
+    const seq2 = await db.device.allocateChangeSeq()
+    expect(seq2).toBe(2)
+    const rec = await db.device.get()
+    expect(rec?.nextChangeSeq).toBe(3)
+
+    // Survives clearCache
+    await db.clearCache()
+    const seq3 = await db.device.allocateChangeSeq()
+    expect(seq3).toBe(3)
+  })
+
+  it('allocateChangeSeq throws when device record is missing', async () => {
+    await expect(db.device.allocateChangeSeq()).rejects.toThrow(/Device record missing/)
   })
 })
 

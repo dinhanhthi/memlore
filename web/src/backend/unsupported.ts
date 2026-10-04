@@ -106,7 +106,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   // Media.
   list_media_for_entry: [],
   list_all_media_paged: EMPTY_PAGE,
-  get_media_upload_limits: { photoBytes: -1, videoBytes: -1 },
   // Sync and devices.
   get_sync_catchup_status: { complete: true, pulled: 0, total: 0 },
   get_sync_scope_upgrade_required: false,
@@ -358,12 +357,10 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'set_version_retention_days',
   'snapshot_entry_version',
   // TODO(later): see docs/LATER.md - Journal and tag creation / management
-  'add_tag_to_entry',
   'create_journal',
   'create_tag',
   'delete_journal',
   'delete_tag',
-  'remove_tag_from_entry',
   'update_journal',
   'update_tag',
   // TODO(later): see docs/LATER.md - Template editing
@@ -401,30 +398,20 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'verify_password',
   // Entry and media writes and Drive connection: Phases 9-16 move these into the handler table (registerHandlers).
   'cloud_folder_connect',
-  'create_entry',
   'delete_media',
   'ensure_video_thumbnail',
   'gdrive_disconnect',
   'gdrive_refresh_storage_quota',
   'gdrive_test_connection',
   'mark_entry_date_user_edited',
-  'move_entry_to_journal',
   'pick_files_to_attach',
-  'pick_image',
   'pick_images_from_library',
-  'pick_video',
   'pick_videos_from_library',
   'push_entry',
   'recalculate_streak',
-  'save_entry_content',
-  'save_pasted_image',
   'set_media_upload_limits',
   'set_sync_enabled',
   'set_sync_settings',
-  'toggle_favorite',
-  'update_entry',
-  'update_entry_date',
-  'update_entry_emotion',
   'update_media_insertion_mode',
 ]
 

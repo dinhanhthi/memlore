@@ -116,10 +116,10 @@ describe('route', () => {
   })
 
   it('rejects action commands with WebUnsupportedError naming the command', async () => {
-    const error = await route('create_entry', {}).catch((e: unknown) => e)
+    const error = await route('soft_delete_entry', {}).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(WebUnsupportedError)
-    expect(error).toMatchObject({ code: 'unsupported_on_web', command: 'create_entry' })
-    expect((error as Error).message).toContain('create_entry')
+    expect(error).toMatchObject({ code: 'unsupported_on_web', command: 'soft_delete_entry' })
+    expect((error as Error).message).toContain('soft_delete_entry')
   })
 
   it('does not mistake prototype keys for commands', async () => {

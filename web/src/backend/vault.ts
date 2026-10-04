@@ -24,9 +24,11 @@
  * `listIndex()` because their flags are unknown until opened; the page logic loads before it shows.
  */
 
+import * as Y from 'yjs'
 import type { Core } from '../core/core'
 import { getKeyRing, onLock, type KeyRing } from './keys'
 import type { IndexEntry } from './sync/entryIndex'
+import type { OutboxEntryV1 } from './sync/outbox'
 import { foldText, matchesQuery, parseQuery, type MatchOptions } from './textFold'
 
 type VaultCore = Pick<Core, 'openEntry' | 'mergeMetadataLww'>
@@ -231,6 +233,8 @@ export class Vault {
   #excludedJournals = new Set<string>()
   /** Journal ids with a known record, or null before the first `setExcludedJournalIds`. */
   #knownJournals: Set<string> | null = null
+  /** Pending outbox intents overlaid on top of synced state. */
+  #outboxIntents = new Map<string, OutboxEntryV1>()
   /** Bumped by `clear()`; a load that started under an older epoch discards its result. */
   #epoch = 0
 
@@ -242,9 +246,22 @@ export class Vault {
     this.#unregister = this.#keys.onLock(() => this.clear())
   }
 
-  /** Visible (non-excluded) entries in RAM. */
+  /** Sets the active outbox intents to overlay on top of synced state. */
+  setOutboxIntents(intents: OutboxEntryV1[]): void {
+    this.#outboxIntents = new Map(intents.map((i) => [i.entry_id, i]))
+  }
+
+  getOutboxIntents(): OutboxEntryV1[] {
+    return Array.from(this.#outboxIntents.values())
+  }
+
+  getOutboxIntent(entryId: string): OutboxEntryV1 | undefined {
+    return this.#outboxIntents.get(entryId)
+  }
+
+  /** Visible (non-excluded) entries in RAM (including web-created ones). */
   get size(): number {
-    return this.#entries.size
+    return this.#getAllVisibleHeld().length
   }
 
   /** Empties every map and forgets the excluded-journal set. Idempotent; also the lock hook. */
@@ -254,6 +271,7 @@ export class Vault {
     this.#stubs = new Map()
     this.#excludedJournals = new Set()
     this.#knownJournals = null
+    this.#outboxIntents = new Map()
   }
 
   /** Unregisters the lock hook and clears. */
@@ -263,11 +281,23 @@ export class Vault {
   }
 
   isLoaded(id: string): boolean {
-    return this.#entries.has(id)
+    if (this.#entries.has(id)) return true
+    const intent = this.#outboxIntents.get(id)
+    if (intent?.created_on_web) {
+      const journalId = intent.fields.journal_id?.value ?? ''
+      return !this.#journalExcluded(journalId)
+    }
+    return false
   }
 
   status(id: string): EntryStatus {
     if (this.#entries.has(id)) return 'visible'
+    const intent = this.#outboxIntents.get(id)
+    if (intent?.created_on_web) {
+      const journalId = intent.fields.journal_id?.value ?? ''
+      if (this.#journalExcluded(journalId)) return 'journal'
+      return 'visible'
+    }
     return this.#stubs.get(id)?.reason ?? 'not-loaded'
   }
 
@@ -283,8 +313,227 @@ export class Vault {
 
   #held(id: string): Held {
     const held = this.#entries.get(id)
-    if (held !== undefined) return held
+    if (held !== undefined) {
+      return this.#applyOverlay(held)
+    }
+    const intent = this.#outboxIntents.get(id)
+    if (intent !== undefined && intent.created_on_web) {
+      const journalId = intent.fields.journal_id?.value ?? ''
+      if (this.#journalExcluded(journalId)) {
+        throw new EntryUnavailableError(id, 'journal')
+      }
+      return this.#syntheticHeldFromIntent(intent)
+    }
     throw new EntryUnavailableError(id, this.status(id) as Exclude<EntryStatus, 'visible'>)
+  }
+
+  #applyOverlay(base: Held): Held {
+    const intent = this.#outboxIntents.get(base.metadata.entry_id)
+    if (!intent) return base
+    return this.#computeOverlaidHeld(base, intent)
+  }
+
+  #computeOverlaidHeld(base: Held, intent: OutboxEntryV1): Held {
+    const m: EntryMetadata = { ...base.metadata }
+    const { fields } = intent
+
+    let content = base.content
+    if (intent.yjs_full_state && intent.yjs_full_state.length > 0) {
+      try {
+        const doc = new Y.Doc()
+        if (base.content.length > 0) {
+          Y.applyUpdate(doc, base.content)
+        }
+        Y.applyUpdate(doc, new Uint8Array(intent.yjs_full_state))
+        content = Y.encodeStateAsUpdate(doc)
+      } catch {
+        // Corrupt intent yjs state: keep base content
+      }
+    }
+
+    const contentText = intent.content_text ?? base.contentText
+    const previewText = intent.preview_text ?? base.previewText
+    if (intent.content_text !== null && intent.content_text !== undefined) {
+      m.content_text = intent.content_text
+    }
+    if (intent.preview_text !== null && intent.preview_text !== undefined) {
+      m.preview_text = intent.preview_text
+    }
+
+    if (fields.title) {
+      const f = fields.title
+      if (
+        base.metadata.updated_at === f.base_updated_at ||
+        (base.metadata.title ?? '') === (f.base ?? '')
+      ) {
+        m.title = f.value
+      }
+    }
+
+    if (fields.entry_date) {
+      const f = fields.entry_date
+      const valTs = Number(f.value)
+      const baseTs = Number(f.base)
+      if (
+        base.metadata.updated_at === f.base_updated_at ||
+        base.metadata.entry_date === baseTs
+      ) {
+        m.entry_date = valTs
+      }
+    }
+
+    if (fields.emotion) {
+      const f = fields.emotion
+      if (
+        base.metadata.updated_at === f.base_updated_at ||
+        (base.metadata.emotion ?? null) === (f.base ?? null)
+      ) {
+        m.emotion = f.value
+      }
+    }
+
+    if (fields.is_favorite) {
+      const f = fields.is_favorite
+      if (
+        base.metadata.updated_at === f.base_updated_at ||
+        Boolean(base.metadata.is_favorite) === Boolean(f.base)
+      ) {
+        m.is_favorite = f.value
+      }
+    }
+
+    if (fields.journal_id) {
+      const f = fields.journal_id
+      if (
+        base.metadata.updated_at === f.base_updated_at ||
+        base.metadata.journal_id === f.base
+      ) {
+        m.journal_id = f.value
+      }
+    }
+
+    if (fields.tags_add || fields.tags_remove) {
+      const currentTags = new Set(base.metadata.tag_ids)
+      for (const [tagId, f] of Object.entries(fields.tags_add || {})) {
+        if (base.metadata.updated_at === f.base_updated_at || !currentTags.has(tagId)) {
+          currentTags.add(tagId)
+        }
+      }
+      for (const [tagId, f] of Object.entries(fields.tags_remove || {})) {
+        if (base.metadata.updated_at === f.base_updated_at || currentTags.has(tagId)) {
+          currentTags.delete(tagId)
+        }
+      }
+      m.tag_ids = Array.from(currentTags)
+    }
+
+    if (intent.media && intent.media.length > 0) {
+      const baseMedia = Array.isArray(base.metadata.media)
+        ? [...(base.metadata.media as Array<Record<string, unknown>>)]
+        : []
+      const existingIds = new Set(baseMedia.map((x) => x.id ?? x.media_id))
+      for (const mRef of intent.media) {
+        if (!existingIds.has(mRef.media_id)) {
+          baseMedia.push({
+            id: mRef.media_id,
+            file_name: mRef.file_name,
+            file_type: mRef.file_type,
+            file_size: mRef.size,
+            has_thumb: mRef.has_thumb,
+            created_at: intent.web_updated_at_secs,
+            is_outbox: true,
+          })
+        }
+      }
+      m.media = baseMedia
+    }
+
+    return {
+      metadata: m,
+      content,
+      contentText,
+      previewText,
+      loadedAt: base.loadedAt,
+      folded: [foldText(m.title ?? ''), foldText(contentText)],
+    }
+  }
+
+  #syntheticHeldFromIntent(intent: OutboxEntryV1): Held {
+    const doc = new Y.Doc()
+    if (intent.yjs_full_state && intent.yjs_full_state.length > 0) {
+      try {
+        Y.applyUpdate(doc, new Uint8Array(intent.yjs_full_state))
+      } catch {
+        // Corrupt intent yjs state: keep empty doc
+      }
+    }
+    const content = Y.encodeStateAsUpdate(doc)
+    const contentText = intent.content_text ?? ''
+    const previewText = intent.preview_text ?? ''
+    const tagIds = Object.keys(intent.fields.tags_add || {})
+    const mediaList = (intent.media || []).map((mRef) => ({
+      id: mRef.media_id,
+      file_name: mRef.file_name,
+      file_type: mRef.file_type,
+      file_size: mRef.size,
+      has_thumb: mRef.has_thumb,
+      created_at: intent.web_updated_at_secs,
+      is_outbox: true,
+    }))
+    const entryDate = intent.fields.entry_date
+      ? Number(intent.fields.entry_date.value)
+      : intent.web_updated_at_secs
+
+    const metadata: EntryMetadata = {
+      entry_id: intent.entry_id,
+      device_id: intent.web_device_id,
+      updated_at: intent.web_updated_at_secs,
+      entry_date: entryDate,
+      created_at: intent.web_updated_at_secs,
+      journal_id: intent.fields.journal_id?.value ?? '',
+      journal_name: null,
+      title: intent.fields.title?.value ?? null,
+      preview_text: previewText,
+      content_text: contentText,
+      emotion: intent.fields.emotion?.value ?? null,
+      is_favorite: intent.fields.is_favorite?.value ?? false,
+      is_deleted: false,
+      is_locked: false,
+      is_invisible: false,
+      vault_id: null,
+      tag_ids: tagIds,
+      media: mediaList,
+    }
+
+    return {
+      metadata,
+      content,
+      contentText,
+      previewText,
+      loadedAt: this.#now(),
+      folded: [foldText(metadata.title ?? ''), foldText(contentText)],
+    }
+  }
+
+  #getAllVisibleHeld(): Held[] {
+    const list: Held[] = []
+    const seenIds = new Set<string>()
+
+    for (const [id, held] of this.#entries) {
+      seenIds.add(id)
+      list.push(this.#applyOverlay(held))
+    }
+
+    for (const [id, intent] of this.#outboxIntents) {
+      if (!seenIds.has(id) && intent.created_on_web) {
+        const journalId = intent.fields.journal_id?.value ?? ''
+        if (!this.#journalExcluded(journalId)) {
+          list.push(this.#syntheticHeldFromIntent(intent))
+        }
+      }
+    }
+
+    return list
   }
 
   /**
@@ -444,7 +693,9 @@ export class Vault {
 
   /** Loaded entries sorted by entry date, newest first (as on desktop), then created, then id. */
   listLoaded(filter: EntryFilter = {}): VaultEntry[] {
-    return [...this.#entries.values()].filter((h) => matchesFilter(h, filter)).sort(byEntryDateDesc)
+    return this.#getAllVisibleHeld()
+      .filter((h) => matchesFilter(h, filter))
+      .sort(byEntryDateDesc)
   }
 
   listFavorites(): VaultEntry[] {
@@ -453,13 +704,13 @@ export class Vault {
 
   count(filter: EntryFilter = {}): number {
     let n = 0
-    for (const held of this.#entries.values()) if (matchesFilter(held, filter)) n += 1
+    for (const held of this.#getAllVisibleHeld()) if (matchesFilter(held, filter)) n += 1
     return n
   }
 
   tagCounts(): Map<string, number> {
     const counts = new Map<string, number>()
-    for (const { metadata } of this.#entries.values()) {
+    for (const { metadata } of this.#getAllVisibleHeld()) {
       for (const tag of new Set(metadata.tag_ids)) counts.set(tag, (counts.get(tag) ?? 0) + 1)
     }
     return counts
@@ -467,7 +718,7 @@ export class Vault {
 
   journalCounts(): Map<string, number> {
     const counts = new Map<string, number>()
-    for (const { metadata } of this.#entries.values()) {
+    for (const { metadata } of this.#getAllVisibleHeld()) {
       counts.set(metadata.journal_id, (counts.get(metadata.journal_id) ?? 0) + 1)
     }
     return counts
@@ -482,7 +733,7 @@ export class Vault {
     const parsed = parseQuery(query)
     if (parsed.length === 0) return []
     const filter = options.filter ?? {}
-    return [...this.#entries.values()]
+    return this.#getAllVisibleHeld()
       .filter((h) => matchesFilter(h, filter) && matchesQuery(h.folded, parsed, options))
       .sort(byEntryDateDesc)
   }

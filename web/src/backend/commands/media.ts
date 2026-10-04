@@ -174,6 +174,7 @@ interface Owner {
   fileSize: number | null
   width: number | null
   height: number | null
+  isOutbox?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -210,6 +211,7 @@ function ownerIn(entry: VaultEntry, mediaId: string): Owner | null {
       fileSize: num(row.file_size),
       width: num(row.width),
       height: num(row.height),
+      isOutbox: row.is_outbox === true,
     }
   }
   return null
@@ -275,10 +277,13 @@ async function downloadCiphertext(
   devices.push(...(await otherDevices(backend, owner.deviceId)))
   let mismatch: Error | null = null // a stale copy on one device must not hide a good one elsewhere
   for (const device of devices) {
+    const candidatePath = owner.isOutbox
+      ? `${device}/outbox/m-${name}`
+      : `${device}/media/${name}`
     try {
       const bytes = await backend.reader.readDeviceFile(
         generation,
-        `${device}/media/${name}`,
+        candidatePath,
         maxBytes,
       )
       if (bytes.length > maxBytes) throw oversize()
@@ -332,7 +337,11 @@ function fetchCiphertext(
   const pending = inflight.get(flight)
   if (pending !== undefined) return pending
   const task = (async (): Promise<Fetched | null> => {
-    const cached = await backend.db.blobs.get(key)
+    let cached = await backend.db.blobs.get(key)
+    if (cached === undefined && owner.isOutbox) {
+      const outboxKey = `outbox/m-${mediaId}${thumb ? '.thumb' : ''}`
+      cached = await backend.db.blobs.get(outboxKey)
+    }
     if (cached !== undefined) {
       try {
         const plain = verify(cached.bytes)

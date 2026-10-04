@@ -38,6 +38,9 @@ export type VaultApi = Pick<
   | 'listIndex'
   | 'search'
   | 'tagCounts'
+  | 'setOutboxIntents'
+  | 'getOutboxIntents'
+  | 'getOutboxIntent'
 >
 
 export interface Taxonomy {
@@ -84,6 +87,8 @@ export interface ReadSession {
   vault: VaultApi
   /** Absent in sessions that cannot serve media. */
   media?: MediaBackend
+  db?: WebDb
+  core?: Core
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
   ready: () => Promise<Taxonomy>
   /**
@@ -150,6 +155,26 @@ export async function openForRead(): Promise<{ vault: VaultApi; taxonomy: Taxono
   const session = await env.session()
   const taxonomy = await session.ready()
   return { vault: session.vault, taxonomy }
+}
+
+/**
+ * Write session: returns the vault, taxonomy, IndexedDB and wasm core.
+ * Rejects with VaultLockedError if locked or if write dependencies are unavailable.
+ */
+export async function openForWrite(): Promise<{
+  vault: VaultApi
+  taxonomy: Taxonomy
+  db: WebDb
+  core: Core
+}> {
+  const env = readEnv()
+  if (!env.isUnlocked()) throw new VaultLockedError()
+  const session = await env.session()
+  const taxonomy = await session.ready()
+  if (!session.db || !session.core) {
+    throw new Error('Write session dependencies (db, core) unavailable')
+  }
+  return { vault: session.vault, taxonomy, db: session.db, core: session.core }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -252,7 +277,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     return { stale: result.stale, changed, degraded: puller.getDegradedDevices() }
   }
 
-  return { vault, media: { db, reader, core, limit: puller.limit }, ready, pull }
+  return { vault, media: { db, reader, core, limit: puller.limit }, db, core, ready, pull }
 }
 
 function indexDiffers(

@@ -27,11 +27,32 @@
  * they never trigger a download.
  */
 
+import * as Y from 'yjs'
 import type { Entry, EmotionKey } from '../../../../src/types/entry'
 import type { EntrySort, EntryTimeRange, PagedResult } from '../../../../src/types/pagination'
 import { EntryUnavailableError, type VaultEntry } from '../vault'
 import type { Handler } from '../router'
-import { openForRead, readEnv, type VaultApi } from './readSession'
+import { getCachedWriteFlag } from '../config'
+import { createDraftManager } from '../drafts'
+import { getKeyRing } from '../keys'
+import {
+  DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES,
+  DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES,
+  formatImageTooLargeError,
+  formatVideoTooLargeError,
+  generateImageThumbnail,
+  generateVideoThumbnail,
+  isAllowedMimeType,
+} from '../media/thumbnail'
+import {
+  buildOutboxIntent,
+  type FieldChange,
+  type OutboxEntryV1,
+  type OutboxFields,
+  type OutboxMediaRef,
+} from '../sync/outbox'
+import { openForRead, openForWrite, readEnv, type VaultApi } from './readSession'
+import { WEB_MEDIA_PATH_PREFIX } from './media'
 
 export const MSG_UNAVAILABLE = 'This entry is not available on the web (locked, hidden or deleted).'
 
@@ -364,6 +385,936 @@ const countEntriesInJournal: Handler = async ({ journalId }) => {
   return loadedIn(vault, String(journalId)).length
 }
 
+// ---------------------------------------------------------------------------------------------
+// Write Commands (Phase 16)
+// ---------------------------------------------------------------------------------------------
+
+function assertWritesEnabled(): void {
+  if (!getCachedWriteFlag()) {
+    throw new Error('read_only')
+  }
+}
+
+export type MediaFilePicker = (accept: string) => Promise<File | null>
+let customMediaPicker: MediaFilePicker | null = null
+
+export function setCustomMediaPicker(picker: MediaFilePicker | null): void {
+  customMediaPicker = picker
+}
+
+async function promptForFile(accept: string): Promise<File | null> {
+  if (customMediaPicker) return customMediaPicker(accept)
+  if (typeof document === 'undefined') return null
+  return new Promise<File | null>((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    let resolved = false
+    const finish = (file: File | null) => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timer)
+      window.removeEventListener('focus', onFocus)
+      resolve(file)
+    }
+    const onFocus = () => {
+      timer = setTimeout(() => finish(null), 300)
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    input.addEventListener('change', () => finish(input.files?.[0] ?? null))
+    input.addEventListener('cancel', () => finish(null))
+    window.addEventListener('focus', onFocus, { once: true })
+    input.click()
+  })
+}
+
+const createEntry: Handler = async (args) => {
+  assertWritesEnabled()
+  const { vault, taxonomy, db, core } = await openForWrite()
+  const ring = getKeyRing()
+  const journalId = String(args.journalId ?? '')
+  if (!journalId) throw new Error('journalId is required')
+
+  const journal = taxonomy.journals.find((j) => j.id === journalId)
+  if (!journal) throw new Error(`Journal not found or not visible: ${journalId}`)
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const entryId = crypto.randomUUID()
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+  const entryDateSecs =
+    typeof args.entryDate === 'number' && Number.isFinite(args.entryDate)
+      ? Math.floor(args.entryDate)
+      : nowSecs
+
+  const titleStr = typeof args.title === 'string' ? args.title : ''
+  const contentText = typeof args.contentText === 'string' ? args.contentText : null
+  const previewText = typeof args.previewText === 'string' ? args.previewText : null
+
+  const autoTags = taxonomy.autoTagIds[journalId] ?? []
+  const tagsAdd: Record<string, FieldChange<boolean>> = {}
+  for (const tagId of autoTags) {
+    tagsAdd[tagId] = {
+      value: true,
+      base: false,
+      base_updated_at: 0,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    }
+  }
+
+  const doc = new Y.Doc()
+  if (contentText) {
+    doc.getText('content').insert(0, contentText)
+  }
+  const yjsBytes = Y.encodeStateAsUpdate(doc)
+
+  const fields: OutboxFields = {
+    title: titleStr
+      ? {
+          value: titleStr,
+          base: '',
+          base_updated_at: 0,
+          change_seq: changeSeq,
+          changed_at_secs: nowSecs,
+        }
+      : null,
+    entry_date: {
+      value: String(entryDateSecs),
+      base: String(nowSecs),
+      base_updated_at: 0,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+    emotion: null,
+    is_favorite: null,
+    journal_id: {
+      value: journalId,
+      base: '',
+      base_updated_at: 0,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+    tags_add: tagsAdd,
+    tags_remove: {},
+  }
+
+  const intent: OutboxEntryV1 = {
+    schema_version: 1,
+    entry_id: entryId,
+    web_device_id: device.deviceId,
+    created_on_web: true,
+    web_updated_at_secs: nowSecs,
+    base_state_vector: [],
+    yjs_full_state: Array.from(yjsBytes),
+    content_text: contentText,
+    preview_text: previewText,
+    fields,
+    media: [],
+  }
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(intent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(entryId, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+  vault.setOutboxIntents([...currentIntents, intent])
+  readEnv().emit('memlore:entries-changed')
+
+  const created = vault.getEntry(entryId)
+  if (!created) throw new Error('Created entry missing from vault overlay')
+  return toEntry(created)
+}
+
+async function ensureLoaded(vault: VaultApi, id: string): Promise<void> {
+  if (vault.status(id) === 'not-loaded') {
+    await vault.load([id])
+  }
+}
+
+const saveEntryContent: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  if (!id) throw new Error('id is required')
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const rawYjs = args.yjsDoc
+  const localDocBytes =
+    rawYjs instanceof Uint8Array
+      ? rawYjs
+      : Array.isArray(rawYjs)
+        ? new Uint8Array(rawYjs)
+        : null
+
+  const contentText = typeof args.contentText === 'string' ? args.contentText : null
+  const previewText = typeof args.previewText === 'string' ? args.previewText : null
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes,
+    contentText,
+    previewText,
+    newFields: {},
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+}
+
+const updateEntry: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  if (!id) throw new Error('id is required')
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const newFields: Partial<OutboxFields> = {}
+  if (typeof args.title === 'string') {
+    const base = priorIntent?.fields.title
+      ? priorIntent.fields.title.base
+      : syncedEntry?.metadata.title ?? ''
+    const baseUpdatedAt = priorIntent?.fields.title
+      ? priorIntent.fields.title.base_updated_at
+      : syncedEntry?.metadata.updated_at ?? 0
+    newFields.title = {
+      value: args.title,
+      base,
+      base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    }
+  }
+
+  const contentText = typeof args.contentText === 'string' ? args.contentText : null
+  const previewText = typeof args.previewText === 'string' ? args.previewText : null
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText,
+    previewText,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+
+  const updated = vault.getEntry(id)
+  if (!updated) throw new Error('Updated entry missing from vault')
+  return toEntry(updated)
+}
+
+const updateEntryDate: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  const entryDate = asNumber(args.entryDate)
+  if (!id || entryDate === null) throw new Error('id and entryDate are required')
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const base = priorIntent?.fields.entry_date
+    ? priorIntent.fields.entry_date.base
+    : String(syncedEntry?.metadata.entry_date ?? nowSecs)
+  const baseUpdatedAt = priorIntent?.fields.entry_date
+    ? priorIntent.fields.entry_date.base_updated_at
+    : syncedEntry?.metadata.updated_at ?? 0
+
+  const newFields: Partial<OutboxFields> = {
+    entry_date: {
+      value: String(Math.floor(entryDate)),
+      base,
+      base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+}
+
+const updateEntryEmotion: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  const rawEmotion = args.emotion
+  const emotion =
+    rawEmotion === null || rawEmotion === undefined
+      ? null
+      : typeof rawEmotion === 'string' && EMOTIONS.includes(rawEmotion)
+        ? rawEmotion
+        : null
+  if (rawEmotion !== null && rawEmotion !== undefined && emotion === null) {
+    throw new Error(`invalid emotion: ${String(rawEmotion)}`)
+  }
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const base = priorIntent?.fields.emotion
+    ? priorIntent.fields.emotion.base
+    : syncedEntry?.metadata.emotion ?? null
+  const baseUpdatedAt = priorIntent?.fields.emotion
+    ? priorIntent.fields.emotion.base_updated_at
+    : syncedEntry?.metadata.updated_at ?? 0
+
+  const newFields: Partial<OutboxFields> = {
+    emotion: {
+      value: emotion,
+      base,
+      base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+
+  const updated = vault.getEntry(id)
+  if (!updated) throw new Error('Updated entry missing from vault')
+  return toEntry(updated)
+}
+
+const toggleFavorite: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  if (!id) throw new Error('id is required')
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const currentFav = syncedEntry?.metadata.is_favorite ?? false
+  const targetFav = !currentFav
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const base = priorIntent?.fields.is_favorite
+    ? priorIntent.fields.is_favorite.base
+    : currentFav
+  const baseUpdatedAt = priorIntent?.fields.is_favorite
+    ? priorIntent.fields.is_favorite.base_updated_at
+    : syncedEntry?.metadata.updated_at ?? 0
+
+  const newFields: Partial<OutboxFields> = {
+    is_favorite: {
+      value: targetFav,
+      base,
+      base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+  return targetFav
+}
+
+const moveEntryToJournal: Handler = async (args) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  const journalId = String(args.journalId ?? '')
+  if (!id || !journalId) throw new Error('id and journalId are required')
+
+  const { vault, taxonomy, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  const journal = taxonomy.journals.find((j) => j.id === journalId)
+  if (!journal) throw new Error(`Journal not found or not visible: ${journalId}`)
+
+  await ensureLoaded(vault, id)
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  const syncedEntry = vault.getEntry(id)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(id)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const base = priorIntent?.fields.journal_id
+    ? priorIntent.fields.journal_id.base
+    : syncedEntry?.metadata.journal_id ?? ''
+  const baseUpdatedAt = priorIntent?.fields.journal_id
+    ? priorIntent.fields.journal_id.base_updated_at
+    : syncedEntry?.metadata.updated_at ?? 0
+
+  const newFields: Partial<OutboxFields> = {
+    journal_id: {
+      value: journalId,
+      base,
+      base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+}
+
+const addTagToEntry: Handler = async (args) => {
+  assertWritesEnabled()
+  const entryId = String(args.entryId ?? '')
+  const tagId = String(args.tagId ?? '')
+  if (!entryId || !tagId) throw new Error('entryId and tagId are required')
+
+  const { vault, taxonomy, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  const tag = taxonomy.tags.find((t) => t.id === tagId)
+  if (!tag) throw new Error(`Tag not found: ${tagId}`)
+
+  await ensureLoaded(vault, entryId)
+
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  const syncedEntry = vault.getEntry(entryId)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(entryId)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const priorTagChange = priorIntent?.fields.tags_add[tagId]
+  const baseUpdatedAt = priorTagChange
+    ? priorTagChange.base_updated_at
+    : (syncedEntry?.metadata.updated_at ?? 0)
+  const baseVal = priorTagChange
+    ? priorTagChange.base
+    : Boolean(syncedEntry?.metadata.tag_ids?.includes(tagId))
+
+  const newFields: Partial<OutboxFields> = {
+    tags_add: {
+      [tagId]: {
+        value: true,
+        base: baseVal,
+        base_updated_at: baseUpdatedAt,
+        change_seq: changeSeq,
+        changed_at_secs: nowSecs,
+      },
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  delete updatedIntent.fields.tags_remove[tagId]
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(entryId, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+}
+
+const removeTagFromEntry: Handler = async (args) => {
+  assertWritesEnabled()
+  const entryId = String(args.entryId ?? '')
+  const tagId = String(args.tagId ?? '')
+  if (!entryId || !tagId) throw new Error('entryId and tagId are required')
+
+  const { vault, taxonomy, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  const tag = taxonomy.tags.find((t) => t.id === tagId)
+  if (!tag) throw new Error(`Tag not found: ${tagId}`)
+
+  await ensureLoaded(vault, entryId)
+
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  const syncedEntry = vault.getEntry(entryId)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(entryId)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const priorTagChange = priorIntent?.fields.tags_remove[tagId]
+  const baseUpdatedAt = priorTagChange
+    ? priorTagChange.base_updated_at
+    : (syncedEntry?.metadata.updated_at ?? 0)
+  const baseVal = priorTagChange
+    ? priorTagChange.base
+    : Boolean(syncedEntry?.metadata.tag_ids?.includes(tagId))
+
+  const newFields: Partial<OutboxFields> = {
+    tags_remove: {
+      [tagId]: {
+        value: true,
+        base: baseVal,
+        base_updated_at: baseUpdatedAt,
+        change_seq: changeSeq,
+        changed_at_secs: nowSecs,
+      },
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  delete updatedIntent.fields.tags_add[tagId]
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(entryId, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+}
+
+const getMediaUploadLimits: Handler = async () => ({
+  photoBytes: DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES,
+  videoBytes: DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES,
+})
+
+const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
+  assertWritesEnabled()
+  const entryId = String(args.entryId ?? '')
+  if (!entryId) throw new Error('entryId is required')
+  const mode = String(args.insertionMode ?? 'inline')
+  if (mode !== 'inline' && mode !== 'attached') {
+    throw new Error(`invalid insertionMode: ${mode}`)
+  }
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, entryId)
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  const syncedEntry = vault.getEntry(entryId)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const accept = kind === 'image' ? 'image/*' : 'video/*'
+  const file = await promptForFile(accept)
+  if (!file) return null
+
+  const maxBytes =
+    kind === 'image'
+      ? DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES
+      : DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES
+  if (file.size > maxBytes) {
+    if (kind === 'image') {
+      throw new Error(formatImageTooLargeError(file.size, maxBytes))
+    } else {
+      throw new Error(formatVideoTooLargeError(file.name, maxBytes))
+    }
+  }
+
+  const mediaPlain = new Uint8Array(await file.arrayBuffer())
+  const rawMime = (file.type || '').trim().toLowerCase()
+  const mimeType = rawMime || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
+  if (!isAllowedMimeType(mimeType)) {
+    throw new Error(`unsupported mime type: ${mimeType}`)
+  }
+  if (kind === 'image' && !mimeType.startsWith('image/')) {
+    throw new Error(`expected image mime type, got: ${mimeType}`)
+  }
+  if (kind === 'video' && !mimeType.startsWith('video/')) {
+    throw new Error(`expected video mime type, got: ${mimeType}`)
+  }
+
+  const { thumbnailBytes } =
+    kind === 'image'
+      ? await generateImageThumbnail(mediaPlain, mimeType)
+      : await generateVideoThumbnail(mediaPlain, mimeType)
+
+  const mediaId = crypto.randomUUID()
+  const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
+  const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
+
+  await db.blobs.put({
+    path: `outbox/m-${mediaId}`,
+    bytes: sealedMedia,
+    size: sealedMedia.length,
+    lastAccess: Date.now(),
+  })
+  await db.blobs.put({
+    path: `outbox/m-${mediaId}.thumb`,
+    bytes: sealedThumb,
+    size: sealedThumb.length,
+    lastAccess: Date.now(),
+  })
+
+  const mediaRef: OutboxMediaRef = {
+    media_id: mediaId,
+    file_name: file.name,
+    file_type: mimeType,
+    size: file.size,
+    has_thumb: true,
+  }
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(entryId)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields: {},
+    mediaRefs: [mediaRef],
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(entryId, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+  readEnv().emit('media-changed')
+
+  return {
+    mediaId,
+    localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
+  }
+}
+
+const savePastedImage: Handler = async (args) => {
+  assertWritesEnabled()
+  const entryId = String(args.entryId ?? '')
+  if (!entryId) throw new Error('entryId is required')
+  const rawBytes = args.bytes
+  const mediaPlain =
+    rawBytes instanceof Uint8Array
+      ? rawBytes
+      : Array.isArray(rawBytes)
+        ? new Uint8Array(rawBytes)
+        : null
+  if (!mediaPlain || mediaPlain.length === 0) {
+    throw new Error('bytes are required')
+  }
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  await ensureLoaded(vault, entryId)
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  const syncedEntry = vault.getEntry(entryId)
+  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+
+  const maxBytes = DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES
+  if (mediaPlain.length > maxBytes) {
+    throw new Error(formatImageTooLargeError(mediaPlain.length, maxBytes))
+  }
+
+  const rawMime =
+    typeof args.mime === 'string' && args.mime.trim()
+      ? args.mime.trim().toLowerCase()
+      : 'image/png'
+  if (!isAllowedMimeType(rawMime) || !rawMime.startsWith('image/')) {
+    throw new Error(`unsupported mime type: ${rawMime}`)
+  }
+  const mimeType = rawMime
+  const { thumbnailBytes } = await generateImageThumbnail(mediaPlain, mimeType)
+
+  const mediaId = crypto.randomUUID()
+  const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
+  const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
+
+  await db.blobs.put({
+    path: `outbox/m-${mediaId}`,
+    bytes: sealedMedia,
+    size: sealedMedia.length,
+    lastAccess: Date.now(),
+  })
+  await db.blobs.put({
+    path: `outbox/m-${mediaId}.thumb`,
+    bytes: sealedThumb,
+    size: sealedThumb.length,
+    lastAccess: Date.now(),
+  })
+
+  const mediaRef: OutboxMediaRef = {
+    media_id: mediaId,
+    file_name: `pasted-${mediaId}.png`,
+    file_type: mimeType,
+    size: mediaPlain.length,
+    has_thumb: true,
+  }
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+  const nowSecs = Math.floor(Date.now() / 1000)
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = await vault.getContentBytes(entryId)
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields: {},
+    mediaRefs: [mediaRef],
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(entryId, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+  readEnv().emit('media-changed')
+
+  return {
+    mediaId,
+    localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
+  }
+}
+
 export const entryHandlers: Record<string, Handler> = {
   list_entries_paged: listEntriesPaged,
   list_all_entries_paged: listAllEntriesPaged,
@@ -376,4 +1327,17 @@ export const entryHandlers: Record<string, Handler> = {
   list_on_this_day: listOnThisDay,
   get_emotion_by_date: getEmotionByDate,
   count_entries_in_journal: countEntriesInJournal,
+  create_entry: createEntry,
+  save_entry_content: saveEntryContent,
+  update_entry: updateEntry,
+  update_entry_date: updateEntryDate,
+  update_entry_emotion: updateEntryEmotion,
+  toggle_favorite: toggleFavorite,
+  move_entry_to_journal: moveEntryToJournal,
+  add_tag_to_entry: addTagToEntry,
+  remove_tag_from_entry: removeTagFromEntry,
+  get_media_upload_limits: getMediaUploadLimits,
+  pick_image: pickMedia('image'),
+  pick_video: pickMedia('video'),
+  save_pasted_image: savePastedImage,
 }

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as Y from 'yjs'
 import * as core from '../src/core/pkg-test/memlore_wasm.js'
+import { buildOutboxIntent } from '../src/backend/sync/outbox.ts'
 
 const fixturesDir = new URL('../../src-tauri/crates/memlore-core/fixtures/', import.meta.url)
 const outPath = fileURLToPath(new URL('web-outbox.v1.json', fixturesDir))
@@ -44,7 +45,7 @@ const slotJson = core.buildDeviceSlot(webDeviceId, 'Web Companion', 1700000000, 
 const files: Record<string, string> = {}
 files[`.meta/keyring/devices/${webDeviceId}.json`] = b64(Buffer.from(slotJson, 'utf8'))
 
-// 1. Created entry with media & thumbnail
+// 1. Created entry with media & thumbnail (exercises create-then-re-edit on web)
 const createdEntryId = '00000000-0000-0000-0000-000000000010'
 const mediaId = '00000000-0000-0000-0000-000000000020'
 const mediaPlain = Uint8Array.from({ length: 120 }, (_, i) => (i * 3 + 1) % 256)
@@ -55,43 +56,68 @@ const sealedThumb = core.sealOutboxThumb(ring, thumbPlain)
 files[`generations/g-0/${webDeviceId}/outbox/m-${mediaId}`] = b64(sealedMedia)
 files[`generations/g-0/${webDeviceId}/outbox/m-${mediaId}.thumb`] = b64(sealedThumb)
 
-const createdDoc = new Y.Doc()
-const createdText = createdDoc.getText('content')
-createdText.insert(0, `Web created body with image <img data-media-id="${mediaId}">`)
-const createdYjs = Y.encodeStateAsUpdate(createdDoc)
+// 1a. Initial draft creation
+const doc1 = new Y.Doc()
+const text1 = doc1.getText('content')
+text1.insert(0, 'Initial draft')
+const initialYjs = Y.encodeStateAsUpdate(doc1)
 
-const createdEntry = {
-  schema_version: 1,
-  entry_id: createdEntryId,
-  web_device_id: webDeviceId,
-  created_on_web: true,
-  web_updated_at_secs: 1700000010,
-  base_state_vector: [],
-  yjs_full_state: Array.from(createdYjs),
-  content_text: 'Web created body with image',
-  preview_text: 'Web created body with image',
-  fields: {
+const initialIntent = buildOutboxIntent({
+  entryId: createdEntryId,
+  webDeviceId,
+  createdOnWeb: true,
+  baseSyncedDocBytes: null,
+  priorIntent: null,
+  localDocBytes: initialYjs,
+  contentText: 'Initial draft',
+  previewText: 'Initial draft',
+  newFields: {
     title: {
-      value: 'Web Created Entry',
+      value: 'Initial Title',
       base: '',
       base_updated_at: 0,
       change_seq: 1,
-      changed_at_secs: 1700000010,
+      changed_at_secs: 1700000005,
     },
-    entry_date: null,
-    emotion: null,
-    is_favorite: null,
     journal_id: {
       value: '4fd64221-d0eb-4bc0-84c9-810bce934d16',
       base: '',
       base_updated_at: 0,
       change_seq: 2,
+      changed_at_secs: 1700000005,
+    },
+  },
+  mediaRefs: [],
+  nowSecs: 1700000005,
+})
+
+// 1b. Re-edit before any desktop sync occurs
+const doc2 = new Y.Doc()
+Y.applyUpdate(doc2, initialYjs)
+const text2 = doc2.getText('content')
+text2.delete(0, text2.length)
+text2.insert(0, `Web created body with image <img data-media-id="${mediaId}">`)
+const reeditYjs = Y.encodeStateAsUpdate(doc2)
+
+const createdEntry = buildOutboxIntent({
+  entryId: createdEntryId,
+  webDeviceId,
+  createdOnWeb: true,
+  baseSyncedDocBytes: null,
+  priorIntent: initialIntent,
+  localDocBytes: reeditYjs,
+  contentText: 'Web created body with image',
+  previewText: 'Web created body with image',
+  newFields: {
+    title: {
+      value: 'Web Created Entry',
+      base: '',
+      base_updated_at: 0,
+      change_seq: 3,
       changed_at_secs: 1700000010,
     },
-    tags_add: {},
-    tags_remove: {},
   },
-  media: [
+  mediaRefs: [
     {
       media_id: mediaId,
       file_name: 'golden.png',
@@ -100,7 +126,8 @@ const createdEntry = {
       has_thumb: true,
     },
   ],
-}
+  nowSecs: 1700000010,
+})
 const sealedCreated = core.sealOutboxEntry(ring, JSON.stringify(createdEntry))
 files[`generations/g-0/${webDeviceId}/outbox/${createdEntryId}.bin`] = b64(sealedCreated)
 
@@ -117,22 +144,20 @@ const meta0 = JSON.parse(opened0.metadataJson || opened0.metadata_json)
 const baseUpdatedAt = Number(meta0.updated_at)
 const editDoc = new Y.Doc()
 Y.applyUpdate(editDoc, opened0.yjs)
-const baseSv = Y.encodeStateVector(editDoc)
 const editText = editDoc.getText('content')
 editText.insert(editText.length, ' + Web append text')
 const editedYjs = Y.encodeStateAsUpdate(editDoc)
 
-const editedEntry = {
-  schema_version: 1,
-  entry_id: editedEntryId,
-  web_device_id: webDeviceId,
-  created_on_web: false,
-  web_updated_at_secs: 1700000020,
-  base_state_vector: Array.from(baseSv),
-  yjs_full_state: Array.from(editedYjs),
-  content_text: 'First golden body + Web append text',
-  preview_text: 'First golden body',
-  fields: {
+const editedEntry = buildOutboxIntent({
+  entryId: editedEntryId,
+  webDeviceId,
+  createdOnWeb: false,
+  baseSyncedDocBytes: opened0.yjs,
+  priorIntent: null,
+  localDocBytes: editedYjs,
+  contentText: 'First golden body + Web append text',
+  previewText: 'First golden body',
+  newFields: {
     title: {
       value: 'Golden one edited by web',
       base: 'Golden one',
@@ -140,7 +165,6 @@ const editedEntry = {
       change_seq: 10,
       changed_at_secs: 1700000020,
     },
-    entry_date: null,
     emotion: {
       value: 'good',
       base: null,
@@ -162,27 +186,25 @@ const editedEntry = {
       change_seq: 13,
       changed_at_secs: 1700000020,
     },
-    tags_add: {},
-    tags_remove: {},
   },
-  media: [],
-}
+  mediaRefs: [],
+  nowSecs: 1700000020,
+})
 const sealedEdited = core.sealOutboxEntry(ring, JSON.stringify(editedEntry))
 files[`generations/g-0/${webDeviceId}/outbox/${editedEntryId}.bin`] = b64(sealedEdited)
 
 // 3. Locked entry intent (625b02b7-f56e-47b0-95bf-5ba5da3f4d32: "Golden six")
 const lockedEntryId = '625b02b7-f56e-47b0-95bf-5ba5da3f4d32'
-const lockedEntry = {
-  schema_version: 1,
-  entry_id: lockedEntryId,
-  web_device_id: webDeviceId,
-  created_on_web: false,
-  web_updated_at_secs: 1700000030,
-  base_state_vector: [],
-  yjs_full_state: [],
-  content_text: null,
-  preview_text: null,
-  fields: {
+const lockedEntry = buildOutboxIntent({
+  entryId: lockedEntryId,
+  webDeviceId,
+  createdOnWeb: false,
+  baseSyncedDocBytes: null,
+  priorIntent: null,
+  localDocBytes: null,
+  contentText: null,
+  previewText: null,
+  newFields: {
     title: {
       value: 'Locked title edited by web',
       base: 'Golden six',
@@ -190,15 +212,10 @@ const lockedEntry = {
       change_seq: 20,
       changed_at_secs: 1700000030,
     },
-    entry_date: null,
-    emotion: null,
-    is_favorite: null,
-    journal_id: null,
-    tags_add: {},
-    tags_remove: {},
   },
-  media: [],
-}
+  mediaRefs: [],
+  nowSecs: 1700000030,
+})
 const sealedLocked = core.sealOutboxEntry(ring, JSON.stringify(lockedEntry))
 files[`generations/g-0/${webDeviceId}/outbox/${lockedEntryId}.bin`] = b64(sealedLocked)
 

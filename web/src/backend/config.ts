@@ -119,6 +119,11 @@ let generation = 0
 /** Last known flag for display only. False until the first successful fetch and after a lock. */
 export const getCachedWriteFlag = (): boolean => cached
 
+/** Test helper to override the cached write flag directly. */
+export function setWriteFlagForTest(val: boolean): void {
+  cached = val
+}
+
 /** What the UI layer reads (Phase 12). Not a gate for writes: `safeUpload` re-fetches. */
 export function getCapabilities(): { writes: boolean } {
   return { writes: cached }

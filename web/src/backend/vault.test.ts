@@ -357,3 +357,212 @@ describe('cross-device LWW (mocked core merge)', () => {
     expect(f.vault.__debugDump()).not.toContain('public')
   })
 })
+
+describe('outbox overlay', () => {
+  it('overlays pending outbox fields on top of synced entry when base matches', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', updated_at: 100, title: 'Base Title' })
+    await f.vault.load(['a'])
+
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'a',
+        web_device_id: 'web-1',
+        created_on_web: false,
+        web_updated_at_secs: 150,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: null,
+        preview_text: null,
+        fields: {
+          title: {
+            value: 'Web Title',
+            base: 'Base Title',
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 150,
+          },
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      },
+    ])
+
+    expect(f.vault.getEntry('a').metadata.title).toBe('Web Title')
+  })
+
+  it('never masks a later desktop edit with an older outbox intent', async () => {
+    const f = setup()
+    // Desktop updated_at is 200, but intent base_updated_at is 100 and base is 'Base Title'
+    f.put({ entry_id: 'a', updated_at: 200, title: 'Desktop Newer Title' })
+    await f.vault.load(['a'])
+
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'a',
+        web_device_id: 'web-1',
+        created_on_web: false,
+        web_updated_at_secs: 150,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: null,
+        preview_text: null,
+        fields: {
+          title: {
+            value: 'Web Title',
+            base: 'Base Title',
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 150,
+          },
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      },
+    ])
+
+    // Desktop newer title wins!
+    expect(f.vault.getEntry('a').metadata.title).toBe('Desktop Newer Title')
+  })
+
+  it('serves outbox-created entry before it appears in synced manifest', () => {
+    const f = setup()
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'created-web-1',
+        web_device_id: 'web-1',
+        created_on_web: true,
+        web_updated_at_secs: 200,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: 'Created body',
+        preview_text: 'Created preview',
+        fields: {
+          title: {
+            value: 'Created Entry',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      },
+    ])
+
+    expect(f.vault.getEntry('created-web-1').metadata.title).toBe('Created Entry')
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).toContain('created-web-1')
+  })
+
+  it('hides created_on_web outbox entry when its journal is excluded', () => {
+    const f = setup()
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'secret-web-1',
+        web_device_id: 'web-1',
+        created_on_web: true,
+        web_updated_at_secs: 200,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: 'Secret body',
+        preview_text: 'Secret preview',
+        fields: {
+          title: {
+            value: 'Secret Entry',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: {
+            value: 'secret-journal',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 2,
+            changed_at_secs: 200,
+          },
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      },
+    ])
+
+    expect(f.vault.isLoaded('secret-web-1')).toBe(true)
+    expect(f.vault.status('secret-web-1')).toBe('visible')
+
+    f.vault.setExcludedJournalIds(['secret-journal'])
+
+    expect(f.vault.isLoaded('secret-web-1')).toBe(false)
+    expect(f.vault.status('secret-web-1')).toBe('journal')
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).not.toContain('secret-web-1')
+    expect(() => f.vault.getEntry('secret-web-1')).toThrow(EntryUnavailableError)
+  })
+
+  it('marks overlaid media with is_outbox: true and tolerates corrupt Yjs full state', async () => {
+    const f = setup()
+    f.put({ entry_id: 'base-entry', title: 'Base Title' })
+    await f.vault.load(['base-entry'])
+
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'base-entry',
+        web_device_id: 'web-1',
+        created_on_web: false,
+        web_updated_at_secs: 300,
+        base_state_vector: [],
+        yjs_full_state: [99, 99, 99, 99], // invalid Yjs update bytes
+        content_text: 'Tolerated content',
+        preview_text: 'Tolerated preview',
+        fields: {
+          title: null,
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [
+          {
+            media_id: 'm1',
+            file_name: 'photo.jpg',
+            file_type: 'image/jpeg',
+            size: 500,
+            has_thumb: true,
+          },
+        ],
+      },
+    ])
+
+    const entry = f.vault.getEntry('base-entry')
+    expect(entry.metadata.content_text).toBe('Tolerated content')
+    const media = entry.metadata.media as Array<{ id: string; is_outbox?: boolean }>
+    expect(media[0].id).toBe('m1')
+    expect(media[0].is_outbox).toBe(true)
+  })
+})

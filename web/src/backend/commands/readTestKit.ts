@@ -1,5 +1,6 @@
 /** Test helpers for the read commands: an in-memory vault double and a session injector. */
 
+import * as Y from 'yjs'
 import { foldText, matchesQuery, parseQuery } from '../textFold'
 import {
   EntryUnavailableError,
@@ -7,6 +8,9 @@ import {
   type LoadResult,
   type VaultEntry,
 } from '../vault'
+import type { OutboxEntryV1 } from '../sync/outbox'
+import type { WebDb } from '../storage/idb'
+import type { Core } from '../../core/core'
 import { configureReadEnv, type PullOutcome, type Taxonomy, type VaultApi } from './readSession'
 
 export interface FakeSpec {
@@ -45,6 +49,7 @@ export class FakeVault implements VaultApi {
   readonly #specs = new Map<string, FakeSpec>()
   readonly #entries = new Map<string, VaultEntry>()
   readonly #stubs = new Map<string, string>()
+  #outboxIntents = new Map<string, OutboxEntryV1>()
 
   constructor(specs: FakeSpec[]) {
     for (const spec of specs) this.#specs.set(spec.id, spec)
@@ -52,6 +57,18 @@ export class FakeVault implements VaultApi {
 
   get loadedIds(): string[] {
     return [...this.#entries.keys()]
+  }
+
+  readonly setOutboxIntents = (intents: OutboxEntryV1[]): void => {
+    this.#outboxIntents = new Map(intents.map((i) => [i.entry_id, i]))
+  }
+
+  readonly getOutboxIntents = (): OutboxEntryV1[] => {
+    return Array.from(this.#outboxIntents.values())
+  }
+
+  readonly getOutboxIntent = (entryId: string): OutboxEntryV1 | undefined => {
+    return this.#outboxIntents.get(entryId)
   }
 
   readonly load = async (ids: readonly string[]): Promise<LoadResult> => {
@@ -76,14 +93,73 @@ export class FakeVault implements VaultApi {
     return result
   }
 
-  readonly isLoaded = (id: string): boolean => this.#entries.has(id)
+  readonly isLoaded = (id: string): boolean =>
+    this.#entries.has(id) || Boolean(this.#outboxIntents.get(id)?.created_on_web)
 
-  readonly status: VaultApi['status'] = (id) =>
-    this.#entries.has(id) ? 'visible' : ((this.#stubs.get(id) ?? 'not-loaded') as 'locked')
+  readonly status: VaultApi['status'] = (id) => {
+    if (this.#outboxIntents.get(id)?.created_on_web) return 'visible'
+    return this.#entries.has(id) ? 'visible' : ((this.#stubs.get(id) ?? 'not-loaded') as 'locked')
+  }
 
   readonly getEntry = (id: string): VaultEntry => {
+    const intent = this.#outboxIntents.get(id)
+    if (intent && intent.created_on_web) {
+      const metadata: EntryMetadata = {
+        entry_id: intent.entry_id,
+        device_id: intent.web_device_id,
+        updated_at: intent.web_updated_at_secs,
+        entry_date: intent.fields.entry_date
+          ? Number(intent.fields.entry_date.value)
+          : intent.web_updated_at_secs,
+        created_at: intent.web_updated_at_secs,
+        journal_id: intent.fields.journal_id?.value ?? 'j1',
+        journal_name: null,
+        title: intent.fields.title?.value ?? null,
+        preview_text: intent.preview_text ?? '',
+        content_text: intent.content_text ?? '',
+        emotion: intent.fields.emotion?.value ?? null,
+        is_favorite: intent.fields.is_favorite?.value ?? false,
+        is_deleted: false,
+        is_locked: false,
+        is_invisible: false,
+        vault_id: null,
+        tag_ids: Object.keys(intent.fields.tags_add ?? {}),
+        media: (intent.media ?? []).map((m) => ({ id: m.media_id })),
+      }
+      return {
+        metadata,
+        content: new Uint8Array(intent.yjs_full_state ?? []),
+        contentText: intent.content_text ?? '',
+        previewText: intent.preview_text ?? '',
+        loadedAt: 0,
+      }
+    }
     const entry = this.#entries.get(id)
-    if (entry !== undefined) return entry
+    if (entry !== undefined) {
+      if (intent) {
+        const m = { ...entry.metadata }
+        if (intent.fields.title) m.title = intent.fields.title.value
+        if (intent.fields.entry_date) m.entry_date = Number(intent.fields.entry_date.value)
+        if (intent.fields.emotion) m.emotion = intent.fields.emotion.value
+        if (intent.fields.is_favorite) m.is_favorite = intent.fields.is_favorite.value
+        if (intent.fields.journal_id) m.journal_id = intent.fields.journal_id.value
+        const tags = new Set(m.tag_ids)
+        for (const t of Object.keys(intent.fields.tags_add ?? {})) tags.add(t)
+        for (const t of Object.keys(intent.fields.tags_remove ?? {})) tags.delete(t)
+        m.tag_ids = Array.from(tags)
+        return {
+          ...entry,
+          metadata: m,
+          content:
+            intent.yjs_full_state.length > 0
+              ? new Uint8Array(intent.yjs_full_state)
+              : entry.content,
+          contentText: intent.content_text ?? entry.contentText,
+          previewText: intent.preview_text ?? entry.previewText,
+        }
+      }
+      return entry
+    }
     const reason = (this.#stubs.get(id) ?? 'not-loaded') as 'locked'
     throw new EntryUnavailableError(id, reason)
   }
@@ -145,7 +221,7 @@ function toVaultEntry(spec: FakeSpec): VaultEntry {
   }
   return {
     metadata,
-    content: new Uint8Array(spec.yjs ?? [1, 2, 3]),
+    content: new Uint8Array(spec.yjs ?? Array.from(Y.encodeStateAsUpdate(new Y.Doc()))),
     contentText: metadata.content_text ?? '',
     previewText: 'preview',
     loadedAt: 0,
@@ -156,6 +232,8 @@ export interface Harness {
   vault: FakeVault
   emitted: string[]
   setUnlocked: (value: boolean) => void
+  db: WebDb
+  core: Core
 }
 
 /** Injects a fake session. Call `configureReadEnv({})` in `afterEach`. */
@@ -171,12 +249,61 @@ export function installFakeSession(
   const vault = new FakeVault(specs)
   const emitted: string[] = []
   let unlocked = true
+
+  let seq = 0
+  const draftsMap = new Map<string, Uint8Array>()
+  const blobsMap = new Map<string, Uint8Array>()
+  const db = {
+    device: {
+      get: async () => ({ deviceId: 'test-device-id', nextChangeSeq: 1 }),
+      allocateChangeSeq: async () => ++seq,
+    },
+    drafts: {
+      put: async (rec: { entryId: string; sealed: Uint8Array }) => {
+        draftsMap.set(rec.entryId, rec.sealed)
+      },
+      get: async (id: string) => {
+        const sealed = draftsMap.get(id)
+        return sealed ? { entryId: id, sealed, updatedAt: Date.now() } : undefined
+      },
+      delete: async (id: string) => {
+        draftsMap.delete(id)
+      },
+      list: async () =>
+        Array.from(draftsMap.entries()).map(([entryId, sealed]) => ({
+          entryId,
+          sealed,
+          updatedAt: Date.now(),
+        })),
+    },
+    blobs: {
+      put: async (b: { path: string; bytes: Uint8Array }) => {
+        blobsMap.set(b.path, b.bytes)
+      },
+      get: async (p: string) => {
+        const bytes = blobsMap.get(p)
+        return bytes ? { path: p, bytes, size: bytes.length, lastAccess: Date.now() } : undefined
+      },
+      delete: async (p: string) => {
+        blobsMap.delete(p)
+      },
+    },
+  } as unknown as WebDb
+
+  const core = {
+    sealOutboxEntry: (_ring: unknown, json: string) => new TextEncoder().encode(json),
+    sealOutboxMedia: (_ring: unknown, bytes: Uint8Array) => bytes,
+    sealOutboxThumb: (_ring: unknown, bytes: Uint8Array) => bytes,
+  } as unknown as Core
+
   configureReadEnv({
     isUnlocked: () => unlocked,
     session: async () => ({
       vault,
       ready: async () => options.taxonomy ?? EMPTY_TAXONOMY,
       pull: options.pull ?? (async () => ({ stale: [], changed: false })),
+      db,
+      core,
     }),
     emit: (event) => {
       emitted.push(event)
@@ -190,5 +317,7 @@ export function installFakeSession(
     setUnlocked: (value) => {
       unlocked = value
     },
+    db,
+    core,
   }
 }

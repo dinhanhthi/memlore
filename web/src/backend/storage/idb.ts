@@ -91,6 +91,7 @@ export interface DeviceRecord {
   recoveryGeneration: number
   masterFingerprint: string
   name: string
+  nextChangeSeq?: number
 }
 
 export interface MetaRecord {
@@ -105,6 +106,7 @@ const DEVICE_FIELDS: ReadonlySet<string> = new Set([
   'recoveryGeneration',
   'masterFingerprint',
   'name',
+  'nextChangeSeq',
 ])
 
 const HEX_RE = /^(?:[0-9a-fA-F]{2})+$/
@@ -136,6 +138,12 @@ export function assertDeviceRecord(value: unknown): asserts value is DeviceRecor
   const gen = value.recoveryGeneration
   if (typeof gen !== 'number' || !Number.isInteger(gen) || gen < 0) {
     throw new TypeError('recoveryGeneration must be a non-negative integer')
+  }
+  if (value.nextChangeSeq !== undefined) {
+    const seq = value.nextChangeSeq
+    if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 1) {
+      throw new TypeError('nextChangeSeq must be a positive integer')
+    }
   }
 }
 
@@ -466,6 +474,18 @@ export class WebDb {
       assertDeviceRecord(record)
       return this.put(STORE_DEVICE, record, DEVICE_KEY)
     },
+    allocateChangeSeq: (): Promise<number> =>
+      this.tx([STORE_DEVICE], 'readwrite', async ([s]) => {
+        const rec = (await requestToPromise(s.get(DEVICE_KEY))) as DeviceRecord | undefined
+        if (!rec) {
+          throw new Error('Device record missing while allocating change_seq')
+        }
+        const current = rec.nextChangeSeq ?? 1
+        const updated: DeviceRecord = { ...rec, nextChangeSeq: current + 1 }
+        assertDeviceRecord(updated)
+        await requestToPromise(s.put(updated, DEVICE_KEY))
+        return current
+      }),
     clear: () => this.del(STORE_DEVICE, DEVICE_KEY),
   }
 
