@@ -15,12 +15,6 @@
 
 <img src="docs/showcase/poster/memlore-poster.png" width="100%" alt="Memlore: A little life. A lasting story." />
 
-<p align="center">
-  <a href="https://youtu.be/Mv3LZ_P5lwg">
-    <img src="https://i.ytimg.com/vi/Mv3LZ_P5lwg/maxresdefault.jpg" width="640" alt="Watch the introduction: Memlore — A little life. A lasting story." />
-  </a>
-</p>
-
 ## ✨ Features
 
 - **Local-first & private** — works fully offline. Your journal stays on your device. No Memlore server, no account, no telemetry.
