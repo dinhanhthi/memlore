@@ -208,7 +208,8 @@ function assertDraftRecord(r: DraftRecord): void {
   }
 }
 
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+/** Byte-for-byte equality: the one definition of "unchanged" for drafts and sealed payloads. */
+export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   if (a.byteLength !== b.byteLength) return false
   for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false
   return true

@@ -34,6 +34,7 @@ import {
   type WriterIdentity,
 } from '../drive/client'
 import { isValidGeneration, isValidOwnId } from '../drive/paths'
+import { sameBytes } from '../storage/idb'
 import { assertRecoveryFence, type ExpectedVaultState } from './fence'
 import { assertFormatGuardOk } from './formatGuard'
 
@@ -78,14 +79,6 @@ export interface SafeUploadDeps {
    * these intents still current? `false` aborts with `StaleWriteError`.
    */
   beforeWrite?: () => Promise<boolean>
-}
-
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false
-  for (let i = 0; i < a.byteLength; i++) {
-    if (a[i] !== b[i]) return false
-  }
-  return true
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -219,7 +212,7 @@ export async function safeUpload(
           )
         }
         const expected = intent.intended.plaintext
-        if (!bytesEqual(openedBytes, expected)) {
+        if (!sameBytes(openedBytes, expected)) {
           throw new SealVerifyError(
             `Seal-then-verify plaintext mismatch for media at ${intent.path}`,
           )

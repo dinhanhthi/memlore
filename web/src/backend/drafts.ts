@@ -12,7 +12,7 @@
  *  - Dispatches uploads via `safeUpload`.
  */
 
-import type { DraftRecord, WebDb } from './storage/idb'
+import { sameBytes, type DraftRecord, type WebDb } from './storage/idb'
 import { safeUpload, type SafeUploadDeps, type SafeUploadIntent } from './sync/safeUpload'
 
 export interface DraftManagerDeps {
@@ -23,10 +23,6 @@ export interface DraftManagerDeps {
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>)
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-  return a.byteLength === b.byteLength && a.every((byte, i) => byte === b[i])
 }
 
 async function isUnpushed(rec: DraftRecord): Promise<boolean> {

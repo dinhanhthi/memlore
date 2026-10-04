@@ -9,6 +9,7 @@ import {
   WRAPPED_MASTER_HEX_LEN,
   assertDeviceRecord,
   openWebDb,
+  sameBytes,
   type DeviceRecord,
   type WebDb,
 } from './idb'
@@ -208,6 +209,15 @@ describe('device', () => {
 
   it('allocateChangeSeq throws when device record is missing', async () => {
     await expect(db.device.allocateChangeSeq()).rejects.toThrow(/Device record missing/)
+  })
+})
+
+describe('sameBytes', () => {
+  it('compares length and every byte', () => {
+    expect(sameBytes(bytes(0), bytes(0))).toBe(true)
+    expect(sameBytes(new Uint8Array([1, 2]), new Uint8Array([1, 2]))).toBe(true)
+    expect(sameBytes(new Uint8Array([1, 2]), new Uint8Array([1, 3]))).toBe(false)
+    expect(sameBytes(new Uint8Array([1]), new Uint8Array([1, 0]))).toBe(false)
   })
 })
 
