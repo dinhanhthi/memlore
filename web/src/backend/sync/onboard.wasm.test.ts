@@ -23,7 +23,16 @@ import {
   sha256Hex,
   unpushedDraftCount,
 } from '../drafts'
-import { configureKeysEnv, dispose, getKeyRing, isUnlocked } from '../keys'
+import { configureReadEnv, readEnv } from '../commands/readSession'
+import {
+  configureKeysEnv,
+  dispose,
+  getKeyRing,
+  isUnlocked,
+  onLock,
+  setKeyRing,
+  type KeyRing,
+} from '../keys'
 import {
   StorageUnavailableError,
   WRAPPED_MASTER_HEX_LEN,
@@ -31,6 +40,7 @@ import {
   openWebDb,
   type WebDb,
 } from '../storage/idb'
+import type { OutboxEntryV1 } from './outbox'
 import {
   CONTENT_READ_ATTEMPTS,
   DeviceRecordConflictError,
@@ -83,7 +93,10 @@ function patched(path: string, change: (value: Record<string, unknown>) => void)
   return JSON.stringify(value)
 }
 
-async function setup(seed: SeedFixtureOptions = {}): Promise<Env> {
+async function setup(
+  seed: SeedFixtureOptions = {},
+  factory: IDBFactory = new IDBFactory(),
+): Promise<Env> {
   const drive = new FakeDrive()
   seedFromFixture(drive, fixture, seed)
   const driveDeps = {
@@ -94,7 +107,7 @@ async function setup(seed: SeedFixtureOptions = {}): Promise<Env> {
   }
   const reader = new DriveReader(driveDeps)
   const writer = new DriveWriter(reader, driveDeps)
-  const db = await openWebDb({ factory: new IDBFactory() })
+  const db = await openWebDb({ factory })
   const onboardSleeps: number[] = []
   const persist = vi.fn<() => Promise<boolean>>(async () => true)
   const randomUUID = vi.fn<() => string>(() => FIXED_ID)
@@ -202,6 +215,8 @@ beforeEach(() => {
 
 afterEach(() => {
   dispose()
+  configureReadEnv({})
+  vi.unstubAllGlobals()
   expect(violations).toEqual([])
 })
 
@@ -762,6 +777,103 @@ describe('onboardComplete: device id', () => {
     await expect(run(env)).rejects.toBeInstanceOf(StorageUnavailableError)
     expect(await env.db.device.get()).toEqual(old)
     expect(isUnlocked()).toBe(false)
+  })
+
+  // Settings can open onboarding while the vault is still unlocked (a reconnect after a refresh
+  // 401). The old session must not outlive the ring it was built for.
+  describe('re-onboard while unlocked', () => {
+    const ENTRY_A = 'aaaaaaaa-2222-4333-8444-555555555555'
+    const intent = (entryId: string): OutboxEntryV1 => ({
+      schema_version: 1,
+      entry_id: entryId,
+      web_device_id: REUSED_ID,
+      created_on_web: true,
+      web_updated_at_secs: 1_700_000_000,
+      base_state_vector: [],
+      yjs_full_state: [1, 2, 3],
+      content_text: 'from vault A',
+      preview_text: null,
+      fields: {
+        title: null,
+        entry_date: null,
+        emotion: null,
+        is_favorite: null,
+        journal_id: null,
+        tags_add: {},
+        tags_remove: {},
+      },
+      media: [],
+    })
+    const openRingForTest = (): KeyRing => {
+      const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as {
+        wrapped_master: string
+      }
+      return core.KeyRing.fromRecovery(
+        fixture.recovery_phrase,
+        recovery.wrapped_master,
+        vaultFingerprint(),
+      )
+    }
+
+    /** An unlocked browser: a ring loaded, a read session built over the same IndexedDB. */
+    async function unlockedEnv(masterFingerprint: string) {
+      const factory = new IDBFactory()
+      vi.stubGlobal('indexedDB', factory)
+      const env = await setup({}, factory)
+      await env.db.device.put(storedRecord(masterFingerprint))
+      const oldRing = openRingForTest()
+      setKeyRing(oldRing)
+      const session = await readEnv().session()
+      session.vault.setOutboxIntents([intent(ENTRY_A)])
+      session.vault.setForeignIntents([intent('bbbbbbbb-2222-4333-8444-555555555555')])
+      const lockHook = vi.fn()
+      onLock(lockHook)
+      return { env, oldRing, session, lockHook }
+    }
+
+    it('another vault: locks first, drops the session, no old intent stays reachable', async () => {
+      const { env, oldRing, session, lockHook } = await unlockedEnv('ef'.repeat(32))
+      await run(env)
+      expect(lockHook).toHaveBeenCalledTimes(1)
+      expect(isUnlocked()).toBe(true)
+      expect(getKeyRing()).not.toBe(oldRing)
+      // The old session was torn down by the lock hooks...
+      expect(session.vault.getOutboxIntents()).toEqual([])
+      expect(session.vault.getOutboxIntent(ENTRY_A)).toBeUndefined()
+      // ...and is no longer the one the commands get.
+      const fresh = await readEnv().session()
+      expect(fresh).not.toBe(session)
+      expect(fresh.vault.getOutboxIntents()).toEqual([])
+      expect(fresh.vault.getOutboxIntent(ENTRY_A)).toBeUndefined()
+      // Nothing of vault A is left to push.
+      expect(await env.db.drafts.list()).toEqual([])
+    })
+
+    it('same vault: a clean lock/unlock cycle, drafts kept', async () => {
+      const { env, oldRing, session, lockHook } = await unlockedEnv(vaultFingerprint())
+      const draft = { entryId: ENTRY_A, sealed: new Uint8Array([1, 2]), updatedAt: 1 }
+      await env.db.drafts.put(draft)
+      await run(env)
+      expect(lockHook).toHaveBeenCalledTimes(1)
+      expect(isUnlocked()).toBe(true)
+      expect(getKeyRing()).not.toBe(oldRing)
+      // The overlay is rebuilt from IndexedDB by the next ready(), not carried over from RAM.
+      expect(session.vault.getOutboxIntents()).toEqual([])
+      expect(await env.db.drafts.list()).toEqual([draft])
+    })
+
+    it('a refused re-onboard leaves the user unlocked with the same session', async () => {
+      const { env, oldRing, session, lockHook } = await unlockedEnv('ef'.repeat(32))
+      await expect(run(env, OTHER_PHRASE)).rejects.toBeInstanceOf(WrongPhraseError)
+      // Unsent draft of the old vault: the conflict refusal.
+      await env.db.drafts.put({ entryId: ENTRY_A, sealed: new Uint8Array([1, 2]), updatedAt: 1 })
+      await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
+      expect(lockHook).not.toHaveBeenCalled()
+      expect(isUnlocked()).toBe(true)
+      expect(getKeyRing()).toBe(oldRing)
+      expect(await readEnv().session()).toBe(session)
+      expect(session.vault.getOutboxIntent(ENTRY_A)).toEqual(intent(ENTRY_A))
+    })
   })
 
   it('probes IndexedDB before the cloud write: a storage failure leaves no orphan slot', async () => {

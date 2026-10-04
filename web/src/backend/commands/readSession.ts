@@ -168,6 +168,15 @@ export function configureReadEnv(partial: Partial<ReadEnv>): void {
   sessionPromise = null
 }
 
+/**
+ * Forgets the default session, so the next `session()` builds a new one. For a switch to another
+ * vault: the puller's index and foreign intents survive a lock, so the old session must go. Call
+ * it while locked (its lock hooks have already cleared the RAM caches).
+ */
+export function resetReadSession(): void {
+  sessionPromise = null
+}
+
 function getDefaultSession(): Promise<ReadSession> {
   sessionPromise ??= buildSession().catch((error: unknown) => {
     sessionPromise = null

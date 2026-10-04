@@ -52,7 +52,8 @@ import {
 } from '../drive/client'
 import { deviceSlotPath, isValidGeneration, isValidOwnId } from '../drive/paths'
 import { ERROR_NAMES } from '../errorNames'
-import { setKeyRing, type KeyRing } from '../keys'
+import { resetReadSession } from '../commands/readSession'
+import { lock, setKeyRing, type KeyRing } from '../keys'
 import type { DeviceRecord, WebDb } from '../storage/idb'
 
 // ---------------------------------------------------------------------------------------------
@@ -615,6 +616,8 @@ async function defaultPersist(): Promise<boolean> {
  * Join the vault. Resolves with the key LEFT LOADED in `keys.ts` (desktop `onboard_complete`
  * leaves the app unlocked). On any failure the ring is zeroized and nothing is installed; the
  * only possible cloud write is the single device slot, and it happens after every vault check.
+ * A ring already loaded is locked once every check has passed (a refusal leaves it untouched), so
+ * a failure after that point leaves the app locked.
  */
 export async function onboardComplete(
   deps: OnboardDeps,
@@ -696,6 +699,13 @@ export async function onboardComplete(
     // leave an orphan slot (the retry generates a new id).
     await db.meta.put({ key: STORAGE_PROBE_KEY, value: true })
     await db.meta.delete(STORAGE_PROBE_KEY)
+    // Every refusal is behind us. A browser still unlocked (Settings opens onboarding after a
+    // reconnect) locks now, BEFORE any wipe or reset: the lock hooks tear down the read and push
+    // sessions, the sync schedule and the caches, and an entry command still holding the old ring
+    // fails with VaultLockedError. `app:unlocked` (auth.ts) restarts them under the new ring.
+    lock('manual')
+    // The read session's puller keeps its index across a lock: another vault needs a new session.
+    if (replacesOtherVault) resetReadSession()
     // The old vault's cached ciphertext must never mix with the new vault.
     if (replacesOtherVault) await db.clearAll()
 
