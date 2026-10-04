@@ -24,6 +24,10 @@ Thumbs.db
 # Vite
 vite.config.ts.timestamp-*
 
+# Wrangler local dev secrets and state
+.dev.vars*
+.wrangler/
+
 # Vitest coverage
 coverage/
 
