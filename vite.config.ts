@@ -32,7 +32,7 @@ export default defineConfig(({ command }) => ({
   resolve: {
     // Deps like recharts pull react through their own pnpm virtual-store
     // symlink, resolving a second React instance and crashing hooks with
-    // "Invalid hook call" (resolveDispatcher -> null). Same fix as web/vite.config.ts.
+    // "Invalid hook call" (resolveDispatcher -> null). Same fix as mockup/vite.config.ts.
     dedupe: ['react', 'react-dom'],
   },
 
@@ -52,6 +52,8 @@ export default defineConfig(({ command }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    include: ['src/**/*.test.{ts,tsx}', 'web/**/*.test.ts', 'workers/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'mockup/**/*.test.ts', 'workers/**/*.test.ts'],
+    // Web tests run via `pnpm web:test` (web/vitest.config.ts), never in the desktop suite.
+    exclude: ['**/node_modules/**', '**/dist/**', 'workers/web-auth/**'],
   },
 }))

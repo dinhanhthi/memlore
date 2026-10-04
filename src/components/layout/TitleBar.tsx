@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useDesignSystem } from '../../hooks/useDesignSystem'
 import { useTheme } from '../../hooks/useTheme'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { cn } from '../../lib/cn'
 import { titlebarRowHeight } from '../../lib/windowChrome'
 import { SIDEBAR_VIEW_ICONS } from '../../lib/viewIcons'
@@ -160,6 +161,7 @@ function useTabBarOverflow(scrollRef: React.RefObject<HTMLDivElement | null>, de
  */
 export function TitleBar() {
   const { t } = useTranslation('nav')
+  const { windowChrome } = useCapabilities()
   const {
     tabs,
     activeTabId,
@@ -265,10 +267,10 @@ export function TitleBar() {
 
   return (
     <div
-      onMouseDown={handleTitleBarMouseDown}
+      onMouseDown={windowChrome ? handleTitleBarMouseDown : undefined}
       className={cn(
         'bg-chrome relative z-40 flex shrink-0 items-center gap-3 pr-2.5',
-        isWebMock ? 'pl-4' : 'pl-22.5',
+        isWebMock || !windowChrome ? 'pl-4' : 'pl-22.5',
         isClean && 'border-border-default border-b',
       )}
       style={{
@@ -278,7 +280,7 @@ export function TitleBar() {
       }}
     >
       {/* Mock macOS traffic-light dots — web preview only, not shown in real Tauri app */}
-      {isWebMock && <MockTrafficLights />}
+      {isWebMock && windowChrome && <MockTrafficLights />}
 
       {/* App logo only — sits right of traffic lights, left of tab strip */}
       <div className="ml-1 flex shrink-0 items-center">

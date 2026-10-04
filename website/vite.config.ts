@@ -120,7 +120,7 @@ export default defineConfig({
     include: ['recharts', 'leaflet', 'leaflet.heat', 'leaflet.markercluster'],
   },
   resolve: {
-    // web/ is a separate Vite root — without dedupe, react-i18next can resolve a
+    // mockup/ is a separate Vite root — without dedupe, react-i18next can resolve a
     // second React copy and hooks throw "Cannot read properties of null
     // (reading 'useSyncExternalStore')".
     dedupe: ['react', 'react-dom', 'react-i18next'],
@@ -129,27 +129,29 @@ export default defineConfig({
       'react-dom': fileURLToPath(new URL('../node_modules/react-dom', import.meta.url)),
       'react-i18next': fileURLToPath(new URL('../node_modules/react-i18next', import.meta.url)),
       '@tauri-apps/api/core': fileURLToPath(new URL('./demo/mocks/core.ts', import.meta.url)),
-      '@tauri-apps/api/event': fileURLToPath(new URL('../web/mocks/event.ts', import.meta.url)),
-      '@tauri-apps/api/window': fileURLToPath(new URL('../web/mocks/window.ts', import.meta.url)),
-      '@tauri-apps/api/path': fileURLToPath(new URL('../web/mocks/path.ts', import.meta.url)),
+      '@tauri-apps/api/event': fileURLToPath(new URL('../mockup/mocks/event.ts', import.meta.url)),
+      '@tauri-apps/api/window': fileURLToPath(
+        new URL('../mockup/mocks/window.ts', import.meta.url),
+      ),
+      '@tauri-apps/api/path': fileURLToPath(new URL('../mockup/mocks/path.ts', import.meta.url)),
       '@tauri-apps/plugin-opener': fileURLToPath(
         new URL('./demo/mocks/plugin-opener.ts', import.meta.url),
       ),
       '@tauri-apps/plugin-dialog': fileURLToPath(
-        new URL('../web/mocks/plugin-dialog.ts', import.meta.url),
+        new URL('../mockup/mocks/plugin-dialog.ts', import.meta.url),
       ),
       '@tauri-apps/plugin-notification': fileURLToPath(
-        new URL('../web/mocks/plugin-notification.ts', import.meta.url),
+        new URL('../mockup/mocks/plugin-notification.ts', import.meta.url),
       ),
     },
   },
   server: {
-    port: 5176,
+    port: 5177,
     strictPort: true,
     host: true,
   },
   preview: {
-    port: 4176,
+    port: 4177,
     strictPort: true,
   },
   build: {

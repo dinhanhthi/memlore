@@ -433,7 +433,7 @@ const SAFE_DEFAULTS: Record<string, unknown | ((args: Record<string, unknown>) =
   // `get_ai_settings` is required even for scenarios that never touch AI:
   // AISettingsPanel / applySnapshot read flags off the snapshot, and a
   // null fallback throws (`entryHighlightsEnabled` on null). All-flags-off
-  // matches `AI_PREVIEW_INVOKE.get_ai_settings` in web/scenarios/index.ts.
+  // matches `AI_PREVIEW_INVOKE.get_ai_settings` in mockup/scenarios/index.ts.
   get_ai_settings: {
     provider: null,
     endpoint: null,
@@ -562,7 +562,7 @@ const SAFE_DEFAULTS: Record<string, unknown | ((args: Record<string, unknown>) =
   chat_rag_preflight: chatRagPreflight,
 
   // Mention menu (`@`) — pairs with the `get_entry` handler in
-  // `web/scenarios/index.ts` that resolves each chip's title.
+  // `mockup/scenarios/index.ts` that resolves each chip's title.
   search_entries: searchEntries,
 }
 

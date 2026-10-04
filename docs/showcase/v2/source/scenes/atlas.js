@@ -1,6 +1,6 @@
 /* Scene "atlas": a stylised Locations map (Natural Earth 110m land, docs/showcase/assets/land.js) in the app
    window. The demo ships no map tiles, so the map is drawn, not captured. Pins are the demo
-   journal's real ones (web/fixtures/media.ts:533-575); the Lisbon pin carries its gallery photo. */
+   journal's real ones (mockup/fixtures/media.ts:533-575); the Lisbon pin carries its gallery photo. */
 (function () {
   const K = window.KIT;
   let LAND = null; // Path2D built once from constant data: not frame state

@@ -29,6 +29,7 @@ import {
   Download,
   EyeOff,
   FileText,
+  Globe,
   Hash,
   Heading,
   Heart,
@@ -70,6 +71,8 @@ import {
   githubUrl,
   introVideoEmbedUrl,
   licenseUrl,
+  webAppLive,
+  webAppUrl,
 } from './links'
 import { DEFAULT_DESIGN_SYSTEM, isTrustedIframeEvent, sendDemoCommand } from './demoBridge'
 import type { DesignSystem } from './demoBridge'
@@ -106,6 +109,7 @@ const lockIcons = {
 } as const
 const platformIcons = {
   macOS: Laptop,
+  Web: Globe,
   'Windows & Linux': Monitor,
   'iOS & Android': Smartphone,
 } as const
@@ -1297,6 +1301,17 @@ const comparisonRows = [
     marks: { Memlore: 'yes', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'yes' },
   },
   {
+    id: 'web',
+    label: 'Web app',
+    description: 'Read and write your journal from any browser, still end-to-end encrypted.',
+    marks: {
+      Memlore: webAppLive ? 'partial' : 'soon',
+      'Day One': 'yes',
+      Journey: 'yes',
+      'Apple Journal': 'no',
+    },
+  },
+  {
     id: 'ios',
     label: 'iOS app',
     marks: { Memlore: 'soon', 'Day One': 'yes', Journey: 'yes', 'Apple Journal': 'yes' },
@@ -1323,10 +1338,15 @@ const comparisonRows = [
   },
 ] satisfies ComparisonRow[]
 
-type PlatformName = 'macOS' | 'Windows & Linux' | 'iOS & Android'
+type PlatformName = 'macOS' | 'Web' | 'Windows & Linux' | 'iOS & Android'
 
 const platformItems = [
   { name: 'macOS' as const, status: 'Download', href: downloadUrl },
+  {
+    name: 'Web' as const,
+    status: webAppLive ? 'Open' : 'Coming soon',
+    href: webAppLive ? webAppUrl : undefined,
+  },
   { name: 'Windows & Linux' as const, status: 'Coming soon' },
   { name: 'iOS & Android' as const, status: 'Coming soon' },
 ] satisfies { name: PlatformName; status: string; href?: string }[]
@@ -1344,10 +1364,14 @@ function PageActions({
     <div className={className}>
       <DownloadLink
         className="download download-hero"
-        label="Download for Mac"
-        shortLabel="Download"
+        label="Download"
         ariaLabel="Download the beta from GitHub"
       />
+      {webAppLive && (
+        <a className="button" data-variant="secondary" href={webAppUrl}>
+          <Globe className="size-4" /> Web version
+        </a>
+      )}
       <a className="button" href="#demo" data-variant="secondary">
         {demoArrow ? (
           <>
@@ -1497,7 +1521,9 @@ export default function LandingPage() {
             onWatch={() => setIntroOpen(true)}
           />
           <LedgerRule area="r4" />
-          <p className="hero-meta">No account · Encrypted on your device · macOS today</p>
+          <p className="hero-meta">
+            No account · Encrypted on your device · {webAppLive ? 'macOS and web today' : 'macOS today'}
+          </p>
         </section>
         <LedgerRule />
         <section className="spec-strip" aria-label="What Memlore is">
@@ -1881,8 +1907,9 @@ export default function LandingPage() {
           <div>
             <h2>Multiple platforms supported</h2>
             <p>
-              We’re starting with macOS and taking the time to make it feel right. Follow along as
-              Memlore grows.
+              {webAppLive
+                ? 'macOS and the web today. Follow along as Memlore grows.'
+                : 'We’re starting with macOS and taking the time to make it feel right. Follow along as Memlore grows.'}
             </p>
           </div>
           <div className="platform-list">
@@ -1892,15 +1919,30 @@ export default function LandingPage() {
                 <div key={item.name}>
                   <Icon className="size-5.5" />
                   <span>{item.name}</span>
-                  {item.name === 'macOS' ? (
+                  {item.href ? (
                     <strong>
                       <a
-                        href={downloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="Download the beta from GitHub"
+                        href={item.href}
+                        {...(item.name === 'macOS'
+                          ? {
+                              target: '_blank',
+                              rel: 'noreferrer',
+                              'aria-label': 'Download the beta from GitHub',
+                            }
+                          : {
+                              'aria-label': 'Open the web app',
+                            })}
                       >
-                        <Download className="size-3.5" /> {item.status}
+                        {item.name === 'macOS' ? (
+                          <>
+                            <Download className="size-3.5" /> {item.status}
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="size-3.5" /> {item.status}{' '}
+                            <ArrowUpRight className="size-3" />
+                          </>
+                        )}
                       </a>
                     </strong>
                   ) : (

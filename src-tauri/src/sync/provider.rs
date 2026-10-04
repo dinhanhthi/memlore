@@ -30,6 +30,8 @@ pub enum FileKind {
     /// Encrypted chunk-vector sync batch files
     /// (`{device_id}/embeddings/batch-*.bin`, see `sync::embedding_sync`).
     EmbeddingChunks,
+    /// Web outbox intent and media files (`{device_id}/outbox/*`).
+    Outbox,
     /// Files directly under `{device_id}/` (no subfolder) — e.g.
     /// `settings.bin`, `tags.bin`, `metadata.json`. Used by own-cloud
     /// reconcile to detect missing whole-table surface blobs.
@@ -49,6 +51,7 @@ impl FileKind {
             FileKind::Journals => Some("journals"),
             FileKind::Versions => Some("versions"),
             FileKind::EmbeddingChunks => Some("embeddings"),
+            FileKind::Outbox => Some("outbox"),
             FileKind::DeviceRoot => None,
         }
     }
@@ -88,6 +91,15 @@ pub enum SyncError {
     /// user-facing action hint. (Name kept for wire compatibility.)
     #[error("cross-mode reject: {0}")]
     CrossModeReject(String),
+}
+
+impl From<memlore_core::CodecError> for SyncError {
+    fn from(e: memlore_core::CodecError) -> Self {
+        match e {
+            memlore_core::CodecError::Serialization(s) => SyncError::Serialization(s),
+            memlore_core::CodecError::Merge(s) => SyncError::Merge(s),
+        }
+    }
 }
 
 /// Result of a revision-aware read ([`SyncProvider::read_file_if_changed`]).

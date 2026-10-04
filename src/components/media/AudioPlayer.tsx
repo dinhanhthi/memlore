@@ -38,7 +38,7 @@ function formatTime(seconds: number): string {
  * speed) plus a live **frequency-bar visualizer** that reacts to the audio.
  *
  * ## Why custom instead of `<audio controls>`
- * Native `controls` are user-agent shadow-DOM UI: Chromium (dev `web/`) and
+ * Native `controls` are user-agent shadow-DOM UI: Chromium (dev `mockup/`) and
  * WKWebView (the packaged Tauri app) render completely different, unstylable
  * bars. Driving a plain `<audio>` (no `controls`) through our own DOM makes
  * the player pixel-identical across engines and lets it honor the OKLCH design

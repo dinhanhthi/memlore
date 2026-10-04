@@ -75,7 +75,7 @@ APP_PATHS=(src/ src-tauri/ public/ index.html vite.config.ts package.json)
 REPO_URL="$(git remote get-url origin 2>/dev/null \
   | sed 's|git@github.com:|https://github.com/|' \
   | sed 's|\.git$||')"
-EXCLUDED_PATHS="website/ web/ docs/ e2e/"
+EXCLUDED_PATHS="website/ mockup/ web/ docs/ e2e/"
 # Conventional-commit scopes that never count toward a bump, however many app
 # files the commit touched.
 EXCLUDED_SCOPE_RE='^[0-9a-f]+ [a-z]+\(website\)!?:'

@@ -281,7 +281,7 @@ describe('useEmbeddingStatus', () => {
   })
 
   // Regression: the web preview's invoke router returns `null` for
-  // unhandled commands (see web/mocks/invokeRouter.ts). refresh must
+  // unhandled commands (see mockup/mocks/invokeRouter.ts). refresh must
   // tolerate null payloads from all three commands without throwing —
   // before the null-guards this crashed at `settings.enabled`.
   it('calls getEmbeddingJobStats with model_id and derives stuck when every pending job is paused', async () => {

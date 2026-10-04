@@ -697,6 +697,8 @@ pub fn hard_wipe_user_data(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM media", [])?;
     conn.execute("DELETE FROM entries", [])?;
     conn.execute("DELETE FROM tags", [])?;
+    // Phase 13: web outbox imports are local-only and wiped on user data reset.
+    outbox_imports_clear(conn)?;
     // `entries_fts` is an external-content FTS5 table. The `entries_ad`
     // trigger fires per row and the resulting index *should* be empty, but
     // a single pre-existing drift would otherwise propagate; force a full
@@ -1062,6 +1064,42 @@ pub fn create_entry(conn: &Connection, params: CreateEntryParams<'_>) -> Result<
         ],
     )?;
     get_entry(conn, &id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+}
+
+/// Create an entry with an explicit ID, mirroring `create_entry` and journal auto-tags.
+/// Uses `INSERT OR IGNORE`. Returns `Ok(true)` if inserted, or `Ok(false)` if ignored
+/// because the ID already exists. Does NOT call `mark_entry_pending`.
+pub fn create_entry_with_id(
+    conn: &Connection,
+    id: &str,
+    params: CreateEntryParams<'_>,
+) -> Result<bool> {
+    let now = now_unix();
+    let rows_affected = conn.execute(
+        "INSERT OR IGNORE INTO entries
+             (id, journal_id, title, preview_text, content_text,
+              entry_date, created_at, updated_at,
+              is_favorite, is_deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, 0)",
+        rusqlite::params![
+            id,
+            params.journal_id,
+            params.title,
+            params.preview_text,
+            params.content_text,
+            params.entry_date,
+            now,
+            now,
+        ],
+    )?;
+    if rows_affected == 0 {
+        return Ok(false);
+    }
+    let auto_tag_ids = list_journal_auto_tag_ids(conn, params.journal_id)?;
+    for tag_id in &auto_tag_ids {
+        add_tag_to_entry(conn, id, tag_id)?;
+    }
+    Ok(true)
 }
 
 const ENTRY_COLUMNS: &str = "id, journal_id, title, preview_text, content_text, \
@@ -3174,6 +3212,23 @@ pub fn get_tags_for_entry(conn: &Connection, entry_id: &str) -> Result<Vec<Tag>>
         })
     })?;
     rows.collect()
+}
+
+/// Filters the provided tag IDs, returning only those that exist and are not soft-deleted.
+/// Preserves the input ordering.
+pub fn existing_tag_ids<S: AsRef<str>>(conn: &Connection, ids: &[S]) -> Result<Vec<String>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut stmt = conn.prepare("SELECT id FROM tags WHERE id = ?1 AND is_deleted = 0")?;
+    let mut valid = Vec::new();
+    for id in ids {
+        let id_str = id.as_ref();
+        if stmt.exists([id_str])? {
+            valid.push(id_str.to_string());
+        }
+    }
+    Ok(valid)
 }
 
 pub fn get_tags_for_entries(
@@ -6282,28 +6337,7 @@ pub const MAX_CHAT_SOURCE_ENTRY_IDS: usize = 32;
 // `ENTRY_CONTEXT_TOP_K` while still bounding the column.
 pub const MAX_CHAT_MEMORY_IDS: usize = 16;
 
-/// Max byte length for id strings that can land in chat attachment /
-/// `source_entry_ids` columns (and, via the sync engine, any peer-supplied
-/// id). UUIDs are 36; nanoid ≤ 21. 128 is generous headroom while still
-/// bounding an adversarial multi-MB string that would otherwise pass the
-/// count caps and be re-pushed forever (chat rows are append-only).
-pub const MAX_SAFE_ID_BYTES: usize = 128;
-
-/// Minimum length matching the historical sync-engine peer-id filter.
-/// Real generators use UUID (36) or nanoid (≥ 21); anything shorter is
-/// presumed crafted.
-const MIN_SAFE_ID_BYTES: usize = 8;
-
-/// Character class + length bounds for ids that may end up in FK columns,
-/// path components, or chat attachment / `source_entry_ids` lists.
-/// Same rules the sync engine applies to peer-supplied ids.
-pub fn is_safe_id(s: &str) -> bool {
-    let len = s.len();
-    len >= MIN_SAFE_ID_BYTES
-        && len <= MAX_SAFE_ID_BYTES
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-}
+pub use memlore_core::outbox::{is_safe_id, MAX_SAFE_ID_BYTES, MIN_SAFE_ID_BYTES};
 
 // ─── Templates ──────────────────────────────────────────────────────────────
 
@@ -7463,6 +7497,80 @@ pub fn create_media(conn: &Connection, params: CreateMediaParams<'_>) -> Result<
     get_media(conn, &id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
 }
 
+#[derive(Debug, Clone)]
+pub struct CreateMediaWithIdParams<'a> {
+    pub id: &'a str,
+    pub entry_id: &'a str,
+    pub extension: &'a str,
+    pub file_type: &'a str,
+    pub storage_path: &'a str,
+    pub thumbnail_path: Option<&'a str>,
+    pub file_size: Option<i64>,
+    pub sort_order: i64,
+    pub insertion_mode: &'a str,
+    pub exif_date: Option<i64>,
+    pub exif_latitude: Option<f64>,
+    pub exif_longitude: Option<f64>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub duration_seconds: Option<f64>,
+}
+
+/// Create a media record with an explicit ID, with `upload_status='pending'`.
+/// The local `file_name` is derived strictly from `id` and `extension`, never from
+/// untrusted user input. Uses `INSERT OR IGNORE`. Returns `Ok(true)` if inserted,
+/// or `Ok(false)` if the ID already existed. Does NOT call `mark_entry_pending`.
+pub fn create_media_with_id(
+    conn: &Connection,
+    params: CreateMediaWithIdParams<'_>,
+) -> Result<bool> {
+    let ext = params.extension.trim_start_matches('.');
+    if !ext.is_empty() && (!ext.chars().all(|c| c.is_ascii_alphanumeric()) || ext.len() > 10) {
+        return Err(rusqlite::Error::ToSqlConversionFailure(
+            "invalid media extension: must be alphanumeric and <= 10 characters".into(),
+        ));
+    }
+    let file_name = if ext.is_empty() {
+        params.id.to_string()
+    } else {
+        format!("{}.{}", params.id, ext)
+    };
+    let now = now_unix();
+    let rows_affected = conn.execute(
+        "INSERT OR IGNORE INTO media \
+             (id, entry_id, file_name, file_type, storage_provider, storage_path, \
+              thumbnail_path, upload_status, file_size, sort_order, created_at, \
+              exif_date, exif_latitude, exif_longitude, insertion_mode, \
+              width, height, duration_seconds) \
+         VALUES (?1, ?2, ?3, ?4, 'local', ?5, ?6, 'pending', ?7, ?8, ?9, \
+                 ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        rusqlite::params![
+            params.id,
+            params.entry_id,
+            file_name,
+            params.file_type,
+            params.storage_path,
+            params.thumbnail_path,
+            params.file_size,
+            params.sort_order,
+            now,
+            params.exif_date,
+            params.exif_latitude,
+            params.exif_longitude,
+            params.insertion_mode,
+            params.width,
+            params.height,
+            params.duration_seconds,
+        ],
+    )?;
+    if rows_affected == 0 {
+        return Ok(false);
+    }
+    set_cover_if_unset_for_image_or_video(conn, params.entry_id, params.id, params.file_type)?;
+    touch_entry_updated_at(conn, params.entry_id)?;
+    Ok(true)
+}
+
 pub fn get_media(conn: &Connection, id: &str) -> Result<Option<Media>> {
     conn.query_row(
         &format!("SELECT {MEDIA_COLUMNS} FROM media WHERE id = ?1"),
@@ -7903,6 +8011,8 @@ pub fn requeue_missing_owned_sync_content(
 /// under the V2 key on the next sync tick.
 pub fn reset_all_sync_state_to_pending(conn: &Connection) -> Result<()> {
     conn.execute("UPDATE sync_state SET sync_status = 'pending'", [])?;
+    // Phase 13: web outbox imports are local-only and wiped on sync reset.
+    outbox_imports_clear(conn)?;
     Ok(())
 }
 
@@ -24897,6 +25007,120 @@ pub fn list_pending_setups(conn: &Connection) -> Result<Vec<PendingFirstTimeSetu
     rows.collect()
 }
 
+// ─── Web Companion Outbox Imports ──────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebOutboxImportRecord {
+    pub path: String,
+    pub revision: Option<String>,
+    pub content_hash: String,
+    pub outcome: String,
+    pub imported_at: i64,
+    pub last_applied_updated_at: Option<i64>,
+    pub post_import_fingerprint: Option<String>,
+    pub decided_fields: Option<String>,
+    pub pending_revision: Option<String>,
+    pub pending_plan: Option<String>,
+    pub created: bool,
+}
+
+pub fn outbox_import_get(conn: &Connection, path: &str) -> Result<Option<WebOutboxImportRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT path, revision, content_hash, outcome, imported_at,
+                last_applied_updated_at, post_import_fingerprint, decided_fields,
+                pending_revision, pending_plan, created
+         FROM web_outbox_imports
+         WHERE path = ?1",
+    )?;
+    let mut rows = stmt.query([path])?;
+    if let Some(row) = rows.next()? {
+        let created_int: i64 = row.get(10)?;
+        Ok(Some(WebOutboxImportRecord {
+            path: row.get(0)?,
+            revision: row.get(1)?,
+            content_hash: row.get(2)?,
+            outcome: row.get(3)?,
+            imported_at: row.get(4)?,
+            last_applied_updated_at: row.get(5)?,
+            post_import_fingerprint: row.get(6)?,
+            decided_fields: row.get(7)?,
+            pending_revision: row.get(8)?,
+            pending_plan: row.get(9)?,
+            created: created_int != 0,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn outbox_import_record(conn: &Connection, record: &WebOutboxImportRecord) -> Result<()> {
+    conn.execute(
+        "INSERT INTO web_outbox_imports (
+            path, revision, content_hash, outcome, imported_at,
+            last_applied_updated_at, post_import_fingerprint, decided_fields,
+            pending_revision, pending_plan, created
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        ON CONFLICT(path) DO UPDATE SET
+            revision = excluded.revision,
+            content_hash = excluded.content_hash,
+            outcome = excluded.outcome,
+            imported_at = excluded.imported_at,
+            last_applied_updated_at = excluded.last_applied_updated_at,
+            post_import_fingerprint = excluded.post_import_fingerprint,
+            decided_fields = excluded.decided_fields,
+            pending_revision = excluded.pending_revision,
+            pending_plan = excluded.pending_plan,
+            created = MAX(web_outbox_imports.created, excluded.created)",
+        rusqlite::params![
+            record.path,
+            record.revision,
+            record.content_hash,
+            record.outcome,
+            record.imported_at,
+            record.last_applied_updated_at,
+            record.post_import_fingerprint,
+            record.decided_fields,
+            record.pending_revision,
+            record.pending_plan,
+            if record.created { 1 } else { 0 },
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn outbox_imports_clear(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM web_outbox_imports", [])?;
+    Ok(())
+}
+
+pub fn outbox_imports_list_all(conn: &Connection) -> Result<Vec<WebOutboxImportRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT path, revision, content_hash, outcome, imported_at,
+                last_applied_updated_at, post_import_fingerprint, decided_fields,
+                pending_revision, pending_plan, created
+         FROM web_outbox_imports
+         WHERE path != '__acks__'
+         ORDER BY imported_at ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let created_int: i64 = row.get(10)?;
+        Ok(WebOutboxImportRecord {
+            path: row.get(0)?,
+            revision: row.get(1)?,
+            content_hash: row.get(2)?,
+            outcome: row.get(3)?,
+            imported_at: row.get(4)?,
+            last_applied_updated_at: row.get(5)?,
+            post_import_fingerprint: row.get(6)?,
+            decided_fields: row.get(7)?,
+            pending_revision: row.get(8)?,
+            pending_plan: row.get(9)?,
+            created: created_int != 0,
+        })
+    })?;
+    rows.collect()
+}
+
 // ─── Keyring V2 — tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -26113,6 +26337,403 @@ mod keyring_v2_tests {
         assert!(
             after.contains(&"tombstone-1".to_string()),
             "tombstone must appear in list_pending_entry_ids after repair so it can be republished"
+        );
+    }
+
+    #[test]
+    fn test_reexported_is_safe_id() {
+        assert_eq!(MIN_SAFE_ID_BYTES, 8);
+        assert_eq!(MAX_SAFE_ID_BYTES, 128);
+        assert!(!is_safe_id("short"));
+        assert!(is_safe_id("valid-id-123_456"));
+        assert!(!is_safe_id("invalid/id"));
+        assert!(!is_safe_id(&"a".repeat(129)));
+        assert!(is_safe_id(&"a".repeat(128)));
+    }
+}
+
+#[cfg(test)]
+mod web_outbox_import_tests {
+    use super::*;
+    use crate::db::schema::migrate;
+
+    fn setup() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_outbox_import_crud_and_sticky_created() {
+        let conn = setup();
+
+        // 1. Non-existent path returns None
+        let initial = outbox_import_get(&conn, "web1/outbox/e1.bin").unwrap();
+        assert_eq!(initial, None);
+
+        // 2. Insert record with created = true
+        let record1 = WebOutboxImportRecord {
+            path: "web1/outbox/e1.bin".to_string(),
+            revision: Some("rev-1".to_string()),
+            content_hash: "hash-abc".to_string(),
+            outcome: "applied".to_string(),
+            imported_at: 1000,
+            last_applied_updated_at: Some(1005),
+            post_import_fingerprint: Some("fp-xyz".to_string()),
+            decided_fields: Some(r#"{"title@1":"applied"}"#.to_string()),
+            pending_revision: None,
+            pending_plan: None,
+            created: true,
+        };
+        outbox_import_record(&conn, &record1).unwrap();
+
+        let fetched1 = outbox_import_get(&conn, "web1/outbox/e1.bin")
+            .unwrap()
+            .expect("must exist");
+        assert_eq!(fetched1, record1);
+
+        // 3. Update record with created = false — created must REMAIN true (sticky)
+        let record2 = WebOutboxImportRecord {
+            path: "web1/outbox/e1.bin".to_string(),
+            revision: Some("rev-2".to_string()),
+            content_hash: "hash-def".to_string(),
+            outcome: "reflected".to_string(),
+            imported_at: 1100,
+            last_applied_updated_at: Some(1105),
+            post_import_fingerprint: Some("fp-xyz2".to_string()),
+            decided_fields: Some(r#"{"title@1":"applied","emotion@2":"reflected"}"#.to_string()),
+            pending_revision: Some("pending-rev".to_string()),
+            pending_plan: Some("{}".to_string()),
+            created: false, // attempts to clear created
+        };
+        outbox_import_record(&conn, &record2).unwrap();
+
+        let fetched2 = outbox_import_get(&conn, "web1/outbox/e1.bin")
+            .unwrap()
+            .expect("must exist");
+        assert_eq!(fetched2.path, record2.path);
+        assert_eq!(fetched2.revision, record2.revision);
+        assert_eq!(fetched2.content_hash, record2.content_hash);
+        assert_eq!(fetched2.outcome, record2.outcome);
+        assert_eq!(fetched2.imported_at, record2.imported_at);
+        assert_eq!(
+            fetched2.last_applied_updated_at,
+            record2.last_applied_updated_at
+        );
+        assert_eq!(
+            fetched2.post_import_fingerprint,
+            record2.post_import_fingerprint
+        );
+        assert_eq!(fetched2.decided_fields, record2.decided_fields);
+        assert_eq!(fetched2.pending_revision, record2.pending_revision);
+        assert_eq!(fetched2.pending_plan, record2.pending_plan);
+        assert!(fetched2.created, "created must be sticky and remain true");
+
+        // 4. Listing all excludes __acks__
+        let acks_record = WebOutboxImportRecord {
+            path: "__acks__".to_string(),
+            revision: None,
+            content_hash: "acks-hash".to_string(),
+            outcome: "acks".to_string(),
+            imported_at: 1200,
+            last_applied_updated_at: None,
+            post_import_fingerprint: None,
+            decided_fields: None,
+            pending_revision: None,
+            pending_plan: None,
+            created: false,
+        };
+        outbox_import_record(&conn, &acks_record).unwrap();
+
+        let all = outbox_imports_list_all(&conn).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].path, "web1/outbox/e1.bin");
+    }
+
+    #[test]
+    fn test_outbox_imports_clear_in_hard_wipe() {
+        let conn = setup();
+        let record = WebOutboxImportRecord {
+            path: "web1/outbox/e1.bin".to_string(),
+            revision: Some("rev-1".to_string()),
+            content_hash: "hash-1".to_string(),
+            outcome: "applied".to_string(),
+            imported_at: 1000,
+            last_applied_updated_at: Some(1000),
+            post_import_fingerprint: None,
+            decided_fields: None,
+            pending_revision: None,
+            pending_plan: None,
+            created: true,
+        };
+        outbox_import_record(&conn, &record).unwrap();
+        assert!(outbox_import_get(&conn, "web1/outbox/e1.bin")
+            .unwrap()
+            .is_some());
+
+        hard_wipe_user_data(&conn).unwrap();
+
+        assert_eq!(
+            outbox_import_get(&conn, "web1/outbox/e1.bin").unwrap(),
+            None
+        );
+        let all = outbox_imports_list_all(&conn).unwrap();
+        assert!(all.is_empty(), "table must be empty after hard wipe");
+    }
+
+    #[test]
+    fn test_outbox_imports_clear_in_reset_all_sync_state() {
+        let conn = setup();
+        let record = WebOutboxImportRecord {
+            path: "web1/outbox/e1.bin".to_string(),
+            revision: Some("rev-1".to_string()),
+            content_hash: "hash-1".to_string(),
+            outcome: "applied".to_string(),
+            imported_at: 1000,
+            last_applied_updated_at: Some(1000),
+            post_import_fingerprint: None,
+            decided_fields: None,
+            pending_revision: None,
+            pending_plan: None,
+            created: true,
+        };
+        outbox_import_record(&conn, &record).unwrap();
+        assert!(outbox_import_get(&conn, "web1/outbox/e1.bin")
+            .unwrap()
+            .is_some());
+
+        reset_all_sync_state_to_pending(&conn).unwrap();
+
+        assert_eq!(
+            outbox_import_get(&conn, "web1/outbox/e1.bin").unwrap(),
+            None
+        );
+        let all = outbox_imports_list_all(&conn).unwrap();
+        assert!(
+            all.is_empty(),
+            "table must be empty after reset_all_sync_state_to_pending"
+        );
+    }
+}
+
+#[cfg(test)]
+mod create_with_id_tests {
+    use super::*;
+    use crate::db::schema::migrate;
+
+    fn setup() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_create_entry_with_id_preserves_id_and_applies_auto_tags() {
+        let conn = setup();
+        let journal = create_journal(&conn, "Work", None).unwrap();
+        let tag1 = upsert_tag_by_name(&conn, "urgent", None).unwrap();
+        let tag2 = upsert_tag_by_name(&conn, "dev", None).unwrap();
+        set_journal_auto_tags(&conn, &journal.id, &[tag1.clone(), tag2.clone()]).unwrap();
+
+        let custom_id = "entry-custom-web-001";
+        let inserted = create_entry_with_id(
+            &conn,
+            custom_id,
+            CreateEntryParams {
+                journal_id: &journal.id,
+                title: Some("Web Created Note"),
+                preview_text: Some("Preview text"),
+                content_text: Some("Content text"),
+                entry_date: 1234567890,
+            },
+        )
+        .unwrap();
+        assert!(inserted, "first call must insert");
+
+        let entry = get_entry(&conn, custom_id).unwrap().expect("must exist");
+        assert_eq!(entry.id, custom_id);
+        assert_eq!(entry.title.as_deref(), Some("Web Created Note"));
+        assert_eq!(entry.entry_date, 1234567890);
+
+        let attached_tags = get_tag_ids_for_entry(&conn, custom_id).unwrap();
+        assert_eq!(attached_tags.len(), 2);
+        assert!(attached_tags.contains(&tag1));
+        assert!(attached_tags.contains(&tag2));
+
+        let second_call = create_entry_with_id(
+            &conn,
+            custom_id,
+            CreateEntryParams {
+                journal_id: &journal.id,
+                title: Some("Overwritten Title?"),
+                preview_text: Some("New preview"),
+                content_text: Some("New content"),
+                entry_date: 9999999999,
+            },
+        )
+        .unwrap();
+        assert!(!second_call, "second call with same ID must be a no-op");
+
+        let entry_after = get_entry(&conn, custom_id).unwrap().unwrap();
+        assert_eq!(entry_after.title.as_deref(), Some("Web Created Note"));
+        assert_eq!(entry_after.entry_date, 1234567890);
+    }
+
+    #[test]
+    fn test_create_media_with_id_preserves_id_and_builds_file_name_from_id() {
+        let conn = setup();
+        let journal = create_journal(&conn, "MediaJournal", None).unwrap();
+        let entry_id = "entry-for-media-001";
+        create_entry_with_id(
+            &conn,
+            entry_id,
+            CreateEntryParams {
+                journal_id: &journal.id,
+                title: Some("Media entry"),
+                preview_text: None,
+                content_text: None,
+                entry_date: 1000,
+            },
+        )
+        .unwrap();
+
+        let media_id = "media-custom-001";
+        let inserted = create_media_with_id(
+            &conn,
+            CreateMediaWithIdParams {
+                id: media_id,
+                entry_id,
+                extension: "png",
+                file_type: "image/png",
+                storage_path: "/local/storage/path/media-custom-001.png",
+                thumbnail_path: Some("/local/storage/path/media-custom-001.thumb.jpg"),
+                file_size: Some(1024),
+                sort_order: 0,
+                insertion_mode: "inline",
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+                width: Some(100),
+                height: Some(100),
+                duration_seconds: None,
+            },
+        )
+        .unwrap();
+        assert!(inserted, "first call must insert");
+
+        let media = get_media(&conn, media_id).unwrap().expect("must exist");
+        assert_eq!(media.id, media_id);
+        assert_eq!(media.file_name, "media-custom-001.png");
+        assert_eq!(media.upload_status, "pending");
+        assert_eq!(
+            media.thumbnail_path.as_deref(),
+            Some("/local/storage/path/media-custom-001.thumb.jpg")
+        );
+
+        let second_call = create_media_with_id(
+            &conn,
+            CreateMediaWithIdParams {
+                id: media_id,
+                entry_id,
+                extension: "png",
+                file_type: "image/png",
+                storage_path: "/different/path.png",
+                thumbnail_path: None,
+                file_size: Some(2048),
+                sort_order: 1,
+                insertion_mode: "attached",
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+                width: None,
+                height: None,
+                duration_seconds: None,
+            },
+        )
+        .unwrap();
+        assert!(!second_call, "second call with same ID must be a no-op");
+
+        let media_after = get_media(&conn, media_id).unwrap().unwrap();
+        assert_eq!(
+            media_after.storage_path,
+            "/local/storage/path/media-custom-001.png"
+        );
+
+        // Path traversal in extension must be rejected
+        let traversal_result = create_media_with_id(
+            &conn,
+            CreateMediaWithIdParams {
+                id: "media-traversal-001",
+                entry_id,
+                extension: "../../../../etc/passwd",
+                file_type: "image/png",
+                storage_path: "/dummy",
+                thumbnail_path: None,
+                file_size: None,
+                sort_order: 0,
+                insertion_mode: "inline",
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+                width: None,
+                height: None,
+                duration_seconds: None,
+            },
+        );
+        assert!(
+            traversal_result.is_err(),
+            "path traversal in extension must be rejected"
+        );
+
+        // Empty extension creates file_name without trailing dot
+        let no_ext_id = "media-no-ext-001";
+        let no_ext_inserted = create_media_with_id(
+            &conn,
+            CreateMediaWithIdParams {
+                id: no_ext_id,
+                entry_id,
+                extension: "...",
+                file_type: "image/png",
+                storage_path: "/dummy",
+                thumbnail_path: None,
+                file_size: None,
+                sort_order: 0,
+                insertion_mode: "inline",
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+                width: None,
+                height: None,
+                duration_seconds: None,
+            },
+        )
+        .unwrap();
+        assert!(no_ext_inserted);
+        let no_ext_media = get_media(&conn, no_ext_id).unwrap().unwrap();
+        assert_eq!(no_ext_media.file_name, no_ext_id);
+    }
+
+    #[test]
+    fn test_existing_tag_ids() {
+        let conn = setup();
+        let t1 = upsert_tag_by_name(&conn, "tag-1", None).unwrap();
+        let t2 = upsert_tag_by_name(&conn, "tag-2", None).unwrap();
+        let t3 = upsert_tag_by_name(&conn, "tag-3", None).unwrap();
+
+        delete_tag(&conn, &t2).unwrap();
+
+        let input_ids = vec![
+            t3.clone(),
+            "completely-unknown-tag".to_string(),
+            t2.clone(),
+            t1.clone(),
+        ];
+        let filtered = existing_tag_ids(&conn, &input_ids).unwrap();
+        assert_eq!(filtered, vec![t3, t1]);
+
+        assert_eq!(
+            existing_tag_ids(&conn, &Vec::<String>::new()).unwrap(),
+            Vec::<String>::new()
         );
     }
 }

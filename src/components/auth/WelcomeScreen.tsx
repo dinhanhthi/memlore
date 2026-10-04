@@ -25,7 +25,7 @@ import {
   planExistingCloudConnect,
   shouldShowExistingCloudCancel,
 } from '../../lib/existingCloudConnect'
-import { isMacOS } from '../../lib/platform'
+import { isMacOS, isWeb } from '../../lib/platform'
 import {
   defaultSelectedProvider,
   pickerIcloudAvailable,
@@ -621,19 +621,25 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
         </div>
 
         {/* Primary path — set up a brand-new encrypted journal */}
-        <Button
-          variant="primary"
-          size="lg"
-          className="w-fit self-center"
-          data-testid="start-first-time-setup"
-          disabled={actionsDisabled}
-          loading={cloudConnectBusy}
-          onClick={() => {
-            void handleStartSetup()
-          }}
-        >
-          {ctaLabel}
-        </Button>
+        {isWeb ? (
+          <p className="text-fg-secondary text-center text-sm" data-testid="web-create-vault-hint">
+            {t('web.createVaultOnDesktop')}
+          </p>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-fit self-center"
+            data-testid="start-first-time-setup"
+            disabled={actionsDisabled}
+            loading={cloudConnectBusy}
+            onClick={() => {
+              void handleStartSetup()
+            }}
+          >
+            {ctaLabel}
+          </Button>
+        )}
 
         {/* Secondary path — this device is joining a vault that already exists
             in the cloud. Reworked by Phase 6 task 4. */}

@@ -6,7 +6,7 @@ changelog page.
 
 Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
 `index.html`, `vite.config.ts` and `package.json` count toward a bump —
-`website/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
+`website/`, `mockup/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
 
 ## v0.2.1 (2026-10-01)
 
@@ -22,6 +22,9 @@ Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
   [#3eec79f](https://github.com/dinhanhthi/memlore/commit/3eec79f)
   [#a59815b](https://github.com/dinhanhthi/memlore/commit/a59815b)
   [#1e6c8bf](https://github.com/dinhanhthi/memlore/commit/1e6c8bf)
+- **Desktop outbox importer for companion web writes.** Desktop sync cycles
+  automatically discover and import encrypted outbox edits and creations from
+  companion devices, merging Yjs entry documents and field changes without clock skew.
 
 ### Notes for maintainers
 

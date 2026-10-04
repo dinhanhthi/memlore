@@ -453,5 +453,8 @@
     "cancel": "Cancel",
     "confirm": "Use these values"
   },
-  "placeholder": "Write your thoughts…"
+  "placeholder": "Write your thoughts…",
+  "web": {
+    "readOnlyBanner": "Read-only on the web. Open Memlore on desktop to edit your entries."
+  }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# scripts/web-dev.sh — start the browser UI preview harness (port 5175).
-# Kills any stale listener on 5175 first (strictPort in web/vite.config.ts).
+# scripts/mockup-dev.sh — start the browser UI preview harness (port 5175).
+# Kills any stale listener on 5175 first (strictPort in mockup/vite.config.ts).
 
 set -euo pipefail
 
@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=scripts/_ui.sh
 source "${SCRIPT_DIR}/_ui.sh"
 
-stop_web_harness_dev_server
+stop_mockup_dev_server
 
 cd "$REPO_ROOT"
 
@@ -25,4 +25,4 @@ if [[ -z "${MEMLORE_WEB_DEV_NO_OPEN:-}" && "$(uname -s)" == "Darwin" && ! -t 0 ]
   open "http://localhost:5175/" >/dev/null 2>&1 || true
 fi
 
-exec vite --config web/vite.config.ts
+exec vite --config mockup/vite.config.ts

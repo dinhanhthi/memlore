@@ -1,7 +1,7 @@
 ---
 title: Memlore — Privacy Policy
 description: How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.
-updated: 20 September 2026
+updated: 4 October 2026
 ---
 
 # Privacy Policy
@@ -72,6 +72,20 @@ Maps, geocoding, and speech-to-text run only if you turn them on. They talk to t
 ## App updates
 
 The app may request GitHub release metadata so it can tell you when an update is available. That check is not telemetry.
+
+## Memlore Web (web.memlore.app)
+
+Memlore Web is an upcoming, optional browser companion. When it is available, it will let you read your existing Memlore journal from a web browser and, once editing is turned on, make edits that your desktop app imports.
+
+- **What is stored locally in the browser:** Memlore Web stores only an encrypted cache in your browser's IndexedDB. The master encryption keys are kept strictly in WebAssembly memory and are wiped as soon as you lock the vault or close the tab. Your journal entries are stored on disk only as AES-256-GCM encrypted ciphertexts; unencrypted text is never stored in browser storage.
+- **The Cloudflare Worker:** An ephemeral Cloudflare Worker at `web.memlore.app/api/*` handles the OAuth 2.0 PKCE token exchange with Google so client secrets stay protected. The Worker never sees, parses, or logs your master recovery phrase, encryption keys, or journal content, and maintains no persistent database or access logs of tokens.
+- **Hosting infrastructure:** Memlore Web is hosted on Cloudflare Pages. Like any web server, Cloudflare processes standard HTTP request headers and IP addresses strictly for DDoS mitigation and content delivery.
+- **Google Drive scope:** Memlore Web connects exclusively to Google Drive's limited `drive.appdata` scope (hidden application data). It cannot view, read, or modify any of your personal Google Drive documents, photos, or spreadsheets.
+- **No analytics:** Memlore Web contains no analytics trackers, advertising scripts, tracking cookies, or behavioral telemetry.
+- **How to delete everything:** You can remove all web traces at any time:
+  1. In your browser's settings, clear the site data for web.memlore.app. This deletes everything Memlore Web stored in that browser (the encrypted cache, unsent edits and the password-wrapped key). The **Clear cache** button in Memlore Web settings removes cached photos and videos only.
+  2. In the Memlore desktop app, open Settings → Security → Security actions → Connected devices and remove the web device.
+  3. Revoke Google Drive access at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
 ## This website
 

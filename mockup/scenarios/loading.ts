@@ -14,7 +14,7 @@ export const pending = (): Promise<never> => new Promise<never>(() => {})
  *
  * This is deliberately an allowlist, not "stall everything": the boot-path
  * commands (auth, settings, sync status, the AI provider/embedding snapshots
- * documented in `web/mocks/invokeRouter.ts`) are dereferenced on mount, and a
+ * documented in `mockup/mocks/invokeRouter.ts`) are dereferenced on mount, and a
  * pending promise leaves `data === undefined` — which crashes the preview the
  * same way a missing mock does. Only the surfaces that own a loading state are
  * listed here.

@@ -1681,6 +1681,25 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     // `auto_tag_id` drop pattern above.
     let _ = conn.execute_batch("ALTER TABLE journals DROP COLUMN icon;");
 
+    // ── Web companion outbox imports (2026-10-02) ─────────────────────────
+    // Additive local-only table for recording imported web outbox intents,
+    // their decide-once outcomes, and crash markers. Never synced.
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS web_outbox_imports (
+            path                    TEXT PRIMARY KEY NOT NULL,
+            revision                TEXT,
+            content_hash            TEXT NOT NULL,
+            outcome                 TEXT NOT NULL,
+            imported_at             INTEGER NOT NULL,
+            last_applied_updated_at INTEGER,
+            post_import_fingerprint TEXT,
+            decided_fields          TEXT,
+            pending_revision        TEXT,
+            pending_plan            TEXT,
+            created                 INTEGER NOT NULL DEFAULT 0
+        );",
+    )?;
+
     Ok(())
 }
 
@@ -4276,6 +4295,103 @@ mod tests {
         assert!(
             dup.is_err(),
             "same (kind, period_start, period_end) with a different model_id must violate the PK"
+        );
+    }
+
+    #[test]
+    fn migrate_creates_web_outbox_imports_on_existing_db() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             CREATE TABLE journals (
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                color TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                sort_order INTEGER DEFAULT 0,
+                is_deleted INTEGER DEFAULT 0
+             );
+             CREATE TABLE entries (
+                id TEXT PRIMARY KEY NOT NULL,
+                journal_id TEXT NOT NULL REFERENCES journals(id) ON DELETE CASCADE,
+                title TEXT,
+                preview_text TEXT,
+                content_text TEXT,
+                entry_date INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                is_favorite INTEGER DEFAULT 0,
+                is_deleted INTEGER DEFAULT 0
+             );
+             CREATE VIRTUAL TABLE entries_fts USING fts5(
+                title,
+                content_text,
+                content='entries',
+                content_rowid='rowid'
+             );
+             INSERT INTO journals (id, name, color, created_at, updated_at)
+             VALUES ('j1', 'Personal', '#fff', 1000, 1000);
+             INSERT INTO entries (id, journal_id, title, content_text, entry_date, created_at, updated_at)
+             VALUES ('e1', 'j1', 'My Journal Entry', 'Hello world', 1000, 1000, 1000);",
+        )
+        .unwrap();
+
+        let table_exists_before: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='web_outbox_imports'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_exists_before, 0);
+
+        migrate(&conn).unwrap();
+
+        let entry_title: String = conn
+            .query_row("SELECT title FROM entries WHERE id='e1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(entry_title, "My Journal Entry");
+
+        let table_exists_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='web_outbox_imports'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_exists_after, 1);
+
+        conn.execute(
+            "INSERT INTO web_outbox_imports (
+                path, revision, content_hash, outcome, imported_at,
+                last_applied_updated_at, post_import_fingerprint, decided_fields,
+                pending_revision, pending_plan, created
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![
+                "web1/outbox/e1.bin",
+                "rev1",
+                "hash1",
+                "applied",
+                2000,
+                2000,
+                "fp1",
+                "{}",
+                None::<String>,
+                None::<String>,
+                1,
+            ],
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+
+        let row_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM web_outbox_imports", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            row_count, 1,
+            "idempotent migration must preserve web_outbox_imports rows"
         );
     }
 }

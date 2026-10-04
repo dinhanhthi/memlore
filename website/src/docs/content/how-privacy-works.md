@@ -33,6 +33,10 @@ Your journal lives on your device, and Memlore has no server that stores it.
 - An on-device model runs on this computer, and its download does not include your journal.
 - Memlore does not run a hosted service and cannot see that traffic.
 
+## On the web
+
+The upcoming web companion operates under the exact same zero-knowledge, zero-telemetry rules. It talks directly to Google Drive over HTTPS, with no Memlore intermediate server. The Cloudflare Worker handles OAuth token exchange only, never sees your encryption keys or journal data, and keeps no logs.
+
 ## Update check
 
 - Opening the app sends a version check to GitHub, not your journal.

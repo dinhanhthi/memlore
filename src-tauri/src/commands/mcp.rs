@@ -354,7 +354,7 @@ fn reload_entry(conn: &Connection, id: &str) -> Result<db::Entry, String> {
 
 /// Same gate as the read path: invisible/deleted → not-found; locked →
 /// not-found even when `ai_embed_include_protected` is on.
-fn require_writable_entry(conn: &Connection, id: &str) -> Result<db::Entry, String> {
+pub(crate) fn require_writable_entry(conn: &Connection, id: &str) -> Result<db::Entry, String> {
     let entry = db::get_entry_for_provider(conn, id).map_err(|e| e.to_string())?;
     let Some(entry) = entry else {
         return Err(ENTRY_NOT_FOUND.to_string());
@@ -365,7 +365,7 @@ fn require_writable_entry(conn: &Connection, id: &str) -> Result<db::Entry, Stri
     Ok(entry)
 }
 
-fn resolve_create_journal(
+pub(crate) fn resolve_create_journal(
     conn: &Connection,
     journal_id: Option<&str>,
 ) -> Result<(String, String), String> {
@@ -387,7 +387,10 @@ fn resolve_create_journal(
         .ok_or_else(|| JOURNAL_NOT_FOUND.to_string())
 }
 
-fn visible_journal(conn: &Connection, id: &str) -> Result<Option<(String, String)>, String> {
+pub(crate) fn visible_journal(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<(String, String)>, String> {
     match db::get_journal(conn, id).map_err(|e| e.to_string())? {
         Some(j) if !j.is_deleted && !j.is_invisible => Ok(Some((j.id, j.name))),
         _ => Ok(None),
@@ -422,7 +425,7 @@ fn attach_tags(conn: &Connection, entry_id: &str, tag_ids: &[String]) -> Result<
     Ok(())
 }
 
-fn validate_emotion(emotion: Option<&str>) -> Result<(), String> {
+pub(crate) fn validate_emotion(emotion: Option<&str>) -> Result<(), String> {
     match emotion {
         None | Some("bad") | Some("neutral") | Some("good") => Ok(()),
         Some(value) => Err(format!("invalid emotion: {value}")),
@@ -436,7 +439,7 @@ fn reject_oversized_yjs(len: usize) -> Result<(), String> {
     Ok(())
 }
 
-fn load_yjs_doc(blob: Option<&[u8]>) -> Result<Doc, String> {
+pub(crate) fn load_yjs_doc(blob: Option<&[u8]>) -> Result<Doc, String> {
     let doc = Doc::new();
     if let Some(bytes) = blob.filter(|b| !b.is_empty()) {
         let update = Update::decode_v1(bytes).map_err(|e| e.to_string())?;

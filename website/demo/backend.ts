@@ -1,8 +1,8 @@
 import type { SearchFilters } from '../../src/types/entry'
 import type { Entry } from '../../src/types/entry'
-import { entries, entryContent, journalsById, tagsForEntry } from '../../web/fixtures/index'
-import { chatSessionsById } from '../../web/fixtures/chat'
-import { route } from '../../web/mocks/invokeRouter'
+import { entries, entryContent, journalsById, tagsForEntry } from '../../mockup/fixtures/index'
+import { chatSessionsById } from '../../mockup/fixtures/chat'
+import { route } from '../../mockup/mocks/invokeRouter'
 import { cancelAllStreams, cancelSessionStreams, cancelStream, streamReply } from './streaming'
 
 export const DEMO_PASSWORD = 'memlore'

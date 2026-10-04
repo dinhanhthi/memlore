@@ -20,15 +20,16 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@tauri-apps/api/core": ["./mocks/core.ts"],
-      "@tauri-apps/api/event": ["./mocks/event.ts"],
-      "@tauri-apps/api/window": ["./mocks/window.ts"],
-      "@tauri-apps/api/path": ["./mocks/path.ts"],
-      "@tauri-apps/plugin-opener": ["./mocks/plugin-opener.ts"],
-      "@tauri-apps/plugin-dialog": ["./mocks/plugin-dialog.ts"],
-      "@tauri-apps/plugin-notification": ["./mocks/plugin-notification.ts"]
+      "@tauri-apps/api/core": ["./src/tauri/core.ts"],
+      "@tauri-apps/api/event": ["./src/tauri/event.ts"],
+      "@tauri-apps/api/window": ["./src/tauri/window.ts"],
+      "@tauri-apps/api/path": ["./src/tauri/path.ts"],
+      "@tauri-apps/plugin-opener": ["./src/tauri/plugin-opener.ts"],
+      "@tauri-apps/plugin-dialog": ["./src/tauri/plugin-dialog.ts"],
+      "@tauri-apps/plugin-notification": ["./src/tauri/plugin-notification.ts"],
+      "@tauri-apps/plugin-autostart": ["./src/tauri/plugin-autostart.ts"]
     }
   },
   "include": ["../src", "."],
-  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**"]
+  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**", "scripts", "dist"]
 }

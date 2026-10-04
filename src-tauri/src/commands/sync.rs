@@ -1045,7 +1045,7 @@ pub(crate) fn run_sync_now(
     // `new_for_session`: adopt the process-level own-cloud reconcile flag so
     // Automatic cycles after the first success skip re-listing even though
     // this function builds a fresh engine every call.
-    let engine = SyncEngine::new_for_session(provider, device_id).with_reporter(reporter);
+    let engine = SyncEngine::new_for_session(provider, device_id.clone()).with_reporter(reporter);
 
     // Phase 5: force re-pair detection before the pull leg.
     let check = block_on(check_force_re_pair_sync(state));
@@ -1323,7 +1323,67 @@ pub(crate) fn run_sync_now(
             } else {
                 Some(summary.errors.join("; "))
             };
-            emit_status(app, phase, state, err);
+            let err_clone = err.clone();
+            emit_status(app, phase, state, err_clone);
+
+            // Outbox importer runs after terminal status has been emitted.
+            let is_folder = {
+                let conn = state.lock().map_err(|e| e.to_string())?;
+                matches!(
+                    configured_cloud_provider(&conn)?,
+                    Some(CloudProvider::Folder(_))
+                )
+            };
+            if !is_folder && !summary.scope_mismatch {
+                let cloud_opt = {
+                    let conn = state.lock().map_err(|e| e.to_string())?;
+                    configured_cloud_provider(&conn)?
+                };
+                if let (Ok(key_list), Some(cloud)) = (key_state.content_key_list(), cloud_opt) {
+                    let slots = block_on(crate::sync::keyring_v2::io::list_device_slots(&cloud))
+                        .unwrap_or_default();
+                    let has_candidate_web_devices = slots.into_iter().any(|s| {
+                        s.device_id != device_id
+                            && !summary.fetched_manifests.contains(&s.device_id)
+                            && !summary.unchanged_peers.contains(&s.device_id)
+                    });
+                    if has_candidate_web_devices {
+                        let sink = crate::sync::outbox_import::TauriOutboxSink { app, state };
+                        use tauri::Manager;
+                        let media_dir = app
+                            .path()
+                            .app_data_dir()
+                            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                            .join("media");
+
+                        let (known_ids, pull_clean) = if summary.pull_clean {
+                            match block_on(engine.fetch_manifests(true)) {
+                                Ok((manifests, errors)) if errors.is_empty() => (
+                                    crate::sync::outbox_import::collect_known_ids_from_manifests(
+                                        &manifests,
+                                    ),
+                                    true,
+                                ),
+                                _ => (std::collections::HashMap::new(), false),
+                            }
+                        } else {
+                            (std::collections::HashMap::new(), false)
+                        };
+
+                        if let Err(e) =
+                            block_on(crate::sync::outbox_import::run_outbox_import_cycle(
+                                &cloud, &cloud, &device_id, &key_list, known_ids, pull_clean,
+                                &summary, &media_dir, state, &sink,
+                            ))
+                        {
+                            log::warn!("run_sync_now: outbox import cycle failed: {e}");
+                        }
+                    }
+                    // Re-emit final sync status to clear any progress state
+                    emit_status(app, phase, state, err);
+                }
+            }
+
             Ok(summary)
         }
         Err(e) => {

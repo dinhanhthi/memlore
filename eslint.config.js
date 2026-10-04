@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'src-tauri']),
+  globalIgnores(['dist', 'src-tauri', 'web/src/core/pkg', 'web/src/core/pkg-test']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -42,9 +42,50 @@ export default defineConfig([
     // App entry points mount the tree and export nothing, which is exactly what
     // the rule reports ("Fast refresh only works when a file has exports").
     // Nothing imports them, so there is no refresh boundary to preserve.
-    files: ['src/main.tsx', 'web/main.tsx', 'website/src/main.tsx'],
+    files: ['src/main.tsx', 'mockup/main.tsx', 'web/main.tsx', 'website/src/main.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    // The web write-safety layer (Phase 15.4): DriveWriter is the only mutating surface
+    // and may ONLY be imported by safeUpload.ts and onboard.ts.
+    files: ['web/src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.wasm.test.ts',
+      'web/src/backend/drive/client.ts',
+      'web/src/backend/sync/onboard.ts',
+      'web/src/backend/sync/safeUpload.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '../drive/client',
+              importNames: ['DriveWriter'],
+              message: 'DriveWriter is only permitted in safeUpload.ts and onboard.ts (Phase 15.4).',
+            },
+            {
+              name: './drive/client',
+              importNames: ['DriveWriter'],
+              message: 'DriveWriter is only permitted in safeUpload.ts and onboard.ts (Phase 15.4).',
+            },
+            {
+              name: './client',
+              importNames: ['DriveWriter'],
+              message: 'DriveWriter is only permitted in safeUpload.ts and onboard.ts (Phase 15.4).',
+            },
+            {
+              name: '../../backend/drive/client',
+              importNames: ['DriveWriter'],
+              message: 'DriveWriter is only permitted in safeUpload.ts and onboard.ts (Phase 15.4).',
+            },
+          ],
+        },
+      ],
     },
   },
 ])

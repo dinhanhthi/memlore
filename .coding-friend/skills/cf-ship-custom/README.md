@@ -85,7 +85,7 @@ would ever be offered it**. The script refuses it. Promote to `0.1.1` first, or
 bump the core version.
 
 **2. "Nothing to release" is a real answer.**
-If the only commits since the last tag touched `website/`, `web/`, `docs/` or
+If the only commits since the last tag touched `website/`, `mockup/`, `web/`, `docs/` or
 `e2e/`, or are scoped `(website)`, the report says `HAS APP CHANGES: no`. That
 means stop — not "ship a patch anyway". Website changes deploy through
 `deploy-website.yml` on push to `main` and need no version at all.

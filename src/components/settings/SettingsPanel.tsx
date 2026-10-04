@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
 import { useStartAtLogin } from '../../hooks/useStartAtLogin'
 import { useVersionRetention } from '../../hooks/useVersionRetention'
@@ -318,6 +319,14 @@ function panelId(id: SettingsCategory): string {
 /// independent settings navigation while surviving SettingsPanel unmounts.
 export function SettingsPanel() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
+  const categories = CATEGORIES.filter(
+    (c) =>
+      (c.id !== 'ai' || caps.ai) &&
+      (c.id !== 'reminders' || caps.reminders) &&
+      (c.id !== 'location' || caps.maps) &&
+      (c.id !== 'data' || caps.importExport),
+  )
   const active = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
     return tab?.settingsCategory ?? 'security'
@@ -331,7 +340,7 @@ export function SettingsPanel() {
 
   // Fallback prevents a crash if persistence ever rehydrates an unknown id
   // (e.g. user drops a SettingsCategory member between releases).
-  const activeCat = CATEGORIES.find((c) => c.id === active) ?? CATEGORIES[0]
+  const activeCat = categories.find((c) => c.id === active) ?? categories[0]
 
   // ── Deep-link anchor scroll + highlight ───────────────────────────────
   const settingsAnchor = useTabStore((s) => {
@@ -394,13 +403,13 @@ export function SettingsPanel() {
 
   function handleTabKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, idx: number) {
     let nextIdx: number | null = null
-    if (e.key === 'ArrowDown') nextIdx = (idx + 1) % CATEGORIES.length
-    else if (e.key === 'ArrowUp') nextIdx = (idx - 1 + CATEGORIES.length) % CATEGORIES.length
+    if (e.key === 'ArrowDown') nextIdx = (idx + 1) % categories.length
+    else if (e.key === 'ArrowUp') nextIdx = (idx - 1 + categories.length) % categories.length
     else if (e.key === 'Home') nextIdx = 0
-    else if (e.key === 'End') nextIdx = CATEGORIES.length - 1
+    else if (e.key === 'End') nextIdx = categories.length - 1
     if (nextIdx === null) return
     e.preventDefault()
-    moveFocus(CATEGORIES[nextIdx].id)
+    moveFocus(categories[nextIdx].id)
   }
 
   const activeMeta = activeCat
@@ -427,7 +436,7 @@ export function SettingsPanel() {
           aria-label={t('tab_sections.categories')}
           aria-orientation="vertical"
         >
-          {CATEGORIES.map((cat, idx) => {
+          {categories.map((cat, idx) => {
             const isActive = cat.id === activeMeta.id
             return (
               <li key={cat.id} role="presentation">

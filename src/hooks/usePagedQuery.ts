@@ -93,7 +93,7 @@ export function usePagedQuery<T>(opts: UsePagedQueryOpts<T>): UsePagedQueryResul
         const result = await fetcherRef.current(forPage)
         if (gen !== genRef.current) return // stale — discard
         // The web preview's invoke router returns `null` for unhandled
-        // commands (see web/mocks/invokeRouter.ts); treat a nullish result
+        // commands (see mockup/mocks/invokeRouter.ts); treat a nullish result
         // as an empty page rather than throwing on `result.items`. The real
         // backend always returns a fully-populated PagedResult.
         const items = result?.items ?? []

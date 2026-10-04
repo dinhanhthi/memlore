@@ -14,51 +14,9 @@
 //! plaintext cloud folder shape to disambiguate anymore. `SyncControlV1`
 //! itself was always mode-independent and is unaffected.
 
-use serde::{Deserialize, Serialize};
-
-pub const SYNC_CONTROL_VERSION: u32 = 1;
-pub const SYNC_CONTROL_DRIVE_PATH: &str = ".meta/control.json";
-
-/// Mode-independent cloud authority. This file is never deleted: its stable
-/// Drive file ID makes conditional updates usable as the recovery lease CAS.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SyncControlV1 {
-    pub version: u32,
-    pub recovery_generation: u64,
-    pub recovery_lease: Option<crate::sync::keyring_v2::RecoveryMarker>,
-    pub updated_at: i64,
-}
-
-impl SyncControlV1 {
-    pub fn initial(now_unix: i64) -> Self {
-        Self {
-            version: SYNC_CONTROL_VERSION,
-            recovery_generation: 0,
-            recovery_lease: None,
-            updated_at: now_unix,
-        }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.version != SYNC_CONTROL_VERSION {
-            return Err(format!(
-                "Unsupported sync control version: {} (expected {})",
-                self.version, SYNC_CONTROL_VERSION
-            ));
-        }
-        if self.updated_at < 0 {
-            return Err("updated_at must be non-negative".to_string());
-        }
-        if let Some(lease) = &self.recovery_lease {
-            lease.validate()?;
-            if lease.recovery_generation != self.recovery_generation {
-                return Err("recovery lease generation must match control generation".to_string());
-            }
-        }
-        Ok(())
-    }
-}
+pub use memlore_core::sync_control::{
+    SyncControlV1, SYNC_CONTROL_DRIVE_PATH, SYNC_CONTROL_VERSION,
+};
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,4 @@
-import { __emit } from '../../web/mocks/event'
+import { __emit } from '../../mockup/mocks/event'
 
 const streams = new Map<string, { timer: ReturnType<typeof setInterval>; sessionId: string }>()
 export function cancelStream(key: string) {

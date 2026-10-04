@@ -30,13 +30,23 @@
 
 ## 💻 Platforms
 
-**macOS** (desktop) is the only supported target today. Windows, Linux, iOS, and Android are planned.
+**macOS** (desktop) is the primary supported target today. Windows, Linux, iOS, and Android are planned.
+
+## 🌐 Memlore Web
+
+Memlore Web ([web.memlore.app](https://web.memlore.app)) is an in-browser companion to the desktop app. It allows reading, searching, and writing entries from any modern browser by connecting directly to your Google Drive `appDataFolder` without any Memlore intermediary server.
+
+- **Zero-knowledge:** Master encryption keys are handled in WebAssembly memory and never leave the browser.
+- **Safety first:** Uses an outbox intent model (`OutboxEntryV1`) — the web never mutates sync manifests directly; desktop imports and merges all changes with CRDT conflict resolution.
+- **Onboarding:** Opens an existing desktop vault using your Google account and 24-word recovery phrase.
+- **Documentation:** See the [Web companion guide](https://memlore.app/docs/web) and [Privacy Policy](https://memlore.app/privacy).
 
 ## 🛠️ Tech stack
 
 | Layer  | Technology                                                                           |
 | ------ | ------------------------------------------------------------------------------------ |
 | App    | Tauri 2 (Rust) + React 19 + TypeScript + Vite                                        |
+| Web    | React 19 + WebAssembly (Rust memlore-wasm) + IndexedDB + Cloudflare Worker            |
 | UI     | Tailwind CSS v4, Zustand, i18next, Leaflet, Recharts                                 |
 | Editor | TipTap + Yjs (CRDT)                                                                  |
 | Data   | SQLite / SQLCipher, FTS5                                                             |
@@ -48,17 +58,21 @@
 
 **Prerequisites:** [Rust](https://rustup.rs/) 1.88+, [Node.js](https://nodejs.org/) 20+, [pnpm](https://pnpm.io/) 9+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. VS Code: install the recommended extensions when prompted (format-on-save + ESLint).
 
-`web/` is the in-browser preview of the Tauri app UI (mocked backend). `website/` is the public marketing site and interactive demo at [memlore.app](https://memlore.app).
+`mockup/` is the in-browser preview of the Tauri app UI (mocked backend). `website/` is the public marketing site and interactive demo at [memlore.app](https://memlore.app). `web/` is the production Web companion app.
 
 ```bash
 pnpm install
 pnpm tauri dev                    # native app
 # MEMLORE_REACT_DEVTOOLS=1 pnpm tauri dev   # optional, after `npx react-devtools`
 
-pnpm web:dev                      # app UI preview (web/) — http://localhost:5175
-pnpm web:build && pnpm web:preview
+pnpm web:dev                      # web companion (web/) — http://localhost:5176
+pnpm web:test                     # web companion test suite
+pnpm web:build                    # compile web assets
 
-pnpm website:dev                  # marketing site (website/) — http://localhost:5176
+pnpm mockup:dev                   # app UI preview (mockup/) — http://localhost:5175
+pnpm mockup:build && pnpm mockup:preview
+
+pnpm website:dev                  # marketing site (website/) — http://localhost:5177
 pnpm website:build && pnpm website:preview
 
 pnpm test                         # frontend
@@ -108,7 +122,7 @@ travels with the repo (`.coding-friend/config.json` stays local).
 
 Releases are stable by default; `--rc` / `--beta` opt into a GitHub prerelease,
 which is what keeps a build off the stable update channel. Changes under
-`website/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
+`website/`, `mockup/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
 [`.github/release-setup.md`](.github/release-setup.md) for the signing and
 notarization secrets CI needs.
 

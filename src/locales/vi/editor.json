@@ -453,5 +453,8 @@
     "cancel": "Hủy",
     "confirm": "Dùng các giá trị này"
   },
-  "placeholder": "Viết suy nghĩ của bạn…"
+  "placeholder": "Viết suy nghĩ của bạn…",
+  "web": {
+    "readOnlyBanner": "Chỉ đọc trên web. Mở Memlore trên máy tính để chỉnh sửa nhật ký."
+  }
 }

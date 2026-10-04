@@ -1,5 +1,5 @@
 import { demoInvoke } from '../backend'
-export { convertFileSrc } from '../../../web/mocks/core'
+export { convertFileSrc } from '../../../mockup/mocks/core'
 export async function invoke<T = unknown>(
   cmd: string,
   args: Record<string, unknown> = {},

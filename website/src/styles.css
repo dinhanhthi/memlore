@@ -673,6 +673,7 @@ main {
 @media (max-width: 40rem) {
   .page-actions {
     gap: 8px;
+    flex-wrap: wrap;
   }
 }
 @container page-actions (max-width: 26rem) {

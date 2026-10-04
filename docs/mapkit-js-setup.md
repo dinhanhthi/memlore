@@ -126,7 +126,7 @@ node scripts/generate-mapkit-token.mjs \
  pnpm tauri dev
 ```
 
-Changing `.env` triggers a Rust rebuild. The web preview (`pnpm web:dev`) does **not** bake this token — Apple Maps in the browser harness stays mocked.
+Changing `.env` triggers a Rust rebuild. The web preview (`pnpm mockup:dev`) does **not** bake this token — Apple Maps in the browser harness stays mocked.
 
 ### Production / signed builds
 
@@ -154,6 +154,6 @@ If tiles fail: check the JWT is one line, Key ID / Team ID match the portal, the
 - Commit `.p8` keys or `.env`.
 - Paste the JWT into source, docs, or chat logs.
 - Reuse an old xJournal MapKit JS key on the new Maps ID — create a new key.
-- Expect `pnpm web:dev` to exercise real MapKit JS.
+- Expect `pnpm mockup:dev` to exercise real MapKit JS.
 
 Apple also has **Certificates, Identifiers &amp; Profiles → Services → Maps → Configure Tokens**. Memlore does not use that hosted-token flow. Use the Maps ID + `.p8` + `scripts/generate-mapkit-token.mjs` path above.

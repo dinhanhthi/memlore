@@ -7604,4 +7604,77 @@ mod tests {
              for each device's second read (name lookup + download); got {total}"
         );
     }
+
+    #[tokio::test]
+    async fn gdrive_lists_and_reads_outbox_intent_and_media_file() {
+        use wiremock::{Request, Respond, ResponseTemplate as RT};
+
+        struct OutboxWiremockResponder;
+        impl Respond for OutboxWiremockResponder {
+            fn respond(&self, request: &Request) -> RT {
+                let url = request.url.to_string();
+                if url.contains("/drive/v3/files/intent-blob-id") {
+                    return RT::new(200).set_body_bytes(b"outbox-intent-ciphertext".to_vec());
+                }
+                if url.contains("/drive/v3/files/media-blob-id") {
+                    return RT::new(200).set_body_bytes(b"media-ciphertext".to_vec());
+                }
+                if url.contains("q=") {
+                    let decoded_q = urlencoding::decode(&url)
+                        .unwrap_or_default()
+                        .replace('+', " ");
+                    if decoded_q.contains("name = 'outbox'") {
+                        return RT::new(200).set_body_json(serde_json::json!({
+                            "files": [{"id": "outbox-folder-id", "name": "outbox"}]
+                        }));
+                    }
+                    if decoded_q.contains("'outbox-folder-id' in parents") {
+                        if decoded_q.contains("name = 'e1.bin'") {
+                            return RT::new(200).set_body_json(serde_json::json!({
+                                "files": [{"id": "intent-blob-id", "name": "e1.bin"}]
+                            }));
+                        }
+                        if decoded_q.contains("name = 'm-med1'") {
+                            return RT::new(200).set_body_json(serde_json::json!({
+                                "files": [{"id": "media-blob-id", "name": "m-med1"}]
+                            }));
+                        }
+                        return RT::new(200).set_body_json(serde_json::json!({
+                            "files": [
+                                {"id": "intent-blob-id", "name": "e1.bin"},
+                                {"id": "media-blob-id", "name": "m-med1"}
+                            ]
+                        }));
+                    }
+                    // Device folder lookup
+                    return RT::new(200).set_body_json(serde_json::json!({
+                        "files": [{"id": "dev-folder-id", "name": "web-dev-1"}]
+                    }));
+                }
+                RT::new(404)
+            }
+        }
+
+        let mock = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(OutboxWiremockResponder)
+            .mount(&mock)
+            .await;
+
+        let provider = GDriveProvider::new(make_session("tok"), &mock.uri(), &mock.uri()).unwrap();
+        *provider.root_folder_id.write().await = Some("root-id".to_string());
+
+        let files = provider
+            .list_files("web-dev-1", FileKind::Outbox)
+            .await
+            .unwrap();
+        assert!(files.contains(&"web-dev-1/outbox/e1.bin".to_string()));
+        assert!(files.contains(&"web-dev-1/outbox/m-med1".to_string()));
+
+        let intent_bytes = provider.read_file("web-dev-1/outbox/e1.bin").await.unwrap();
+        assert_eq!(intent_bytes, b"outbox-intent-ciphertext");
+
+        let media_bytes = provider.read_file("web-dev-1/outbox/m-med1").await.unwrap();
+        assert_eq!(media_bytes, b"media-ciphertext");
+    }
 }

@@ -35,6 +35,10 @@ Sync is off until you turn it on; with no Memlore server or account in between, 
 - Writing inside an entry edited on both devices is kept from both sides.
 - A title, journal name, or setting keeps the later save.
 
+## On the web
+
+The upcoming web companion syncs with Google Drive directly in your browser. When editing on the web is turned on, edits made in the browser are written as sealed intents to your own outbox folder, and your desktop app imports and merges them on its next sync. iCloud Drive is not available on the web because Apple provides no web API for iCloud Drive folders.
+
 ## Turning sync off
 
 - Disconnecting stops sync here; this device's journal and the cloud files both stay.

@@ -11077,4 +11077,66 @@ mod tests {
         assert_eq!(std::fs::read(&active_db).unwrap(), b"active-plain");
         assert!(active_media.join("a.bin").is_file());
     }
+
+    /// The memlore-core copy of `authorize_recovery_push` must agree with the
+    /// desktop one on every branch, including the byte-exact error strings
+    /// (they reach `SyncError::Auth`, the UI and the logs).
+    #[test]
+    fn core_authorize_recovery_push_matches_desktop_on_every_branch() {
+        use memlore_core::sync_control as core_sc;
+
+        let m = marker();
+        let permit_for = |m: &RecoveryMarker| RecoveryOwnerPermit {
+            job_id: m.job_id,
+            owner_device_id: m.owner_device_id.clone(),
+            operation: m.operation.clone(),
+            recovery_generation: m.recovery_generation,
+            nonce: m.nonce.clone(),
+        };
+        let good = permit_for(&m);
+        let mut permits = vec![good.clone()];
+        let mut p = good.clone();
+        p.job_id += 1;
+        permits.push(p);
+        let mut p = good.clone();
+        p.owner_device_id.push('x');
+        permits.push(p);
+        let mut p = good.clone();
+        p.operation = "cloud_cleanup".to_string();
+        permits.push(p);
+        let mut p = good.clone();
+        p.recovery_generation += 1;
+        permits.push(p);
+        let mut p = good.clone();
+        p.nonce.push('x');
+        permits.push(p);
+
+        let mut cases = 0;
+        for marker in [None, Some(&m)] {
+            for permit in std::iter::once(None).chain(permits.iter().map(Some)) {
+                // Generations around the marker/permit generation (4).
+                for cloud in [0u64, 3, 4, 5] {
+                    for local in [3u64, 4, 5] {
+                        let core_permit = permit.map(|p| core_sc::RecoveryOwnerPermit {
+                            job_id: p.job_id,
+                            owner_device_id: p.owner_device_id.clone(),
+                            operation: p.operation.clone(),
+                            recovery_generation: p.recovery_generation,
+                            nonce: p.nonce.clone(),
+                        });
+                        let desktop = authorize_recovery_push(marker, cloud, local, permit);
+                        let core = core_sc::authorize_recovery_push(
+                            marker,
+                            cloud,
+                            local,
+                            core_permit.as_ref(),
+                        );
+                        assert_eq!(desktop, core, "cloud={cloud} local={local}");
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(cases, 2 * 7 * 4 * 3);
+    }
 }

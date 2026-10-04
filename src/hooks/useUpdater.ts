@@ -9,7 +9,7 @@ import { flushTabSession } from './useTabSessionRestore'
  * `UpdateAvailableModal`.
  *
  * Only `invoke` is used — never `@tauri-apps/plugin-updater`. Both
- * `website/vite.config.ts` and `web/vite.config.ts` throw on any
+ * `website/vite.config.ts` and `mockup/vite.config.ts` throw on any
  * `@tauri-apps/*` import outside their small aliased set, so importing the
  * plugin would break the demo and web-harness builds.
  */

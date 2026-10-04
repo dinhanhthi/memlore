@@ -246,7 +246,7 @@ describe('usePagedQuery', () => {
   })
 
   // Regression: the web preview's invoke router returns `null` for
-  // unhandled commands (see web/mocks/invokeRouter.ts). A nullish fetcher
+  // unhandled commands (see mockup/mocks/invokeRouter.ts). A nullish fetcher
   // result must be treated as an empty page rather than throwing on
   // `result.items` — before the null-guard this crashed every usePagedQuery
   // consumer (e.g. DailyChat) on mount.

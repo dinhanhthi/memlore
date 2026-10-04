@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import {
   setEditorMounted,
   registerActiveEditorInstance,
@@ -88,6 +89,7 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error'
 export function EditorPanel({ entryId }: EditorPanelProps) {
   const { t } = useTranslation('editor')
   const { t: tAi } = useTranslation('ai')
+  const { writes } = useCapabilities()
   const [entry, setEntry] = useState<Awaited<ReturnType<typeof getEntry>>>(null)
   const [notFound, setNotFound] = useState(false)
   const [title, setTitle] = useState('')
@@ -1139,6 +1141,15 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   // entry title above the scrollable ProseMirror canvas (640px column).
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {!writes && (
+        <div
+          role="status"
+          className="bg-panel-2 text-fg-secondary border-border-subtle shrink-0 border-b px-4 py-2 text-sm"
+        >
+          {t('web.readOnlyBanner')}
+        </div>
+      )}
+
       {/* Find-in-editor bar — overlays the editor top-right. Controlled by
           `findOpen`; Task 3 will wire the ⌘F event listener to open it. */}
       {findOpen && (
@@ -1154,7 +1165,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       <Editor
         doc={doc}
         mathExtensions={mathExtensions}
-        editable={true}
+        editable={writes}
         onUpdate={handleEditorUpdate}
         onApplyTemplate={handleApplyTemplate}
         initialTemplate={pendingTemplate}
@@ -1208,6 +1219,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
               <textarea
                 ref={titleInputRef}
                 value={title}
+                readOnly={!writes}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 onKeyDown={(e) => {
                   // Title is a single logical field — Enter should move focus
@@ -1225,14 +1237,16 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
                 style={{ fontFamily: 'var(--font-title)' }}
                 className="xj-entry-title text-fg block flex-1 resize-none overflow-hidden border-none bg-transparent py-1 text-3xl leading-tight font-bold tracking-tight wrap-break-word outline-none"
               />
-              <div className="shrink-0 pt-2">
-                <SuggestTitlePill
-                  entryId={entry?.id ?? null}
-                  bodyCharCount={entryCharCount}
-                  currentTitle={title}
-                  onTitleSuggested={handleTitleChange}
-                />
-              </div>
+              {writes && (
+                <div className="shrink-0 pt-2">
+                  <SuggestTitlePill
+                    entryId={entry?.id ?? null}
+                    bodyCharCount={entryCharCount}
+                    currentTitle={title}
+                    onTitleSuggested={handleTitleChange}
+                  />
+                </div>
+              )}
             </div>
           </>
         }
