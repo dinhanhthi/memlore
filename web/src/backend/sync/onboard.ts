@@ -334,11 +334,25 @@ export interface MetaState {
 }
 
 export async function readMeta(reader: DriveReader, core: Core, v: Versions): Promise<MetaState> {
+  return (await readMetaWithText(reader, core, v)).meta
+}
+
+/** `readMeta`, also returning the file text it parsed (onboarding caches it for the push fence). */
+async function readMetaWithText(
+  reader: DriveReader,
+  core: Core,
+  v: Versions,
+): Promise<{ meta: MetaState; text: string }> {
   const text = await readRequired(
     reader,
     META_PATH,
     () => new VaultCorruptError('Cloud vault _meta.json is missing'),
   )
+  return { meta: parseMetaText(core, v, text), text }
+}
+
+/** Format guard, then the core parser: the `_meta.json` text as `MetaState`. */
+export function parseMetaText(core: Core, v: Versions, text: string): MetaState {
   assertKnownVersion(META_PATH, text, v.keyring)
   let parsed: Record<string, unknown>
   try {
@@ -511,6 +525,22 @@ export async function cacheContentText(db: WebDb, text: string, now: number): Pr
   })
 }
 
+/**
+ * Cache the `_meta.json` text onboarding verified against the unwrapped ring, pinned, like
+ * `cacheContentText`. The push session builds its `ExpectedVaultState` (epoch, content epoch) from
+ * this copy: a fresh read is never trusted as "expected".
+ */
+export async function cacheMetaText(db: WebDb, text: string, now: number): Promise<void> {
+  await db.files.put({
+    path: META_PATH,
+    ciphertext: new TextEncoder().encode(text),
+    etag: null,
+    modifiedTime: null,
+    lastAccess: now,
+    pinned: true,
+  })
+}
+
 async function loadContentKeys(
   ring: KeyRing,
   reader: DriveReader,
@@ -605,7 +635,7 @@ export async function onboardComplete(
   probePhrase(core, input.phrase, wrapped)
 
   // 4. meta + generation.
-  const meta = await readMeta(reader, core, v)
+  const { meta, text: metaText } = await readMetaWithText(reader, core, v)
   if (meta.recoveryGeneration !== control.recoveryGeneration) {
     throw new GenerationMismatchError(control.recoveryGeneration, meta.recoveryGeneration)
   }
@@ -684,6 +714,11 @@ export async function onboardComplete(
     } else {
       await dropCache()
     }
+    // Same for the meta the ring was verified against. A failure only makes a push refuse
+    // (re-onboard): a stale copy must not survive to become the push fence's "expected".
+    await cacheMetaText(db, metaText, (deps.now ?? Date.now)()).catch(() =>
+      db.files.delete(META_PATH).catch(() => undefined),
+    )
 
     // 10. Ask for durable storage; a failure is not fatal.
     let persisted = false

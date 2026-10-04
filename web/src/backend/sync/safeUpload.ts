@@ -1,7 +1,9 @@
 /**
  * safeUpload: the only write path (Phase 15.4).
  *
- * `safeUpload.ts` is the ONLY importer of `DriveWriter`, other than `onboard.ts`.
+ * `safeUpload.ts` is the ONLY importer of `DriveWriter`, other than `onboard.ts`. The push session
+ * (`push.ts`) gets its writer from `createOutboxWriter` and creates the outbox folder only through
+ * `safeEnsureOutboxFolder`, which runs checks 1-4 below first.
  * Each batch runs inside the `navigator.locks` single-writer lock, and checks in order:
  *  1. a FRESH `fetchWriteFlag()` (fail-closed);
  *  2. `assertClockOk()`;
@@ -9,7 +11,8 @@
  *  4. the format guard (`assertFormatGuardOk`);
  *  5. every target path matches the outbox allowlist (`generations/g-<localGen>/<webId>/outbox/…`);
  *  6. seal-then-verify: re-open the sealed bytes with WASM (`openOutboxEntry` / `openMedia`) and
- *     require an exact match with the intended content.
+ *     require an exact match with the intended content. A failure is a `SealVerifyError`, so a
+ *     caller can skip that one batch; every other refusal concerns the whole vault.
  *
  * Only then does it write each intent through the lock-scoped `put` handed to the batch by
  * `DriveWriter.withLock` (update-in-place).
@@ -22,18 +25,23 @@ import { fetchWriteFlag } from '../config'
 import {
   DriveWriter,
   type DriveReader,
+  type DriveWriterDeps,
+  type EnsureFolderResult,
   type LockManagerLike,
   type PutResult,
+  type WriterIdentity,
 } from '../drive/client'
-import {
-  isValidGeneration,
-  isValidOwnId,
-} from '../drive/paths'
-import {
-  assertRecoveryFence,
-  type ExpectedVaultState,
-} from './fence'
+import { isValidGeneration, isValidOwnId } from '../drive/paths'
+import { assertRecoveryFence, type ExpectedVaultState } from './fence'
 import { assertFormatGuardOk } from './formatGuard'
+
+/** Seal-then-verify (check 6) refused this batch: its bytes do not round-trip. */
+export class SealVerifyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SealVerifyError'
+  }
+}
 
 export interface SafeUploadIntent {
   path: string
@@ -101,34 +109,62 @@ export function isOutboxIntentPath(path: string, localGen: number, ownId: string
   return outboxPattern.test(path)
 }
 
+/** A writer for the outbox of `identity` (the push session's only way to get one). */
+export function createOutboxWriter(
+  reader: DriveReader,
+  deps: DriveWriterDeps,
+  identity: WriterIdentity,
+): DriveWriter {
+  const writer = new DriveWriter(reader, deps)
+  writer.setIdentity(identity)
+  return writer
+}
+
+/** Checks 1-4: write flag, clock, fence, format guard. The caller holds the writer lock. */
+async function assertBatchAllowed(deps: SafeUploadDeps): Promise<void> {
+  // 1. Fresh fetchWriteFlag (fail-closed)
+  const fetchFlag = deps.fetchWriteFlagImpl ?? fetchWriteFlag
+  const writeAllowed = await fetchFlag()
+  if (!writeAllowed) {
+    throw new Error('Writes disabled: write flag is false')
+  }
+
+  // 2. assertClockOk
+  assertClockOk()
+
+  // 3. The recovery fence (also contacts server and updates clock offset)
+  await assertRecoveryFence({
+    reader: deps.reader,
+    core: deps.core,
+    expected: deps.expectedFence,
+    revalidatePull: deps.revalidatePull,
+  })
+
+  // Re-assert clock now that server Date header was sampled during fence read
+  assertClockOk()
+
+  // 4. The format guard
+  assertFormatGuardOk()
+}
+
+/**
+ * Creates `<ownId>` and `<ownId>/outbox` (the only folders the web may create) under the writer
+ * lock, after the same checks 1-4 as an upload batch: a folder is a write too.
+ */
+export async function safeEnsureOutboxFolder(deps: SafeUploadDeps): Promise<EnsureFolderResult> {
+  return deps.writer.withLock(async (locked) => {
+    await assertBatchAllowed(deps)
+    return locked.ensureFolder()
+  }, deps.locks)
+}
+
 export async function safeUpload(
   intents: readonly SafeUploadIntent[],
   deps: SafeUploadDeps,
 ): Promise<PutResult[]> {
   return deps.writer.withLock(async (locked) => {
-    // 1. Fresh fetchWriteFlag (fail-closed)
-    const fetchFlag = deps.fetchWriteFlagImpl ?? fetchWriteFlag
-    const writeAllowed = await fetchFlag()
-    if (!writeAllowed) {
-      throw new Error('Writes disabled: write flag is false')
-    }
-
-    // 2. assertClockOk
-    assertClockOk()
-
-    // 3. The recovery fence (also contacts server and updates clock offset)
-    await assertRecoveryFence({
-      reader: deps.reader,
-      core: deps.core,
-      expected: deps.expectedFence,
-      revalidatePull: deps.revalidatePull,
-    })
-
-    // Re-assert clock now that server Date header was sampled during fence read
-    assertClockOk()
-
-    // 4. The format guard
-    assertFormatGuardOk()
+    // 1-4. Write flag, clock, fence, format guard
+    await assertBatchAllowed(deps)
 
     // 5. Every target path matches the outbox allowlist
     for (const intent of intents) {
@@ -146,7 +182,7 @@ export async function safeUpload(
         try {
           openedJson = deps.core.openOutboxEntry(deps.ring, intent.bytes)
         } catch (err: unknown) {
-          throw new Error(
+          throw new SealVerifyError(
             `Seal-then-verify failed to open entry at ${intent.path}: ${err instanceof Error ? err.message : String(err)}`,
           )
         }
@@ -156,20 +192,22 @@ export async function safeUpload(
             ? JSON.parse(intent.intended.entry)
             : intent.intended.entry
         if (!deepEqual(opened, expected)) {
-          throw new Error(`Seal-then-verify payload mismatch for entry at ${intent.path}`)
+          throw new SealVerifyError(`Seal-then-verify payload mismatch for entry at ${intent.path}`)
         }
       } else {
         let openedBytes: Uint8Array
         try {
           openedBytes = deps.core.openMedia(deps.ring, intent.bytes)
         } catch (err: unknown) {
-          throw new Error(
+          throw new SealVerifyError(
             `Seal-then-verify failed to open media at ${intent.path}: ${err instanceof Error ? err.message : String(err)}`,
           )
         }
         const expected = intent.intended.plaintext
         if (!bytesEqual(openedBytes, expected)) {
-          throw new Error(`Seal-then-verify plaintext mismatch for media at ${intent.path}`)
+          throw new SealVerifyError(
+            `Seal-then-verify plaintext mismatch for media at ${intent.path}`,
+          )
         }
       }
     }

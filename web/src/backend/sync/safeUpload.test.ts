@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadCore, type Core } from '../../core/core'
 import type { KeyRing } from '../keys'
-import {
-  ClockSkewError,
-  resetClock,
-  updateClockOffset,
-} from '../clock'
+import { ClockSkewError, resetClock, updateClockOffset } from '../clock'
 import {
   DriveReader,
   DriveWriter,
@@ -20,14 +16,11 @@ import {
   loadDesktopFixture,
   seedFromFixture,
 } from '../drive/fakeDrive'
-import {
-  ROOT_FOLDER_NAME,
-  outboxEntryPath,
-  outboxMediaPath,
-} from '../drive/paths'
+import { ROOT_FOLDER_NAME, outboxEntryPath, outboxMediaPath } from '../drive/paths'
 import { resumeWrites } from './fence'
 import { latchFormatGuard, resetFormatGuardLatch } from './formatGuard'
 import {
+  SealVerifyError,
   safeUpload,
   type SafeUploadIntent,
   type SafeUploadDeps,
@@ -228,7 +221,9 @@ describe('safeUpload: the only write path', () => {
     ]
 
     const mutatingBefore = drive.mutating().length
-    await expect(safeUpload(intents, makeDeps())).rejects.toThrow(/seal.*verify/i)
+    const upload = safeUpload(intents, makeDeps())
+    await expect(upload).rejects.toThrow(/seal.*verify/i)
+    await expect(upload).rejects.toBeInstanceOf(SealVerifyError)
     expect(drive.mutating().length).toBe(mutatingBefore)
   })
 
@@ -450,9 +445,9 @@ describe('safeUpload: the only write path', () => {
 
   it('fails closed when navigator.locks is unavailable', async () => {
     const intents: SafeUploadIntent[] = []
-    await expect(
-      safeUpload(intents, makeDeps({ locks: null })),
-    ).rejects.toThrow(LockUnavailableError)
+    await expect(safeUpload(intents, makeDeps({ locks: null }))).rejects.toThrow(
+      LockUnavailableError,
+    )
   })
 
   it('blocks upload when format guard is latched', async () => {

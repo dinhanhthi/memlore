@@ -271,6 +271,22 @@ describe('onboardComplete: happy path', () => {
     expect(text(cached?.ciphertext ?? new Uint8Array())).toBe(text(fixtureBytes(fixture, CONTENT)))
   })
 
+  it('caches the _meta.json text it onboarded with (pinned) for the push fence', async () => {
+    const env = await setup()
+    await env.db.files.put({
+      path: META,
+      ciphertext: bytes('stale'),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 1,
+      pinned: true,
+    })
+    await run(env)
+    const cached = await env.db.files.get(META)
+    expect(cached?.pinned).toBe(true)
+    expect(text(cached?.ciphertext ?? new Uint8Array())).toBe(text(fixtureBytes(fixture, META)))
+  })
+
   it('caches nothing when _content.json is confirmed absent', async () => {
     const env = await setup({ omit: (p) => p === CONTENT })
     await run(env)

@@ -306,6 +306,7 @@ describe('refresh', () => {
         `${env.desktop}/journals/4fd64221-d0eb-4bc0-84c9-810bce934d16.bin`,
         `${env.desktop}/journals/efd3b558-3fa2-4b35-b31d-e16a918e98cc.bin`,
         '.meta/keyring/_content.json',
+        '.meta/keyring/_meta.json',
       ].sort(),
     )
     expect(
