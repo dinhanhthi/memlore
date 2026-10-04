@@ -1,5 +1,9 @@
+import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createDraftManager, resetDraftsAutostartForTest, type DraftManager } from '../drafts'
 import { dispose, lock, setKeyRing, type KeyRing } from '../keys'
+import { openWebDb } from '../storage/idb'
+import type { PushResult } from '../sync/push'
 import type { PullOutcome } from './readSession'
 import {
   BACKOFF_BASE_MS,
@@ -8,6 +12,7 @@ import {
   INTERVAL_MS,
   MSG_FORMAT_READ_ONLY,
   MSG_SYNC_DEGRADED,
+  PUSH_DEBOUNCE_MS,
   configureSyncEnv,
   startSyncSchedule,
   stopSyncSchedule,
@@ -53,9 +58,24 @@ function harness() {
   const docListeners = new Map<string, Set<Listener>>()
   const events: Array<{ event: string; payload: unknown }> = []
   const script: Array<() => Promise<PullOutcome>> = []
+  const pushScript: Array<() => Promise<PushResult>> = []
   const h = {
     pulls: 0,
     outcome: NOOP,
+    pushes: 0,
+    /** The cached write flag. Off by default, so the pull-only tests never push. */
+    flag: false,
+    /** The unpushed draft count; a push sets it to its result's `pending`. */
+    pending: 0,
+    pushResult: { pushed: 0, skipped: 0, pending: 0 } as PushResult,
+    /** `pull` / `push`, in call order. */
+    log: [] as string[],
+    queuePush: (fn: () => Promise<PushResult>) => pushScript.push(fn),
+    /** Replaces the scripted push entirely (its result is returned as is). */
+    pushImpl: null as (() => Promise<PushResult>) | null,
+    online: () => {
+      for (const fn of [...(winListeners.get('online') ?? [])]) fn()
+    },
     events,
     states: () =>
       events
@@ -119,8 +139,21 @@ function harness() {
     emitChanged: () => {
       events.push({ event: 'memlore:entries-changed', payload: undefined })
     },
+    cachedWriteFlag: () => h.flag,
+    pendingCount: () => h.pending,
+    push: async () => {
+      h.pushes += 1
+      h.log.push('push')
+      if (h.pushImpl !== null) return h.pushImpl()
+      const next = pushScript.shift()
+      // A fresh object per run, like `pushAll`.
+      const result = next === undefined ? { ...h.pushResult } : await next()
+      h.pending = result.pending
+      return result
+    },
     pull: async () => {
       h.pulls += 1
+      h.log.push('pull')
       const next = script.shift()
       return next === undefined ? h.outcome : next()
     },
@@ -517,5 +550,327 @@ describe('status and settings', () => {
   it('reports not connected without a Drive session', async () => {
     harness()
     await expect(syncHandlers.gdrive_get_status({})).resolves.toEqual({ connected: false })
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Push (Phase 16.5)
+// ---------------------------------------------------------------------------------------------
+
+async function draftManager(): Promise<DraftManager> {
+  resetDraftsAutostartForTest()
+  return createDraftManager({ db: await openWebDb({ factory: new IDBFactory() }) })
+}
+
+const PUSHED_ALL: PushResult = { pushed: 1, skipped: 0, pending: 0 }
+
+describe('push triggers', () => {
+  it('pushes once, PUSH_DEBOUNCE_MS after the last of several saves', async () => {
+    const h = harness()
+    h.flag = true
+    const drafts = await draftManager()
+    startSyncSchedule()
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    for (const id of ['a', 'b', 'c']) {
+      await drafts.saveDraft(id, new Uint8Array([1]))
+      await h.advance(PUSH_DEBOUNCE_MS / 2)
+    }
+    expect(h.pushes).toBe(0)
+    await h.advance(PUSH_DEBOUNCE_MS / 2 - 1)
+    expect(h.pushes).toBe(0)
+    await h.advance(1)
+    expect(h.pushes).toBe(1)
+    await h.advance(PUSH_DEBOUNCE_MS * 5)
+    expect(h.pushes).toBe(1)
+  })
+
+  it('never pushes while the cached write flag is off', async () => {
+    const h = harness()
+    h.pending = 2
+    const drafts = await draftManager()
+    startSyncSchedule()
+    await h.settle()
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    h.online()
+    await syncHandlers.sync_now({})
+    await h.settle()
+    expect(h.pushes).toBe(0)
+  })
+
+  it('never pushes while locked, and a lock drops a pending debounced push', async () => {
+    const h = harness()
+    h.flag = true
+    const drafts = await draftManager()
+    startSyncSchedule()
+    await h.settle()
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    lock('manual')
+    expect(h.timerCount()).toBe(0)
+    await drafts.saveDraft('b', new Uint8Array([1]))
+    h.online()
+    await h.advance(PUSH_DEBOUNCE_MS * 2)
+    expect(h.pushes).toBe(0)
+  })
+
+  it('pushes when the tab becomes visible and when the browser comes back online', async () => {
+    const h = harness()
+    h.flag = true
+    startSyncSchedule()
+    await h.settle()
+    h.setVisible('hidden')
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    h.setVisible('visible')
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(2)
+  })
+
+  it('pushes once after the unlock pull (hydration) when drafts are pending', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+  })
+
+  it('pushes pending drafts after an interval pull (the flag may arrive after the unlock pull)', async () => {
+    const h = harness()
+    h.pending = 1
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull'])
+    h.flag = true
+    h.pushResult = PUSHED_ALL
+    await h.advance(INTERVAL_MS)
+    expect(h.log).toEqual(['pull', 'pull', 'push'])
+  })
+
+  it('does not push after the unlock pull when nothing is pending', async () => {
+    const h = harness()
+    h.flag = true
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull'])
+  })
+
+  it('installs its listeners once across restarts', async () => {
+    const h = harness()
+    h.flag = true
+    const drafts = await draftManager()
+    startSyncSchedule()
+    startSyncSchedule()
+    await h.settle()
+    expect(h.listenerCount()).toBe(3)
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    expect(h.pushes).toBe(1)
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(2)
+  })
+})
+
+describe('push status', () => {
+  it('reports the unpushed draft count as entriesPending, 0 while locked', async () => {
+    const h = harness()
+    h.pending = 3
+    await expect(syncHandlers.get_sync_status({})).resolves.toMatchObject({ entriesPending: 3 })
+    lock('manual')
+    await expect(syncHandlers.get_sync_status({})).resolves.toMatchObject({ entriesPending: 0 })
+  })
+
+  it('emits the status after a push changes entriesPending, without leaving synced', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = PUSHED_ALL
+    startSyncSchedule()
+    await h.settle()
+    expect(h.states()).toEqual(['syncing', 'synced', 'synced'])
+    expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0, error: null })
+  })
+
+  it('emits nothing after a push that leaves entriesPending unchanged', async () => {
+    const h = harness()
+    h.flag = true
+    startSyncSchedule()
+    await h.settle()
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    expect(h.states()).toEqual(['syncing', 'synced'])
+  })
+
+  it('sync_now pulls, then pushes, and reports what was pushed', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = PUSHED_ALL
+    await expect(syncHandlers.sync_now({})).resolves.toEqual({
+      pushed: 1,
+      pulled: 0,
+      merged: 0,
+      errors: [],
+    })
+    expect(h.log).toEqual(['pull', 'push'])
+    expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0, error: null })
+  })
+
+  it('sync_now pushes even when nothing is known to be pending', async () => {
+    const h = harness()
+    h.flag = true
+    await syncHandlers.sync_now({})
+    expect(h.log).toEqual(['pull', 'push'])
+    expect(h.states()).toEqual(['syncing', 'synced'])
+  })
+
+  it('sync_now does not push after a failed pull', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.queue(async () => {
+      throw new Error('offline')
+    })
+    const summary = (await syncHandlers.sync_now({})) as { errors: string[] }
+    expect(summary.errors).toEqual(['offline'])
+    expect(h.pushes).toBe(0)
+  })
+
+  it('sync_now reports a push error in errors and ends in the error status', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = { pushed: 0, skipped: 0, pending: 1, error: new Error('Drive said no') }
+    const summary = (await syncHandlers.sync_now({})) as { pushed: number; errors: string[] }
+    expect(summary).toMatchObject({ pushed: 0, errors: ['Drive said no'] })
+    expect(h.last()).toMatchObject({ state: 'error', error: 'Drive said no', entriesPending: 1 })
+  })
+
+  it('a push error is the error status and backs off like a failed pull', async () => {
+    const h = harness()
+    h.flag = true
+    const drafts = await draftManager()
+    h.pending = 1
+    h.queuePush(async () => ({ pushed: 0, skipped: 0, pending: 1, error: new Error('quota') }))
+    startSyncSchedule()
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+    expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+    // Inside the backoff window: no automatic push, no pull on focus.
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    await h.settle()
+    expect(h.log).toEqual(['pull', 'push'])
+    // The retry pushes again (a push has its own backoff, see the next test).
+    h.pushResult = PUSHED_ALL
+    await h.advance(BACKOFF_BASE_MS)
+    expect(h.log).toEqual(['pull', 'push', 'push'])
+    expect(h.last()).toMatchObject({ state: 'synced', error: null, entriesPending: 0 })
+  })
+
+  it('reports a run that several triggers joined once', async () => {
+    const h = harness()
+    h.flag = true
+    startSyncSchedule()
+    await h.settle()
+    // pushAll hands every joiner of a run the same result object.
+    let release!: (r: PushResult) => void
+    const shared = new Promise<PushResult>((resolve) => (release = resolve))
+    h.pushImpl = () => shared
+    h.online()
+    h.online()
+    await h.settle()
+    const before = h.events.length
+    release({ pushed: 0, skipped: 0, pending: 1, error: new Error('quota') })
+    await h.settle()
+    expect(h.events).toHaveLength(before + 1)
+    expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+    // One failure: the retry lands after the first backoff step, not the second.
+    h.pushImpl = async () => PUSHED_ALL
+    await h.advance(BACKOFF_BASE_MS)
+    expect(h.last()).toMatchObject({ state: 'synced', error: null })
+  })
+
+  it('a second push failure doubles the backoff', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = { pushed: 0, skipped: 0, pending: 1, error: new Error('quota') }
+    startSyncSchedule()
+    await h.settle()
+    await h.advance(BACKOFF_BASE_MS)
+    expect(h.pushes).toBe(2)
+    await h.advance(BACKOFF_BASE_MS * 2 - 1)
+    expect(h.pushes).toBe(2)
+    await h.advance(1)
+    expect(h.pushes).toBe(3)
+  })
+
+  it('a failing push does not block pulls, and a clean pull keeps the push error', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = { pushed: 0, skipped: 0, pending: 1, error: new Error('quota') }
+    startSyncSchedule()
+    await h.settle()
+    await h.advance(FOCUS_MIN_AGE_MS + 1)
+    h.focus()
+    await h.settle()
+    expect(h.pulls).toBe(2)
+    expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+  })
+
+  it('clears a push error once a later push succeeds', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.queuePush(async () => ({ pushed: 0, skipped: 0, pending: 1, error: new Error('quota') }))
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()?.state).toBe('error')
+    h.pushResult = PUSHED_ALL
+    h.online()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', error: null, entriesPending: 0 })
+  })
+
+  it('a successful push does not hide a pull error', async () => {
+    const h = harness()
+    h.flag = true
+    h.queue(async () => {
+      throw new Error('offline')
+    })
+    startSyncSchedule()
+    await h.settle()
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    expect(h.last()).toMatchObject({ state: 'error', error: 'offline' })
+  })
+
+  it('ignores the report of a push that finishes after the lock', async () => {
+    const h = harness()
+    h.flag = true
+    let release!: (r: PushResult) => void
+    h.queuePush(() => new Promise<PushResult>((resolve) => (release = resolve)))
+    startSyncSchedule()
+    await h.settle()
+    h.online()
+    await h.settle()
+    lock('manual')
+    const before = h.events.length
+    release({ pushed: 0, skipped: 0, pending: 1, error: new Error('late') })
+    await h.settle()
+    expect(h.events).toHaveLength(before)
   })
 })

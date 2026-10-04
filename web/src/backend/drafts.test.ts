@@ -6,8 +6,10 @@ import {
   DraftManager,
   createDraftManager,
   isAnyDraftDirty,
+  onDraftSaved,
   resetDraftsAutostartForTest,
   sha256Hex,
+  unpushedDraftCount,
 } from './drafts'
 
 const mocks = vi.hoisted(() => ({ safeUpload: vi.fn(async () => undefined) }))
@@ -169,5 +171,33 @@ describe('DraftManager', () => {
 
     expect(isAnyDraftDirty()).toBe(true)
     expect(fresh.isDirtySync()).toBe(true)
+  })
+
+  it('notifies save listeners once per stored draft, until unsubscribed', async () => {
+    const saved = vi.fn()
+    const off = onDraftSaved(saved)
+    await manager.saveDraft('e1', new Uint8Array([1]))
+    expect(saved).toHaveBeenCalledTimes(1)
+    off()
+    await manager.saveDraft('e1', new Uint8Array([2]))
+    expect(saved).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not notify when the draft could not be stored', async () => {
+    const saved = vi.fn()
+    const off = onDraftSaved(saved)
+    vi.spyOn(db.drafts, 'put').mockRejectedValueOnce(new Error('quota'))
+    await expect(manager.saveDraft('e1', new Uint8Array([1]))).rejects.toThrow('quota')
+    expect(saved).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('counts the unpushed drafts without reading IndexedDB', async () => {
+    expect(unpushedDraftCount()).toBe(0)
+    await manager.saveDraft('e1', new Uint8Array([1]))
+    await manager.saveDraft('e2', new Uint8Array([2]))
+    expect(unpushedDraftCount()).toBe(2)
+    await manager.flush('e1', [], UPLOAD_DEPS, new Uint8Array([1]))
+    expect(unpushedDraftCount()).toBe(1)
   })
 })

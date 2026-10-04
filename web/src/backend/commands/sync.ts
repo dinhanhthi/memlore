@@ -1,6 +1,7 @@
 /**
- * Sync commands, status events and the pull schedule (Phase 10.4). READ-ONLY: the web has no local
- * push queue yet (Phase 16), so every "pull" here is `ReadSession.pull()` and `entriesPending` is 0.
+ * Sync commands, status events, the pull schedule (Phase 10.4) and the push triggers (Phase 16.5).
+ * A "pull" here is `ReadSession.pull()`; a "push" is `pushAll()` (sync/push.ts), which uploads the
+ * unpushed drafts to this device's outbox. `entriesPending` is the unpushed draft count.
  *
  * Desktop contract followed here (src-tauri/src/commands/sync.rs, src/lib/tauri.ts):
  *   Event  "sync:status-changed" `{state, enabled, configured, provider, lastSync, entriesPending,
@@ -13,8 +14,9 @@
  *   Event  "sync:progress" is deliberately NOT emitted: the UI treats every `pulling-*` tick as
  *          "rows are landing" and refetches all lists, which a no-op pull must not trigger. The
  *          lists refresh through the two events above (and syncStore does it on `synced` anyway).
- *   Cmd    sync_now -> SyncSummary `{pushed, pulled, merged, errors}`. A pull failure is reported in
- *          `errors` (the store reads `summary.errors`), it does not reject. Locked: rejects.
+ *   Cmd    sync_now -> SyncSummary `{pushed, pulled, merged, errors}`: a pull, then (cached write
+ *          flag on) a push. A pull or push failure is reported in `errors` (the store reads
+ *          `summary.errors`), it does not reject. Locked: rejects.
  *   Cmd    get_sync_status -> SyncStatus; get_sync_settings -> SyncSettings `{intervalMinutes,
  *          onSave, onLaunch}`, which has no provider field: "Drive only, iCloud unavailable" is
  *          `provider: 'gdrive'` here and in `gdrive_get_status`, plus the `icloud_availability`
@@ -33,14 +35,35 @@
  *     (Phase 12), so only the status and the puller's `getReonboardReason()` flag carry the signal;
  *     the desktop's `xj://force-re-pair` event routes to screens whose commands are unsupported.
  *
+ * PUSH (only while the schedule runs, i.e. unlocked, and only when the cached write flag is on;
+ * `safeUpload` re-fetches the flag before any write):
+ *   - `PUSH_DEBOUNCE_MS` after the last `saveDraft` (the drafts notifier, one hook for every write
+ *     command), when the tab becomes visible, when the browser comes back `online`, and after the
+ *     unlock pull and every interval pull when drafts are pending. The unlock pull hydrates the
+ *     read session, which refreshes the dirty set. The write flag is fetched on the same
+ *     `app:unlocked` and may land after that pull: the interval pull then catches those drafts.
+ *   - `sync_now` pulls FIRST, then pushes, and skips the push when the pull failed. The pull is what
+ *     detects a revoked device (`slot-missing`), which the write fence does not check: pushing first
+ *     could upload to an outbox the desktop already revoked. A revoke never touches drafts
+ *     (`clearCache` keeps them), so pulling first loses nothing.
+ *   - A push error is the `error` status with its message and backs off 30 s, 60 s, ... 5 min on its
+ *     own counter (a failing push must not starve pulls); the retry pushes again, `online` skips the
+ *     wait, a successful push clears the error. A successful pull keeps a push error on screen.
+ *   - A push emits a status only when it fails, clears its own error, or changes `entriesPending`:
+ *     never `syncing` / a fresh `synced` per save (the store refetches every list on `synced`).
+ *
  * Errors are told apart by `name`, not `instanceof`: importing the puller or onboard module here
  * would drag the WASM core into the router bundle (this file is imported statically by router.ts).
+ * For the same reason push.ts is only ever imported dynamically.
  */
 
 import { emitFromBackend, listen } from '../../tauri/event'
+import { getCachedWriteFlag } from '../config'
+import { onDraftSaved, unpushedDraftCount } from '../drafts'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, isUnlocked, onLock } from '../keys'
 import type { Handler } from '../router'
+import type { PushResult } from '../sync/push'
 import { readEnv, type PullOutcome } from './readSession'
 
 export const STATUS_EVENT = 'sync:status-changed'
@@ -50,6 +73,7 @@ export const FOCUS_MIN_AGE_MS = 30_000
 export const INTERVAL_MS = 5 * 60_000
 export const BACKOFF_BASE_MS = 30_000
 export const BACKOFF_MAX_MS = 5 * 60_000
+export const PUSH_DEBOUNCE_MS = 2_000
 
 export const MSG_FORMAT_READ_ONLY =
   'This vault uses a newer sync format than this app version understands, so it stays read-only. Update the app.'
@@ -99,6 +123,14 @@ export interface SyncEnv {
   isUnlocked: () => boolean
   /** One pull of the read session. */
   pull: () => Promise<PullOutcome>
+  /** `pushAll()`, imported lazily (push.ts loads the WASM core). Never rejects. */
+  push: () => Promise<PushResult>
+  /** The last fetched write flag. Off: no push at all. */
+  cachedWriteFlag: () => boolean
+  /** The unpushed draft count, without reading IndexedDB. */
+  pendingCount: () => number
+  /** Subscribes to every successful `saveDraft`; returns the unsubscribe function. */
+  onDraftSaved: (listener: () => void) => () => void
   document: DocumentLike | null
   window: Target | null
 }
@@ -112,6 +144,10 @@ function defaultEnv(): SyncEnv {
     emitChanged: () => readEnv().emit(CHANGED_EVENT),
     isUnlocked,
     pull: async () => (await readEnv().session()).pull(),
+    push: async () => (await import('../sync/push')).pushAll(),
+    cachedWriteFlag: getCachedWriteFlag,
+    pendingCount: unpushedDraftCount,
+    onDraftSaved,
     document: typeof document === 'undefined' ? null : (document as unknown as DocumentLike),
     window: typeof window === 'undefined' ? null : (window as unknown as Target),
   }
@@ -147,6 +183,16 @@ let retryTimer: unknown = null
 /** Bumped on stop: a pull that finishes under an older epoch reports nothing. */
 let epoch = 0
 let autostartInstalled = false
+/** Push backoff, apart from the pull's so a failing push never blocks pulls. */
+let pushFailures = 0
+let pushNextAt = 0
+let pushRetryTimer: unknown = null
+/** The last push error, until a push succeeds. A successful pull keeps showing it. */
+let pushError: string | null = null
+/** `entriesPending` of the last status event. */
+let reportedPending = 0
+/** The last push result reported: `pushAll` resolves every joiner of a run to the same object. */
+let lastReported: PushResult | null = null
 
 /** Test seam: override injected pieces and reset all state. Pass `{}` to restore the defaults. */
 export function configureSyncEnv(partial: Partial<SyncEnv>): void {
@@ -161,20 +207,31 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   nextAttemptAt = 0
   failures = 0
   halted = false
+  pushFailures = 0
+  pushNextAt = 0
+  pushError = null
+  reportedPending = 0
+  lastReported = null
 }
 
-const snapshot = (): SyncStatus => ({
-  enabled: true,
-  configured: true,
-  provider: 'gdrive',
-  lastSync: lastSyncSec,
-  entriesPending: 0,
-})
+const snapshot = (): SyncStatus => {
+  const e = env()
+  return {
+    enabled: true,
+    configured: true,
+    provider: 'gdrive',
+    lastSync: lastSyncSec,
+    entriesPending: e.isUnlocked() ? e.pendingCount() : 0,
+  }
+}
 
 function setPhase(next: SyncPhase, error: string | null): void {
-  phase = next
-  lastError = error
-  const payload: SyncStatusEvent = { ...snapshot(), state: next, error }
+  // A push error survives a pull that succeeds: the drafts are still not uploaded.
+  const keepPushError = next === 'synced' && pushError !== null
+  phase = keepPushError ? 'error' : next
+  lastError = keepPushError ? pushError : error
+  const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: lastError }
+  reportedPending = payload.entriesPending
   env().emit(STATUS_EVENT, payload)
 }
 
@@ -280,7 +337,99 @@ function request(trigger: Trigger): void {
   if (active === null || halted || !e.isUnlocked() || isHidden(e)) return
   if (e.now() < nextAttemptAt) return
   if (trigger === 'focus' && e.now() - lastAttemptAt < FOCUS_MIN_AGE_MS) return
-  void runPull()
+  const pulling = runPull()
+  if (trigger !== 'start' && trigger !== 'interval') return
+  // After the unlock pull, which hydrated the read session (and refreshed the dirty set); the
+  // interval catches drafts that pull missed because the write flag was not fetched yet.
+  void pulling.then((report) => {
+    if (report.message === null && report.outcome !== null && env().pendingCount() > 0) {
+      requestPush('start')
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Push
+// ---------------------------------------------------------------------------------------------
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+function clearPushRetry(): void {
+  if (pushRetryTimer !== null) env().clearTimeout(pushRetryTimer)
+  pushRetryTimer = null
+}
+
+function resetPushBackoff(): void {
+  pushFailures = 0
+  pushNextAt = 0
+  clearPushRetry()
+}
+
+type PushTrigger = 'start' | 'save' | 'visible' | 'online' | 'retry'
+
+/** An automatic push. `online` skips the backoff wait: the network being back is the point. */
+function requestPush(trigger: PushTrigger): void {
+  const e = env()
+  if (active === null || halted || !e.isUnlocked() || !e.cachedWriteFlag()) return
+  if (trigger !== 'online' && e.now() < pushNextAt) return
+  void runPush()
+}
+
+/** One `pushAll()`; its result is reported once even when several callers join the same run. */
+function runPush(): Promise<PushResult> {
+  const startedEpoch = epoch
+  return env()
+    .push()
+    .then((result) => {
+      if (result !== lastReported) {
+        lastReported = result
+        reportPush(result, startedEpoch)
+      }
+      return result
+    })
+}
+
+function reportPush(result: PushResult, startedEpoch: number): void {
+  const e = env()
+  const name = result.error instanceof Error ? result.error.name : ''
+  if (name === ERROR_NAMES.reonboardRequired) {
+    // A fence refusal re-validated through the puller, which locked: still report it, like a pull.
+    halted = true
+    clearRetry()
+    resetPushBackoff()
+    setPhase('error', errorText(result.error))
+    return
+  }
+  if (startedEpoch !== epoch || !e.isUnlocked() || name === ERROR_NAMES.vaultLocked) return
+  if (result.error !== undefined) {
+    pushFailures += 1
+    const delay = backoffMs(pushFailures)
+    pushNextAt = e.now() + delay
+    pushError = errorText(result.error)
+    setPhase('error', pushError)
+    schedulePushRetry(delay)
+    return
+  }
+  resetPushBackoff()
+  if (pushError !== null) {
+    const shown = lastError === pushError
+    pushError = null
+    if (shown) {
+      setPhase('synced', degraded ? MSG_SYNC_DEGRADED : null)
+      return
+    }
+  }
+  if (e.pendingCount() !== reportedPending) setPhase(phase, lastError)
+}
+
+function schedulePushRetry(delay: number): void {
+  clearPushRetry()
+  if (active === null) return
+  pushRetryTimer = env().setTimeout(() => {
+    pushRetryTimer = null
+    requestPush('retry')
+  }, delay)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -294,6 +443,7 @@ export function stopSyncSchedule(): void {
   active = null
   epoch += 1
   clearRetry()
+  clearPushRetry()
   current.stop()
 }
 
@@ -306,11 +456,25 @@ export function startSyncSchedule(): void {
   nextAttemptAt = 0
   lastAttemptAt = 0
   degraded = false
+  pushFailures = 0
+  pushNextAt = 0
+  pushError = null
   if (phase === 'error') setPhase('idle', null)
 
   const onFocus = (): void => request('focus')
   const onVisibility = (): void => {
-    if (!isHidden(e)) request('focus')
+    if (isHidden(e)) return
+    request('focus')
+    requestPush('visible')
+  }
+  const onOnline = (): void => requestPush('online')
+  let debounce: unknown = null
+  const onSaved = (): void => {
+    if (debounce !== null) e.clearTimeout(debounce)
+    debounce = e.setTimeout(() => {
+      debounce = null
+      requestPush('save')
+    }, PUSH_DEBOUNCE_MS)
   }
   let timer: unknown = null
   const tick = (): void => {
@@ -320,13 +484,18 @@ export function startSyncSchedule(): void {
     }, INTERVAL_MS)
   }
   e.window?.addEventListener('focus', onFocus)
+  e.window?.addEventListener('online', onOnline)
   e.document?.addEventListener('visibilitychange', onVisibility)
+  const unsubscribeSaved = e.onDraftSaved(onSaved)
   const unregisterLock = onLock(() => stopSyncSchedule())
   active = {
     stop: () => {
       e.window?.removeEventListener('focus', onFocus)
+      e.window?.removeEventListener('online', onOnline)
       e.document?.removeEventListener('visibilitychange', onVisibility)
+      unsubscribeSaved()
       if (timer !== null) e.clearTimeout(timer)
+      if (debounce !== null) e.clearTimeout(debounce)
       unregisterLock()
       if (phase === 'syncing') phase = 'idle'
     },
@@ -355,19 +524,29 @@ const LOCKED_STATUS: SyncStatus = {
 }
 
 async function syncNow(): Promise<SyncSummary> {
-  if (!env().isUnlocked()) throw new VaultLockedError()
+  const e = env()
+  if (!e.isUnlocked()) throw new VaultLockedError()
   // The user intervened: reset the backoff and a format halt (a retry is the point), like the
   // desktop's `reset_backoff`.
   failures = 0
   nextAttemptAt = 0
   if (retryTimer !== null) clearRetry()
+  resetPushBackoff()
   if (halted && lastError?.startsWith(MSG_FORMAT_READ_ONLY)) halted = false
   const report = await runPull()
+  const errors = report.message === null ? [] : [report.message]
+  // Pull first (see the header): it detects a revoke before anything is written.
+  let pushed = 0
+  if (report.outcome !== null && e.isUnlocked() && e.cachedWriteFlag()) {
+    const result = await runPush()
+    pushed = result.pushed
+    if (result.error !== undefined) errors.push(errorText(result.error))
+  }
   return {
-    pushed: 0,
+    pushed,
     pulled: report.outcome?.stale.length ?? 0,
     merged: 0,
-    errors: report.message === null ? [] : [report.message],
+    errors,
   }
 }
 

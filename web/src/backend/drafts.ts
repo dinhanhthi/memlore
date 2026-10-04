@@ -7,6 +7,8 @@
  *    state. Dropping pushed drafts is the deferred 16.1 retention rule (docs/LATER.md).
  *  - "Dirty" = some draft whose `pushedHash` is missing or is not the hash of its `sealed`.
  *  - Provides `beforeunload` warning when there are unpushed drafts.
+ *  - Notifies `onDraftSaved` listeners after every stored draft (the debounced push trigger in
+ *    `commands/sync.ts`), so the write commands need no push call of their own.
  *  - Dispatches uploads via `safeUpload`.
  */
 
@@ -37,6 +39,16 @@ let saveGen = 0
 
 const savedSince = (entryId: string, gen: number): boolean => (lastSaveGen.get(entryId) ?? 0) > gen
 
+const saveListeners = new Set<() => void>()
+
+/** Calls `listener` after every successful `saveDraft`. Returns the unsubscribe function. */
+export function onDraftSaved(listener: () => void): () => void {
+  saveListeners.add(listener)
+  return () => {
+    saveListeners.delete(listener)
+  }
+}
+
 export class DraftManager {
   readonly #db: WebDb
 
@@ -54,6 +66,7 @@ export class DraftManager {
     saveGen += 1
     lastSaveGen.set(entryId, saveGen)
     unpushedIds.add(entryId)
+    for (const listener of [...saveListeners]) listener()
   }
 
   async getDraft(entryId: string): Promise<Uint8Array | undefined> {
@@ -147,6 +160,11 @@ let beforeUnloadInstalled = false
 
 export function isAnyDraftDirty(): boolean {
   return unpushedIds.size > 0
+}
+
+/** The last known number of unpushed drafts, without reading IndexedDB (`entriesPending`). */
+export function unpushedDraftCount(): number {
+  return unpushedIds.size
 }
 
 export function resetDraftsAutostartForTest(): void {
