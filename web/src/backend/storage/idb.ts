@@ -76,6 +76,19 @@ export interface BlobRecord {
   lastAccess: number
 }
 
+/** Blob keys under this prefix are the sealed media of drafts, never cache. */
+export const OUTBOX_BLOB_PREFIX = 'outbox/'
+
+/** Deletes every blob row except the drafts' outbox media. */
+async function deleteCachedBlobs(blobs: IDBObjectStore): Promise<void> {
+  const keys = (await requestToPromise(blobs.getAllKeys())) as IDBValidKey[]
+  await Promise.all(
+    keys
+      .filter((k) => !(typeof k === 'string' && k.startsWith(OUTBOX_BLOB_PREFIX)))
+      .map((k) => requestToPromise(blobs.delete(k))),
+  )
+}
+
 export interface DraftRecord {
   entryId: string
   /** Sealed (encrypted) draft bytes. Sealing happens outside this module. */
@@ -442,8 +455,14 @@ export class WebDb {
         await requestToPromise(s.put({ ...rec, lastAccess: now }))
         return true
       }),
-    /** Drops every cached media row (the Settings "Clear cache"); no other store is opened. */
-    clear: () => this.clearStores([STORE_BLOBS]),
+    /**
+     * Drops every cached media row (the Settings "Clear cache"); no other store is opened. Keeps
+     * the sealed outbox media of drafts (`outbox/…`): it is not cache and has no other copy.
+     */
+    clear: () =>
+      this.tx([STORE_BLOBS], 'readwrite', async ([blobs]) => {
+        await deleteCachedBlobs(blobs)
+      }),
     totalSize: async (): Promise<number> =>
       (await this.all<BlobRecord>(STORE_BLOBS)).reduce((sum, b) => sum + b.size, 0),
     /** Path, size, lastAccess of every cached blob, without keeping the bytes. */
@@ -506,7 +525,7 @@ export class WebDb {
   }
 
   /**
-   * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts, the device record, the
+   * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts and their `outbox/` media, the device record, the
    * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`) and the `CACHE_LIMIT_KEY` preference.
    */
   clearCache(): Promise<void> {
@@ -515,7 +534,7 @@ export class WebDb {
       const keys = (await requestToPromise(meta.getAllKeys())) as IDBValidKey[]
       await Promise.all([
         requestToPromise(files.clear()),
-        requestToPromise(blobs.clear()),
+        deleteCachedBlobs(blobs),
         ...keys
           .filter((k) => !(typeof k === 'string' && isPreservedMetaKey(k)))
           .map((k) => requestToPromise(meta.delete(k))),

@@ -190,6 +190,23 @@ describe('clearCache / clearAll', () => {
     await db.device.put(device())
   })
 
+  it('clearCache and blobs.clear keep the sealed outbox media of drafts', async () => {
+    const outbox = { path: 'outbox/m-1', bytes: bytes(2), size: 2, lastAccess: 1 }
+    const thumb = { path: 'outbox/m-1.thumb', bytes: bytes(1), size: 1, lastAccess: 1 }
+    await db.blobs.put(outbox)
+    await db.blobs.put(thumb)
+    await db.clearCache()
+    expect((await db.blobs.listByLastAccess()).map((b) => b.path).sort()).toEqual([
+      'outbox/m-1',
+      'outbox/m-1.thumb',
+    ])
+    await db.blobs.put({ path: 'b', bytes: bytes(1), size: 1, lastAccess: 1 })
+    await db.blobs.clear()
+    expect(await db.blobs.get('b')).toBeUndefined()
+    expect(await db.blobs.get('outbox/m-1')).toBeDefined()
+    expect(await db.blobs.get('outbox/m-1.thumb')).toBeDefined()
+  })
+
   it('clearCache keeps drafts and device', async () => {
     await db.clearCache()
     expect(await db.files.list()).toEqual([])
