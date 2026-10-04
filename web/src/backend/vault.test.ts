@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { KeyRing } from './keys'
 import { VaultLockedError } from './keys'
 import type { IndexEntry } from './sync/entryIndex'
+import type { OutboxEntryV1 } from './sync/outbox'
 import { EntryUnavailableError, createVault, type EntryMetadata, type VaultSource } from './vault'
 
 const enc = new TextEncoder()
@@ -564,5 +565,109 @@ describe('outbox overlay', () => {
     const media = entry.metadata.media as Array<{ id: string; is_outbox?: boolean }>
     expect(media[0].id).toBe('m1')
     expect(media[0].is_outbox).toBe(true)
+  })
+})
+
+function webIntent(
+  entryId: string,
+  overrides: Omit<Partial<OutboxEntryV1>, 'fields'> & {
+    fields?: Partial<OutboxEntryV1['fields']>
+  } = {},
+): OutboxEntryV1 {
+  const { fields, ...rest } = overrides
+  return {
+    schema_version: 1,
+    entry_id: entryId,
+    web_device_id: 'web-1',
+    created_on_web: true,
+    web_updated_at_secs: 200,
+    base_state_vector: [],
+    yjs_full_state: [],
+    content_text: 'Draft body',
+    preview_text: 'Draft preview',
+    ...rest,
+    fields: {
+      title: { value: 'Draft', base: '', base_updated_at: 0, change_seq: 1, changed_at_secs: 200 },
+      entry_date: null,
+      emotion: null,
+      is_favorite: null,
+      journal_id: null,
+      tags_add: {},
+      tags_remove: {},
+      ...fields,
+    },
+    media: [],
+  }
+}
+
+describe('a stub and the overlaid journal win over outbox intents', () => {
+  const reasons = [
+    ['locked', { is_locked: true }],
+    ['invisible', { is_invisible: true }],
+    ['deleted', { is_deleted: true }],
+  ] as const
+
+  it.each(reasons)(
+    'hides a created_on_web draft once desktop made the entry %s',
+    async (reason, flags) => {
+      const f = setup()
+      f.vault.setOutboxIntents([webIntent('w1')])
+      f.put({ entry_id: 'w1', updated_at: 300, title: 'Draft', tag_ids: ['t1'], ...flags })
+      await f.vault.load(['w1'])
+
+      expect(f.vault.status('w1')).toBe(reason)
+      expect(f.vault.isLoaded('w1')).toBe(false)
+      expect(() => f.vault.getEntry('w1')).toThrow(EntryUnavailableError)
+      expect(() => f.vault.getContentBytes('w1')).toThrow(EntryUnavailableError)
+      expect(f.vault.listLoaded()).toEqual([])
+      expect(f.vault.search('draft')).toEqual([])
+      expect(f.vault.size).toBe(0)
+      expect(f.vault.count()).toBe(0)
+      expect(f.vault.journalCounts().size).toBe(0)
+      expect(f.vault.getSynced('w1').status).toBe(reason)
+    },
+  )
+
+  it('hides an entry the web moved into a journal that is excluded', async () => {
+    const f = setup()
+    f.put({ entry_id: 'e1', journal_id: 'j1', title: 'Moved' })
+    await f.vault.load(['e1'])
+    f.vault.setOutboxIntents([
+      webIntent('e1', {
+        created_on_web: false,
+        fields: {
+          title: null,
+          journal_id: {
+            value: 'j2',
+            base: 'j1',
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+        },
+      }),
+    ])
+    expect(f.vault.getEntry('e1').metadata.journal_id).toBe('j2')
+
+    f.vault.setExcludedJournalIds(['j2'])
+
+    expect(f.vault.status('e1')).toBe('journal')
+    expect(f.vault.isLoaded('e1')).toBe(false)
+    expect(() => f.vault.getEntry('e1')).toThrow(EntryUnavailableError)
+    expect(f.vault.listLoaded()).toEqual([])
+    expect(f.vault.search('moved')).toEqual([])
+    expect(f.vault.journalCounts().get('j2')).toBeUndefined()
+    expect(f.vault.getSynced('e1').status).toBe('visible')
+  })
+
+  it('still serves a created_on_web draft with no synced copy and no stub', () => {
+    const f = setup()
+    f.vault.setOutboxIntents([webIntent('w1')])
+
+    expect(f.vault.status('w1')).toBe('visible')
+    expect(f.vault.isLoaded('w1')).toBe(true)
+    expect(f.vault.getEntry('w1').metadata.title).toBe('Draft')
+    expect(f.vault.search('draft').map((e) => e.metadata.entry_id)).toEqual(['w1'])
+    expect(f.vault.count()).toBe(1)
   })
 })

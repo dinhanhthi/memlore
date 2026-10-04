@@ -306,24 +306,27 @@ export class Vault {
   }
 
   isLoaded(id: string): boolean {
-    if (this.#entries.has(id)) return true
-    const intent = this.#outboxIntents.get(id)
-    if (intent?.created_on_web) {
-      const journalId = intent.fields.journal_id?.value ?? ''
-      return !this.#journalExcluded(journalId)
-    }
-    return false
+    return this.status(id) === 'visible'
   }
 
+  /**
+   * Visibility with the overlay applied. A stub (locked, invisible, deleted, journal) always wins
+   * over an outbox intent, and the overlaid journal is subject to journal exclusion.
+   */
   status(id: string): EntryStatus {
-    if (this.#entries.has(id)) return 'visible'
     const intent = this.#outboxIntents.get(id)
+    const held = this.#entries.get(id)
+    if (held !== undefined) {
+      const journalId = this.#overlaidJournalId(held.metadata, intent)
+      return this.#journalExcluded(journalId) ? 'journal' : 'visible'
+    }
+    const stub = this.#stubs.get(id)
+    if (stub !== undefined) return stub.reason
     if (intent?.created_on_web) {
       const journalId = intent.fields.journal_id?.value ?? ''
-      if (this.#journalExcluded(journalId)) return 'journal'
-      return 'visible'
+      return this.#journalExcluded(journalId) ? 'journal' : 'visible'
     }
-    return this.#stubs.get(id)?.reason ?? 'not-loaded'
+    return 'not-loaded'
   }
 
   /** Throws `EntryUnavailableError` for locked, invisible, deleted and not-loaded entries. */
@@ -337,19 +340,20 @@ export class Vault {
   }
 
   #held(id: string): Held {
+    const status = this.status(id)
+    if (status !== 'visible') throw new EntryUnavailableError(id, status)
     const held = this.#entries.get(id)
-    if (held !== undefined) {
-      return this.#applyOverlay(held)
-    }
+    if (held !== undefined) return this.#applyOverlay(held)
     const intent = this.#outboxIntents.get(id)
-    if (intent !== undefined && intent.created_on_web) {
-      const journalId = intent.fields.journal_id?.value ?? ''
-      if (this.#journalExcluded(journalId)) {
-        throw new EntryUnavailableError(id, 'journal')
-      }
-      return this.#syntheticHeldFromIntent(intent)
-    }
-    throw new EntryUnavailableError(id, this.status(id) as Exclude<EntryStatus, 'visible'>)
+    if (intent !== undefined) return this.#syntheticHeldFromIntent(intent)
+    throw new EntryUnavailableError(id, 'not-loaded')
+  }
+
+  /** The journal id after the intent's journal move, if that move applies to this base. */
+  #overlaidJournalId(base: EntryMetadata, intent: OutboxEntryV1 | undefined): string {
+    const f = intent?.fields.journal_id
+    if (f && (base.updated_at === f.base_updated_at || base.journal_id === f.base)) return f.value
+    return base.journal_id
   }
 
   #applyOverlay(base: Held): Held {
@@ -424,12 +428,7 @@ export class Vault {
       }
     }
 
-    if (fields.journal_id) {
-      const f = fields.journal_id
-      if (base.metadata.updated_at === f.base_updated_at || base.metadata.journal_id === f.base) {
-        m.journal_id = f.value
-      }
-    }
+    m.journal_id = this.#overlaidJournalId(base.metadata, intent)
 
     if (fields.tags_add || fields.tags_remove) {
       const currentTags = new Set(base.metadata.tag_ids)
@@ -540,11 +539,12 @@ export class Vault {
 
     for (const [id, held] of this.#entries) {
       seenIds.add(id)
-      list.push(this.#applyOverlay(held))
+      const view = this.#applyOverlay(held)
+      if (!this.#journalExcluded(view.metadata.journal_id)) list.push(view)
     }
 
     for (const [id, intent] of this.#outboxIntents) {
-      if (!seenIds.has(id) && intent.created_on_web) {
+      if (!seenIds.has(id) && !this.#stubs.has(id) && intent.created_on_web) {
         const journalId = intent.fields.journal_id?.value ?? ''
         if (!this.#journalExcluded(journalId)) {
           list.push(this.#syntheticHeldFromIntent(intent))
