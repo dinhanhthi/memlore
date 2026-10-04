@@ -44,10 +44,10 @@ const iifes = HTML_FILES.map(({ label, path }) => ({
 }))
 
 describe('web app boot script', () => {
-  const webBoot = readFileSync(resolve(REPO_ROOT, 'web/public/boot.js'), 'utf8')
+  const webBoot = readFileSync(resolve(REPO_ROOT, 'web/static/boot.js'), 'utf8')
   const webHtml = readFileSync(resolve(REPO_ROOT, 'web/index.html'), 'utf8')
 
-  it('keeps web/public/boot.js in lockstep with the desktop inline IIFE', () => {
+  it('keeps web/static/boot.js in lockstep with the desktop inline IIFE', () => {
     expect(normalizeIife(webBoot)).toBe(normalizeIife(iifes[0].script))
   })
 

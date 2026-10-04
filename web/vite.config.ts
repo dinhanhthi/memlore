@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -30,13 +31,36 @@ function tauriAliasGuard() {
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
+// Files only the web app ships. They live in web/static/, not in `publicDir`: that points at the
+// repo-root `public/` (the logos and stickers src/ references), which the Tauri app bundles too.
+const WEB_ONLY_FILES = ['_headers', 'boot.js'] as const
+
+function webOnlyFiles(): Plugin {
+  const read = (name: string) => readFileSync(here(`./static/${name}`))
+  return {
+    name: 'web-only-files',
+    configureServer(server) {
+      server.middlewares.use('/boot.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript')
+        res.end(read('boot.js'))
+      })
+    },
+    generateBundle() {
+      for (const name of WEB_ONLY_FILES) {
+        this.emitFile({ type: 'asset', fileName: name, source: read(name) })
+      }
+    },
+  }
+}
+
 export default defineConfig({
   root: here('.'),
+  publicDir: here('../public'),
   // Isolate from the Tauri (5173) and mockup dev servers: sharing node_modules/.vite
   // causes 504 Outdated Optimize Dep on whichever server did not trigger the last
   // re-optimization.
   cacheDir: here('../node_modules/.vite-web'),
-  plugins: [tailwindcss(), react(), tauriAliasGuard()],
+  plugins: [tailwindcss(), react(), tauriAliasGuard(), webOnlyFiles()],
   define: {
     'import.meta.env.VITE_MEMLORE_PLATFORM': JSON.stringify('web'),
   },
