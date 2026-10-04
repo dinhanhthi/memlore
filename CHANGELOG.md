@@ -1,12 +1,16 @@
 # Changelog
 
-Developer-facing release notes. Each `v*` tag's section becomes the body of its
-GitHub Release. The plain-language version for users lives on the website's
+Developer-facing release notes for both platforms. `## v…` sections are the
+desktop app; each one becomes the body of its GitHub Release. `## web-v…`
+sections are the web companion (web.memlore.app), which has its own versions and
+no GitHub Release. The plain-language version for users lives on the website's
 changelog page.
 
-Versions follow semver, and only changes under `src/`, `src-tauri/`, `public/`,
-`index.html`, `vite.config.ts` and `package.json` count toward a bump —
-`website/`, `mockup/`, `web/`, `workers/`, `docs/` and `e2e/` do not.
+Versions follow semver, per platform. Desktop bumps count changes under `src/`,
+`src-tauri/`, `public/`, `index.html`, `vite.config.ts` and `package.json`; web
+bumps count `web/`, `workers/web-auth/`, `src/`, `public/`, the `memlore-core`
+and `memlore-wasm` crates and `package.json`. `website/`, `mockup/`, `docs/` and
+`e2e/` count for neither.
 
 ## v0.2.1 (2026-10-01)
 

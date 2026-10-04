@@ -120,11 +120,21 @@ travels with the repo (`.coding-friend/config.json` stays local).
 | `scripts/bump-info.sh`                                        | Reads commits since the last published tag, names the release state, and computes the next version. Writes nothing     |
 | `scripts/bump.sh`                                             | Writes the version into `package.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock`, then verifies all four agree |
 
-Releases are stable by default; `--rc` / `--beta` opt into a GitHub prerelease,
-which is what keeps a build off the stable update channel. Changes under
-`website/`, `mockup/`, `web/`, `docs/` and `e2e/` never drive a version bump. See
+Memlore ships two platforms, each with its own version and tags:
+
+| Platform                        | Ship with        | Version file                | Tag          | Pipeline                                      |
+| ------------------------------- | ---------------- | --------------------------- | ------------ | --------------------------------------------- |
+| Desktop app (macOS)             | `/cf-ship --mac` | `src-tauri/tauri.conf.json` | `v0.2.1`     | `release.yml`: signed, notarized `.dmg`       |
+| Web companion (web.memlore.app) | `/cf-ship --web` | `web/version.json`          | `web-v0.1.0` | `deploy-web.yml`: Cloudflare Pages (+ Worker) |
+
+`/cf-ship --all` ships every platform that has changes; plain `/cf-ship` asks
+which one. The web is deployed only by pushing a `web-v*` tag, never by hand.
+Releases are stable by default; `--rc` / `--beta` opt into a desktop prerelease
+(kept off the stable update channel) or a web preview deploy. Changes under
+`website/`, `mockup/`, `docs/` and `e2e/` never drive a version bump. See
 [`.github/release-setup.md`](.github/release-setup.md) for the signing and
-notarization secrets CI needs.
+notarization secrets the desktop build needs; the web needs the
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 
 ### 🔄 Reset local state
 
