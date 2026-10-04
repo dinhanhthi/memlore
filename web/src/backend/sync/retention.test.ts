@@ -218,6 +218,19 @@ describe('intent retention', () => {
       expect(r.vault.getOutboxIntent('e1')).toBeUndefined()
     })
 
+    it('keeps the outbox media another stored draft still references', async () => {
+      await r.draft(reflected)
+      await r.draft(intent('e2', { media: [{ ...media, has_thumb: true }] }), false)
+      expect((await r.run()).dropped).toEqual(['e1'])
+      expect(await r.db.drafts.get('e1')).toBeUndefined()
+      expect(await blobsOf(r.db)).toEqual([
+        'cache-x',
+        'outbox/m-m0',
+        'outbox/m-m0.thumb',
+        'outbox/m-other',
+      ])
+    })
+
     it('never drops an unpushed draft', async () => {
       await r.draft(reflected, false)
       const res = await r.run()

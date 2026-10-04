@@ -11,7 +11,9 @@
  *      (Phase 16.5), so the overlay and the next write's `priorIntent` see the web edits saved
  *      before a reload. Every write command awaits `ready()` first, so none runs on an empty
  *      overlay. Intent retention (`sync/retention.ts`) then runs once, and again after every
- *      `pull()`; its notices are returned by the next `pull()`,
+ *      `pull()`; its notices are returned by the next `pull()`. Retention passes and the
+ *      outbox-writing entry commands share one per-session mutex (`acquireOutboxLock`), so a pass
+ *      never drops a draft (and its media) that a write is rebuilding from `priorIntent`,
  *   4. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
  * Every read handler first checks the key holder and rejects with `VaultLockedError` when locked.
  *
@@ -105,6 +107,12 @@ export interface ReadSession {
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
   ready: () => Promise<Taxonomy>
   /**
+   * Waits for the outbox mutex (held by one retention pass or one outbox write at a time) and
+   * resolves its release. Never await `ready()` or `pull()` while holding it: both can run
+   * retention, which waits for the same mutex.
+   */
+  acquireOutboxLock: () => Promise<() => void>
+  /**
    * Phase 10.4: re-reads the cloud (always hits the network), re-applies the journal exclusions
    * and reloads the entries that are already in RAM and changed on the server.
    */
@@ -190,6 +198,11 @@ export async function openForWrite(): Promise<{
   return { vault: session.vault, taxonomy, db: session.db, core: session.core }
 }
 
+/** The session's outbox mutex (see `ReadSession.acquireOutboxLock`). Call after `openForWrite()`. */
+export async function acquireOutboxLock(): Promise<() => void> {
+  return (await readEnv().session()).acquireOutboxLock()
+}
+
 // ---------------------------------------------------------------------------------------------
 // Default session
 // ---------------------------------------------------------------------------------------------
@@ -244,35 +257,46 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     if (started !== epoch) throw new VaultLockedError()
   }
 
-  // Intent retention (sync/retention.ts): one pass at a time; its notices wait for the next pull.
-  let notices: string[] = []
-  let retaining: Promise<unknown> = Promise.resolve()
-  const retain = (): Promise<boolean> => {
-    const started = epoch
-    const run = retaining.then(async () => {
-      try {
-        const result = await runRetention({
-          db,
-          core,
-          ring: getKeyRing(),
-          nowSecs: () => nowSecs(),
-          desktops: puller.desktops,
-          vault,
-        })
-        if (started !== epoch) return false
-        notices.push(...result.notices)
-        return result.changed
-      } catch (error) {
-        // Fail safe: nothing was dropped that should not be; keep everything until next time.
-        if (started === epoch) {
-          const reason = error instanceof Error ? error.name : typeof error
-          console.warn(`Intent retention skipped (${reason})`)
-        }
-        return false
-      }
+  // The outbox mutex: a FIFO chain of never-rejecting promises, one holder at a time.
+  let outboxTail: Promise<void> = Promise.resolve()
+  const acquireOutboxLock = async (): Promise<() => void> => {
+    const previous = outboxTail
+    let release!: () => void
+    outboxTail = new Promise<void>((resolve) => {
+      release = resolve
     })
-    retaining = run
-    return run
+    await previous
+    return release
+  }
+
+  // Intent retention (sync/retention.ts): one pass at a time, under the outbox mutex, so it never
+  // interleaves with an outbox write. Its notices wait for the next pull.
+  let notices: string[] = []
+  const retain = async (): Promise<boolean> => {
+    const started = epoch
+    const release = await acquireOutboxLock()
+    try {
+      const result = await runRetention({
+        db,
+        core,
+        ring: getKeyRing(),
+        nowSecs: () => nowSecs(),
+        desktops: puller.desktops,
+        vault,
+      })
+      if (started !== epoch) return false
+      notices.push(...result.notices)
+      return result.changed
+    } catch (error) {
+      // Fail safe: nothing was dropped that should not be; keep everything until next time.
+      if (started === epoch) {
+        const reason = error instanceof Error ? error.name : typeof error
+        console.warn(`Intent retention skipped (${reason})`)
+      }
+      return false
+    } finally {
+      release()
+    }
   }
 
   const taxonomy = async (): Promise<Taxonomy> => {
@@ -363,7 +387,15 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     }
   }
 
-  return { vault, media: { db, reader, core, limit: puller.limit }, db, core, ready, pull }
+  return {
+    vault,
+    media: { db, reader, core, limit: puller.limit },
+    db,
+    core,
+    ready,
+    acquireOutboxLock,
+    pull,
+  }
 }
 
 /**

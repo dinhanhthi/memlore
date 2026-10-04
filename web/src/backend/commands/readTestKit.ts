@@ -322,6 +322,7 @@ export function installFakeSession(
     session: async () => ({
       vault,
       ready: async () => options.taxonomy ?? EMPTY_TAXONOMY,
+      acquireOutboxLock: async () => () => undefined,
       pull: options.pull ?? (async () => ({ stale: [], changed: false })),
       db,
       core,

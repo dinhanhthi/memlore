@@ -52,7 +52,7 @@ import {
   type OutboxFields,
   type OutboxMediaRef,
 } from '../sync/outbox'
-import { openForRead, openForWrite, readEnv, type VaultApi } from './readSession'
+import { acquireOutboxLock, openForRead, openForWrite, readEnv, type VaultApi } from './readSession'
 import { WEB_MEDIA_PATH_PREFIX } from './media'
 
 export const MSG_UNAVAILABLE = 'This entry is not available on the web (locked, hidden or deleted).'
@@ -396,6 +396,27 @@ function assertWritesEnabled(): void {
   }
 }
 
+/**
+ * An outbox-writing command. `lock()` takes the session's outbox mutex, shared with intent
+ * retention (`sync/retention.ts`): call it after `openForWrite()` / `ensureLoaded()` and before
+ * reading `priorIntent`, so no retention pass can drop the draft (and its media) this write builds
+ * on. It is released when the command settles. Never await `ready()` or `pull()` after it.
+ */
+function outboxWrite(
+  body: (args: Record<string, unknown>, lock: () => Promise<void>) => Promise<unknown>,
+): Handler {
+  return async (args) => {
+    const held: { release?: () => void } = {}
+    try {
+      return await body(args, async () => {
+        held.release ??= await acquireOutboxLock()
+      })
+    } finally {
+      held.release?.()
+    }
+  }
+}
+
 export type MediaFilePicker = (accept: string) => Promise<File | null>
 let customMediaPicker: MediaFilePicker | null = null
 
@@ -429,9 +450,10 @@ async function promptForFile(accept: string): Promise<File | null> {
   })
 }
 
-const createEntry: Handler = async (args) => {
+const createEntry = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const { vault, taxonomy, db, core } = await openForWrite()
+  await lock()
   const ring = getKeyRing()
   const journalId = String(args.journalId ?? '')
   if (!journalId) throw new Error('journalId is required')
@@ -536,7 +558,7 @@ const createEntry: Handler = async (args) => {
   const created = vault.getEntry(entryId)
   if (!created) throw new Error('Created entry missing from vault overlay')
   return toEntry(created)
-}
+})
 
 async function ensureLoaded(vault: VaultApi, id: string): Promise<void> {
   if (vault.status(id) === 'not-loaded') {
@@ -544,7 +566,7 @@ async function ensureLoaded(vault: VaultApi, id: string): Promise<void> {
   }
 }
 
-const saveEntryContent: Handler = async (args) => {
+const saveEntryContent = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   if (!id) throw new Error('id is required')
@@ -553,6 +575,7 @@ const saveEntryContent: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -599,9 +622,9 @@ const saveEntryContent: Handler = async (args) => {
   const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
-}
+})
 
-const updateEntry: Handler = async (args) => {
+const updateEntry = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   if (!id) throw new Error('id is required')
@@ -610,6 +633,7 @@ const updateEntry: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -671,9 +695,9 @@ const updateEntry: Handler = async (args) => {
   const updated = vault.getEntry(id)
   if (!updated) throw new Error('Updated entry missing from vault')
   return toEntry(updated)
-}
+})
 
-const updateEntryDate: Handler = async (args) => {
+const updateEntryDate = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   const entryDate = asNumber(args.entryDate)
@@ -683,6 +707,7 @@ const updateEntryDate: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -737,9 +762,9 @@ const updateEntryDate: Handler = async (args) => {
   const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
-}
+})
 
-const updateEntryEmotion: Handler = async (args) => {
+const updateEntryEmotion = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   const rawEmotion = args.emotion
@@ -757,6 +782,7 @@ const updateEntryEmotion: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -815,9 +841,9 @@ const updateEntryEmotion: Handler = async (args) => {
   const updated = vault.getEntry(id)
   if (!updated) throw new Error('Updated entry missing from vault')
   return toEntry(updated)
-}
+})
 
-const toggleFavorite: Handler = async (args) => {
+const toggleFavorite = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   if (!id) throw new Error('id is required')
@@ -826,6 +852,7 @@ const toggleFavorite: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -884,9 +911,9 @@ const toggleFavorite: Handler = async (args) => {
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
   return targetFav
-}
+})
 
-const moveEntryToJournal: Handler = async (args) => {
+const moveEntryToJournal = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const id = String(args.id ?? '')
   const journalId = String(args.journalId ?? '')
@@ -899,6 +926,7 @@ const moveEntryToJournal: Handler = async (args) => {
   if (!journal) throw new Error(`Journal not found or not visible: ${journalId}`)
 
   await ensureLoaded(vault, id)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
   const syncedEntry = vault.getEntry(id)
@@ -953,9 +981,9 @@ const moveEntryToJournal: Handler = async (args) => {
   const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
-}
+})
 
-const addTagToEntry: Handler = async (args) => {
+const addTagToEntry = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const entryId = String(args.entryId ?? '')
   const tagId = String(args.tagId ?? '')
@@ -968,6 +996,7 @@ const addTagToEntry: Handler = async (args) => {
   if (!tag) throw new Error(`Tag not found: ${tagId}`)
 
   await ensureLoaded(vault, entryId)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
   const syncedEntry = vault.getEntry(entryId)
@@ -1027,9 +1056,9 @@ const addTagToEntry: Handler = async (args) => {
   const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
-}
+})
 
-const removeTagFromEntry: Handler = async (args) => {
+const removeTagFromEntry = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const entryId = String(args.entryId ?? '')
   const tagId = String(args.tagId ?? '')
@@ -1042,6 +1071,7 @@ const removeTagFromEntry: Handler = async (args) => {
   if (!tag) throw new Error(`Tag not found: ${tagId}`)
 
   await ensureLoaded(vault, entryId)
+  await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
   const syncedEntry = vault.getEntry(entryId)
@@ -1101,14 +1131,15 @@ const removeTagFromEntry: Handler = async (args) => {
   const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
   vault.setOutboxIntents([...currentIntents, updatedIntent])
   readEnv().emit('memlore:entries-changed')
-}
+})
 
 const getMediaUploadLimits: Handler = async () => ({
   photoBytes: DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES,
   videoBytes: DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES,
 })
 
-const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
+const pickMedia = (kind: 'image' | 'video'): Handler =>
+  outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const entryId = String(args.entryId ?? '')
   if (!entryId) throw new Error('entryId is required')
@@ -1121,9 +1152,9 @@ const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, entryId)
-  const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getEntry(entryId)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  if (!vault.getEntry(entryId) && !vault.getOutboxIntent(entryId)) {
+    throw new EntryNotAvailableError()
+  }
 
   const accept = kind === 'image' ? 'image/*' : 'video/*'
   const file = await promptForFile(accept)
@@ -1163,6 +1194,11 @@ const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
   const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
   const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
 
+  // Outbox mutex from here (not across the picker or the thumbnail): re-read the intent,
+  // a retention pass may have dropped it meanwhile.
+  await lock()
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  if (!vault.getEntry(entryId) && !priorIntent) throw new EntryNotAvailableError()
   await db.blobs.put({
     path: `outbox/m-${mediaId}`,
     bytes: sealedMedia,
@@ -1221,9 +1257,9 @@ const pickMedia = (kind: 'image' | 'video'): Handler => async (args) => {
     mediaId,
     localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
   }
-}
+})
 
-const savePastedImage: Handler = async (args) => {
+const savePastedImage = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
   const entryId = String(args.entryId ?? '')
   if (!entryId) throw new Error('entryId is required')
@@ -1242,9 +1278,9 @@ const savePastedImage: Handler = async (args) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, entryId)
-  const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getEntry(entryId)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  if (!vault.getEntry(entryId) && !vault.getOutboxIntent(entryId)) {
+    throw new EntryNotAvailableError()
+  }
 
   const maxBytes = DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES
   if (mediaPlain.length > maxBytes) {
@@ -1265,6 +1301,11 @@ const savePastedImage: Handler = async (args) => {
   const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
   const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
 
+  // Outbox mutex from here (not across the thumbnail): re-read the intent,
+  // a retention pass may have dropped it meanwhile.
+  await lock()
+  const priorIntent = vault.getOutboxIntent(entryId) ?? null
+  if (!vault.getEntry(entryId) && !priorIntent) throw new EntryNotAvailableError()
   await db.blobs.put({
     path: `outbox/m-${mediaId}`,
     bytes: sealedMedia,
@@ -1323,7 +1364,7 @@ const savePastedImage: Handler = async (args) => {
     mediaId,
     localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
   }
-}
+})
 
 export const entryHandlers: Record<string, Handler> = {
   list_entries_paged: listEntriesPaged,

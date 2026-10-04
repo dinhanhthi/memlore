@@ -208,6 +208,13 @@ function updateOverlay(
   return true
 }
 
+function mediaPaths(media: OutboxEntryV1['media']): string[] {
+  return media.flatMap((m) => [
+    `${OUTBOX_BLOB_PREFIX}m-${m.media_id}`,
+    `${OUTBOX_BLOB_PREFIX}m-${m.media_id}.thumb`,
+  ])
+}
+
 /** One pass over every draft. Never rejects for a read error: it keeps everything instead. */
 export async function runRetention(deps: RetentionDeps): Promise<RetentionResult> {
   const { desktops } = deps
@@ -229,10 +236,12 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
   const load = await deps.vault.load(drafts.map((d) => d.entryId))
   const failed = new Set(load.failed.map((f) => f.id))
 
+  const opened = new Map(drafts.map((d) => [d.entryId, openIntent(deps, d)]))
+
   const result: RetentionResult = { dropped: [], notices: [], changed: false }
   for (const draft of drafts) {
     const id = draft.entryId
-    const intent = openIntent(deps, draft)
+    const intent = opened.get(id) ?? null
     if (intent === null || failed.has(id)) continue
     const synced = deps.vault.getSynced(id)
     if (synced.status === 'journal') continue // its metadata is hidden: cannot tell, keep
@@ -261,11 +270,14 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
     })
 
     if (!res.retain && pushed) {
-      const blobs = intent.media.flatMap((m) => [
-        `${OUTBOX_BLOB_PREFIX}m-${m.media_id}`,
-        `${OUTBOX_BLOB_PREFIX}m-${m.media_id}.thumb`,
-      ])
+      // Defense in depth: never delete media another stored draft still references.
+      // (A draft that does not open is kept, but its references are unknown.)
+      const shared = new Set(
+        [...opened].flatMap(([other, i]) => (other === id ? [] : mediaPaths(i?.media ?? []))),
+      )
+      const blobs = mediaPaths(intent.media).filter((p) => !shared.has(p))
       if (await deps.db.drafts.dropPushed(id, draft.sealed, hash, blobs)) {
+        opened.delete(id)
         await forgetEntry(deps, id)
         updateOverlay(deps, intent, known, null)
         result.dropped.push(id)

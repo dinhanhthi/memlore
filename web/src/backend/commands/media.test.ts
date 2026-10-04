@@ -177,6 +177,7 @@ async function rig(
       vault,
       media,
       ready: async () => EMPTY_TAXONOMY,
+      acquireOutboxLock: async () => () => undefined,
       pull: async () => ({ stale: [], changed: false }),
     }),
   })

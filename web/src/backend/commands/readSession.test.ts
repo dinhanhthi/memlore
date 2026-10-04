@@ -376,6 +376,119 @@ describe('drafts rehydrate the outbox overlay', () => {
       expect(persisted.fields.is_favorite?.value).toBe(true)
     })
 
+    describe('retention and outbox writes share one mutex', () => {
+      const ref = {
+        media_id: 'm1',
+        file_name: 'a.jpg',
+        file_type: 'image/jpeg',
+        size: 1,
+        has_thumb: true,
+      }
+      const BLOBS = ['outbox/m-m1', 'outbox/m-m1.thumb']
+
+      /** A pushed draft with media that retention keeps until `e1` is tombstoned. */
+      async function raceRig() {
+        const draft = await pushedDraft(intent({ media: [ref] }))
+        const desktops: RetentionDesktops = {
+          manifests: ['desk-a'],
+          slots: new Set(['desk-a']),
+          tombstones: new Set(),
+        }
+        const r = await hydrationRig([draft], desktops)
+        for (const path of BLOBS) {
+          await r.db.blobs.put({ path, bytes: new Uint8Array([1]), size: 1, lastAccess: 0 })
+        }
+        configureReadEnv({ isUnlocked: () => true, session: async () => r.session })
+        setWriteFlagForTest(true)
+        await r.session.ready()
+        expect(await r.db.drafts.get('e1')).toBeDefined() // kept by the first pass
+        desktops.tombstones = new Set(['e1']) // the next pass drops it
+        return { ...r, draft }
+      }
+
+      /** Holds the next call of `method` until the returned gate opens. */
+      function holdNext<K extends 'get' | 'list'>(
+        target: Record<K, () => Promise<unknown>>,
+        method: K,
+      ) {
+        const gate = new Gate()
+        const reached = { value: false }
+        const original = target[method]
+        target[method] = async () => {
+          target[method] = original
+          reached.value = true
+          await gate.promise
+          return original()
+        }
+        return { gate, reached }
+      }
+
+      const ticks = async (n = 30): Promise<void> => {
+        for (let i = 0; i < n; i++) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+
+      /** Every media ref of the stored draft still has its sealed blobs: it can be packed. */
+      async function assertPushable(db: WebDb): Promise<void> {
+        const stored = await db.drafts.get('e1')
+        if (stored === undefined) return
+        const persisted = JSON.parse(dec.decode(stored.sealed)) as OutboxEntryV1
+        for (const m of persisted.media) {
+          expect(await db.blobs.get(`outbox/m-${m.media_id}`), m.media_id).toBeDefined()
+          if (m.has_thumb) expect(await db.blobs.get(`outbox/m-${m.media_id}.thumb`)).toBeDefined()
+        }
+      }
+
+      it('a retention pass waits for an in-flight write; the edit keeps its media', async () => {
+        const r = await raceRig()
+        // The write reads priorIntent, then awaits the device record: hold it there.
+        const held = holdNext(r.db.device, 'get')
+        const write = entryHandlers.toggle_favorite({ id: 'e1' })
+        await ticks()
+        expect(held.reached.value).toBe(true)
+
+        const pulled = r.session.pull()
+        await ticks()
+        // Retention has not run: the pushed draft and its media are still there.
+        expect((await r.db.drafts.get('e1'))?.sealed).toEqual(r.draft.sealed)
+        expect(await r.db.blobs.get('outbox/m-m1')).toBeDefined()
+
+        held.gate.open()
+        await write
+        await pulled
+        const stored = await r.db.drafts.get('e1')
+        expect(stored?.pushedHash).toBeUndefined() // the new edit, not yet pushed
+        const persisted = JSON.parse(dec.decode(stored?.sealed)) as OutboxEntryV1
+        expect(persisted.fields.is_favorite?.value).toBe(true)
+        expect(persisted.media.map((m) => m.media_id)).toEqual(['m1'])
+        await assertPushable(r.db)
+      })
+
+      it('a write waits for an in-flight retention pass', async () => {
+        const r = await raceRig()
+        const held = holdNext(r.db.drafts, 'list')
+        const pulled = r.session.pull()
+        await ticks()
+        expect(held.reached.value).toBe(true)
+
+        const write = entryHandlers.toggle_favorite({ id: 'e1' })
+        await ticks()
+        // The write has not saved: the stored draft is still the pushed one.
+        expect((await r.db.drafts.get('e1'))?.sealed).toEqual(r.draft.sealed)
+
+        held.gate.open()
+        await pulled
+        await write
+        // Retention dropped the pushed draft first; the write built on the synced state.
+        const persisted = JSON.parse(
+          dec.decode((await r.db.drafts.get('e1'))?.sealed),
+        ) as OutboxEntryV1
+        expect(persisted.fields.is_favorite?.value).toBe(true)
+        expect(persisted.media).toEqual([])
+        expect(await r.db.blobs.get('outbox/m-m1')).toBeUndefined()
+        await assertPushable(r.db)
+      })
+    })
+
     it('pull() returns its notices once and reports the change', async () => {
       const created = intent({ entry_id: 'e9', created_on_web: true })
       const draft = await pushedDraft(created)
