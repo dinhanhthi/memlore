@@ -7,6 +7,9 @@
 
 export type ChangelogKind = 'new' | 'improved' | 'fixed' | 'breaking'
 
+/** The desktop app (`v*` tags) or the web companion (`web-v*` tags). Each has its own versions. */
+export type ChangelogPlatform = 'mac' | 'web'
+
 export type ChangelogItem = {
   kind: ChangelogKind
   text: string
@@ -19,6 +22,8 @@ export type ChangelogRelease = {
   date: string
   /** `false` marks a prerelease; it is shown with a Beta marker and never becomes `latestStableVersion`. */
   stable: boolean
+  /** Absent means `'mac'`: every release before the web companion was the desktop app. */
+  platform?: ChangelogPlatform
   items: ChangelogItem[]
 }
 
@@ -83,8 +88,13 @@ export const releases: ChangelogRelease[] = [
  * a beta bump sitting at the top of `releases`, the public site must still show
  * the last stable version.
  */
+export function platformOf(release: ChangelogRelease): ChangelogPlatform {
+  return release.platform ?? 'mac'
+}
+
+/** The site badge is the downloadable desktop app: web releases never reach it. */
 export function latestStableReleaseOf(entries: ChangelogRelease[]): ChangelogRelease {
-  const stable = entries.find((entry) => entry.stable)
+  const stable = entries.find((entry) => entry.stable && platformOf(entry) === 'mac')
   if (!stable) throw new Error('changelogData: no stable release to show')
   return stable
 }
@@ -96,6 +106,7 @@ export function latestStableVersionOf(entries: ChangelogRelease[]): string {
 export const latestStableRelease = latestStableReleaseOf(releases)
 export const latestStableVersion = latestStableRelease.version
 
-export function releaseAnchorId(version: string): string {
-  return `v${version}`
+/** The release's tag: `v0.2.1` for the desktop app, `web-v0.1.0` for the web companion. */
+export function releaseAnchorId(release: ChangelogRelease): string {
+  return `${platformOf(release) === 'web' ? 'web-' : ''}v${release.version}`
 }

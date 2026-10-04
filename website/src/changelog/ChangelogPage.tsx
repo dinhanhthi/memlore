@@ -5,6 +5,7 @@ import { SiteFooterBar } from '../SiteFooterBar'
 import { SiteHeader } from '../SiteHeader'
 import { useActiveChangelogAnchor } from './activeChangelogAnchor'
 import {
+  platformOf,
   releaseAnchorId,
   releases,
   type ChangelogKind,
@@ -30,12 +31,17 @@ const kinds = {
   breaking: 'Breaking',
 } satisfies Record<ChangelogKind, string>
 
+function releaseLabel(release: ChangelogRelease): string {
+  return platformOf(release) === 'web' ? `Web v${release.version}` : `v${release.version}`
+}
+
 function Release({ release }: { release: ChangelogRelease }) {
-  const id = releaseAnchorId(release.version)
+  const id = releaseAnchorId(release)
   return (
     <section className="changelog-release">
       <div className="changelog-release-head">
-        <h2 id={id}>v{release.version}</h2>
+        <h2 id={id}>{releaseLabel(release)}</h2>
+        {platformOf(release) === 'web' ? <span className="changelog-platform">Web</span> : null}
         {release.stable ? null : <span className="changelog-beta">Beta</span>}
         <p className="changelog-date">
           Released <time dateTime={release.date}>{formatDate(release.date)}</time>
@@ -67,11 +73,11 @@ function ChangelogToc() {
       <p className="changelog-toc-title">Versions</p>
       <ol>
         {releases.map((release) => {
-          const id = releaseAnchorId(release.version)
+          const id = releaseAnchorId(release)
           return (
-            <li key={release.version}>
+            <li key={id}>
               <a href={`#${id}`} aria-current={active === id ? 'true' : undefined}>
-                v{release.version}
+                {releaseLabel(release)}
               </a>
             </li>
           )
@@ -97,11 +103,14 @@ export default function ChangelogPage() {
             <SectionIndex>Changelog</SectionIndex>
             <h1>What’s new</h1>
             <LedgerRule />
-            <p className="changelog-intro">Every version of Memlore, in plain words.</p>
+            <p className="changelog-intro">
+              Every version of Memlore, in plain words. The web companion has its own versions,
+              marked Web.
+            </p>
             <LedgerRule />
             <LedgerGap />
             {releases.map((release) => (
-              <div key={release.version}>
+              <div key={releaseAnchorId(release)}>
                 <LedgerRule />
                 <Release release={release} />
               </div>

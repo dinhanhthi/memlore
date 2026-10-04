@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { releaseAnchorId, releases } from './changelogData'
 
-export const releaseAnchorIds = releases.map((release) => releaseAnchorId(release.version))
+export const releaseAnchorIds = releases.map((release) => releaseAnchorId(release))
 
 /** Last heading that has crossed `probeY` (viewport coordinates). Before that, the first id. */
 export function activeChangelogAnchor(
