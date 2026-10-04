@@ -637,6 +637,62 @@ describe('onboardComplete: device id', () => {
     expect((await env.db.device.get())?.masterFingerprint).toBe(vaultFingerprint())
   })
 
+  /** A draft sealed under the fixture vault's content key (what this browser would have saved). */
+  const sealedForThisVault = (entryId: string): Uint8Array => {
+    const meta = JSON.parse(text(fixtureBytes(fixture, META))) as { master_fingerprint: string }
+    const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as { wrapped_master: string }
+    const ring = core.KeyRing.fromRecovery(
+      fixture.recovery_phrase,
+      recovery.wrapped_master,
+      meta.master_fingerprint,
+    )
+    ring.loadContentList(text(fixtureBytes(fixture, CONTENT)))
+    const empty = { entry_date: null, emotion: null, is_favorite: null, journal_id: null }
+    const sealed = core.sealOutboxEntry(
+      ring,
+      JSON.stringify({
+        schema_version: 1,
+        entry_id: entryId,
+        web_device_id: FIXED_ID,
+        created_on_web: true,
+        web_updated_at_secs: 1_700_000_000,
+        base_state_vector: [],
+        yjs_full_state: [1, 2, 3],
+        content_text: 'x',
+        preview_text: null,
+        fields: { title: null, ...empty, tags_add: {}, tags_remove: {} },
+        media: [],
+      }),
+    )
+    ring.lock()
+    return sealed
+  }
+
+  it('no device record + drafts of THIS vault: onboards and re-pushes them', async () => {
+    const env = await setup()
+    const entryId = 'eeeeeeee-1111-4222-8333-ffffffffffff'
+    const sealed = sealedForThisVault(entryId)
+    const pushedHash = await sha256Hex(sealed)
+    await env.db.drafts.put({ entryId, sealed, updatedAt: 1, pushedHash })
+    await run(env)
+    expect(await env.db.drafts.list()).toEqual([{ entryId, sealed, updatedAt: 1 }])
+  })
+
+  it('no device record + drafts that do not open under this vault: refused, ZERO writes', async () => {
+    const env = await setup()
+    const sealed = new Uint8Array([1, 2])
+    const pushedHash = await sha256Hex(sealed)
+    await env.db.drafts.put({ entryId: 'e1', sealed, updatedAt: 1, pushedHash })
+    const before = snapshot(env.drive)
+    await expect(run(env)).rejects.toBeInstanceOf(DeviceRecordConflictError)
+    expectNothingWritten(env, before)
+    expect(await env.db.device.get()).toBeUndefined()
+    expect(await env.db.drafts.list()).toEqual([
+      { entryId: 'e1', sealed, updatedAt: 1, pushedHash },
+    ])
+    expect(isUnlocked()).toBe(false)
+  })
+
   it('same vault: the id is reused and nothing is cleared (drafts and cache survive)', async () => {
     const env = await setup()
     await env.db.device.put(storedRecord(vaultFingerprint()))

@@ -510,6 +510,16 @@ export function applyContentText(ring: KeyRing, text: string | null, v: Versions
   }
 }
 
+/** True when `sealed` is an outbox intent this ring can open. */
+function opensUnder(core: Core, ring: KeyRing, sealed: Uint8Array): boolean {
+  try {
+    core.openOutboxEntry(ring, sealed)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Cache the `_content.json` text (wrapped key material, safe ciphertext) in the `files` store under
  * its Drive path so a reload can unlock offline. Pinned: it must never be evicted as cache.
@@ -670,7 +680,13 @@ export async function onboardComplete(
     const existing = await db.device.get()
     const replacesOtherVault =
       existing !== undefined && existing.masterFingerprint !== meta.masterFingerprint
-    if (replacesOtherVault && (await db.drafts.list()).length > 0) {
+    const drafts = await db.drafts.list()
+    if (replacesOtherVault && drafts.length > 0) {
+      throw new DeviceRecordConflictError()
+    }
+    // No record to tell which vault the drafts belong to: they are this vault's only if every one
+    // opens under its keys. Otherwise they would be orphaned exactly like another vault's drafts.
+    if (existing === undefined && drafts.some((d) => !opensUnder(core, ring, d.sealed))) {
       throw new DeviceRecordConflictError()
     }
     // IndexedDB must accept writes BEFORE the cloud slot is written, or a storage failure would
