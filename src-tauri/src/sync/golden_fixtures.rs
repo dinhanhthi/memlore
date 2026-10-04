@@ -1353,12 +1353,12 @@ async fn golden_outbox_convergence_and_propagation() {
     .await;
     assert_eq!(imp2.intents_applied, 0, "second import cycle applies 0");
     assert_eq!(
-        imp2.intents_skipped_unchanged, 3,
-        "3 intents skipped unchanged"
+        imp2.intents_skipped_unchanged, 4,
+        "4 intents skipped unchanged, including the unsupported-version one"
     );
     assert_eq!(
-        imp2.intents_refused, 1,
-        "unsupported version intent refused"
+        imp2.intents_refused, 0,
+        "an unchanged unsupported-version intent is not re-read"
     );
     assert!(summary2.pushed >= 1, "Desktop A pushed at least 1 entry");
 

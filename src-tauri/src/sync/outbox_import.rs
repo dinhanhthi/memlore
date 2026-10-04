@@ -1733,10 +1733,19 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
         let recorded =
             access.with_conn(|conn| outbox_import_get(conn, &intent_path).map_err(sync_io))?;
         let recorded_revision = recorded.as_ref().and_then(|r| r.revision.as_deref());
-        let is_pending = recorded
-            .as_ref()
-            .and_then(|r| r.pending_plan.as_ref())
-            .is_some();
+        // Re-read unconditionally only a crash-interrupted apply, or an intent skipped for a
+        // version this build now understands (after a desktop upgrade). Refused, corrupt and
+        // skipped_version rows also fill `pending_plan` (with their reason), but they are final
+        // until the intent file changes.
+        let is_pending = recorded.as_ref().is_some_and(|r| match r.outcome.as_str() {
+            "pending" => r.pending_plan.is_some(),
+            "skipped_version" => r
+                .pending_plan
+                .as_deref()
+                .and_then(|v| v.parse::<u16>().ok())
+                .is_some_and(|v| v == OUTBOX_SCHEMA_VERSION),
+            _ => false,
+        });
 
         let (bytes, revision): (Vec<u8>, Option<String>) = if is_pending {
             match provider.read_file(&intent_path).await {
@@ -1786,7 +1795,7 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                     post_import_fingerprint: None,
                     decided_fields: None,
                     pending_revision: None,
-                    pending_plan: None,
+                    pending_plan: Some(v.to_string()),
                     created: false,
                 };
                 let _ = access.with_conn(|conn| outbox_import_record(conn, &rec).map_err(sync_io));
@@ -3517,6 +3526,133 @@ mod tests {
 
         assert_eq!(res.intents_listed, 25);
         assert_eq!(res.intents_applied, 20); // capped at 20!
+    }
+
+    /// A refused intent stores its reason in `pending_plan`; that must not mark it as a
+    /// crash-pending intent, or it is re-downloaded every cycle and starves the budget.
+    #[tokio::test]
+    async fn test_import_cycle_refused_intents_are_not_reprocessed() {
+        use memlore_core::keyring_types::{DeviceSlotV2, KEYRING_V2_VERSION};
+        use memlore_core::outbox::seal_outbox_entry;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let provider = crate::sync::golden_fixtures::fenced_provider(temp_dir.path(), 0);
+        let sync_p: &(dyn SyncProvider + Send + Sync) = &provider;
+        let media_dir = temp_dir.path().join("media");
+        std::fs::create_dir_all(&media_dir).unwrap();
+
+        let own_device_id = "11111111-1111-1111-1111-111111111111";
+        let web_device_id = "55555555-5555-5555-5555-555555555555";
+
+        let web_slot = DeviceSlotV2 {
+            version: KEYRING_V2_VERSION,
+            device_id: web_device_id.to_string(),
+            name: "Web Companion".to_string(),
+            created_at: 1000,
+            last_seen_at: 1000,
+        };
+        crate::sync::keyring_v2::io::write_device_slot(&provider, &web_slot)
+            .await
+            .unwrap();
+
+        let key_list = test_key_list();
+
+        // 25 edits of entries this desktop has never seen and that were not created on the
+        // web: each one is refused ("absent") and recorded.
+        for i in 0..25 {
+            let eid = format!("entry-ref-{:02}", i);
+            let mut fields = OutboxFields::default();
+            fields.title = Some(FieldChange {
+                value: format!("Title {i}"),
+                base: "".to_string(),
+                base_updated_at: 0,
+                change_seq: 1,
+                changed_at_secs: 1000,
+            });
+            let entry = OutboxEntryV1 {
+                schema_version: 1,
+                entry_id: eid.clone(),
+                web_device_id: web_device_id.to_string(),
+                created_on_web: false,
+                web_updated_at_secs: 1000 + i as i64,
+                base_state_vector: vec![],
+                yjs_full_state: make_test_yjs(&format!("Content {i}")),
+                content_text: Some(format!("Content {i}")),
+                preview_text: Some("P".to_string()),
+                fields,
+                media: vec![],
+            };
+            let sealed = seal_outbox_entry(&key_list, &entry).unwrap();
+            sync_p
+                .write_file(&format!("{web_device_id}/outbox/{eid}.bin"), &sealed)
+                .await
+                .unwrap();
+        }
+
+        let conn = setup_test_db();
+        let summary = SyncSummary {
+            pull_clean: true,
+            ..Default::default()
+        };
+        let sink = TestOutboxSink::default();
+        let mut results = Vec::new();
+        for _ in 0..3 {
+            results.push(
+                run_outbox_import_cycle(
+                    &provider,
+                    &provider,
+                    own_device_id,
+                    &key_list,
+                    HashMap::new(),
+                    true,
+                    &summary,
+                    &media_dir,
+                    &conn,
+                    &sink,
+                )
+                .await
+                .unwrap(),
+            );
+        }
+
+        assert_eq!(results[0].intents_refused, 20);
+        // Cycle 2 skips the 20 already-refused intents and reaches the last 5.
+        assert_eq!(results[1].intents_skipped_unchanged, 20);
+        assert_eq!(results[1].intents_refused, 5);
+        // Cycle 3 downloads nothing: every refusal is final until the intent file changes.
+        assert_eq!(results[2].intents_skipped_unchanged, 25);
+        assert_eq!(results[2].intents_refused, 0);
+
+        // A version skip stays skipped while the version is unknown, and is re-read once this
+        // build understands it (a desktop upgrade), even though the file did not change.
+        let first = format!("{web_device_id}/outbox/entry-ref-00.bin");
+        let cycle_with_skipped_version = async |version: &str| {
+            conn.execute(
+                "UPDATE web_outbox_imports SET outcome = 'skipped_version', pending_plan = ?1 \
+                 WHERE path = ?2",
+                rusqlite::params![version, first],
+            )
+            .unwrap();
+            run_outbox_import_cycle(
+                &provider,
+                &provider,
+                own_device_id,
+                &key_list,
+                HashMap::new(),
+                true,
+                &summary,
+                &media_dir,
+                &conn,
+                &sink,
+            )
+            .await
+            .unwrap()
+        };
+        let unknown = cycle_with_skipped_version("999").await;
+        assert_eq!(unknown.intents_skipped_unchanged, 25);
+        let now_known = cycle_with_skipped_version(&OUTBOX_SCHEMA_VERSION.to_string()).await;
+        assert_eq!(now_known.intents_skipped_unchanged, 24);
+        assert_eq!(now_known.intents_refused, 1);
     }
 
     #[tokio::test]
