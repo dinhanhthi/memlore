@@ -1,9 +1,12 @@
 /**
- * Drafts Queue and Lifecycle Management (Phase 16.1).
+ * Drafts Queue and Lifecycle Management (Phase 16.1, retention Phase 16.5).
  *
  *  - Stores sealed ciphertext in IndexedDB (`db.drafts`).
- *  - Holds unpushed intents and media until safeUpload succeeds.
- *  - Provides `beforeunload` warning when there are unsynced drafts.
+ *  - A draft is KEPT after its upload and marked pushed (`pushedHash`): the overlay is rebuilt
+ *    from every draft after a reload, so a pushed-but-unimported edit is never rebuilt from synced
+ *    state. Dropping pushed drafts is the deferred 16.1 retention rule (docs/LATER.md).
+ *  - "Dirty" = some draft whose `pushedHash` is missing or is not the hash of its `sealed`.
+ *  - Provides `beforeunload` warning when there are unpushed drafts.
  *  - Dispatches uploads via `safeUpload`.
  */
 
@@ -14,22 +17,43 @@ export interface DraftManagerDeps {
   db: WebDb
 }
 
+/** Lowercase SHA-256 hex of `bytes` (Web Crypto). */
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>)
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function isUnpushed(rec: DraftRecord): Promise<boolean> {
+  const hash: unknown = rec.pushedHash
+  return typeof hash !== 'string' || hash !== (await sha256Hex(rec.sealed))
+}
+
+// Page-wide dirty state. `entries.ts` builds a new manager per command, so it cannot live on an
+// instance. `saveGen` stamps every save, so a refresh or a flush that started before a save never
+// clears the id that save made dirty.
+const unpushedIds = new Set<string>()
+const lastSaveGen = new Map<string, number>()
+let saveGen = 0
+
+const savedSince = (entryId: string, gen: number): boolean => (lastSaveGen.get(entryId) ?? 0) > gen
+
 export class DraftManager {
   readonly #db: WebDb
-  #dirty = false
 
   constructor(deps: DraftManagerDeps) {
     this.#db = deps.db
   }
 
   async saveDraft(entryId: string, sealed: Uint8Array): Promise<void> {
+    // A plain put: the record has no `pushedHash`, so it is unpushed.
     await this.#db.drafts.put({
       entryId,
       sealed,
       updatedAt: Date.now(),
     })
-    this.#dirty = true
-    activeDirtyManagers.add(this)
+    saveGen += 1
+    lastSaveGen.set(entryId, saveGen)
+    unpushedIds.add(entryId)
   }
 
   async getDraft(entryId: string): Promise<Uint8Array | undefined> {
@@ -39,34 +63,34 @@ export class DraftManager {
 
   async deleteDraft(entryId: string): Promise<void> {
     await this.#db.drafts.delete(entryId)
-    const list = await this.#db.drafts.list()
-    this.#dirty = list.length > 0
-    if (!this.#dirty) activeDirtyManagers.delete(this)
+    unpushedIds.delete(entryId)
   }
 
+  /** Every draft, pushed or not. Also refreshes the dirty state from IndexedDB. */
   async listDrafts(): Promise<DraftRecord[]> {
-    const list = await this.#db.drafts.list()
-    this.#dirty = list.length > 0
-    return list
+    return (await this.#refresh()).all
+  }
+
+  /** Drafts not yet uploaded in their current form. Also refreshes the dirty state. */
+  async listUnpushedDrafts(): Promise<DraftRecord[]> {
+    return (await this.#refresh()).unpushed
   }
 
   async isDirty(): Promise<boolean> {
-    const list = await this.#db.drafts.list()
-    this.#dirty = list.length > 0
-    return this.#dirty
+    return (await this.listUnpushedDrafts()).length > 0
   }
 
+  /** The last known dirty state, without reading IndexedDB (for `beforeunload`). */
   isDirtySync(): boolean {
-    return this.#dirty
+    return isAnyDraftDirty()
   }
 
   installBeforeUnload(windowObj?: Window): () => void {
-    const target =
-      windowObj ?? (typeof window !== 'undefined' ? window : undefined)
+    const target = windowObj ?? (typeof window !== 'undefined' ? window : undefined)
     if (!target) return () => undefined
 
     const handler = (e: BeforeUnloadEvent): void => {
-      if (this.#dirty) {
+      if (isAnyDraftDirty()) {
         e.preventDefault()
         e.returnValue = ''
       }
@@ -79,28 +103,55 @@ export class DraftManager {
   }
 
   /**
-   * Flushes a set of prepared `SafeUploadIntent[]` through `safeUpload`.
-   * On success, cleans up the draft record for entryId.
+   * Uploads `intents` (packed from `sealed`, the draft bytes the caller read) through
+   * `safeUpload`, then marks the draft pushed, only if its stored bytes are still `sealed`: a
+   * `saveDraft` during the upload stays unpushed. The caller passes `sealed` rather than this
+   * re-reading the record so the recorded hash is the hash of what was actually packed. The draft
+   * is never deleted. A rejected upload changes nothing and rethrows.
    */
   async flush(
     entryId: string,
     intents: SafeUploadIntent[],
     uploadDeps: SafeUploadDeps,
+    sealed: Uint8Array,
   ): Promise<void> {
+    const startGen = saveGen
+    const hash = await sha256Hex(sealed)
     await safeUpload(intents, uploadDeps)
-    await this.deleteDraft(entryId)
+    const marked = await this.#db.drafts.markPushed(entryId, sealed, hash)
+    if (marked && !savedSince(entryId, startGen)) unpushedIds.delete(entryId)
+  }
+
+  async #refresh(): Promise<{ all: DraftRecord[]; unpushed: DraftRecord[] }> {
+    const startGen = saveGen
+    const all = await this.#db.drafts.list()
+    const unpushed: DraftRecord[] = []
+    const seen = new Set<string>()
+    for (const rec of all) {
+      seen.add(rec.entryId)
+      if (await isUnpushed(rec)) {
+        unpushed.push(rec)
+        unpushedIds.add(rec.entryId)
+      } else if (!savedSince(rec.entryId, startGen)) {
+        unpushedIds.delete(rec.entryId)
+      }
+    }
+    for (const id of [...unpushedIds]) {
+      if (!seen.has(id) && !savedSince(id, startGen)) unpushedIds.delete(id)
+    }
+    return { all, unpushed }
   }
 }
 
-const activeDirtyManagers = new Set<DraftManager>()
 let beforeUnloadInstalled = false
 
 export function isAnyDraftDirty(): boolean {
-  return activeDirtyManagers.size > 0
+  return unpushedIds.size > 0
 }
 
 export function resetDraftsAutostartForTest(): void {
-  activeDirtyManagers.clear()
+  unpushedIds.clear()
+  lastSaveGen.clear()
 }
 
 export function installDraftsAutostart(windowObj?: Window): () => void {

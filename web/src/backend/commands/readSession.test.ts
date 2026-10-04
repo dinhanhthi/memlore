@@ -1,8 +1,13 @@
+import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Core } from '../../core/core'
+import { setWriteFlagForTest } from '../config'
 import { VaultLockedError } from '../keys'
-import type { WebDb } from '../storage/idb'
-import { createReadSession, type ReadSession } from './readSession'
+import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import { createEmptyOutboxFields, type OutboxEntryV1 } from '../sync/outbox'
+import { entryHandlers } from './entries'
+import { configureReadEnv, createReadSession, type ReadSession } from './readSession'
+import { FakeVault } from './readTestKit'
 
 const fakes = vi.hoisted(() => ({
   hooks: [] as Array<() => void>,
@@ -19,7 +24,10 @@ vi.mock('../keys', async (importOriginal) => ({
   getKeyRing: () => ({}),
 }))
 vi.mock('../sync/pull', () => ({ createPuller: () => fakes.puller }))
-vi.mock('../vault', () => ({ createVault: () => fakes.vault }))
+vi.mock('../vault', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../vault')>()),
+  createVault: () => fakes.vault,
+}))
 
 class Gate {
   readonly promise: Promise<void>
@@ -73,6 +81,7 @@ async function rig(): Promise<Rig> {
   const db = {
     files: { paths, get: async () => ({ ciphertext: enc.encode(journalFile) }) },
     meta: { listByPrefix: async () => [], put: async () => undefined },
+    drafts: { list: async () => [] },
   } as unknown as WebDb
   const core = { openDeviceBin: (_r: unknown, b: Uint8Array) => b } as unknown as Core
   const session = await createReadSession({ db, reader: {} as never, core })
@@ -148,5 +157,145 @@ describe('read session and lock races', () => {
     r.lock()
     r.pathsGate.current.open()
     await outcome
+  })
+})
+
+describe('drafts rehydrate the outbox overlay', () => {
+  const dec = new TextDecoder()
+
+  const intent = (over: Partial<OutboxEntryV1> = {}): OutboxEntryV1 => ({
+    schema_version: 1,
+    entry_id: 'e1',
+    web_device_id: 'web-1234',
+    created_on_web: false,
+    web_updated_at_secs: 100,
+    base_state_vector: [],
+    yjs_full_state: [],
+    content_text: null,
+    preview_text: null,
+    fields: {
+      ...createEmptyOutboxFields(),
+      title: {
+        value: 'Web title',
+        base: 'Title e1',
+        base_updated_at: 1,
+        change_seq: 1,
+        changed_at_secs: 100,
+      },
+    },
+    media: [],
+    ...over,
+  })
+
+  async function hydrationRig(drafts: Array<{ entryId: string; sealed: Uint8Array }>) {
+    const vault = Object.assign(new FakeVault([{ id: 'e1', updatedAt: 1 }]), {
+      setExcludedJournalIds: vi.fn(),
+    })
+    fakes.vault = vault
+    fakes.puller = {
+      index: new Map(),
+      refresh: async () => ({}),
+      warmStart: async () => [] as string[],
+    }
+    const db = await openWebDb({ factory: new IDBFactory() })
+    await db.device.put({
+      deviceId: 'web-1234',
+      wrappedMasterHex: 'ab'.repeat(WRAPPED_MASTER_HEX_LEN / 2),
+      kekSaltHex: 'cd'.repeat(16),
+      recoveryGeneration: 1,
+      masterFingerprint: 'fp-1',
+      name: 'Memlore Web',
+      nextChangeSeq: 2,
+    })
+    for (const d of drafts) await db.drafts.put({ ...d, updatedAt: 1 })
+    const openOutboxEntry = vi.fn((_ring: unknown, bytes: Uint8Array) => {
+      if (bytes[0] !== 0x7b) throw new Error('aead: tag mismatch')
+      return dec.decode(bytes)
+    })
+    const core = {
+      openDeviceBin: (_r: unknown, b: Uint8Array) => b,
+      openOutboxEntry,
+      sealOutboxEntry: (_r: unknown, json: string) => enc.encode(json),
+    } as unknown as Core
+    const session = await createReadSession({ db, reader: {} as never, core })
+    return { vault, db, session, openOutboxEntry }
+  }
+
+  afterEach(() => {
+    configureReadEnv({})
+    setWriteFlagForTest(false)
+    vi.restoreAllMocks()
+  })
+
+  it('exposes every sealed draft through the overlay once ready() resolves', async () => {
+    const r = await hydrationRig([{ entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) }])
+    expect(r.vault.getOutboxIntent('e1')).toBeUndefined()
+
+    await r.session.ready()
+
+    expect(r.vault.getOutboxIntent('e1')).toEqual(intent())
+    await r.session.ready()
+    expect(r.openOutboxEntry).toHaveBeenCalledTimes(1) // once per unlock
+  })
+
+  it('a second edit after a reload accumulates on top of the hydrated intent', async () => {
+    const r = await hydrationRig([{ entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) }])
+    configureReadEnv({ isUnlocked: () => true, session: async () => r.session })
+    setWriteFlagForTest(true)
+
+    await entryHandlers.toggle_favorite({ id: 'e1' })
+
+    const next = r.vault.getOutboxIntent('e1')
+    expect(next?.fields.title?.value).toBe('Web title')
+    expect(next?.fields.is_favorite?.value).toBe(true)
+    const stored = await r.db.drafts.get('e1')
+    const persisted = JSON.parse(dec.decode(stored?.sealed)) as OutboxEntryV1
+    expect(persisted.fields.title?.value).toBe('Web title')
+  })
+
+  it('skips and keeps a draft that fails to open', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const corrupt = new Uint8Array([0, 1, 2])
+    const r = await hydrationRig([
+      { entryId: 'bad', sealed: corrupt },
+      { entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) },
+    ])
+
+    await r.session.ready()
+
+    expect(r.vault.getOutboxIntent('bad')).toBeUndefined()
+    expect(r.vault.getOutboxIntent('e1')).toEqual(intent())
+    expect((await r.db.drafts.get('bad'))?.sealed).toEqual(corrupt)
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('a lock during hydration discards the result; the next unlock hydrates again', async () => {
+    const r = await hydrationRig([{ entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) }])
+    const gate = new Gate()
+    const list = r.db.drafts.list
+    r.db.drafts.list = async () => {
+      await gate.promise
+      return list()
+    }
+    const pending = r.session.ready()
+    const outcome = expect(pending).rejects.toBeInstanceOf(VaultLockedError)
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    for (const hook of [...fakes.hooks]) hook()
+    gate.open()
+    await outcome
+    expect(r.vault.getOutboxIntent('e1')).toBeUndefined()
+
+    await r.session.ready()
+    expect(r.vault.getOutboxIntent('e1')).toEqual(intent())
+  })
+
+  it('keeps an intent a write already set over the hydrated one', async () => {
+    const r = await hydrationRig([{ entryId: 'e1', sealed: enc.encode(JSON.stringify(intent())) }])
+    const newer = intent({ web_updated_at_secs: 200 })
+    r.vault.setOutboxIntents([newer])
+
+    await r.session.ready()
+
+    expect(r.vault.getOutboxIntent('e1')).toEqual(newer)
   })
 })

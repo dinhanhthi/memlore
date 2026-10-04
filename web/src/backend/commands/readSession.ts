@@ -7,7 +7,11 @@
  *   2. the journal/tag/template files are opened and the locked and invisible journal ids are fed to
  *      `vault.setExcludedJournalIds` BEFORE any entry is loaded (so an entry of a locked journal is
  *      never retained),
- *   3. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
+ *   3. once per unlock, every draft in IndexedDB is opened and fed to `vault.setOutboxIntents`
+ *      (Phase 16.5), so the overlay and the next write's `priorIntent` see the web edits saved
+ *      before a reload. Every write command awaits `ready()` first, so none runs on an empty
+ *      overlay,
+ *   4. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
  * Every read handler first checks the key holder and rejects with `VaultLockedError` when locked.
  *
  * Heavy modules (WASM core, puller, vault, Drive client, IndexedDB) are imported lazily by the
@@ -23,6 +27,7 @@ import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '
 import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
+import type { OutboxEntryV1 } from '../sync/outbox'
 import type { Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 
@@ -204,15 +209,17 @@ export interface ReadSessionDeps {
 /** The session over a given store, Drive reader and core (the default one passes the real ones). */
 export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSession> {
   const { db, reader, core } = deps
-  const [{ createPuller }, { createVault }] = await Promise.all([
+  const [{ createPuller }, { createVault }, { createDraftManager }] = await Promise.all([
     import('../sync/pull'),
     import('../vault'),
+    import('../drafts'),
   ])
   const puller = createPuller({ reader, db, core })
   const vault = createVault({ core, puller })
 
   let cache: { key: unknown; value: Taxonomy } | null = null
   let warmed: Promise<void> | null = null
+  let hydrated: Promise<void> | null = null
   // Bumped by the lock hook. Every step that awaits captures it first and discards its result
   // (writes no cache, no exclusions, no warm-start state) when a lock landed in between.
   let epoch = 0
@@ -220,6 +227,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     epoch += 1
     cache = null
     warmed = null
+    hydrated = null
   })
   const assertSameEpoch = (started: number): void => {
     if (started !== epoch) throw new VaultLockedError()
@@ -236,11 +244,35 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     return value
   }
 
+  // Lists every draft (pushed ones too: a pushed edit may not be imported yet), which also
+  // recomputes the page's dirty flag after a reload. Intents already in the overlay win: they
+  // were set by a write after these drafts were read.
+  const hydrate = async (): Promise<void> => {
+    const started = epoch
+    const drafts = await createDraftManager({ db }).listDrafts()
+    assertSameEpoch(started)
+    if (drafts.length === 0) return
+    const ring = getKeyRing()
+    const opened = drafts.flatMap((d) => openDraft(core, ring, d.entryId, d.sealed))
+    const current = vault.getOutboxIntents()
+    const set = new Set(current.map((i) => i.entry_id))
+    vault.setOutboxIntents([...opened.filter((i) => !set.has(i.entry_id)), ...current])
+  }
+
   const ready = async (): Promise<Taxonomy> => {
     const started = epoch
     if (puller.index === null) await puller.refresh()
     assertSameEpoch(started)
     const value = await taxonomy()
+    assertSameEpoch(started)
+    if (hydrated === null) {
+      const run = hydrate()
+      hydrated = run
+      run.catch(() => {
+        if (hydrated === run) hydrated = null
+      })
+    }
+    await hydrated
     assertSameEpoch(started)
     if (warmed === null) {
       const run = puller.warmStart().then(async (ids) => {
@@ -278,6 +310,28 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   }
 
   return { vault, media: { db, reader, core, limit: puller.limit }, db, core, ready, pull }
+}
+
+/**
+ * One draft's intent, or nothing when it cannot be opened or is not an intent for `entryId`. A
+ * draft that fails is logged and KEPT (it may open after a key change; dropping it loses an edit).
+ */
+function openDraft(
+  core: Core,
+  ring: KeyRing,
+  entryId: string,
+  sealed: Uint8Array,
+): OutboxEntryV1[] {
+  try {
+    const parsed = JSON.parse(core.openOutboxEntry(ring, sealed)) as unknown
+    if (!isRecord(parsed) || parsed.entry_id !== entryId || !isRecord(parsed.fields)) {
+      throw new Error('not an outbox intent for this entry')
+    }
+    return [parsed as unknown as OutboxEntryV1]
+  } catch (error) {
+    console.warn(`Skipping draft ${entryId}: it could not be opened`, error)
+    return []
+  }
 }
 
 function indexDiffers(

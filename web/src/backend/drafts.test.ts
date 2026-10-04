@@ -1,10 +1,19 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { openWebDb, type WebDb } from './storage/idb'
+import type { SafeUploadDeps } from './sync/safeUpload'
 import {
   DraftManager,
   createDraftManager,
+  isAnyDraftDirty,
+  resetDraftsAutostartForTest,
+  sha256Hex,
 } from './drafts'
+
+const mocks = vi.hoisted(() => ({ safeUpload: vi.fn(async () => undefined) }))
+vi.mock('./sync/safeUpload', () => ({ safeUpload: mocks.safeUpload }))
+
+const UPLOAD_DEPS = {} as SafeUploadDeps
 
 describe('DraftManager', () => {
   let factory: IDBFactory
@@ -15,6 +24,9 @@ describe('DraftManager', () => {
     factory = new IDBFactory()
     db = await openWebDb({ factory })
     manager = createDraftManager({ db })
+    resetDraftsAutostartForTest()
+    mocks.safeUpload.mockReset()
+    mocks.safeUpload.mockResolvedValue(undefined)
   })
 
   it('saves, retrieves, and deletes sealed drafts in db.drafts', async () => {
@@ -72,5 +84,90 @@ describe('DraftManager', () => {
 
     cleanup()
     expect(listeners['beforeunload']).toHaveLength(0)
+  })
+
+  it('flush keeps the draft and marks it pushed', async () => {
+    const sealed = new Uint8Array([1, 2, 3])
+    await manager.saveDraft('e1', sealed)
+    expect(isAnyDraftDirty()).toBe(true)
+
+    await manager.flush('e1', [], UPLOAD_DEPS, sealed)
+
+    expect(mocks.safeUpload).toHaveBeenCalledTimes(1)
+    const rec = await db.drafts.get('e1')
+    expect(rec?.sealed).toEqual(sealed)
+    expect(rec?.pushedHash).toBe(await sha256Hex(sealed))
+    expect(await manager.listUnpushedDrafts()).toEqual([])
+    expect(isAnyDraftDirty()).toBe(false)
+    expect(manager.isDirtySync()).toBe(false)
+  })
+
+  it('a saveDraft that lands during the upload stays unpushed', async () => {
+    const first = new Uint8Array([1])
+    const second = new Uint8Array([2])
+    await manager.saveDraft('e1', first)
+    let release!: () => void
+    mocks.safeUpload.mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => (release = () => resolve(undefined))),
+    )
+
+    const flushing = manager.flush('e1', [], UPLOAD_DEPS, first)
+    await vi.waitFor(() => expect(mocks.safeUpload).toHaveBeenCalled())
+    // Another command instance, as entries.ts creates one per call.
+    await createDraftManager({ db }).saveDraft('e1', second)
+    release()
+    await flushing
+
+    const rec = await db.drafts.get('e1')
+    expect(rec?.sealed).toEqual(second)
+    expect(rec?.pushedHash).toBeUndefined()
+    expect((await manager.listUnpushedDrafts()).map((d) => d.entryId)).toEqual(['e1'])
+    expect(isAnyDraftDirty()).toBe(true)
+  })
+
+  it('a safeUpload rejection leaves the draft unpushed and rethrows', async () => {
+    const sealed = new Uint8Array([9])
+    await manager.saveDraft('e1', sealed)
+    mocks.safeUpload.mockRejectedValueOnce(new Error('refused'))
+
+    await expect(manager.flush('e1', [], UPLOAD_DEPS, sealed)).rejects.toThrow('refused')
+
+    expect(await db.drafts.get('e1')).toMatchObject({ entryId: 'e1', sealed })
+    expect((await db.drafts.get('e1'))?.pushedHash).toBeUndefined()
+    expect(isAnyDraftDirty()).toBe(true)
+  })
+
+  it('counts an old record without pushedHash, or with a stale one, as unpushed', async () => {
+    await db.drafts.put({ entryId: 'old', sealed: new Uint8Array([1]), updatedAt: 1 })
+    await db.drafts.put({
+      entryId: 'stale',
+      sealed: new Uint8Array([2]),
+      updatedAt: 1,
+      pushedHash: await sha256Hex(new Uint8Array([3])),
+    })
+    await db.drafts.put({
+      entryId: 'pushed',
+      sealed: new Uint8Array([4]),
+      updatedAt: 1,
+      pushedHash: await sha256Hex(new Uint8Array([4])),
+    })
+
+    const unpushed = await manager.listUnpushedDrafts()
+    expect(unpushed.map((d) => d.entryId).sort()).toEqual(['old', 'stale'])
+    expect(await manager.isDirty()).toBe(true)
+  })
+
+  it('is dirty after a reload: a new manager over an IDB that already holds an unpushed draft', async () => {
+    await db.drafts.put({ entryId: 'e1', sealed: new Uint8Array([1]), updatedAt: 1 })
+    // A fresh page: module state is empty, no saveDraft ran.
+    resetDraftsAutostartForTest()
+    const reloaded = await openWebDb({ factory })
+    const fresh = createDraftManager({ db: reloaded })
+    expect(isAnyDraftDirty()).toBe(false)
+
+    await fresh.listDrafts()
+
+    expect(isAnyDraftDirty()).toBe(true)
+    expect(fresh.isDirtySync()).toBe(true)
   })
 })

@@ -94,6 +94,11 @@ export interface DraftRecord {
   /** Sealed (encrypted) draft bytes. Sealing happens outside this module. */
   sealed: Uint8Array
   updatedAt: number
+  /**
+   * SHA-256 hex of the `sealed` bytes last uploaded. Absent (every record written before Phase
+   * 16.5) or different from the hash of `sealed`: the draft is unpushed.
+   */
+  pushedHash?: string
 }
 
 /** No field here can hold raw key bytes: `wrappedMasterHex` is the wrapped blob, `kekSaltHex` is public. */
@@ -191,10 +196,22 @@ function assertBlobRecord(r: BlobRecord): void {
   if (r.size !== r.bytes.byteLength) throw new TypeError('blob size must equal bytes length')
 }
 
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/
+
 function assertDraftRecord(r: DraftRecord): void {
   assertString(r.entryId, 'draft entryId')
   assertBytes(r.sealed, 'draft sealed bytes')
   assertNumber(r.updatedAt, 'draft updatedAt')
+  const hash: unknown = r.pushedHash
+  if (hash !== undefined && !(typeof hash === 'string' && SHA256_HEX_RE.test(hash))) {
+    throw new TypeError('draft pushedHash must be a SHA-256 hex string')
+  }
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) return false
+  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false
+  return true
 }
 
 function assertMetaRecord(r: MetaRecord): void {
@@ -485,6 +502,23 @@ export class WebDb {
     },
     delete: (entryId: string) => this.del(STORE_DRAFTS, entryId),
     list: () => this.all<DraftRecord>(STORE_DRAFTS),
+    /**
+     * Sets `pushedHash` in ONE transaction, only while the stored `sealed` bytes are still the
+     * `uploaded` ones (a draft saved again during the upload stays unpushed). Compares bytes, not
+     * hashes: hashing is async and would let the transaction auto-commit. Resolves false when the
+     * draft is missing or changed.
+     */
+    markPushed: (entryId: string, uploaded: Uint8Array, pushedHash: string): Promise<boolean> =>
+      this.tx([STORE_DRAFTS], 'readwrite', async ([s]) => {
+        const rec = (await requestToPromise(s.get(entryId))) as DraftRecord | undefined
+        if (!rec || !(rec.sealed instanceof Uint8Array) || !sameBytes(rec.sealed, uploaded)) {
+          return false
+        }
+        const updated: DraftRecord = { ...rec, pushedHash }
+        assertDraftRecord(updated)
+        await requestToPromise(s.put(updated))
+        return true
+      }),
   }
 
   readonly device = {

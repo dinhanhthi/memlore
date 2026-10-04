@@ -119,6 +119,43 @@ describe('drafts and meta', () => {
     await db.meta.put({ key: 'cacheBytes', value: 5 })
     expect(await db.meta.get('cacheBytes')).toEqual({ key: 'cacheBytes', value: 5 })
   })
+
+  it('accepts a draft without pushedHash and rejects a non-hex one', async () => {
+    await db.drafts.put({ entryId: 'e1', sealed: bytes(8), updatedAt: 1 })
+    expect((await db.drafts.get('e1'))?.pushedHash).toBeUndefined()
+    await db.drafts.put({
+      entryId: 'e1',
+      sealed: bytes(8),
+      updatedAt: 1,
+      pushedHash: 'ab'.repeat(32),
+    })
+    expect((await db.drafts.get('e1'))?.pushedHash).toBe('ab'.repeat(32))
+    for (const bad of ['', 'zz'.repeat(32), 'ab', 5]) {
+      expect(() =>
+        db.drafts.put({
+          entryId: 'e1',
+          sealed: bytes(8),
+          updatedAt: 1,
+          pushedHash: bad as unknown as string,
+        }),
+      ).toThrow(TypeError)
+    }
+  })
+
+  it('markPushed sets pushedHash only while the stored bytes are the uploaded ones', async () => {
+    const hash = 'cd'.repeat(32)
+    expect(await db.drafts.markPushed('none', bytes(4), hash)).toBe(false)
+    await db.drafts.put({ entryId: 'e1', sealed: bytes(4, 1), updatedAt: 3 })
+    expect(await db.drafts.markPushed('e1', bytes(4, 2), hash)).toBe(false)
+    expect((await db.drafts.get('e1'))?.pushedHash).toBeUndefined()
+    expect(await db.drafts.markPushed('e1', bytes(4, 1), hash)).toBe(true)
+    expect(await db.drafts.get('e1')).toEqual({
+      entryId: 'e1',
+      sealed: bytes(4, 1),
+      updatedAt: 3,
+      pushedHash: hash,
+    })
+  })
 })
 
 describe('device', () => {
