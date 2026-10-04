@@ -8,8 +8,9 @@
 //!   built outside wasm32).
 //! - Structured data crosses as JSON strings (no extra dependencies).
 //! - Time is always a parameter; nothing here reads a clock or generates ids.
-//! - Error strings carry no key material, no plaintext and no fragments of the
-//!   rejected input (JSON errors report only a class, line and column).
+//! - Error strings carry no key material, no journal text and no fragments of the
+//!   rejected input (JSON errors report only a class, line and column). One
+//!   exception: outbox intent validation may name a rejected id or emotion token.
 //! - Untrusted input is size-capped before any decrypt or parse
 //!   ([`MAX_ENTRY_BYTES`], [`MAX_MEDIA_BYTES`], [`MAX_BIN_BYTES`],
 //!   [`MAX_JSON_BYTES`]); over-limit input returns an error and no data.
@@ -362,6 +363,8 @@ fn seal_media_inner(
     plaintext: &[u8],
     thumb: bool,
 ) -> Result<Vec<u8>, String> {
+    let what = if thumb { "thumbnail" } else { "media file" };
+    check_len(what, plaintext.len(), MAX_MEDIA_BYTES)?;
     let list = state.list()?;
     let out = if thumb {
         envelope::seal_thumb(list, plaintext)
@@ -821,6 +824,18 @@ mod tests {
         assert!(check_len("x", 4, 4).is_ok());
         let err = check_len("x", 5, 4).unwrap_err();
         assert_eq!(err, "x too large: 5 bytes (max 4)");
+    }
+
+    #[test]
+    fn oversized_media_and_thumbs_are_rejected_before_sealing() {
+        let s = list_state();
+        let big = vec![0u8; MAX_MEDIA_BYTES + 1];
+        assert!(seal_media_inner(&s, &big, false)
+            .unwrap_err()
+            .contains("too large"));
+        assert!(seal_media_inner(&s, &big, true)
+            .unwrap_err()
+            .contains("too large"));
     }
 
     #[test]
