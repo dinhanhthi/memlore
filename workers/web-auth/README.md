@@ -39,7 +39,8 @@ Secrets, set with `wrangler secret put` and never committed:
 - `COOKIE_KEY` - base64 of 32 random bytes (`openssl rand -base64 32`). A key of any other length is rejected.
 
 For local dev, put the same three keys in `workers/web-auth/.dev.vars` (gitignored), then run
-`pnpm web-auth:dev --env dev` next to `pnpm web:dev`. Add `--var WEB_WRITES_ENABLED:1` to test writes.
+`pnpm web-auth:dev` (it uses `--env dev`) next to `pnpm web:dev`, or next to
+`pnpm web:build && pnpm web:preview` for the production bundle. Add `--var WEB_WRITES_ENABLED:1` to test writes.
 
 See `docs/plans/2026-10-02-web-app/setup-guide.md` for the full walkthrough.
 

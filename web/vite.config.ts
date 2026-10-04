@@ -35,6 +35,18 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 // repo-root `public/` (the logos and stickers src/ references), which the Tauri app bundles too.
 const WEB_ONLY_FILES = ['_headers', 'boot.js'] as const
 
+/** The `/*` block of web/static/_headers (CSP and friends), so `web:preview` serves what Pages serves. */
+function productionHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {}
+  let inGlobalBlock = false
+  for (const line of readFileSync(here('./static/_headers'), 'utf8').split('\n')) {
+    if (!line.startsWith(' ') && line.trim() !== '') inGlobalBlock = line.trim() === '/*'
+    const match = /^\s+([A-Za-z-]+):\s*(.+)$/.exec(line)
+    if (inGlobalBlock && match) headers[match[1]] = match[2].trim()
+  }
+  return headers
+}
+
 function webOnlyFiles(): Plugin {
   const read = (name: string) => readFileSync(here(`./static/${name}`))
   return {
@@ -88,9 +100,14 @@ export default defineConfig({
     // wrangler dev
     proxy: { '/api': 'http://localhost:8787' },
   },
+  // `pnpm web:build && pnpm web:preview` is the production-like local run: the built bundle, the
+  // production headers, and the local Worker (`pnpm web-auth:dev`) on the same origin under /api.
+  // Port 5176 because the Google OAuth client and the Worker's dev APP_ORIGIN allow only that origin.
   preview: {
-    port: 4176,
+    port: 5176,
     strictPort: true,
+    proxy: { '/api': 'http://localhost:8787' },
+    headers: productionHeaders(),
   },
   build: {
     outDir: here('./dist'),
