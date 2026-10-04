@@ -1,13 +1,25 @@
 name: Deploy Web Companion
 
+# Ships web.memlore.app. The web companion has its own version (web/version.json)
+# and its own tags, `web-v<semver>`, cut by `/cf-ship --web`. Desktop tags stay
+# `v*` and are released by release.yml; `web-v*` never matches that `v*` filter.
+#
+# - pull_request:      test + build only, never deploys.
+# - push web-v* tag:   test + build, then deploy. A stable tag (web-v0.2.0) goes to
+#                      production; a prerelease tag (web-v0.2.0-rc.1) goes to the
+#                      Pages `preview` branch (preview.memlore-web.pages.dev) and
+#                      never touches the Worker.
+# - workflow_dispatch: re-deploys an existing web tag (e.g. after a CI failure).
+#                      Must be started from a web-v* tag ref, never from a branch.
+#
+# No GitHub Release is ever created for a web tag. The desktop updater reads
+# /releases/latest (stable) and the newest release of any kind (beta); a web
+# release would hijack both channels and break desktop updates.
+
 on:
+  push:
+    tags: ['web-v*']
   workflow_dispatch:
-    inputs:
-      deploy_worker:
-        description: 'Deploy workers/web-auth Worker as well'
-        required: false
-        type: boolean
-        default: false
   pull_request:
     paths:
       - 'web/**'
@@ -21,16 +33,53 @@ permissions:
 
 concurrency:
   group: deploy-web-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-and-test:
     name: Build & Test Web Companion
     runs-on: macos-14
     timeout-minutes: 45
+    outputs:
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      worker_changed: ${{ steps.release.outputs.worker_changed }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The previous web tag is needed to tell whether the Worker changed.
+          fetch-depth: 0
+
+      # A deploy must come from a web-v* tag whose version matches web/version.json,
+      # so what is live is always a tagged, versioned build.
+      - name: Check the web release tag
+        id: release
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME#web-v}" = "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Deploys run only from a web-v* tag (got ${GITHUB_REF_TYPE} '${GITHUB_REF_NAME}'). Ship with /cf-ship --web."
+            exit 1
+          fi
+          TAG_VERSION="${GITHUB_REF_NAME#web-v}"
+          FILE_VERSION="$(node -p "require('./web/version.json').version")"
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match web/version.json (${FILE_VERSION})."
+            exit 1
+          fi
+          case "$TAG_VERSION" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          # The previous web tag reachable from this commit's parent. None means the
+          # first web release, which deploys the Worker too.
+          PREV="$(git describe --tags --abbrev=0 --match 'web-v*' "${GITHUB_SHA}^" 2>/dev/null || true)"
+          if [ -z "$PREV" ] || ! git diff --quiet "$PREV" "$GITHUB_SHA" -- workers/web-auth; then
+            echo "worker_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "worker_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Web ${TAG_VERSION}: previous tag ${PREV:-none}"
 
       - uses: pnpm/action-setup@v4
 
@@ -67,16 +116,22 @@ jobs:
         run: pnpm web:build
 
       - name: Deploy to Cloudflare Pages
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler pages deploy web/dist --project-name memlore-web --branch main
+          PAGES_BRANCH: ${{ steps.release.outputs.prerelease == 'true' && 'preview' || 'main' }}
+        run: pnpm exec wrangler pages deploy web/dist --project-name memlore-web --branch "$PAGES_BRANCH" --commit-message "$GITHUB_REF_NAME"
 
   deploy-worker:
     name: Deploy Auth Worker
     needs: [build-and-test]
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy_worker == true
+    # Production only, and only when workers/web-auth changed since the previous
+    # web tag: every deploy re-applies wrangler.toml, including WEB_WRITES_ENABLED.
+    if: >-
+      github.event_name != 'pull_request' &&
+      needs.build-and-test.outputs.prerelease == 'false' &&
+      needs.build-and-test.outputs.worker_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
