@@ -102,6 +102,16 @@ describe('router coverage of src/ invoke() commands', () => {
   })
 })
 
+describe('app_version', () => {
+  it('reports the web companion version from web/version.json, not the desktop one', async () => {
+    const { version } = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../version.json', import.meta.url)), 'utf8'),
+    ) as { version: string }
+    expect(version).toMatch(/^\d+\.\d+\.\d+(-(beta|rc)\.\d+)?$/)
+    await expect(route('app_version')).resolves.toBe(version)
+  })
+})
+
 describe('route', () => {
   it('resolves query commands to their safe default', async () => {
     await expect(route('list_media_for_entry')).resolves.toEqual([])

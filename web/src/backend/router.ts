@@ -9,6 +9,7 @@ import { installConfigAutostart } from './config'
 import { installDraftsAutostart } from './drafts'
 import { installEvictorAutostart } from './storage/evictor'
 import { unsupported } from './unsupported'
+import webVersion from '../../version.json'
 
 export type Handler = (args: Record<string, unknown>) => unknown | Promise<unknown>
 
@@ -18,6 +19,8 @@ const settings = new Map<string, string>()
 
 /** Implemented commands, keyed by command name. Phases 9-16 fill it via `registerHandlers`. */
 export const handlers: Record<string, Handler> = {
+  // The web companion's own version (web/version.json, bumped by `/cf-ship --web`), not the desktop app's.
+  app_version: async () => webVersion.version,
   // Native titlebar tweak, nothing to do in a browser.
   set_titlebar_row_height: async () => undefined,
   get_setting: async ({ key }) => settings.get(String(key)) ?? null,

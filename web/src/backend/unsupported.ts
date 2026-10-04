@@ -95,7 +95,6 @@ const AI_SETTINGS_OFF = {
  */
 export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   // Boot and vault state (startup/encryption mode, device id: served by commands/auth.ts).
-  app_version: null,
   check_for_update: null,
   get_pending_first_time_setup: null,
   is_biometric_available: false,
