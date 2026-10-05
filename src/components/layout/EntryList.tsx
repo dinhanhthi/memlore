@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 import { useSelectedEntryId, useUpdateActiveTab } from '../../hooks/useActiveTab'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useRestoredScroll } from '../../hooks/useRestoredScroll'
 import { getTabScroll, tabScrollKey } from '../../lib/tabScrollPositions'
 import { useTabStore } from '../../stores/tabStore'
@@ -314,6 +315,8 @@ export function EntryList({
 
   const paginatorLabel = tagFilter?.name ?? (starred ? 'favorites' : 'entries')
 
+  // Entry deletion is desktop-only (docs/LATER.md); without onDelete the card hides its trash button.
+  const { deleteEntries } = useCapabilities()
   const handleDeleteEntry = useCallback(
     async (id: string) => {
       // Clear the selection first so the editor doesn't keep showing
@@ -512,7 +515,7 @@ export function EntryList({
                       journal={journalMap.get(entry.journal_id) ?? null}
                       tags={entryTags.get(entry.id) ?? EMPTY_TAGS}
                       idleBg={ENTRY_CARD_IDLE_BG}
-                      onDelete={() => handleDeleteEntry(entry.id)}
+                      onDelete={deleteEntries ? () => handleDeleteEntry(entry.id) : undefined}
                       onToggleFavorite={() => toggleFavorite(entry.id)}
                     />
                   </div>
@@ -541,7 +544,9 @@ export function EntryList({
                               journal={journalMap.get(entry.journal_id) ?? null}
                               tags={entryTags.get(entry.id) ?? EMPTY_TAGS}
                               idleBg={ENTRY_CARD_IDLE_BG}
-                              onDelete={() => handleDeleteEntry(entry.id)}
+                              onDelete={
+                                deleteEntries ? () => handleDeleteEntry(entry.id) : undefined
+                              }
                               onToggleFavorite={() => toggleFavorite(entry.id)}
                             />
                           </div>
