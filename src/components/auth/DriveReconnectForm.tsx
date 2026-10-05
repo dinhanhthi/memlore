@@ -2,6 +2,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
+import { isWeb } from '../../lib/platform'
 import { gdriveBeginConnect, gdriveCompleteConnect, recheckForceRePair } from '../../lib/tauri'
 import { Button } from '../common/Button'
 import { Callout } from '../common/Callout'
@@ -71,7 +72,8 @@ export function DriveReconnectForm({
     setIsReconnecting(true)
     try {
       const begin = await gdriveBeginConnect()
-      await openUrl(begin.authUrl)
+      // Web: begin already opened the sign-in popup inside the click gesture.
+      if (!isWeb) await openUrl(begin.authUrl)
       const outcome = await gdriveCompleteConnect(begin.sessionId, password)
       if (outcome.outcome === 'needs_force_re_pair') {
         // Token persisted, vault genuinely rotated — re-pair is now possible.

@@ -2,6 +2,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { create } from 'zustand'
 import { useForceRePairStore } from '../hooks/useForceRePair'
+import { isWeb } from '../lib/platform'
 import {
   cloudFolderConnect,
   gdriveBeginConnect,
@@ -209,7 +210,8 @@ export const useGdriveConnectStore = create<GdriveConnectState>((set, get) => ({
         const begin = await gdriveBeginConnect()
         set({ sessionId: begin.sessionId })
         unlisten = await attachProgress()
-        await openUrl(begin.authUrl)
+        // Web: begin already opened the sign-in popup inside the click gesture.
+        if (!isWeb) await openUrl(begin.authUrl)
         // Never short-circuit this await: `gdrive_cancel_connect` resolves it via
         // the OAUTH_CANCELLED marker (handled in catch) or the outcome switch.
         outcome = await gdriveCompleteConnect(begin.sessionId, password)

@@ -17,7 +17,7 @@ import {
 } from '../../lib/tauri'
 import { cn } from '../../lib/cn'
 import { displayCloudRootPath } from '../../lib/displayCloudRootPath'
-import { isMacOS } from '../../lib/platform'
+import { isMacOS, isWeb } from '../../lib/platform'
 import {
   asCloudProviderKind,
   defaultSelectedProvider,
@@ -258,7 +258,8 @@ export function GoogleDriveSettings() {
       const begin = await gdriveBeginConnect()
       pendingSessionIdRef.current = begin.sessionId
       setIsAwaitingCallback(true)
-      await openUrl(begin.authUrl)
+      // Web: begin already opened the sign-in popup inside the click gesture.
+      if (!isWeb) await openUrl(begin.authUrl)
       const outcome: GdriveConnectOutcome = await gdriveCompleteConnect(begin.sessionId, password)
       clearCancelHooks()
       setPassword('')

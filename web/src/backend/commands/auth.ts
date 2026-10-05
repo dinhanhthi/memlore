@@ -105,8 +105,8 @@
  *          wrapper tauri.ts:1246 gdriveBeginConnect(), no args.
  *   Rust   src-tauri/src/commands/gdrive.rs:469 -> BeginConnectResponse (gdrive.rs:148,
  *          serde camelCase: auth_url -> authUrl, session_id -> sessionId).
- *   Use    WelcomeScreen.tsx:307 (then openUrl(authUrl) at :316, which the web shim
- *          web/src/tauri/plugin-opener.ts serves), gdriveConnectStore.ts:209.
+ *   Use    WelcomeScreen.tsx, gdriveConnectStore.ts, GoogleDriveSettings.tsx and
+ *          DriveReconnectForm.tsx; each skips openUrl(authUrl) on the web (`isWeb`).
  *   Web    start the PKCE/OAuth flow from phase 8 (drive/oauth.ts) and return
  *          { authUrl, sessionId }. Replaces unsupported.ts:448.
  *
@@ -602,7 +602,7 @@ const gdriveBeginConnect: Handler = async () => {
     createdAt: e.now(),
     loggedOut: false,
   })
-  // The popup is already open (opened here, inside the click gesture), so WelcomeScreen skips
+  // The popup is already open (opened here, inside the click gesture), so every caller skips
   // openUrl(authUrl) on the web; authUrl only fills the shared contract with a state-free
   // same-origin JSON URL.
   return { authUrl: `${e.origin()}/api/config`, sessionId }
