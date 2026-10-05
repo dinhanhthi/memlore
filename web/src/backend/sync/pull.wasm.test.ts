@@ -16,7 +16,7 @@ import {
   type DesktopFixture,
 } from '../drive/fakeDrive'
 import { resetClock } from '../clock'
-import { configureKeysEnv, dispose, getKeyRing, isUnlocked } from '../keys'
+import { configureKeysEnv, dispose, getKeyRing, isUnlocked, VaultLockedError } from '../keys'
 import { openWebDb, type WebDb } from '../storage/idb'
 import { resumeWrites } from './fence'
 import { isFormatGuardLatched, resetFormatGuardLatch } from './formatGuard'
@@ -36,6 +36,17 @@ const PASSWORD = '12345678'
 const OWN_ID = 'cccccccc-1111-4222-8333-dddddddddddd'
 const OTHER_DEVICE = 'dddddddd-2222-4333-8444-eeeeeeeeeeee'
 const NEWEST = 1791025173
+const SECOND_JOURNAL = 'j-second.bin'
+
+class Gate {
+  readonly promise: Promise<void>
+  open!: () => void
+  constructor() {
+    this.promise = new Promise<void>((resolve) => {
+      this.open = resolve
+    })
+  }
+}
 
 let core: Core
 let fixture: DesktopFixture
@@ -47,25 +58,44 @@ interface Env {
   db: WebDb
   puller: Puller
   desktop: string
-  net: { down: boolean; mediaInFlight: number; mediaPeak: number }
+  net: {
+    down: boolean
+    mediaInFlight: number
+    mediaPeak: number
+    /** Extra milliseconds before a download answers, keyed by Memlore-relative path. */
+    delay?: (path: string) => number
+    /** An HTTP status a download answers with instead of its content, keyed by path. */
+    fail?: (path: string) => number | undefined
+    /** A gate a download waits on before it is sent, keyed by path. */
+    hold?: (path: string) => Gate | undefined
+  }
   limit?: Limiter
 }
 
 const manifestPath = (): string => `generations/g-0/${fixture.device_id}/metadata.json`
 
-async function setup(seed: { omit?: (path: string) => boolean } = {}): Promise<Env> {
+async function setup(
+  seed: { omit?: (path: string) => boolean } = {},
+  deps: { isUnlocked?: () => boolean } = {},
+): Promise<Env> {
   const drive = new FakeDrive()
   seedFromFixture(drive, fixture, seed)
-  const net = { down: false, mediaInFlight: 0, mediaPeak: 0 }
+  const net: Env['net'] = { down: false, mediaInFlight: 0, mediaPeak: 0 }
   const fetchImpl = async (input: string, init?: RequestInit): Promise<Response> => {
     if (net.down) throw new TypeError('network down')
     const isMedia = input.includes('alt=media')
     if (!isMedia) return drive.fetch(input, init)
+    // alt=media URLs carry the file id, not a name: resolve the Memlore-relative path.
+    const id = /\/files\/([^/]+)$/.exec(new URL(input).pathname)?.[1] ?? ''
+    const path = pathOf(drive, id)
     net.mediaInFlight += 1
     net.mediaPeak = Math.max(net.mediaPeak, net.mediaInFlight)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2))
-      return await drive.fetch(input, init)
+      await net.hold?.(path)?.promise
+      await new Promise((resolve) => setTimeout(resolve, 2 + (net.delay?.(path) ?? 0)))
+      const response = await drive.fetch(input, init)
+      const status = net.fail?.(path)
+      return status === undefined ? response : json({ error: 'x' }, status)
     } finally {
       net.mediaInFlight -= 1
     }
@@ -94,7 +124,13 @@ async function setup(seed: { omit?: (path: string) => boolean } = {}): Promise<E
     { phrase: fixture.recovery_phrase, password: PASSWORD },
   )
   drive.requests.length = 0
-  const puller = createPuller({ reader, db, core, now: () => 1_800_000_000_000 })
+  const puller = createPuller({
+    reader,
+    db,
+    core,
+    now: () => 1_800_000_000_000,
+    isUnlocked: deps.isUnlocked,
+  })
   return { drive, reader, writer, db, puller, desktop: fixture.device_id, net }
 }
 
@@ -138,7 +174,7 @@ function patchManifest(
 
 type Row = { entry_id: string; updated_at: number; is_deleted: boolean; local_version: number }
 
-/** A second desktop folder with a manifest and a copy of one fixture entry file. */
+/** A second desktop folder with a manifest, small files and a copy of one fixture entry file. */
 function addSecondDevice(drive: FakeDrive, rows: Row[], entryFileFrom?: string): string {
   const folder = drive.chain('Memlore', 'generations', 'g-0', OTHER_DEVICE)
   drive.addFile(
@@ -154,6 +190,9 @@ function addSecondDevice(drive: FakeDrive, rows: Row[], entryFileFrom?: string):
       generated_at: NEWEST,
     }),
   )
+  drive.addFile('tags.bin', folder, 'TAGS')
+  const journals = drive.chain('Memlore', 'generations', 'g-0', OTHER_DEVICE, 'journals')
+  drive.addFile(SECOND_JOURNAL, journals, 'JOURNAL')
   if (entryFileFrom !== undefined) {
     const entries = drive.chain('Memlore', 'generations', 'g-0', OTHER_DEVICE, 'entries')
     for (const row of rows) {
@@ -412,6 +451,149 @@ describe('refresh', () => {
     expect(entryDownloads(env.drive)).toEqual([
       `generations/g-0/${OTHER_DEVICE}/entries/${first.entry_id}.bin`,
     ])
+  })
+
+  it('reads per-device files in parallel through the limiter', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    const result = await env.puller.refresh()
+    expect(result.devices).toEqual([env.desktop, OTHER_DEVICE].sort())
+    expect(env.net.mediaPeak).toBeGreaterThanOrEqual(2)
+    expect(env.net.mediaPeak).toBeLessThanOrEqual(4)
+  })
+
+  it('parallel reads share the device-tree folder lookups', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    const devicesFolder = env.drive.find(['Memlore', '.meta', 'keyring', 'devices'])
+    if (!devicesFolder) throw new Error('no devices folder')
+    await env.puller.refresh()
+    // The authority check's own lookups precede the slot listing: count only what follows.
+    const slotListing = env.drive.requests.findIndex((r) =>
+      (r.url.searchParams.get('q') ?? '').includes(`'${devicesFolder.id}' in parents`),
+    )
+    if (slotListing < 0) throw new Error('no slot listing')
+    const lookups = new Map<string, number>()
+    for (const r of env.drive.requests.slice(slotListing + 1)) {
+      const q = r.url.searchParams.get('q') ?? ''
+      if (!q.includes(`mimeType = '${FOLDER}'`)) continue
+      const name = /name = '((?:[^'\\]|\\.)*)'/.exec(q)?.[1]?.replace(/\\(.)/g, '$1')
+      const parentId = /'([^']+)' in parents/.exec(q)?.[1]
+      if (name === undefined || parentId === undefined) continue
+      // A lookup that found nothing is forgotten by the folder cache by design.
+      const found = env.drive.files.some(
+        (f) => f.name === name && f.parents[0] === parentId && f.mimeType === FOLDER,
+      )
+      if (!found) continue
+      const base = pathOf(env.drive, parentId)
+      const key = base === '' ? name : `${base}/${name}`
+      // Only the device tree: `Memlore` itself is re-resolved by the uncached readSharedFile.
+      if (key !== 'generations' && !key.startsWith('generations/')) continue
+      lookups.set(key, (lookups.get(key) ?? 0) + 1)
+    }
+    expect(Object.fromEntries(lookups)).toEqual({
+      generations: 1,
+      'generations/g-0': 1,
+      [`generations/g-0/${env.desktop}`]: 1,
+      [`generations/g-0/${OTHER_DEVICE}`]: 1,
+      [`generations/g-0/${env.desktop}/journals`]: 1,
+      [`generations/g-0/${OTHER_DEVICE}/journals`]: 1,
+    })
+  })
+
+  it('results are deterministic regardless of completion order', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    await env.puller.refresh() // seed the cache so an unreadable manifest degrades, not skips
+    for (const device of [env.desktop, OTHER_DEVICE]) {
+      const manifest = env.drive.find(['Memlore', 'generations', 'g-0', device, 'metadata.json'])
+      if (!manifest) throw new Error('no manifest')
+      manifest.content = bytes('not json')
+    }
+    // The first listed device answers last; a fold in completion order would flip every result.
+    env.net.delay = (path) => (path === `generations/g-0/${env.desktop}/metadata.json` ? 30 : 0)
+    const result = await env.puller.refresh()
+    const order = [env.desktop, OTHER_DEVICE].sort()
+    expect(result.devices).toEqual(order)
+    expect(env.puller.desktops.manifests).toEqual(order)
+    expect(env.puller.getDegradedDevices()).toEqual(
+      order.map((device) => ({ device, reason: 'manifest-unreadable' })),
+    )
+    expect(result.warnings).toEqual(
+      order.flatMap((device) => [
+        `${device}: manifest is not valid JSON`,
+        `${device}: manifest unavailable, using the cached copy`,
+      ]),
+    )
+  })
+
+  it('a transient error on one device rejects only after every in-flight read settled', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    env.net.fail = (path) => (path === `generations/g-0/${env.desktop}/tags.bin` ? 503 : undefined)
+    const release = new Gate()
+    const reached = new Gate()
+    env.net.hold = (path) => {
+      if (path !== `generations/g-0/${OTHER_DEVICE}/journals/${SECOND_JOURNAL}`) return undefined
+      reached.open()
+      return release
+    }
+    let settled = false
+    const refresh = env.puller.refresh()
+    void refresh.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    await Promise.race([
+      reached.promise,
+      refresh.then(
+        () => undefined,
+        () => undefined,
+      ),
+    ])
+    expect(settled, 'refresh() settled while a read was still held').toBe(false)
+    release.open()
+    await expect(refresh).rejects.toBeInstanceOf(PullTransientError)
+    expect(env.puller.index).toBeNull()
+  })
+
+  it('a lock mid-refresh issues no further downloads', async () => {
+    const unlocked = { current: true }
+    const env = await setup({}, { isUnlocked: () => unlocked.current })
+    const smallFile = /\/(outbox-acks|tags|templates)\.bin$|\/journals\/[^/]+\.bin$/
+    const release = new Gate()
+    const reached = new Gate()
+    const downloadsSeen: string[] = []
+    let held = false
+    env.net.hold = (path) => {
+      downloadsSeen.push(path)
+      if (held || !smallFile.test(path)) return undefined
+      held = true
+      reached.open()
+      return release
+    }
+    const refresh = env.puller.refresh()
+    await reached.promise
+    // Let every read admitted before the lock reach the network; only downloads a task
+    // starts after the lock count as violations.
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    unlocked.current = false
+    const downloadsAtLock = downloadsSeen.length
+    release.open()
+    await expect(refresh).rejects.toBeInstanceOf(VaultLockedError)
+    expect(downloadsSeen.length).toBe(downloadsAtLock)
   })
 })
 

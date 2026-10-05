@@ -18,9 +18,11 @@
  *     half-created peer) is skipped. Manifest failures other than NotFound abort the whole pull
  *     (a partial manifest set would make the LWW winners wrong). A manifest with an unknown field,
  *     row shape or `schema_version` latches the format guard and keeps the previously cached
- *     manifest for that device (degraded `manifest-format`); the pull still serves.
+ *     manifest for that device (degraded `manifest-format`); the pull still serves. Per-device
+ *     reads run concurrently through the shared limiter; results are folded in device-list order.
  *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin` and
- *     `templates.bin` ciphertext. `settings.bin` is skipped (nothing in Phase 10 needs it).
+ *     `templates.bin` ciphertext (also concurrent per-device reads through the shared limiter,
+ *     folded in device-list order). `settings.bin` is skipped (nothing in Phase 10 needs it).
  *  4. `computeDiff` (WASM) against the previously cached manifest gives the stale set; cached entry
  *     ciphertext of stale ids is dropped so a changed entry is never served from the cache, and an
  *     in-flight download of a stale path is detached: it never caches, and later callers start a
@@ -206,6 +208,15 @@ interface Manifest {
   entries: ManifestEntryRow[]
 }
 
+/** One device's manifest-read result, folded into the pull in `devices` order. */
+interface DeviceManifestRead {
+  device: string
+  manifest: Manifest | null
+  warnings: string[]
+  degraded: DegradedDevice | undefined
+  webPeer: boolean
+}
+
 const ACKS_FILE = 'outbox-acks.bin'
 /** A cached intent of another web device: `<device>/outbox/<entryId>.bin`. */
 const FOREIGN_INTENT = /^([^/]+)\/outbox\/([^/]+)\.bin$/
@@ -369,45 +380,38 @@ export class Puller {
       (id) => id !== this.#ownId,
     )
     this.#assertUnlocked()
+    // Per-device manifest reads run concurrently through the shared limiter; the results are
+    // folded in `devices` order so warnings, degraded flags, manifest insertion order and the
+    // web-peer list never depend on completion order.
+    const results = await Promise.allSettled(
+      devices.map((device) => this.#readDeviceManifest(core, generation, device)),
+    )
     const manifests = new Map<string, Manifest>()
     const warnings: string[] = []
     const degraded: DegradedDevice[] = []
     const webPeers: string[] = []
-    for (const device of devices) {
-      this.#assertUnlocked()
-      const read = await this.#readOptional(generation, `${device}/metadata.json`)
-      if (read === 'oversize') warnings.push(`${device}: manifest is too large and was ignored`)
-      const text = read === 'oversize' ? null : read
-      const parsed =
-        text === null ? null : this.#parseManifest(core, device, decoder.decode(text), warnings)
-      const normalized = parsed === 'unsupported' ? null : parsed
-      let manifest: Manifest | null
-      if (normalized === null) {
-        // Keep-previous: the cached copy is the newest manifest ever read successfully for this
-        // device (a failed read never overwrites it), so a stale manifest cannot advance a winner.
-        manifest = await this.#cachedManifest(device, warnings)
-        const reason: DegradedReason =
-          read === 'oversize'
-            ? 'manifest-oversize'
-            : text === null
-              ? 'manifest-missing'
-              : parsed === 'unsupported'
-                ? 'manifest-format'
-                : 'manifest-unreadable'
-        // A device with no manifest at all (the web's own outbox folder) is not degraded.
-        if (manifest !== null || reason !== 'manifest-missing') degraded.push({ device, reason })
-        else if (this.#listedSlots?.has(device) === true) webPeers.push(device)
-      } else {
-        manifest = this.#toManifest(device, normalized, warnings)
-      }
-      if (manifest !== null) manifests.set(device, manifest)
+    for (const result of results) {
+      // The first rejection in `devices` order aborts the pull: a partial manifest set would
+      // make the LWW winners wrong. allSettled waited for every read, so nothing keeps
+      // writing after this throws.
+      if (result.status === 'rejected') throw result.reason
+      const read = result.value
+      warnings.push(...read.warnings)
+      if (read.degraded !== undefined) degraded.push(read.degraded)
+      if (read.webPeer) webPeers.push(read.device)
+      if (read.manifest !== null) manifests.set(read.device, read.manifest)
     }
 
     this.#assertUnlocked()
     const stale = await this.#diffAndCacheManifests(core, manifests)
-    for (const device of manifests.keys()) {
-      this.#assertUnlocked()
-      await this.#cacheSmallFiles(generation, device, warnings)
+    // Small files of every desktop run concurrently through the shared limiter; the first
+    // rejection in device order aborts the pull and the warnings fold in device order.
+    const smallFiles = await Promise.allSettled(
+      [...manifests.keys()].map((device) => this.#cacheSmallFiles(generation, device)),
+    )
+    for (const result of smallFiles) {
+      if (result.status === 'rejected') throw result.reason
+      warnings.push(...result.value)
     }
     this.#assertUnlocked()
     const foreignIntents = await this.#cacheForeignIntents(generation, webPeers, warnings)
@@ -424,6 +428,50 @@ export class Puller {
     }
     this.#desktops = { manifests: [...manifests.keys()], slots: this.#listedSlots, tombstones }
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
+  }
+
+  /**
+   * One device's `metadata.json` (concurrency-limited read), its keep-previous fallback and the
+   * per-device warnings/degraded flag — returned whole so the caller folds in `devices` order.
+   * A device with no manifest at all (the web's own outbox folder) is not degraded; it is a web
+   * peer when its slot is listed.
+   */
+  async #readDeviceManifest(
+    core: Core,
+    generation: number,
+    device: string,
+  ): Promise<DeviceManifestRead> {
+    const warnings: string[] = []
+    const read = await this.#limit(() => {
+      this.#assertUnlocked()
+      return this.#readOptional(generation, `${device}/metadata.json`)
+    })
+    if (read === 'oversize') warnings.push(`${device}: manifest is too large and was ignored`)
+    const text = read === 'oversize' ? null : read
+    const parsed =
+      text === null ? null : this.#parseManifest(core, device, decoder.decode(text), warnings)
+    const normalized = parsed === 'unsupported' ? null : parsed
+    let manifest: Manifest | null
+    let degraded: DegradedDevice | undefined
+    let webPeer = false
+    if (normalized === null) {
+      // Keep-previous: the cached copy is the newest manifest ever read successfully for this
+      // device (a failed read never overwrites it), so a stale manifest cannot advance a winner.
+      manifest = await this.#cachedManifest(device, warnings)
+      const reason: DegradedReason =
+        read === 'oversize'
+          ? 'manifest-oversize'
+          : text === null
+            ? 'manifest-missing'
+            : parsed === 'unsupported'
+              ? 'manifest-format'
+              : 'manifest-unreadable'
+      if (manifest !== null || reason !== 'manifest-missing') degraded = { device, reason }
+      else if (this.#listedSlots?.has(device) === true) webPeer = true
+    } else {
+      manifest = this.#toManifest(device, normalized, warnings)
+    }
+    return { device, manifest, warnings, degraded, webPeer }
   }
 
   #toManifest(device: string, normalized: string, warnings: string[]): Manifest {
@@ -643,32 +691,60 @@ export class Puller {
     else await this.#db.files.put(record)
   }
 
-  /** `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin` of one desktop. */
-  async #cacheSmallFiles(generation: number, device: string, warnings: string[]): Promise<void> {
-    const reader = this.#reader
-    const bytesOf = async (path: string): Promise<Uint8Array | null | 'oversize'> => {
-      const bytes = await this.#readOptional(generation, path)
+  /**
+   * `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin` of one desktop. Every
+   * individual network call is concurrency-limited (wrapping the whole task in `#limit` would
+   * deadlock the queue); the returned warnings fold into the pull's warnings in device order.
+   */
+  async #cacheSmallFiles(generation: number, device: string): Promise<string[]> {
+    const warnings: string[] = []
+    const bytesOf = (path: string): Promise<Uint8Array | null | 'oversize'> =>
+      this.#limit(() => {
+        this.#assertUnlocked()
+        return this.#readOptional(generation, path)
+      })
+    const cache = async (path: string, bytes: Uint8Array | null | 'oversize'): Promise<void> => {
       if (bytes === 'oversize') warnings.push(`${path}: file is too large and was ignored`)
-      return bytes
+      else if (bytes !== null) await this.#putFile(path, bytes, false)
     }
     const acks = `${device}/${ACKS_FILE}`
-    const ackBytes = await bytesOf(acks)
-    if (ackBytes === null) await this.#db.files.delete(acks)
-    else if (ackBytes !== 'oversize') await this.#putFile(acks, ackBytes, false) // oversize: keep cached
-
-    const names = await guarded(`${device}/journals`, () =>
-      reader.listDeviceFiles(generation, device, 'journals'),
+    const tags = `${device}/tags.bin`
+    const templates = `${device}/templates.bin`
+    // Acks, tags, templates and the journals listing all start at once; the listed journal
+    // files are downloaded concurrently below.
+    const [ackRead, tagRead, templateRead, journalListing] = await Promise.allSettled([
+      bytesOf(acks),
+      bytesOf(tags),
+      bytesOf(templates),
+      this.#limit(() => {
+        this.#assertUnlocked()
+        return guarded(`${device}/journals`, () =>
+          this.#reader.listDeviceFiles(generation, device, 'journals'),
+        )
+      }),
+    ])
+    // The first rejection in this order aborts the device; allSettled already waited for every
+    // read, so nothing keeps writing after this throws.
+    if (ackRead.status === 'rejected') throw ackRead.reason
+    if (tagRead.status === 'rejected') throw tagRead.reason
+    if (templateRead.status === 'rejected') throw templateRead.reason
+    if (journalListing.status === 'rejected') throw journalListing.reason
+    const names = journalListing.value.filter((n) => n.endsWith('.bin'))
+    const journalReads = Promise.allSettled(
+      names.map((name) => bytesOf(`${device}/journals/${name}`)),
     )
-    for (const name of names.filter((n) => n.endsWith('.bin'))) {
-      const path = `${device}/journals/${name}`
-      const bytes = await bytesOf(path)
-      if (bytes !== null && bytes !== 'oversize') await this.#putFile(path, bytes, false)
+    if (ackRead.value === null) await this.#db.files.delete(acks)
+    else await cache(acks, ackRead.value)
+    await cache(tags, tagRead.value)
+    await cache(templates, templateRead.value)
+    const journals = (await journalReads).map((result) => {
+      if (result.status === 'rejected') throw result.reason
+      return result.value
+    })
+    for (const [index, bytes] of journals.entries()) {
+      await cache(`${device}/journals/${names[index]}`, bytes)
     }
-    for (const file of ['tags.bin', 'templates.bin']) {
-      const path = `${device}/${file}`
-      const bytes = await bytesOf(path)
-      if (bytes !== null && bytes !== 'oversize') await this.#putFile(path, bytes, false)
-    }
+    return warnings
   }
 
   /**
@@ -695,6 +771,7 @@ export class Puller {
     }
     const found = await Promise.all(
       listed.map(async ({ device, entryId, path }): Promise<ForeignIntentFile | null> => {
+        // TODO(later): assert unlocked inside the limited call, see docs/LATER.md.
         const read = await this.#limit(() => this.#readOptional(generation, path))
         if (read === null) return null
         if (read === 'oversize') {
