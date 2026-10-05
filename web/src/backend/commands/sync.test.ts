@@ -1,8 +1,9 @@
 import { IDBFactory } from 'fake-indexeddb'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { oauth } from '../drive/oauth'
 import { createDraftManager, resetDraftsAutostartForTest, type DraftManager } from '../drafts'
 import { dispose, lock, setKeyRing, type KeyRing } from '../keys'
-import { openWebDb } from '../storage/idb'
+import { WRAPPED_MASTER_HEX_LEN, openWebDb } from '../storage/idb'
 import type { PushResult } from '../sync/push'
 import type { PullOutcome } from './readSession'
 import {
@@ -613,6 +614,133 @@ describe('status and settings', () => {
 
   it('reports not connected without a Drive session', async () => {
     harness()
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toEqual({ connected: false })
+  })
+})
+
+describe('gdrive_refresh_storage_quota', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  /** A connected browser: OAuth session plus an enrolled device record. */
+  async function connect(): Promise<void> {
+    vi.spyOn(oauth, 'isConnected').mockReturnValue(true)
+    vi.spyOn(oauth, 'getAccessToken').mockResolvedValue('tok')
+    const factory = new IDBFactory()
+    vi.stubGlobal('indexedDB', factory)
+    const db = await openWebDb({ factory })
+    await db.device.put({
+      deviceId: 'web-1234',
+      wrappedMasterHex: 'ab'.repeat(WRAPPED_MASTER_HEX_LEN / 2),
+      kekSaltHex: 'cd'.repeat(16),
+      recoveryGeneration: 1,
+      masterFingerprint: 'fp-1',
+      name: 'Memlore Web',
+    })
+    db.close()
+  }
+
+  function scriptDrive(about: Response, pages: Response[]): string[] {
+    const urls: string[] = []
+    let page = 0
+    vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
+      urls.push(String(input))
+      const auth = new Headers(init?.headers).get('authorization')
+      if (auth !== 'Bearer tok') return new Response('unauthorized', { status: 401 })
+      if (String(input).includes('/drive/v3/about')) return about
+      if (String(input).includes('/drive/v3/files')) {
+        const next = pages[page]
+        page += 1
+        return next ?? new Response('missing page', { status: 500 })
+      }
+      return new Response('unexpected', { status: 500 })
+    })
+    return urls
+  }
+
+  const aboutOk = (email = 'ada@example.com', usage = '1000', limit?: string) =>
+    Response.json({
+      user: { emailAddress: email },
+      storageQuota: { usage, ...(limit === undefined ? {} : { limit }) },
+    })
+
+  it('reports the signed-in email, Drive quota, and bytes Memlore occupies', async () => {
+    const h = harness()
+    await connect()
+    startSyncSchedule()
+    await h.settle()
+    const urls = scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '40' }, { size: 'nope' }], nextPageToken: 'p2' }),
+      Response.json({ files: [{ size: '2' }, {}] }),
+    ])
+
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).resolves.toEqual({
+      connected: true,
+      provider: 'gdrive',
+      lastSync: 1_800_000_000,
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+    expect(
+      urls.some((url) => url.includes('/drive/v3/about') && url.includes('emailAddress')),
+    ).toBe(true)
+    const lists = urls.filter((url) => url.includes('/drive/v3/files'))
+    expect(lists).toHaveLength(2)
+    expect(lists.every((url) => url.includes('spaces=appDataFolder'))).toBe(true)
+    expect(lists[1]).toContain('pageToken=p2')
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toMatchObject({
+      connected: true,
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+  })
+
+  it('keeps the last good quota when about fails, and the last Memlore usage when the file sum fails', async () => {
+    harness()
+    await connect()
+    scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '42' }] }),
+    ])
+    await syncHandlers.gdrive_refresh_storage_quota({})
+
+    scriptDrive(new Response('down', { status: 400 }), [])
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).rejects.toThrow()
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toMatchObject({
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+
+    scriptDrive(aboutOk('', '2000'), [new Response('list down', { status: 400 })])
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).resolves.toEqual({
+      connected: true,
+      provider: 'gdrive',
+      email: 'ada@example.com',
+      storageUsed: 2000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+  })
+
+  it('rejects when Drive is not connected and forgets the cached account', async () => {
+    harness()
+    await connect()
+    scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '42' }] }),
+    ])
+    await syncHandlers.gdrive_refresh_storage_quota({})
+
+    vi.mocked(oauth.isConnected).mockReturnValue(false)
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).rejects.toThrow(
+      'Not connected to Google Drive',
+    )
     await expect(syncHandlers.gdrive_get_status({})).resolves.toEqual({ connected: false })
   })
 })

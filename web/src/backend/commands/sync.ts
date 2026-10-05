@@ -179,6 +179,17 @@ let phase: SyncPhase = 'idle'
 let lastError: string | null = null
 /** Unix seconds of the last successful pull. */
 let lastSyncSec: number | null = null
+/**
+ * Last Drive account snapshot from `gdrive_refresh_storage_quota`. Session memory,
+ * like the desktop settings cache: a later `gdrive_get_status` can paint it before
+ * the next live fetch. Cleared when the Drive session is gone.
+ */
+let storageCache: {
+  email?: string
+  storageUsed?: number
+  storageTotal?: number
+  storageAppUsed?: number
+} = {}
 /** Set while the last successful pull left a device on its cached manifest. */
 let degraded = false
 /** `MSG_FORMAT_READ_ONLY` with the reason, while the last successful pull reported a latched guard. */
@@ -231,6 +242,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   phase = 'idle'
   lastError = null
   lastSyncSec = null
+  storageCache = {}
   degraded = false
   formatReadOnly = null
   pendingNotices = []
@@ -632,27 +644,76 @@ async function getSyncSettings(): Promise<{
   return { intervalMinutes: INTERVAL_MS / 60_000, onSave: false, onLaunch: true }
 }
 
-/** Connected = a Drive session exists AND this browser is enrolled (a device record exists). */
-async function gdriveGetStatus(): Promise<{
+interface GDriveStatus {
   connected: boolean
   provider?: string
   lastSync?: number
-}> {
+  email?: string
+  storageUsed?: number
+  storageTotal?: number
+  storageAppUsed?: number
+}
+
+function connectedDriveStatus(): GDriveStatus {
+  return {
+    connected: true,
+    provider: 'gdrive',
+    ...(lastSyncSec === null ? {} : { lastSync: lastSyncSec }),
+    ...storageCache,
+  }
+}
+
+/** Connected = a Drive session exists AND this browser is enrolled (a device record exists). */
+async function gdriveGetStatus(): Promise<GDriveStatus> {
   try {
     const [{ oauth }, { openWebDb }] = await Promise.all([
       import('../drive/oauth'),
       import('../storage/idb'),
     ])
-    if (!oauth.isConnected()) return { connected: false }
-    if ((await (await openWebDb()).device.get()) === undefined) return { connected: false }
-    return {
-      connected: true,
-      provider: 'gdrive',
-      ...(lastSyncSec === null ? {} : { lastSync: lastSyncSec }),
+    if (!oauth.isConnected()) {
+      storageCache = {}
+      return { connected: false }
     }
+    if ((await (await openWebDb()).device.get()) === undefined) return { connected: false }
+    return connectedDriveStatus()
   } catch {
     return { connected: false }
   }
+}
+
+/**
+ * Live account email, Drive quota, and bytes Memlore occupies in appDataFolder.
+ * Mirrors desktop `gdrive_refresh_storage_quota`: `about` must succeed or the
+ * previous cache is left untouched; a failed file-size sum keeps the last
+ * Memlore usage. Rejects when this browser is not connected, so the settings
+ * panel keeps the snapshot it already painted.
+ */
+async function gdriveRefreshStorageQuota(): Promise<GDriveStatus> {
+  const status = await gdriveGetStatus()
+  if (!status.connected) throw new Error('Not connected to Google Drive')
+  const [{ DriveReader }, { oauth }] = await Promise.all([
+    import('../drive/client'),
+    import('../drive/oauth'),
+  ])
+  const reader = new DriveReader({ getToken: () => oauth.getAccessToken() })
+  const about = await reader.fetchDriveAbout()
+  let appUsed = storageCache.storageAppUsed
+  try {
+    appUsed = await reader.fetchAppdataUsageBytes()
+  } catch (error) {
+    console.warn(
+      `[web] gdrive_refresh_storage_quota: appdata usage sum failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+  const next = { ...storageCache }
+  if (about.email) next.email = about.email
+  if (about.usage != null) next.storageUsed = about.usage
+  if (about.limit != null) next.storageTotal = about.limit
+  if (appUsed != null) next.storageAppUsed = appUsed
+  storageCache = next
+  return connectedDriveStatus()
 }
 
 export const syncHandlers: Record<string, Handler> = {
@@ -660,4 +721,5 @@ export const syncHandlers: Record<string, Handler> = {
   get_sync_status: getSyncStatus,
   get_sync_settings: getSyncSettings,
   gdrive_get_status: gdriveGetStatus,
+  gdrive_refresh_storage_quota: gdriveRefreshStorageQuota,
 }

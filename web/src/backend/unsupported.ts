@@ -401,7 +401,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'delete_media',
   'ensure_video_thumbnail',
   'gdrive_disconnect',
-  'gdrive_refresh_storage_quota',
   'gdrive_test_connection',
   'pick_files_to_attach',
   'pick_images_from_library',

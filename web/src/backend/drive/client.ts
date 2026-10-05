@@ -292,6 +292,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Drive returns int64 quota and file sizes as decimal strings. Anything else is absent. */
+function parseQuotaBytes(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null
+  const n = Number(value)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+/** Account snapshot from Drive `about`: signed-in email plus quota, in bytes. */
+export interface DriveAbout {
+  email: string | null
+  usage: number | null
+  limit: number | null
+}
+
 /** Drive ids are opaque but url-safe; refuse anything else before it enters a URL or query. */
 function assertDriveId(id: unknown, what: string): string {
   if (typeof id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(id)) {
@@ -478,6 +492,77 @@ export class DriveReader {
       current = await this.#cachedFolder(segment, current)
     }
     return current
+  }
+
+  /**
+   * Account quota and the signed-in email via Drive `about`.
+   * `about.user.emailAddress` is available under `drive.appdata`. The OAuth
+   * userinfo endpoint is not used: this app does not request `openid` / `email`.
+   */
+  async fetchDriveAbout(): Promise<DriveAbout> {
+    const params = new URLSearchParams({ fields: 'user(emailAddress),storageQuota' })
+    const response = await send(
+      this.#t,
+      `${this.#t.apiBase}/drive/v3/about?${params.toString()}`,
+      { method: 'GET' },
+      true,
+    )
+    ensureOk(response, 'about')
+    const body = await readJson(response)
+    if (!isRecord(body) || !isRecord(body.storageQuota)) {
+      throw new DriveProtocolError('about response has no storageQuota')
+    }
+    const user = body.user
+    const rawEmail =
+      isRecord(user) && typeof user.emailAddress === 'string' ? user.emailAddress : ''
+    return {
+      email: rawEmail === '' ? null : rawEmail,
+      usage: parseQuotaBytes(body.storageQuota.usage),
+      limit: parseQuotaBytes(body.storageQuota.limit),
+    }
+  }
+
+  /**
+   * Bytes this app occupies in Drive `appDataFolder`: the sum of every non-folder
+   * file's `size`. That space is exclusive to this OAuth client, so the total is
+   * Memlore only — not Photos, Gmail, or other Drive apps.
+   */
+  async fetchAppdataUsageBytes(): Promise<number> {
+    const q = `trashed = false and mimeType != '${FOLDER_MIME}'`
+    let total = 0
+    let pageToken: string | null = null
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const params = new URLSearchParams({
+        q,
+        fields: 'nextPageToken,files(size)',
+        spaces: APPDATA_PARENT,
+        pageSize: '1000',
+      })
+      if (pageToken !== null) params.set('pageToken', pageToken)
+      const response = await send(
+        this.#t,
+        `${this.#t.apiBase}/drive/v3/files?${params.toString()}`,
+        { method: 'GET' },
+        true,
+      )
+      ensureOk(response, 'appdata usage')
+      const body = await readJson(response)
+      if (!isRecord(body) || !Array.isArray(body.files)) {
+        throw new DriveProtocolError('list response has no files array')
+      }
+      for (const item of body.files) {
+        if (!isRecord(item)) throw new DriveProtocolError('list entry is not an object')
+        const size = parseQuotaBytes(item.size)
+        if (size !== null) total += size
+      }
+      const next = body.nextPageToken
+      if (next === undefined || next === null || next === '') return total
+      if (typeof next !== 'string' || next === pageToken) {
+        throw new DriveProtocolError('bad nextPageToken')
+      }
+      pageToken = next
+    }
+    throw new DriveProtocolError('too many pages')
   }
 
   /** Child entries of a folder: sub-folders or non-folder files. */
