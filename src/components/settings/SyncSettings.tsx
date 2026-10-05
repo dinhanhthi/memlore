@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useDeviceList } from '../../hooks/useDeviceList'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { cn } from '../../lib/cn'
@@ -31,6 +32,7 @@ function syncPanelId(id: SyncTab) {
 /// 3. Schedule — enable sync and scheduler intervals
 export function SyncSettings() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const showDevices = useSyncStore(
     (s) => (s.status?.enabled ?? false) && s.status?.provider != null,
   )
@@ -41,9 +43,15 @@ export function SyncSettings() {
   })
   const setActiveTab = (tab: SyncTab) => useTabStore.getState().updateActiveTab({ syncTab: tab })
 
+  // syncAdmin gates the admin tabs outright (web shows only the cloud
+  // provider panel); the devices tab additionally needs a connected provider.
   const visibleTabs = useMemo(
-    () => SYNC_TABS.filter((tab) => tab.id !== 'devices' || showDevices),
-    [showDevices],
+    () =>
+      SYNC_TABS.filter((tab) => {
+        if (!caps.syncAdmin) return tab.id === 'gdrive'
+        return tab.id !== 'devices' || showDevices
+      }),
+    [caps.syncAdmin, showDevices],
   )
 
   const resolvedActiveTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : 'gdrive'
@@ -84,10 +92,8 @@ export function SyncSettings() {
       />
 
       <div className="min-h-0 flex-1">
-        {SYNC_TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const isActive = resolvedActiveTab === tab.id
-          const isVisible = tab.id !== 'devices' || showDevices
-          if (!isVisible) return null
 
           return (
             <RestoredScroll

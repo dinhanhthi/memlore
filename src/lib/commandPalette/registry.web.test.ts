@@ -158,6 +158,8 @@ const WEB_HIDDEN_IDS: readonly string[] = [
   'settings_value.default_search_mode.keyword',
   'settings_value.default_search_mode.meaning',
   'settings_value.default_search_mode',
+  'settings_value.media_view_mode.full',
+  'settings_value.media_view_mode.panel',
   // All AI feature toggles + their deep-link fallback rows
   ...AI_FEATURE_IDS.flatMap((f) => [
     `settings_value.${f}.enable`,

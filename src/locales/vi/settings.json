@@ -917,9 +917,11 @@
     "cross_mode": {
       "needs_password_title": "Thư mục đồng bộ đang được mã hóa bằng mật khẩu",
       "needs_password_body": "Thiết bị này đang ở chế độ không mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị có bảo vệ bằng mật khẩu. Hãy đặt một mật khẩu trong Bảo mật để mở khóa các mục đã đồng bộ — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_password_body_web": "Thiết bị này đang ở chế độ không mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị có bảo vệ bằng mật khẩu. Để đọc các mục đã đồng bộ, hãy mở ứng dụng Memlore trên máy tính ở thiết bị đã tạo thư mục đồng bộ, bỏ mật khẩu trong Cài đặt → Bảo mật, rồi đồng bộ một lần — ứng dụng web không thể tự đặt mật khẩu hay ngắt kết nối.",
       "needs_password_note": "Muốn thư mục trên Drive cũng không có mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật bỏ mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
       "needs_no_password_title": "Thư mục đồng bộ không được mã hóa",
       "needs_no_password_body": "Thiết bị này đang ở chế độ mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị không có mật khẩu. Hãy bỏ mật khẩu trong Bảo mật để đọc các mục này — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_no_password_body_web": "Thiết bị này đang ở chế độ mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị không có mật khẩu. Để đọc các mục này, hãy mở ứng dụng Memlore trên máy tính ở thiết bị đã tạo thư mục đồng bộ, đặt cùng mật khẩu vault với thiết bị này trong Cài đặt → Bảo mật, rồi đồng bộ một lần — ứng dụng web không thể tự đổi cài đặt mật khẩu hay ngắt kết nối.",
       "needs_no_password_note": "Muốn thư mục trên Drive cũng được bảo vệ bằng mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật đặt mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
       "cta": "Mở cài đặt Bảo mật"
     }

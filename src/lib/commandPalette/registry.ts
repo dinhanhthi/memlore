@@ -249,10 +249,8 @@ const PAGE_COMMANDS: Command[] = [
 // Every settings navigation command is gated on its category's capability
 // (`isSettingsCategoryAvailable`) so a category hidden on this platform can
 // never be navigated to from the palette.
-const settingsNav =
-  (category: SettingsCategory) =>
-  (): boolean =>
-    isSettingsCategoryAvailable(category, capabilities)
+const settingsNav = (category: SettingsCategory) => (): boolean =>
+  isSettingsCategoryAvailable(category, capabilities)
 
 const SETTINGS_COMMANDS: Command[] = [
   {
@@ -1396,6 +1394,9 @@ export const PILL_SETTINGS: readonly PillSetting[] = [
     options: [{ value: 'full' }, { value: 'panel' }],
     get: getMediaViewMode,
     set: (v) => void setMediaViewMode(v as MediaViewMode),
+    // The media view itself is gated by caps.gallery (Sidebar + tabStore);
+    // on web the toggle would write a mode nothing renders.
+    available: () => capabilities.gallery,
   },
   // ── AI ──
   {

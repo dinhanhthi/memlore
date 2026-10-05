@@ -917,9 +917,11 @@
     "cross_mode": {
       "needs_password_title": "Sync folder is encrypted with a password",
       "needs_password_body": "This device is in no-password mode, but the cloud folder was set up by a password-protected device. Set a password in Security to unlock the synced entries — or disconnect from this cloud folder.",
+      "needs_password_body_web": "This device is in no-password mode, but the cloud folder was set up by a password-protected device. To read the synced entries, open the Memlore desktop app on the device that set up the cloud folder, remove its password in Settings → Security, then sync once — the web app cannot set a password or disconnect by itself.",
       "needs_password_note": "Want the cloud folder to be unencrypted too? Open the device that set up the cloud folder, remove its password in Settings → Security, then sync once. After that, this device can disconnect, wipe the cloud folder manually from drive.google.com, and reconnect.",
       "needs_no_password_title": "Sync folder is unencrypted",
       "needs_no_password_body": "This device is in password mode, but the cloud folder was set up by a no-password device. Remove the password in Security to read these entries — or disconnect from this cloud folder.",
+      "needs_no_password_body_web": "This device is in password mode, but the cloud folder was set up by a no-password device. To read these entries, open the Memlore desktop app on the device that set up the cloud folder, set the same vault password as this device in Settings → Security, then sync once — the web app cannot change password settings or disconnect by itself.",
       "needs_no_password_note": "Want the cloud folder to be password-protected too? Open the device that set up the cloud folder, set a password in Settings → Security, then sync once. After that, this device can disconnect, wipe the cloud folder manually from drive.google.com, and reconnect.",
       "cta": "Open Security settings"
     }

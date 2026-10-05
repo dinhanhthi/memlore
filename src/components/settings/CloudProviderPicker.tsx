@@ -2,7 +2,7 @@ import { Cloud, HardDrive } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 import { useCapabilities } from '../../hooks/useCapabilities'
-import { isMacOS } from '../../lib/platform'
+import { isMacOS, isWeb } from '../../lib/platform'
 import { providerLabel, providerOrder } from '../../lib/providerLabel'
 import type { CloudProviderKind } from '../../lib/tauri'
 import { Button } from '../common/Button'
@@ -41,7 +41,7 @@ export function CloudProviderPicker({
   const { t } = useTranslation('settings')
   const { icloud } = useCapabilities()
   const entries = providerOrder(isMacOS(), icloudAvailable).filter(
-    (entry) => icloud || entry.kind !== 'icloud',
+    (entry) => (icloud || entry.kind !== 'icloud') && (!isWeb || entry.kind !== 'local'),
   )
 
   return (
@@ -50,7 +50,11 @@ export function CloudProviderPicker({
       aria-label={t('cloud.picker_title')}
       className={cn(
         'grid grid-cols-1 gap-3',
-        entries.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
+        entries.length === 1
+          ? 'sm:grid-cols-1'
+          : entries.length === 3
+            ? 'sm:grid-cols-3'
+            : 'sm:grid-cols-2',
       )}
     >
       {entries.map(({ kind, disabled: kindDisabled }) => {
