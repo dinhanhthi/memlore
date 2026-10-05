@@ -35,6 +35,13 @@
  *     dropped. Its media is not fetched here. `foreignIntents` exposes the cached set: the read
  *     session opens and validates them for the read-only overlay. Like the other small files they
  *     are re-downloaded on every pull (the listing carries no change marker).
+ *  7. A cached `metadata.json` of a device that is no longer listed is pruned: a ghost device's
+ *     stale rows must not survive into `primeFromCache`.
+ *
+ * `primeFromCache()` rebuilds the index straight from the cached manifests — IndexedDB only, no
+ * Drive reads — so a reload can paint the list while `refresh()` revalidates in the background
+ * (stale-while-revalidate). It is deliberately narrower: no slot data, no foreign intents, no
+ * degraded flags.
  *
  * `fetchEntries` / `warmStart` download entry ciphertext on demand (deduplicated, concurrency 4).
  * An entry payload with an unknown envelope version latches the format guard and is still returned.
@@ -220,6 +227,8 @@ interface DeviceManifestRead {
 const ACKS_FILE = 'outbox-acks.bin'
 /** A cached intent of another web device: `<device>/outbox/<entryId>.bin`. */
 const FOREIGN_INTENT = /^([^/]+)\/outbox\/([^/]+)\.bin$/
+/** A cached manifest: `<device>/metadata.json` (capture 1 is the device id). */
+const CACHED_MANIFEST = /^([^/]+)\/metadata\.json$/
 
 /** One intent file of another web device, as ciphertext (opened by the read session). */
 export interface ForeignIntentFile {
@@ -364,6 +373,51 @@ export class Puller {
     return this.#refreshing
   }
 
+  /**
+   * Rebuilds the index from the manifests cached by the last pull — IndexedDB only, no Drive
+   * reads — so a reload can show the list while `refresh()` revalidates in the background.
+   * False when there is nothing usable to prime from (the caller then falls back to
+   * `refresh()`); a cache read error means the same. A `VaultLockedError` (a lock between the
+   * reads and the assignment) propagates. `desktops.slots` stays null, `foreignIntents` and
+   * the degraded list stay empty: priming is deliberately narrower than a refresh.
+   */
+  async primeFromCache(): Promise<boolean> {
+    if (this.#index !== null) return true
+    try {
+      const record = await this.#db.device.get()
+      if (record === undefined) return false
+      const devices = (await this.#db.files.paths())
+        .map((path) => CACHED_MANIFEST.exec(path)?.[1])
+        .filter((device): device is string => device !== undefined && device !== record.deviceId)
+        .sort()
+      const manifests = new Map<string, Manifest>()
+      for (const device of devices) {
+        // The keep-previous reader: the cached text is the core-normalized manifest and one
+        // that no longer parses is skipped — the next refresh re-reads the device.
+        const manifest = await this.#cachedManifest(device, [])
+        if (manifest !== null) manifests.set(device, manifest)
+      }
+      if (manifests.size === 0) return false
+      this.#assertUnlocked()
+      // A refresh that completed meanwhile owns the fresher index: keep it.
+      if (this.#index !== null) return true
+      this.#ownId = record.deviceId
+      this.#generation = record.recoveryGeneration
+      this.#index = buildEntryIndex(
+        [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
+      )
+      const tombstones = new Set<string>()
+      for (const manifest of manifests.values()) {
+        for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
+      }
+      this.#desktops = { manifests: [...manifests.keys()], slots: null, tombstones }
+      return true
+    } catch (error) {
+      if (error instanceof VaultLockedError) throw error
+      return false
+    }
+  }
+
   async #refresh(): Promise<PullResult> {
     // Folder ids are reused between reads, never across refreshes: the authority check below
     // must see a deleted or recreated `devices` folder, not a cached id.
@@ -404,6 +458,7 @@ export class Puller {
 
     this.#assertUnlocked()
     const stale = await this.#diffAndCacheManifests(core, manifests)
+    await this.#pruneGhostManifests(devices)
     // Small files of every desktop run concurrently through the shared limiter; the first
     // rejection in device order aborts the pull and the warnings fold in device order.
     const smallFiles = await Promise.allSettled(
@@ -650,6 +705,23 @@ export class Puller {
       await this.#putFile(path, encoder.encode(manifest.text), false)
     }
     return [...stale].sort()
+  }
+
+  /**
+   * Drops the cached `metadata.json` of a device that is no longer listed (it left the vault):
+   * the keep-previous fallback above protects only still-listed devices, and a ghost's stale
+   * rows must not survive into the next `primeFromCache`. Cache-only — nothing is written to
+   * Drive and the ghost's other cached files are untouched. Runs only on a refresh that got
+   * past the device listing, so a failed listing prunes nothing.
+   */
+  async #pruneGhostManifests(devices: readonly string[]): Promise<void> {
+    const listed = new Set(devices)
+    for (const path of await this.#db.files.paths()) {
+      const device = CACHED_MANIFEST.exec(path)?.[1]
+      if (device !== undefined && device !== this.#ownId && !listed.has(device)) {
+        await this.#db.files.delete(path)
+      }
+    }
   }
 
   /**

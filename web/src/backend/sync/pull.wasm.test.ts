@@ -1278,3 +1278,182 @@ describe('other web devices outbox (read-only)', () => {
     expect(env.drive.mutating()).toEqual([])
   })
 })
+
+describe('primeFromCache', () => {
+  const prime = (puller: Puller): Promise<boolean> => puller.primeFromCache()
+
+  /** A fresh puller over the same db and reader: a "reload" (new page load over the cache). */
+  const reload = (env: Env, deps: { isUnlocked?: () => boolean } = {}): Puller =>
+    createPuller({
+      reader: env.reader,
+      db: env.db,
+      core,
+      now: () => 1_800_000_000_000,
+      isUnlocked: deps.isUnlocked,
+    })
+
+  it('primes the index from the cached manifests with zero network requests', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const expected = env.puller.index
+    env.drive.requests.length = 0
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(reloaded.index).not.toBe(expected)
+    expect([...(reloaded.index?.entries() ?? [])]).toEqual([...(expected?.entries() ?? [])])
+    expect(env.drive.requests).toEqual([])
+  })
+
+  it('serves fetchEntries and warmStart from the cache without a refresh', async () => {
+    const env = await setup()
+    const ids = await env.puller.warmStart()
+    env.drive.requests.length = 0
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(await reloaded.warmStart()).toEqual(ids)
+    const got = await reloaded.fetchEntries(ids)
+    expect(got.size).toBe(ids.length)
+    expect(env.drive.requests).toEqual([])
+  })
+
+  it('exposes the cached manifests but no slots, intents or degraded state', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(reloaded.desktops.manifests).toEqual([env.desktop])
+    expect(reloaded.desktops.slots).toBeNull()
+    expect(reloaded.foreignIntents).toEqual([])
+    expect(reloaded.getDegradedDevices()).toEqual([])
+  })
+
+  it('returns false with nothing cached or no enrolment', async () => {
+    const env = await setup()
+    expect(await prime(env.puller)).toBe(false)
+    expect(env.puller.index).toBeNull()
+    const freshDb = await openWebDb({ factory: new IDBFactory() })
+    const unenrolled = createPuller({ reader: env.reader, db: freshDb, core })
+    expect(await prime(unenrolled)).toBe(false)
+    expect(unenrolled.index).toBeNull()
+  })
+
+  it('is a no-op once an index exists', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const index = env.puller.index
+    expect(await prime(env.puller)).toBe(true)
+    expect(env.puller.index).toBe(index)
+  })
+
+  it('skips a cached manifest that does not parse and primes the rest', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    await env.puller.refresh()
+    const cached = await env.db.files.get(`${OTHER_DEVICE}/metadata.json`)
+    if (!cached) throw new Error('manifest was not cached')
+    await env.db.files.put({ ...cached, ciphertext: bytes('not json') })
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(reloaded.desktops.manifests).toEqual([env.desktop])
+    expect(reloaded.index?.has('second-entry')).toBe(false)
+    expect(reloaded.index?.size).toBe(7)
+  })
+
+  it('a revocation after priming drops the cache, locks and clears the index', async () => {
+    const env = await setup()
+    await env.puller.warmStart()
+    await env.db.drafts.put({ entryId: 'draft-1', sealed: new Uint8Array([1, 2, 3]), updatedAt: 1 })
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    const slot = env.drive.find(['Memlore', '.meta', 'keyring', 'devices', `${OWN_ID}.json`])
+    if (!slot) throw new Error('no slot')
+    env.drive.files = env.drive.files.filter((f) => f.id !== slot.id)
+    await expect(reloaded.refresh()).rejects.toMatchObject({
+      name: 'ReonboardRequiredError',
+      reason: 'slot-missing',
+    })
+    expect(reloaded.index).toBeNull()
+    expect(await env.db.files.list()).toEqual([])
+    expect(await env.db.drafts.get('draft-1')).toBeDefined()
+    expect((await env.db.device.get())?.deviceId).toBe(OWN_ID)
+    expect(isUnlocked()).toBe(false)
+    expect(getReonboardReason()).toBe('slot-missing')
+  })
+
+  it('a transient refresh failure keeps the primed index in place', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    const index = reloaded.index
+    env.net.down = true
+    await expect(reloaded.refresh()).rejects.toBeInstanceOf(PullTransientError)
+    expect(reloaded.index).toBe(index)
+  })
+
+  it('a lock between the cache reads and the index assignment rejects with VaultLockedError', async () => {
+    const unlocked = { current: true }
+    const env = await setup({}, { isUnlocked: () => unlocked.current })
+    await env.puller.refresh()
+    const reloaded = reload(env, { isUnlocked: () => unlocked.current })
+    // Flip the flag at the last IndexedDB read, before the index assignment.
+    const realPaths = env.db.files.paths.bind(env.db.files)
+    vi.spyOn(env.db.files, 'paths').mockImplementation(async () => {
+      const paths = await realPaths()
+      unlocked.current = false
+      return paths
+    })
+    await expect(prime(reloaded)).rejects.toBeInstanceOf(VaultLockedError)
+    expect(reloaded.index).toBeNull()
+  })
+
+  it('a cache read failure resolves false so the caller falls back to refresh', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const reloaded = reload(env)
+    vi.spyOn(env.db.files, 'paths').mockRejectedValue(new Error('idb down'))
+    expect(await prime(reloaded)).toBe(false)
+    expect(reloaded.index).toBeNull()
+  })
+
+  it('a refresh prunes a cached manifest whose device left the vault; a listed 404 keeps it', async () => {
+    const env = await setup()
+    const folder = addSecondDevice(env.drive, [
+      { entry_id: 'second-entry', updated_at: NEWEST + 50, is_deleted: false, local_version: 1 },
+    ])
+    await env.puller.refresh()
+    const manifestPath = `${OTHER_DEVICE}/metadata.json`
+    expect(await env.db.files.get(manifestPath)).toBeDefined()
+
+    // Counter-case: the folder is still listed but the manifest file is gone — keep-previous
+    // uses the cached manifest, the device stays in the index and degraded as manifest-missing.
+    const manifest = env.drive.files.find(
+      (f) => f.parents[0] === folder && f.name === 'metadata.json',
+    )
+    if (!manifest) throw new Error('no second manifest')
+    env.drive.files = env.drive.files.filter((f) => f.id !== manifest.id)
+    const kept = await env.puller.refresh()
+    expect(kept.devices).toEqual([env.desktop, OTHER_DEVICE].sort())
+    expect(env.puller.getDegradedDevices()).toEqual([
+      { device: OTHER_DEVICE, reason: 'manifest-missing' },
+    ])
+    expect(await env.db.files.get(manifestPath)).toBeDefined()
+    expect(env.puller.index?.has('second-entry')).toBe(true)
+
+    // Ghost: the whole device folder left the vault — the cached manifest is pruned.
+    const ghost = new Set(
+      env.drive.files
+        .filter((f) => pathOf(env.drive, f.id).startsWith(`generations/g-0/${OTHER_DEVICE}`))
+        .map((f) => f.id),
+    )
+    env.drive.files = env.drive.files.filter((f) => !ghost.has(f.id))
+    await env.puller.refresh()
+    expect(await env.db.files.get(manifestPath)).toBeUndefined()
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(reloaded.desktops.manifests).toEqual([env.desktop])
+    expect(reloaded.index?.has('second-entry')).toBe(false)
+  })
+})

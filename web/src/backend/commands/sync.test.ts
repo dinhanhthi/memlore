@@ -870,6 +870,126 @@ describe('push triggers', () => {
   })
 })
 
+describe('push gate', () => {
+  it('gates save, visible, online and flag-on pushes while the unlock pull is still in flight', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    const drafts = await draftManager()
+    startSyncSchedule()
+    await h.settle()
+    expect(h.pulls).toBe(1) // the unlock pull is in flight, held
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    h.online()
+    h.flagOn()
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    gate.resolve(NOOP)
+    await h.settle()
+    expect(h.pushes).toBe(1) // the first success pushes the pending drafts
+  })
+
+  it('the first successful pull pushes pending drafts exactly once, whatever ran it', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    startSyncSchedule()
+    await h.settle()
+    gate.resolve(NOOP)
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    await h.advance(INTERVAL_MS) // an interval pull does not push again
+    await h.settle()
+    expect(h.pushes).toBe(1)
+
+    // A 'retry' success after a transient failure is also the epoch's first: one push.
+    const h2 = harness()
+    h2.flag = true
+    h2.pending = 1
+    h2.queue(async () => {
+      throw named('PullTransientError', 'offline')
+    })
+    startSyncSchedule()
+    await h2.settle()
+    expect(h2.pushes).toBe(0)
+    await h2.advance(BACKOFF_BASE_MS) // the retry pull succeeds
+    expect(h2.pushes).toBe(1)
+  })
+
+  it('a pull failing with a revocation halts the schedule and no push ever runs', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 3
+    h.queue(async () => {
+      lock('revoked')
+      throw named('ReonboardRequiredError', 'This browser must be re-enrolled (slot-missing).')
+    })
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'error' })
+    h.online()
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    h.flagOn()
+    await h.advance(PUSH_DEBOUNCE_MS * 3)
+    expect(h.pushes).toBe(0)
+  })
+
+  it('a transient pull failure keeps pushes gated until a later pull succeeds', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const drafts = await draftManager()
+    h.queue(async () => {
+      throw named('PullTransientError', 'offline')
+    })
+    startSyncSchedule()
+    await h.settle()
+    // Every trigger fires while no pull has ever succeeded: still gated.
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.online()
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    // The backoff retry pulls and succeeds: the gate opens and the drafts go out.
+    h.pushResult = { pushed: 2, skipped: 0, pending: 0 }
+    await h.advance(BACKOFF_BASE_MS)
+    await h.settle()
+    expect(h.pushes).toBe(1)
+  })
+
+  it('the gate resets on stop/start: a new epoch pushes nothing until its pull lands', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = PUSHED_ALL
+    startSyncSchedule()
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    h.pending = 1
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    stopSyncSchedule()
+    startSyncSchedule()
+    await h.settle()
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(1) // gated again under the new epoch
+    gate.resolve(NOOP)
+    await h.settle()
+    expect(h.pushes).toBe(2)
+  })
+})
+
 describe('push status', () => {
   it('reports the unpushed draft count as entriesPending, 0 while locked', async () => {
     const h = harness()
@@ -1129,11 +1249,13 @@ describe('push status', () => {
   it('a successful push does not hide a pull error', async () => {
     const h = harness()
     h.flag = true
+    startSyncSchedule() // the unlock pull succeeds: automatic pushes are ungated
+    await h.settle()
     h.queue(async () => {
       throw new Error('offline')
     })
-    startSyncSchedule()
-    await h.settle()
+    const summary = (await syncHandlers.sync_now({})) as { errors: string[] }
+    expect(summary.errors).toEqual(['offline'])
     h.online()
     await h.settle()
     expect(h.pushes).toBe(1)

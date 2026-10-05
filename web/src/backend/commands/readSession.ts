@@ -2,8 +2,10 @@
  * Shared read session for the entry / taxonomy / search commands (Phase 10.3).
  *
  * One lazily built `{db, puller, vault}` per page. `ready()` is what every read handler awaits:
- *   1. `puller.refresh()` when there is no index yet (the sync commands of Phase 10.4 will drive
- *      later refreshes; a new index object invalidates the taxonomy cache below),
+ *   1. `puller.primeFromCache()` first — the cached index serves the list at once while the
+ *      sync schedule's unlock pull revalidates (stale-while-revalidate); `puller.refresh()`
+ *      runs only when nothing could be primed (the sync commands of Phase 10.4 drive later
+ *      refreshes; a new index object invalidates the taxonomy cache below),
  *   2. the journal/tag/template files are opened and the locked and invisible journal ids are fed to
  *      `vault.setExcludedJournalIds` BEFORE any entry is loaded (so an entry of a locked journal is
  *      never retained),
@@ -258,7 +260,7 @@ export interface ReadSessionDeps {
 export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSession> {
   const { db, reader, core } = deps
   const [
-    { createPuller },
+    { createPuller, PullTransientError },
     { createVault },
     { createDraftManager },
     { runRetention },
@@ -282,6 +284,10 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   let cache: { key: unknown; value: Taxonomy } | null = null
   let warmed: Promise<void> | null = null
   let hydrated: Promise<void> | null = null
+  /** Once-per-unlock `puller.primeFromCache` memo; a rejection clears it so the next call retries. */
+  let primed: Promise<boolean> | null = null
+  /** The index object `prime()` produced: while it still stands, a transient warm failure is noise. */
+  let primedIndex: ReadonlyMap<string, IndexEntry> | null = null
   /** The puller's foreign intent set last fed to the vault (a refresh makes a new array). */
   let foreignSeen: readonly ForeignIntentFile[] | null = null
   /** `<device>/<entry>@<web_updated_at_secs>` of the foreign intents shown, for `changed`. */
@@ -294,12 +300,37 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     cache = null
     warmed = null
     hydrated = null
+    primed = null
+    primedIndex = null
     foreignSeen = null
     foreignKey = ''
     notices = []
   })
   const assertSameEpoch = (started: number): void => {
     if (started !== epoch) throw new VaultLockedError()
+  }
+
+  /**
+   * `puller.primeFromCache()` once per unlock: the cached index serves the list at once while
+   * the schedule's unlock pull revalidates (stale-while-revalidate). False — or a rejection —
+   * means the caller falls back to `puller.refresh()` / retries next time.
+   */
+  const prime = (): Promise<boolean> => {
+    if (primed === null) {
+      const started = epoch
+      const run = (async () => {
+        const was = puller.index
+        const ok = await puller.primeFromCache()
+        // A lock mid-prime discards this epoch's result; the caller's assertSameEpoch rejects.
+        if (started === epoch && was === null && ok) primedIndex = puller.index
+        return ok
+      })()
+      primed = run
+      run.catch(() => {
+        if (primed === run) primed = null
+      })
+    }
+    return primed
   }
 
   // The outbox mutex: a FIFO chain of never-rejecting promises, one holder at a time.
@@ -390,7 +421,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
 
   const ready = async (): Promise<Taxonomy> => {
     const started = epoch
-    if (puller.index === null) await puller.refresh()
+    if (puller.index === null && !(await prime())) await puller.refresh()
     assertSameEpoch(started)
     const value = await taxonomy()
     assertSameEpoch(started)
@@ -413,13 +444,24 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
         if (warmed === run) warmed = null
       })
     }
-    await warmed
+    try {
+      await warmed
+    } catch (error) {
+      // An offline reload serves the cached list: while the primed index still stands (no
+      // refresh has replaced it) a transient warm failure is swallowed; the cleared memo
+      // retries the warm start on the next ready().
+      const stillPrimed = primedIndex !== null && puller.index === primedIndex
+      if (!(stillPrimed && error instanceof PullTransientError)) throw error
+    }
     assertSameEpoch(started)
     return value
   }
 
   const pull = async (): Promise<PullOutcome> => {
     const started = epoch
+    // Prime first so a reload compares the refresh against the cached index, not nothing.
+    await prime()
+    assertSameEpoch(started)
     const before = puller.index
     const taxonomyBefore = cache === null ? null : JSON.stringify(cache.value)
     const foreignBefore = foreignKey

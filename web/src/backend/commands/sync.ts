@@ -40,9 +40,12 @@
  *
  * PUSH (only while the schedule runs, i.e. unlocked, and only when the cached write flag is on;
  * `safeUpload` re-fetches the flag before any write):
+ *   - every automatic push waits for the FIRST successful pull of the schedule (`pulledThisEpoch`):
+ *     the pull is the revocation check, and with a primed read session a save can now precede it.
+ *     The first success pushes pending drafts itself, whatever trigger ran that pull.
  *   - `PUSH_DEBOUNCE_MS` after the last `saveDraft` (the drafts notifier, one hook for every write
- *     command), when the tab becomes visible, when the browser comes back `online`, and after the
- *     unlock pull and every interval pull when drafts are pending. The unlock pull hydrates the
+ *     command), when the tab becomes visible, when the browser comes back `online`, and after
+ *     every interval pull when drafts are pending. The unlock pull hydrates the
  *     read session, which refreshes the dirty set. The write flag is fetched on the same
  *     `app:unlocked` and may land after that pull: the interval pull then catches those drafts.
  *   - `sync_now` pulls FIRST, then pushes, and skips the push when the pull failed. The pull is what
@@ -219,6 +222,11 @@ let failures = 0
 let halted = false
 /** Pushes need a re-onboard (`MissingVaultStateError`): no automatic push until the next unlock. */
 let pushHalted = false
+/**
+ * The revocation check of this schedule's epoch ran: until the first successful pull, automatic
+ * pushes stay gated (a primed read session lets a save land before that pull).
+ */
+let pulledThisEpoch = false
 let active: { stop: () => void } | null = null
 let retryTimer: unknown = null
 /** Bumped on stop: a pull that finishes under an older epoch reports nothing. */
@@ -251,6 +259,7 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   nextAttemptAt = 0
   failures = 0
   halted = false
+  pulledThisEpoch = false
   pushFailures = 0
   pushNextAt = 0
   pushError = null
@@ -327,6 +336,8 @@ async function doPull(): Promise<PullReport> {
   try {
     const outcome = await e.pull()
     if (startedEpoch !== epoch) return { outcome: null, message: null }
+    const firstPull = !pulledThisEpoch
+    pulledThisEpoch = true
     failures = 0
     nextAttemptAt = 0
     clearRetry()
@@ -341,6 +352,9 @@ async function doPull(): Promise<PullReport> {
     pendingNotices.push(...(outcome.notices ?? []))
     setPhase('synced', pullNote())
     if (outcome.changed) e.emitChanged()
+    // The revocation check just ran: drafts saved before it (a primed session writes at once) or
+    // while the write flag was still unfetched go out now. `requestPush` still applies its guards.
+    if (firstPull && e.pendingCount() > 0) requestPush('start')
     return { outcome, message: null }
   } catch (error: unknown) {
     return fail(error, startedEpoch)
@@ -395,9 +409,10 @@ function request(trigger: Trigger): void {
   if (e.now() < nextAttemptAt) return
   if (trigger === 'focus' && e.now() - lastAttemptAt < FOCUS_MIN_AGE_MS) return
   const pulling = runPull()
-  if (trigger !== 'start' && trigger !== 'interval') return
-  // After the unlock pull, which hydrated the read session (and refreshed the dirty set); the
-  // interval catches drafts that pull missed because the write flag was not fetched yet.
+  if (trigger !== 'interval') return
+  // Interval pulls only: a successful start pull is always the epoch's first, so `doPull` already
+  // pushed pending drafts itself. The interval still catches drafts the unlock pull missed because
+  // the write flag was not fetched yet.
   void pulling.then((report) => {
     if (report.message === null && report.outcome !== null && env().pendingCount() > 0) {
       requestPush('start')
@@ -428,7 +443,15 @@ type PushTrigger = 'start' | 'save' | 'visible' | 'online' | 'retry'
 /** An automatic push. `online` skips the backoff wait: the network being back is the point. */
 function requestPush(trigger: PushTrigger): void {
   const e = env()
-  if (active === null || halted || pushHalted || !e.isUnlocked() || !e.cachedWriteFlag()) return
+  if (
+    active === null ||
+    halted ||
+    pushHalted ||
+    !pulledThisEpoch ||
+    !e.isUnlocked() ||
+    !e.cachedWriteFlag()
+  )
+    return
   if (trigger !== 'online' && e.now() < pushNextAt) return
   void runPush()
 }
@@ -522,6 +545,7 @@ export function startSyncSchedule(): void {
   const e = env()
   halted = false
   pushHalted = false
+  pulledThisEpoch = false
   failures = 0
   nextAttemptAt = 0
   lastAttemptAt = 0
