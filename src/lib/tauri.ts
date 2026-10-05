@@ -1611,6 +1611,11 @@ export interface ResetCounts {
   journals: number
 }
 
+export interface RepairCounts {
+  entries: number
+  journals: number
+}
+
 export interface SyncMaintenanceResult<T> {
   queued: boolean
   result: T | null
@@ -1618,7 +1623,7 @@ export interface SyncMaintenanceResult<T> {
 
 export const syncResetLocalState = (): Promise<SyncMaintenanceResult<ResetCounts>> =>
   invoke('sync_reset_local_state')
-export const syncRepairFromThisDevice = (): Promise<SyncMaintenanceResult<number>> =>
+export const syncRepairFromThisDevice = (): Promise<SyncMaintenanceResult<RepairCounts>> =>
   invoke('sync_repair_from_this_device')
 
 // Scope upgrade (drive.file → drive.appdata migration)

@@ -39,6 +39,8 @@ import {
   SYNC_RECOVERY_STATUS_EVENT,
   syncRepairFromThisDevice,
   syncResetLocalState,
+  type RepairCounts,
+  type SyncMaintenanceResult,
   verifySecondLockPassword,
   type SyncRecoveryStatus,
 } from './tauri'
@@ -287,10 +289,15 @@ describe('sync maintenance wrappers', () => {
   })
 
   it('returns repair result outcome from backend', async () => {
-    const outcome = { queued: false, result: 3 }
+    const outcome: SyncMaintenanceResult<RepairCounts> = {
+      queued: false,
+      result: { entries: 3, journals: 1 },
+    }
     vi.mocked(invoke).mockResolvedValue(outcome)
 
-    await expect(syncRepairFromThisDevice()).resolves.toEqual(outcome)
+    const result: SyncMaintenanceResult<RepairCounts> = await syncRepairFromThisDevice()
+    expect(result).toEqual(outcome)
+    expect(result.result).toEqual({ entries: 3, journals: 1 })
 
     expect(invoke).toHaveBeenCalledWith('sync_repair_from_this_device')
   })

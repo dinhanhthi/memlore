@@ -19,7 +19,7 @@
 //! `_impl` helpers instead, every pulled entry would re-mark as pending
 //! and ping-pong between devices.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use rusqlite::Connection;
@@ -460,6 +460,14 @@ impl ConnAccess for Connection {
     {
         f(self)
     }
+}
+
+/// Entry and journal ids already claimed by at least one live peer.
+/// Empty sets mean the caller should adopt everything (safe fallback).
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) struct PeerOwnedIds {
+    pub entries: HashSet<String>,
+    pub journals: HashSet<String>,
 }
 
 impl SyncEngine {
@@ -5269,40 +5277,57 @@ impl SyncEngine {
         self.fetch_manifests(false).await
     }
 
-    /// Returns the set of entry IDs already claimed by at least one live peer.
-    /// On any error (network unavailable, all peers unreachable), returns an empty set —
-    /// caller treats empty as "adopt everything" (safe fallback).
-    pub(crate) async fn collect_peer_entry_ids(&self) -> std::collections::HashSet<String> {
+    /// Returns entry and journal ids already claimed by at least one live peer,
+    /// from a single manifest fetch. On any error (network unavailable, all
+    /// peers unreachable), returns empty sets — caller treats empty as
+    /// "adopt everything" (safe fallback).
+    pub(crate) async fn collect_peer_owned_ids(&self) -> PeerOwnedIds {
         let (manifests, errors) = match self.fetch_peer_manifests().await {
             Ok(pair) => pair,
             Err(e) => {
                 log::warn!(
-                    "collect_peer_entry_ids: list_devices failed ({e}); adopting all entries as fallback"
+                    "collect_peer_owned_ids: list_devices failed ({e}); adopting all entries and journals as fallback"
                 );
-                return std::collections::HashSet::new();
+                return PeerOwnedIds::default();
             }
         };
         if !errors.is_empty() {
             log::warn!(
-                "collect_peer_entry_ids: {} peer(s) could not be reached; their entries may be re-adopted: {:?}",
+                "collect_peer_owned_ids: {} peer(s) could not be reached; their entries and journals may be re-adopted: {:?}",
                 errors.len(),
                 errors
             );
         }
-        // Only LIVE peer entries count as ownership. A tombstoned (is_deleted)
+        // Only LIVE peer rows count as ownership. A tombstoned (is_deleted)
         // summary is a deletion record, not a live claim — counting it would
         // make `sync_repair_from_this_device` skip this device's newer live
         // local copy, letting a stale remote tombstone suppress the only good
         // copy.
-        manifests
-            .iter()
-            .flat_map(|(_, m)| {
-                m.entries
-                    .iter()
-                    .filter(|e| !e.is_deleted)
-                    .map(|e| e.entry_id.clone())
-            })
-            .collect()
+        let mut owned = PeerOwnedIds::default();
+        for (_, manifest) in &manifests {
+            for entry in &manifest.entries {
+                if !entry.is_deleted {
+                    owned.entries.insert(entry.entry_id.clone());
+                }
+            }
+            for journal in &manifest.journals {
+                if !journal.is_deleted {
+                    owned.journals.insert(journal.journal_id.clone());
+                }
+            }
+        }
+        owned
+    }
+
+    /// Returns the set of entry IDs already claimed by at least one live peer.
+    /// On any error (network unavailable, all peers unreachable), returns an empty set —
+    /// caller treats empty as "adopt everything" (safe fallback).
+    ///
+    /// Production repair uses [`Self::collect_peer_owned_ids`]. This wrapper
+    /// stays so entry-only callers (and the existing engine tests) keep working.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) async fn collect_peer_entry_ids(&self) -> HashSet<String> {
+        self.collect_peer_owned_ids().await.entries
     }
 
     /// Push then pull. Per-entry errors from either half are flattened
@@ -20021,6 +20046,52 @@ mod tests {
             .unwrap();
     }
 
+    /// Like [`write_peer_manifest`], but also writes journal summaries.
+    /// `journals` is `(journal_id, is_deleted)`.
+    async fn write_peer_manifest_with_journals(
+        provider: &crate::sync::provider::test_support::MockProvider,
+        peer: &str,
+        entry_ids: &[&str],
+        journals: &[(&str, bool /* is_deleted */)],
+    ) {
+        let entries: Vec<super::super::metadata::SyncedEntrySummary> = entry_ids
+            .iter()
+            .map(|id| super::super::metadata::SyncedEntrySummary {
+                entry_id: id.to_string(),
+                updated_at: 1_000,
+                local_version: 1,
+                is_deleted: false,
+            })
+            .collect();
+        let journals: Vec<super::super::metadata::SyncedJournalSummary> = journals
+            .iter()
+            .map(
+                |(id, is_deleted)| super::super::metadata::SyncedJournalSummary {
+                    journal_id: id.to_string(),
+                    updated_at: 1_000,
+                    local_version: 1,
+                    is_deleted: *is_deleted,
+                },
+            )
+            .collect();
+        let manifest = DeviceMetadata {
+            device_id: peer.to_string(),
+            recovery_generation: 0,
+            entries,
+            journals,
+            chats_present: false,
+            memory_present: false,
+            generated_at: 1_000,
+        };
+        provider
+            .write_file(
+                &format!("{peer}/metadata.json"),
+                &serde_json::to_vec(&manifest).unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn collect_peer_entry_ids_returns_all_peer_ids() {
         let provider = Arc::new(crate::sync::provider::test_support::MockProvider::new());
@@ -20323,6 +20394,152 @@ mod tests {
         assert_eq!(ids.len(), 2, "only peer-a entries expected");
         assert!(ids.contains("e7"), "e7 must be present");
         assert!(ids.contains("e8"), "e8 must be present");
+    }
+
+    #[tokio::test]
+    async fn collect_peer_owned_ids_returns_peer_journal_ids() {
+        let provider = Arc::new(crate::sync::provider::test_support::MockProvider::new());
+        write_peer_manifest_with_journals(
+            &provider,
+            "peer-a",
+            &["e1"],
+            &[("j1", false), ("j2", false)],
+        )
+        .await;
+        write_peer_manifest_with_journals(&provider, "peer-b", &["e2"], &[("j3", false)]).await;
+        let engine = SyncEngine::new(
+            Arc::clone(&provider) as Arc<dyn SyncProvider>,
+            "dev-self".to_string(),
+        );
+
+        let owned = engine.collect_peer_owned_ids().await;
+
+        assert!(
+            owned.entries.contains("e1"),
+            "peer entry e1 must be claimed"
+        );
+        assert!(
+            owned.entries.contains("e2"),
+            "peer entry e2 must be claimed"
+        );
+        assert_eq!(owned.entries.len(), 2, "both live peer entries");
+        for id in ["j1", "j2", "j3"] {
+            assert!(
+                owned.journals.contains(id),
+                "set must contain live peer journal {id}"
+            );
+        }
+        assert_eq!(owned.journals.len(), 3, "all 3 live peer journals");
+    }
+
+    #[tokio::test]
+    async fn collect_peer_owned_ids_excludes_tombstoned_journals() {
+        // A peer journal marked is_deleted is a deletion record, not a live
+        // ownership claim. Counting it would make repair skip this device's
+        // newer live local copy.
+        let provider = Arc::new(crate::sync::provider::test_support::MockProvider::new());
+        write_peer_manifest_with_journals(
+            &provider,
+            "peer-a",
+            &["live-entry"],
+            &[("live-journal", false), ("tombstoned-journal", true)],
+        )
+        .await;
+        let engine = SyncEngine::new(
+            Arc::clone(&provider) as Arc<dyn SyncProvider>,
+            "dev-self".to_string(),
+        );
+
+        let owned = engine.collect_peer_owned_ids().await;
+
+        assert!(
+            owned.journals.contains("live-journal"),
+            "live peer journal must be claimed"
+        );
+        assert!(
+            !owned.journals.contains("tombstoned-journal"),
+            "tombstoned peer journal must NOT count as peer ownership"
+        );
+        assert_eq!(owned.journals.len(), 1, "only the live journal is owned");
+        assert!(
+            owned.entries.contains("live-entry"),
+            "live peer entry is still claimed"
+        );
+    }
+
+    #[tokio::test]
+    async fn collect_peer_owned_ids_skips_self_journals() {
+        let provider = Arc::new(crate::sync::provider::test_support::MockProvider::new());
+        write_peer_manifest_with_journals(
+            &provider,
+            "dev-self",
+            &["e0"],
+            &[("self-journal", false)],
+        )
+        .await;
+        write_peer_manifest_with_journals(&provider, "peer-a", &["e7"], &[("peer-journal", false)])
+            .await;
+        let engine = SyncEngine::new(
+            Arc::clone(&provider) as Arc<dyn SyncProvider>,
+            "dev-self".to_string(),
+        );
+
+        let owned = engine.collect_peer_owned_ids().await;
+
+        assert!(
+            !owned.journals.contains("self-journal"),
+            "self journal must NOT be in the peer set"
+        );
+        assert!(
+            !owned.entries.contains("e0"),
+            "self entry must NOT be in the peer set"
+        );
+        assert!(
+            owned.journals.contains("peer-journal"),
+            "peer journal must be present"
+        );
+        assert!(owned.entries.contains("e7"), "peer entry must be present");
+        assert_eq!(owned.journals.len(), 1, "only the peer journal");
+        assert_eq!(owned.entries.len(), 1, "only the peer entry");
+    }
+
+    #[tokio::test]
+    async fn collect_peer_owned_ids_empty_when_list_devices_fails() {
+        struct FailingProvider;
+
+        #[async_trait::async_trait]
+        impl SyncProvider for FailingProvider {
+            async fn list_devices(&self) -> Result<Vec<String>, SyncError> {
+                Err(SyncError::Io("network down".into()))
+            }
+            async fn list_files(
+                &self,
+                _device_id: &str,
+                _kind: crate::sync::provider::FileKind,
+            ) -> Result<Vec<String>, SyncError> {
+                Err(SyncError::Io("network down".into()))
+            }
+            async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
+                Err(SyncError::NotFound(path.to_string()))
+            }
+            async fn write_file(&self, _path: &str, _data: &[u8]) -> Result<(), SyncError> {
+                Err(SyncError::Io("network down".into()))
+            }
+            async fn delete_file(&self, _path: &str) -> Result<(), SyncError> {
+                Err(SyncError::Io("network down".into()))
+            }
+        }
+
+        let engine = SyncEngine::new(Arc::new(FailingProvider), "dev-self".to_string());
+        let owned = engine.collect_peer_owned_ids().await;
+        assert!(
+            owned.entries.is_empty(),
+            "entries must be empty when list_devices fails"
+        );
+        assert!(
+            owned.journals.is_empty(),
+            "journals must be empty when list_devices fails"
+        );
     }
 
     // ─── versions (Phase 2: sync + rotation + prune) ────────────────────────
