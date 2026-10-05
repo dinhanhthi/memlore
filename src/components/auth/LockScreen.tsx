@@ -8,7 +8,6 @@ import { Callout } from '../common/Callout'
 import { ForgotPasswordScreen } from './ForgotPasswordScreen'
 import { AuthPageCard } from '../common/AuthPageCard'
 import { cn } from '../../lib/cn'
-import { isWeb } from '../../lib/platform'
 
 /// LockScreen renders ONLY in password-locked mode. Device mode never
 /// shows this screen — the key is loaded from the OS keychain at startup.
@@ -18,7 +17,6 @@ import { isWeb } from '../../lib/platform'
 /// goes to Settings → "Lock Journal".
 export function LockScreen() {
   const { t } = useTranslation('auth')
-  const { t: tCommon } = useTranslation('common')
   const { isBiometricAvailable, isBiometricEnabled, unlock, unlockWithBiometric } = useAuth()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -87,14 +85,7 @@ export function LockScreen() {
           aria-hidden="true"
           draggable={false}
         />
-        <div className="flex items-center justify-center gap-2">
-          <h1 className="font-title text-fg text-2xl font-extrabold">{t('lock.welcome_back')}</h1>
-          {isWeb && (
-            <span className="bg-accent-soft text-accent-text shrink-0 rounded-full px-2 py-0.5 text-xs font-medium">
-              {tCommon('app.beta_badge')}
-            </span>
-          )}
-        </div>
+        <h1 className="font-title text-fg text-2xl font-extrabold">{t('lock.welcome_back')}</h1>
         <p className="text-fg-muted text-sm">{t('lock.encrypted_device')}</p>
       </div>
 
