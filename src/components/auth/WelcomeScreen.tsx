@@ -313,7 +313,8 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
         // without this the screen just sits on "Connecting…". Only our own
         // session's phase events update the hint.
         unlistenProgress = await attachProgress(sessionId)
-        await openUrl(begin.authUrl)
+        // Web: begin already opened the sign-in popup inside the click gesture.
+        if (!isWeb) await openUrl(begin.authUrl)
         // Unset-mode → backend bypasses password check; pass empty string.
         outcome = await gdriveCompleteConnect(sessionId, '')
       } else {

@@ -602,9 +602,9 @@ const gdriveBeginConnect: Handler = async () => {
     createdAt: e.now(),
     loggedOut: false,
   })
-  // The popup is already open (opened here, inside the click gesture). The UI still calls
-  // openUrl(authUrl); the sign-in itself is the popup, so this is a state-free same-origin JSON URL.
-  // TODO(later): see docs/LATER.md - Phase 12 should skip openUrl for this web flow.
+  // The popup is already open (opened here, inside the click gesture), so WelcomeScreen skips
+  // openUrl(authUrl) on the web; authUrl only fills the shared contract with a state-free
+  // same-origin JSON URL.
   return { authUrl: `${e.origin()}/api/config`, sessionId }
 }
 
