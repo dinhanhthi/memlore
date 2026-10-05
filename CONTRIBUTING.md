@@ -69,13 +69,18 @@ cargo install wasm-bindgen-cli --version =0.2.118 --locked   # must match Cargo.
 
 ### Run it locally
 
-One-time: create `workers/web-auth/.dev.vars` (gitignored) with the Web OAuth client's credentials and a cookie key, and make sure that client allows `http://localhost:5176` (origin) and `http://localhost:5176/api/oauth/callback` (redirect):
+One-time setup:
 
-```
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-COOKIE_KEY=...        # openssl rand -base64 32
-```
+1. In the Google Cloud project of your desktop dev client, create a **Web application** OAuth client with origin `http://localhost:5176` and redirect URI `http://localhost:5176/api/oauth/callback`. Step by step: [`docs/gdrive-oauth-setup.md` → Web client](docs/gdrive-oauth-setup.md#web-client-only-for-the-web-companion-web). It must be the same project, or the web sees an empty Drive.
+2. Create `workers/web-auth/.dev.vars` (gitignored; the web does not read the desktop's env file) with that client's credentials and a fresh cookie key:
+
+   ```
+   GOOGLE_CLIENT_ID=...       # the Web client, not the Desktop one
+   GOOGLE_CLIENT_SECRET=...
+   COOKIE_KEY=...             # openssl rand -base64 32
+   ```
+
+   Without it, sign-in fails with `500` on `/api/oauth/start`.
 
 Then, in two terminals:
 

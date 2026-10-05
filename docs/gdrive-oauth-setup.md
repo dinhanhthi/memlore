@@ -60,6 +60,21 @@ below.
 > **Advanced → Go to Memlore (unsafe)** to proceed. Skip **Verification Center**
 > until you publish.
 
+#### Web client (only for the web companion, `web/`)
+
+The web companion signs in through its own **Web application** client. Create it
+in the **same project** as the Desktop client: the hidden `appDataFolder` belongs
+to the project, so a client from another project sees an empty Drive.
+
+1. **Clients** → **+ Create client** → Application type: **Web application**.
+2. **Authorized JavaScript origins:** `http://localhost:5176`
+   (production adds `https://web.memlore.app`).
+3. **Authorized redirect URIs:** `http://localhost:5176/api/oauth/callback`
+   (production adds `https://web.memlore.app/api/oauth/callback`).
+4. **Create**, then copy its **Client ID** and **Client Secret**. Unlike the
+   Desktop client's, this secret is a real secret: it only ever lives in the
+   OAuth Worker, never in the browser.
+
 ---
 
 ## Going to production
@@ -200,6 +215,17 @@ The local DB is **SQLCipher-encrypted** (the key is derived from your password).
    `src-tauri/build.rs` reads `.env` and forwards `GDRIVE_CLIENT_ID` and `GDRIVE_CLIENT_SECRET` to cargo via `rustc-env`. A real shell env var of the same name (if you choose to `export` instead) always wins over the `.env` file. Cargo rebuilds the crate whenever `.env` changes or those vars are flipped, so updates take effect on the next `pnpm tauri dev`.
 
 Each developer uses their own Desktop client from Google Cloud Console. `.env` is gitignored — never commit client IDs or secrets.
+
+**Web companion (`web/`), first time only:** the web does not read this file. Its
+OAuth Worker reads `workers/web-auth/.dev.vars` (gitignored by `.dev.vars*`):
+
+```bash
+GOOGLE_CLIENT_ID=456-def.apps.googleusercontent.com   # the Web client above
+GOOGLE_CLIENT_SECRET=GOCSPX-yyyyyyyy
+COOKIE_KEY=...                                       # openssl rand -base64 32
+```
+
+Then run it as described in [CONTRIBUTING.md → Run it locally](../CONTRIBUTING.md#run-it-locally).
 
 **Test the flow:**
 

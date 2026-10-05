@@ -66,9 +66,12 @@ pnpm install
 pnpm tauri dev                    # native app
 # MEMLORE_REACT_DEVTOOLS=1 pnpm tauri dev   # optional, after `npx react-devtools`
 
-pnpm web:dev                      # web companion (web/) — http://localhost:5176
-pnpm web:test                     # web companion test suite
-pnpm web:build                    # compile web assets
+# web companion (web/) — first time: create workers/web-auth/.dev.vars,
+# see CONTRIBUTING.md → "Run it locally"
+pnpm web-auth:dev                    # its OAuth Worker on :8787, keep it running
+pnpm web:build && pnpm web:preview   # production bundle on http://localhost:5176
+pnpm web:dev                         # or: hot-reload dev server on :5176 (no CSP)
+pnpm web:test                        # web companion test suite
 
 pnpm mockup:dev                   # app UI preview (mockup/) — http://localhost:5175
 pnpm mockup:build && pnpm mockup:preview
