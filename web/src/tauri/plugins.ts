@@ -9,6 +9,10 @@ export async function openUrl(url: string | URL): Promise<void> {
   } catch {
     throw new Error('openUrl: invalid URL')
   }
+  if (parsed.protocol === 'mailto:') {
+    window.location.assign(parsed.href)
+    return
+  }
   if (parsed.protocol !== 'https:') {
     throw new Error('openUrl: only https URLs are allowed on web')
   }

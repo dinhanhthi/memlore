@@ -4,6 +4,7 @@ import { ExternalLink, Globe, Mail } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
+import { isWeb } from '../../lib/platform'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { useLogoDirection, logoSrc, ALL_LOGO_DIRECTIONS } from '../../hooks/useLogoDirection'
 import { useAppVersion } from '../../hooks/useAppVersion'
@@ -15,6 +16,7 @@ const AUTHOR_WEBSITE_URL = 'https://memlore.app'
 const AUTHOR_EMAIL = 'contact@memlore.app'
 const REPO_URL = 'https://github.com/dinhanhthi/memlore'
 const ISSUES_URL = 'https://github.com/dinhanhthi/memlore/issues'
+const DESKTOP_DOWNLOAD_URL = 'https://memlore.app'
 
 function ExternalLinkRow({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -52,10 +54,17 @@ function InlineExternalLink({ href, children }: { href: string; children?: React
 
 export function AboutView() {
   const { t } = useTranslation('settings')
+  const { t: tCommon } = useTranslation('common')
   const isClay = useUiStore((s) => s.designSystem) === 'clay'
   // Which build am I on? — the first thing a bug report needs.
   const version = useAppVersion()
-  const principleKeys = ['local_first', 'private', 'ai_optional', 'yours']
+  const principleKeys = [
+    isWeb ? 'local_first_web' : 'local_first',
+    'private',
+    'ai_optional',
+    'yours',
+  ]
+  const webLimitKeys = ['vault', 'online', 'editing', 'features', 'security']
 
   return (
     <RestoredScroll
@@ -71,7 +80,7 @@ export function AboutView() {
         <div className="mb-6">
           <AboutLogo />
           <h1 className="font-title text-fg text-3xl font-extrabold">
-            {t('about_section.heading_title')}
+            {isWeb ? tCommon('app.web_name') : t('about_section.heading_title')}
           </h1>
           {version != null && (
             <p className="text-fg-muted text-2xs mt-1 font-mono">
@@ -85,6 +94,31 @@ export function AboutView() {
             {t('about_section.description')}
           </p>
         </div>
+
+        {isWeb && (
+          <SettingsSection title={t('about_section.web.title')}>
+            <p className="text-fg-secondary text-sm leading-relaxed">
+              {t('about_section.web.intro')}
+            </p>
+            <ul className="text-fg-secondary mt-3 space-y-1.5 text-sm">
+              {webLimitKeys.map((key) => (
+                <li key={key} className="flex gap-2">
+                  <span className="bg-accent mt-2 h-1 w-1 shrink-0 rounded-full" />
+                  <span>{t(`about_section.web.limits.${key}`)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-fg-secondary mt-3 text-sm leading-relaxed">
+              <Trans
+                i18nKey="about_section.web.recommend"
+                ns="settings"
+                components={{
+                  desktopLink: <InlineExternalLink href={DESKTOP_DOWNLOAD_URL} />,
+                }}
+              />
+            </p>
+          </SettingsSection>
+        )}
 
         <SettingsSection title={t('about_section.principles_title')}>
           <ul className="text-fg-secondary space-y-1.5 text-sm">

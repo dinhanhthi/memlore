@@ -481,10 +481,23 @@
   "about_section": {
     "heading_title": "Memlore",
     "version": "Version {{version}}",
+    "web": {
+      "title": "About the web version",
+      "intro": "Memlore Web is a companion to the desktop app. It opens the encrypted journal you already sync to Google Drive, right in your browser — but it does less than the desktop app.",
+      "limits": {
+        "vault": "Needs a journal created in the desktop app and synced through Google Drive. iCloud Drive is not supported.",
+        "online": "Entries load from Google Drive as you open them; offline you can only read what is already cached.",
+        "editing": "You can write and edit entries, but not delete them, and journals, tags and templates can only be managed on desktop.",
+        "features": "No AI, dashboard, stats, gallery, \"On this day\", reminders, version history, import/export, voice memos or file attachments.",
+        "security": "No biometric unlock, password change or recovery tools."
+      },
+      "recommend": "For the full experience — offline, AI, stats and everything else — use the <desktopLink>Memlore desktop app</desktopLink>."
+    },
     "description": "A little life. A lasting story. A cross-platform, privacy-first, local-first journal — with rich, optional AI.",
     "principles_title": "Core principles",
     "principles": {
       "local_first": "Local-first — works fully offline. Your entries stay on your device.",
+      "local_first_web": "Encrypted in your browser — entries are decrypted only in this tab; the browser cache and Google Drive hold ciphertext only.",
       "private": "Private — encrypted at rest. No Memlore server, no account, no telemetry.",
       "ai_optional": "Optional AI — off until you opt in. Your provider, including on-device.",
       "yours": "Yours — sync through your own Drive if you want. Export anytime."

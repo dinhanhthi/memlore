@@ -481,10 +481,23 @@
   "about_section": {
     "heading_title": "Memlore",
     "version": "Phiên bản {{version}}",
+    "web": {
+      "title": "Về phiên bản web",
+      "intro": "Memlore Web là bản đồng hành của ứng dụng desktop. Nó mở nhật ký đã mã hóa mà bạn đồng bộ lên Google Drive, ngay trong trình duyệt — nhưng có ít chức năng hơn bản desktop.",
+      "limits": {
+        "vault": "Cần một nhật ký được tạo trong ứng dụng desktop và đồng bộ qua Google Drive. Không hỗ trợ iCloud Drive.",
+        "online": "Các mục được tải từ Google Drive khi bạn mở; khi ngoại tuyến bạn chỉ đọc được những gì đã lưu đệm.",
+        "editing": "Bạn có thể viết và sửa mục, nhưng không xóa được; nhật ký, thẻ và mẫu chỉ quản lý được trên desktop.",
+        "features": "Không có AI, bảng điều khiển, thống kê, thư viện ảnh, \"Ngày này năm xưa\", nhắc nhở, lịch sử phiên bản, nhập/xuất, ghi âm hay đính kèm tệp.",
+        "security": "Không mở khóa sinh trắc học, đổi mật khẩu hay công cụ khôi phục."
+      },
+      "recommend": "Để dùng đầy đủ chức năng — ngoại tuyến, AI, thống kê và mọi thứ khác — hãy dùng <desktopLink>ứng dụng Memlore desktop</desktopLink>."
+    },
     "description": "Một đời bé nhỏ. Một câu chuyện ở lại. Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
     "principles_title": "Nguyên tắc cốt lõi",
     "principles": {
       "local_first": "Ưu tiên cục bộ — hoạt động hoàn toàn ngoại tuyến. Các mục nằm trên thiết bị của bạn.",
+      "local_first_web": "Mã hóa ngay trong trình duyệt — các mục chỉ được giải mã trong tab này; bộ nhớ đệm trình duyệt và Google Drive chỉ chứa dữ liệu đã mã hóa.",
       "private": "Riêng tư — mã hóa khi lưu. Không máy chủ Memlore, không tài khoản, không telemetry.",
       "ai_optional": "AI tùy chọn — tắt cho đến khi bạn bật. Nhà cung cấp của bạn, kể cả trên thiết bị.",
       "yours": "Của bạn — đồng bộ qua Drive của riêng bạn nếu muốn. Xuất bất cứ lúc nào."
