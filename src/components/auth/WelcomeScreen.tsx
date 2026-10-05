@@ -91,6 +91,7 @@ interface Props {
 export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Props) {
   const { t } = useTranslation('auth')
   const { t: tSettings } = useTranslation('settings')
+  const { t: tCommon } = useTranslation('common')
 
   // Language selection is the very first thing shown on a fresh install, so the
   // intro (and every later step) renders in the user's language. It's
@@ -601,9 +602,16 @@ export function WelcomeScreen({ onSetupSuccess, initialScreen = 'language' }: Pr
             draggable={false}
             className="block h-24 w-auto shrink-0"
           />
-          <h1 className="font-title text-fg text-3xl font-extrabold">
-            {t('welcome_first_run.title')}
-          </h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="font-title text-fg text-3xl font-extrabold">
+              {t('welcome_first_run.title')}
+            </h1>
+            {isWeb && (
+              <span className="bg-accent-soft text-accent-text shrink-0 rounded-full px-2 py-0.5 text-xs font-medium">
+                {tCommon('app.beta_badge')}
+              </span>
+            )}
+          </div>
           <p className="text-fg-muted text-sm">
             {t('welcome_first_run.subtitle')}{' '}
             <button

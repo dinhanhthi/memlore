@@ -1,6 +1,7 @@
 {
   "app": {
-    "name": "Memlore"
+    "name": "Memlore",
+    "beta_badge": "Beta"
   },
   "sync_catchup": {
     "incomplete": "Dữ liệu tổng quan vẫn đang được cập nhật trong khi các mục cũ đồng bộ.",

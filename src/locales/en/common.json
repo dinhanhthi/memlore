@@ -1,6 +1,7 @@
 {
   "app": {
-    "name": "Memlore"
+    "name": "Memlore",
+    "beta_badge": "Beta"
   },
   "sync_catchup": {
     "incomplete": "Figures are still filling in while older entries sync.",
