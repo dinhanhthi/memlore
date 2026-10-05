@@ -1,7 +1,12 @@
 {
   "app": {
     "name": "Memlore",
+    "web_name": "Memlore Web",
     "beta_badge": "Beta"
+  },
+  "web_unsupported": {
+    "title": "Không hỗ trợ trên phiên bản web",
+    "body": "Hãy mở ứng dụng Memlore trên máy tính để dùng tính năng này."
   },
   "sync_catchup": {
     "incomplete": "Dữ liệu tổng quan vẫn đang được cập nhật trong khi các mục cũ đồng bộ.",

@@ -21,7 +21,7 @@ import { useVersionRetention } from '../../hooks/useVersionRetention'
 import { cn } from '../../lib/cn'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
 import { isSettingsCategoryAvailable } from '../../lib/settingsAvailability'
-import { useTabStore } from '../../stores/tabStore'
+import { DEFAULT_SETTINGS_CATEGORY, useTabStore } from '../../stores/tabStore'
 import {
   type NewEntryMode,
   type UpdateChannel,
@@ -30,6 +30,7 @@ import {
   useUiStore,
 } from '../../stores/uiStore'
 import { RestoredScroll } from '../common/RestoredScroll'
+import { UnsupportedOnWeb } from '../common/UnsupportedOnWeb'
 import { AiIcon } from '../common/AiIcon'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { Button } from '../common/Button'
@@ -332,13 +333,15 @@ function panelId(id: SettingsCategory): string {
 export function SettingsPanel() {
   const { t } = useTranslation('settings')
   const caps = useCapabilities()
-  // Single source of truth shared with the palette's settings.* deep links —
-  // a hidden category (e.g. security on web) can never be navigated to, and a
-  // persisted/default hidden category falls back to categories[0] below.
-  const categories = CATEGORIES.filter((c) => isSettingsCategoryAvailable(c.id, caps))
+  // Every category shows in the rail on every platform — an unavailable one
+  // (e.g. security on web) renders an "unsupported on web" placeholder in the
+  // detail pane instead of being hidden. `isSettingsCategoryAvailable` stays
+  // the single source of truth shared with the palette's settings.* deep
+  // links (which still hide unavailable categories).
+  const categories = CATEGORIES
   const active = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
-    return tab?.settingsCategory ?? 'security'
+    return tab?.settingsCategory ?? DEFAULT_SETTINGS_CATEGORY
   })
   const setActive = (category: SettingsCategory) =>
     useTabStore.getState().updateActiveTab({ settingsCategory: category })
@@ -534,7 +537,11 @@ export function SettingsPanel() {
             isClay ? 'xj-main-panel bg-elevated rounded-2xl' : 'bg-panel-3 dark:bg-transparent',
           )}
         >
-          <DetailContent category={activeMeta.id} />
+          {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+            <DetailContent category={activeMeta.id} />
+          ) : (
+            <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />
+          )}
         </div>
       ) : (
         <div
@@ -557,7 +564,11 @@ export function SettingsPanel() {
                   {t(`categories.${activeMeta.id}.description`)}
                 </p>
               </div>
-              <DetailContent category={activeMeta.id} />
+              {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+                <DetailContent category={activeMeta.id} />
+              ) : (
+                <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />
+              )}
             </div>
           </div>
         </div>

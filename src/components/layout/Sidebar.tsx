@@ -3,7 +3,6 @@ import { ExternalLink, PenLine, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useActiveView, useUpdateActiveTab } from '../../hooks/useActiveTab'
-import { useCapabilities } from '../../hooks/useCapabilities'
 import { useAiDailyChatEnabled } from '../../hooks/useAiDailyChatEnabled'
 import { useJournals } from '../../hooks/useJournals'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
@@ -60,21 +59,14 @@ export function Sidebar() {
   const activeView = useActiveView()
   const updateActiveTab = useUpdateActiveTab()
   const dailyChatEnabled = useAiDailyChatEnabled()
-  const caps = useCapabilities()
-  // Splice AI nav items before Settings when their toggles are on.
-  // `null` (initial probe pending) suppresses the item — avoids a paint flash.
-  const beforeSettings = NAV_ITEMS.slice(0, -1).filter(
-    (item) =>
-      (item.view !== 'dashboard' || caps.dashboard) &&
-      (item.view !== 'stats' || caps.stats) &&
-      (item.view !== 'map' || caps.maps) &&
-      // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
-      (item.view !== 'onthisday' || caps.lookback) &&
-      (item.view !== 'media' || caps.gallery),
-  )
+  // Every nav item shows on every platform — views the build doesn't support
+  // render an "unsupported on web" placeholder via TwoPanelLayout instead of
+  // being hidden. Splice AI nav items before Settings when their toggles are
+  // on. `null` (initial probe pending) suppresses the item — avoids a paint flash.
+  const beforeSettings = NAV_ITEMS.slice(0, -1)
   const settingsItem = NAV_ITEMS[NAV_ITEMS.length - 1]
   const aiItems: NavItem[] = []
-  if (dailyChatEnabled === true && caps.ai && caps.chat) aiItems.push(CHAT_ITEM)
+  if (dailyChatEnabled === true) aiItems.push(CHAT_ITEM)
   const displayItems: NavItem[] = [...beforeSettings, ...aiItems, settingsItem, ABOUT_ITEM]
   const { createJournal } = useJournals()
   const [contextMenu, setContextMenu] = useState<{

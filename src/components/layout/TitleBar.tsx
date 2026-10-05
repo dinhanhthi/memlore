@@ -285,21 +285,23 @@ export function TitleBar() {
       {isWebMock && windowChrome && <MockTrafficLights />}
 
       {/* App logo only — sits right of traffic lights, left of tab strip */}
-      <div className="ml-1 flex shrink-0 items-center">
+      <div className="ml-1 flex shrink-0 items-center gap-2">
         <TitleBarLogo />
-      </div>
 
-      {/* Web companion wordmark + beta badge. Gated on isWeb (the
-          web.memlore.app build flag), NOT isWebMock — isWebMock is also
-          true in mockup/ and the website demo where this must not show. */}
-      {isWeb && (
-        <div className="flex shrink-0 items-center gap-1.5 select-none">
-          <span className="font-title text-fg text-base">{tCommon('app.name')}</span>
-          <span className="bg-accent-soft text-accent-text rounded-full px-2 py-0.5 text-xs font-medium">
-            {tCommon('app.beta_badge')}
-          </span>
-        </div>
-      )}
+        {/* Web companion wordmark + beta badge. Gated on isWeb (the
+            web.memlore.app build flag), NOT isWebMock — isWebMock is also
+            true in mockup/ and the website demo where this must not show. */}
+        {isWeb && (
+          <div className="flex items-center gap-1.5 select-none">
+            <span className="font-title text-fg text-base font-bold">
+              {tCommon('app.web_name')}
+            </span>
+            <span className="bg-accent-soft text-accent-text text-2xs rounded-full px-1.5 py-0.5 leading-none font-medium">
+              {tCommon('app.beta_badge')}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Tab strip — DndContext wraps the scroll container so dnd-kit's
        *  auto-scroll detects the strip as the scrollable ancestor of the
