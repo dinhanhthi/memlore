@@ -20,6 +20,7 @@ import { useStartAtLogin } from '../../hooks/useStartAtLogin'
 import { useVersionRetention } from '../../hooks/useVersionRetention'
 import { cn } from '../../lib/cn'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
+import { isSettingsCategoryAvailable } from '../../lib/settingsAvailability'
 import { useTabStore } from '../../stores/tabStore'
 import {
   type NewEntryMode,
@@ -320,13 +321,10 @@ function panelId(id: SettingsCategory): string {
 export function SettingsPanel() {
   const { t } = useTranslation('settings')
   const caps = useCapabilities()
-  const categories = CATEGORIES.filter(
-    (c) =>
-      (c.id !== 'ai' || caps.ai) &&
-      (c.id !== 'reminders' || caps.reminders) &&
-      (c.id !== 'location' || caps.maps) &&
-      (c.id !== 'data' || caps.importExport),
-  )
+  // Single source of truth shared with the palette's settings.* deep links —
+  // a hidden category (e.g. security on web) can never be navigated to, and a
+  // persisted/default hidden category falls back to categories[0] below.
+  const categories = CATEGORIES.filter((c) => isSettingsCategoryAvailable(c.id, caps))
   const active = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
     return tab?.settingsCategory ?? 'security'

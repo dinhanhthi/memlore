@@ -67,7 +67,10 @@ export function Sidebar() {
     (item) =>
       (item.view !== 'dashboard' || caps.dashboard) &&
       (item.view !== 'stats' || caps.stats) &&
-      (item.view !== 'map' || caps.maps),
+      (item.view !== 'map' || caps.maps) &&
+      // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
+      (item.view !== 'onthisday' || caps.lookback) &&
+      (item.view !== 'media' || caps.gallery),
   )
   const settingsItem = NAV_ITEMS[NAV_ITEMS.length - 1]
   const aiItems: NavItem[] = []

@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useActiveTab, useActiveView, useSelectedEntryId } from '../../hooks/useActiveTab'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { isEditorDistractionShellActive } from '../../lib/editorDistraction'
 import { useInvisibleLock } from '../../hooks/useInvisibleLock'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
@@ -58,6 +59,7 @@ function streakToneClasses(streak: number): string {
  */
 export function FooterBar() {
   const { t } = useTranslation('nav')
+  const caps = useCapabilities()
   const { streakInfo } = useStreaks()
   const { lock, lockBlockedReason } = useLockAction()
   const secondLock = useSecondLock(false)
@@ -281,19 +283,22 @@ export function FooterBar() {
           </>
         )}
         {!distractionShellActive && <AIProviderInfoPopover />}
-        <Tooltip content={t('streak.tooltip')} placement="top">
-          <div
-            data-testid="footer-streak"
-            className={cn(
-              'inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-xs font-semibold',
-              streakToneClasses(streakInfo?.current_streak ?? 0),
-            )}
-            aria-label={t('streak.footer_label', { count: streakInfo?.current_streak ?? 0 })}
-          >
-            <Flame className="size-4" strokeWidth={1.75} />
-            <span>{streakInfo?.current_streak ?? 0}</span>
-          </div>
-        </Tooltip>
+        {/* TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index */}
+        {caps.stats && (
+          <Tooltip content={t('streak.tooltip')} placement="top">
+            <div
+              data-testid="footer-streak"
+              className={cn(
+                'inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-xs font-semibold',
+                streakToneClasses(streakInfo?.current_streak ?? 0),
+              )}
+              aria-label={t('streak.footer_label', { count: streakInfo?.current_streak ?? 0 })}
+            >
+              <Flame className="size-4" strokeWidth={1.75} />
+              <span>{streakInfo?.current_streak ?? 0}</span>
+            </div>
+          </Tooltip>
+        )}
         {sidebarRight && sidebarToggle}
       </div>
       <SecondLockPromptModal

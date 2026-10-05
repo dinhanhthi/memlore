@@ -2,6 +2,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Clock, Cloud, HardDrive, Mail, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
 import { useIcloudAvailability } from '../../hooks/useIcloudAvailability'
 import { usePickFolder } from '../../hooks/usePickFolder'
@@ -126,6 +127,7 @@ function recoveryStatusLabelKey(status: string): string {
  */
 export function GoogleDriveSettings() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const { available: icloudAvailable, loading: icloudLoading } = useIcloudAvailability()
   const pickFolder = usePickFolder()
   const lastErrorAction = useSyncStore((s) => s.lastErrorAction)
@@ -512,6 +514,19 @@ export function GoogleDriveSettings() {
     lastErrorAction?.kind !== 'cross_mode_needs_no_password' &&
     lastErrorAction?.kind !== 'force_re_pair_required'
 
+  // The Security category is hidden when !vaultAdmin (web) — hide the deep
+  // link too rather than rely on the panel's silent fallback to categories[0].
+  const securityCta = caps.vaultAdmin ? (
+    <Button
+      variant="primary"
+      size="sm"
+      onClick={() => setSettingsCategory('security')}
+      data-testid="cross-mode-goto-security"
+    >
+      {t('gdrive.cross_mode.cta')}
+    </Button>
+  ) : undefined
+
   const storageUsage =
     status?.storageUsed != null && status.storageTotal != null
       ? getStorageUsage(status.storageUsed, status.storageTotal)
@@ -569,16 +584,7 @@ export function GoogleDriveSettings() {
           tone="danger"
           className="mb-4"
           title={t('gdrive.cross_mode.needs_password_title')}
-          action={
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setSettingsCategory('security')}
-              data-testid="cross-mode-goto-security"
-            >
-              {t('gdrive.cross_mode.cta')}
-            </Button>
-          }
+          action={securityCta}
         >
           <p>{t('gdrive.cross_mode.needs_password_body')}</p>
           <p className="mt-1">{t('gdrive.cross_mode.needs_password_note')}</p>
@@ -589,16 +595,7 @@ export function GoogleDriveSettings() {
           tone="danger"
           className="mb-4"
           title={t('gdrive.cross_mode.needs_no_password_title')}
-          action={
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setSettingsCategory('security')}
-              data-testid="cross-mode-goto-security"
-            >
-              {t('gdrive.cross_mode.cta')}
-            </Button>
-          }
+          action={securityCta}
         >
           <p>{t('gdrive.cross_mode.needs_no_password_body')}</p>
           <p className="mt-1">{t('gdrive.cross_mode.needs_no_password_note')}</p>

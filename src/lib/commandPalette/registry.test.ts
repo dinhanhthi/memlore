@@ -207,7 +207,8 @@ describe('getCommands', () => {
     const lockCmd = commands.find((c) => c.id === 'action.lock_invisible')
 
     useInvisibleLockStore.setState({ activeVaultId: null })
-    expect(unlockCmd?.available?.()).toBeUndefined()
+    // Unlock is always exposed on desktop (gated only by capabilities.secondLock).
+    expect(unlockCmd?.available?.()).toBe(true)
     expect(lockCmd?.available?.()).toBe(false)
 
     useInvisibleLockStore.setState({ activeVaultId: 'vault-a' })

@@ -111,8 +111,16 @@ interface TabState {
 // Dashboard and Statistics are off on the web (docs/LATER.md), so tabs open on Entries there.
 const HOME_VIEW: ActiveView = capabilities.dashboard ? 'dashboard' : 'entries'
 
+// TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
 const isUnavailableView = (view: ActiveView): boolean =>
-  (view === 'dashboard' && !capabilities.dashboard) || (view === 'stats' && !capabilities.stats)
+  (view === 'dashboard' && !capabilities.dashboard) ||
+  (view === 'stats' && !capabilities.stats) ||
+  (view === 'media' && !capabilities.gallery) ||
+  (view === 'onthisday' && !capabilities.lookback) ||
+  (view === 'map' && !capabilities.maps) ||
+  // Daily Chat fires `daily_chat_*` invokes — all unsupported on web. Gate matches
+  // the palette's page.chat (`capabilities.ai && capabilities.chat`).
+  (view === 'chat' && !(capabilities.ai && capabilities.chat))
 
 export function makeDefaultTab(): Tab {
   return {

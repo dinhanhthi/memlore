@@ -48,6 +48,7 @@ import {
   lightModeAllowed,
 } from '../designSystem'
 import { navigateToSetting, SETTINGS_ANCHORS } from '../settingsNavigation'
+import { isSettingsCategoryAvailable } from '../settingsAvailability'
 import { setSetting } from '../tauri'
 import {
   getAiFeatureEnabled,
@@ -117,7 +118,7 @@ import type { Command, CommandGroup } from './types'
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { EditorLineHeightPreset, EditorParagraphSpacingPreset } from '../editorTypography'
-import type { UiFontScale, TimeFormat } from '../../stores/uiStore'
+import type { SettingsCategory, TimeFormat, UiFontScale } from '../../stores/uiStore'
 import type { LanguagePreference } from '../i18n'
 import type { MediaViewMode } from '../../hooks/useMediaViewMode'
 import type { SearchMode } from '../../hooks/useDefaultSearchMode'
@@ -174,6 +175,8 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.onthisday',
     icon: History,
     keywords: ['memories', 'past', 'anniversary'],
+    // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
+    available: () => capabilities.lookback,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'onthisday', selectedEntryId: null }),
   },
@@ -183,6 +186,8 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.media',
     icon: Image,
     keywords: ['photos', 'gallery', 'images'],
+    // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
+    available: () => capabilities.gallery,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'media', selectedEntryId: null }),
   },
@@ -192,6 +197,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.map',
     icon: MapPin,
     keywords: ['location', 'places', 'geo'],
+    available: () => capabilities.maps,
     run: () => useTabStore.getState().updateActiveTab({ activeView: 'map', selectedEntryId: null }),
   },
   {
@@ -210,8 +216,10 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.chat',
     icon: MessageSquare,
     keywords: ['ai', 'assistant', 'daily'],
-    // Always listed in the palette; Sidebar visibility is gated via
-    // `useAiDailyChatEnabled` → `aiSettingsStore.dailyChatEnabled`.
+    // On desktop always listed in the palette; Sidebar visibility is
+    // additionally gated via `useAiDailyChatEnabled` →
+    // `aiSettingsStore.dailyChatEnabled`.
+    available: () => capabilities.ai && capabilities.chat,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'chat', selectedEntryId: null }),
   },
@@ -237,6 +245,15 @@ const PAGE_COMMANDS: Command[] = [
 
 // Settings navigation commands — one per SettingsCategory.
 // Category/sub-tab live on the active Tab (tabStore), not global uiStore.
+//
+// Every settings navigation command is gated on its category's capability
+// (`isSettingsCategoryAvailable`) so a category hidden on this platform can
+// never be navigated to from the palette.
+const settingsNav =
+  (category: SettingsCategory) =>
+  (): boolean =>
+    isSettingsCategoryAvailable(category, capabilities)
+
 const SETTINGS_COMMANDS: Command[] = [
   {
     id: 'settings.general',
@@ -244,6 +261,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.general',
     icon: SlidersHorizontal,
     keywords: ['settings', 'general', 'startup', 'login', 'language', 'time', 'version'],
+    available: settingsNav('general'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -258,6 +276,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.editor',
     icon: Settings,
     keywords: ['settings', 'editor', 'math', 'emoji', 'font', 'fonts', 'title', 'fixed', 'scroll'],
+    available: settingsNav('editor'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -272,6 +291,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.appearance',
     icon: Settings,
     keywords: ['settings', 'appearance'],
+    available: settingsNav('appearance'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -286,6 +306,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.security',
     icon: Lock,
     keywords: ['settings', 'security'],
+    available: settingsNav('security'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -300,6 +321,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.sync',
     icon: Cloud,
     keywords: ['settings', 'sync'],
+    available: settingsNav('sync'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -314,6 +336,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.media',
     icon: Image,
     keywords: ['settings', 'media'],
+    available: settingsNav('media'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -328,6 +351,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.location',
     icon: MapPin,
     keywords: ['settings', 'location'],
+    available: settingsNav('location'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -342,6 +366,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.journals',
     icon: BookOpen,
     keywords: ['settings', 'journals'],
+    available: settingsNav('journals'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -356,6 +381,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.templates',
     icon: LayoutTemplate,
     keywords: ['settings', 'templates'],
+    available: settingsNav('templates'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -370,6 +396,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.reminders',
     icon: Bell,
     keywords: ['settings', 'reminders'],
+    available: settingsNav('reminders'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -384,6 +411,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.ai',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -398,6 +426,7 @@ const SETTINGS_COMMANDS: Command[] = [
     labelKey: 'settings.data',
     icon: Code2,
     keywords: ['settings', 'data'],
+    available: settingsNav('data'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -417,6 +446,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.editor_general',
     icon: Settings,
     keywords: ['settings', 'editor', 'general'],
+    available: settingsNav('editor'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -432,6 +462,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.editor_layout',
     icon: Settings,
     keywords: ['settings', 'editor', 'layout'],
+    available: settingsNav('editor'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -447,6 +478,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.editor_font',
     icon: Type,
     keywords: ['settings', 'editor', 'font', 'fonts', 'typography'],
+    available: settingsNav('editor'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -463,6 +495,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.appearance_theme',
     icon: Settings,
     keywords: ['settings', 'appearance', 'theme'],
+    available: settingsNav('appearance'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -478,6 +511,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.appearance_display',
     icon: Settings,
     keywords: ['settings', 'appearance', 'display'],
+    available: settingsNav('appearance'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -494,6 +528,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.security_device_password',
     icon: Lock,
     keywords: ['settings', 'security', 'password', 'biometric'],
+    available: settingsNav('security'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -509,6 +544,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.security_second_lock',
     icon: Lock,
     keywords: ['settings', 'security', 'second', 'lock', 'protected'],
+    available: settingsNav('security'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -524,6 +560,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.security_recovery_devices',
     icon: Lock,
     keywords: ['settings', 'security', 'recovery', 'keys', 'devices'],
+    available: settingsNav('security'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -539,6 +576,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.security_invisible_lock',
     icon: EyeOff,
     keywords: ['settings', 'security', 'invisible', 'hidden'],
+    available: settingsNav('security'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -555,6 +593,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.location_geocoding',
     icon: MapPin,
     keywords: ['settings', 'location', 'geocoding'],
+    available: settingsNav('location'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -570,6 +609,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.location_saved',
     icon: MapPin,
     keywords: ['settings', 'location', 'saved'],
+    available: settingsNav('location'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -586,6 +626,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.sync_gdrive',
     icon: Cloud,
     keywords: ['settings', 'sync', 'gdrive', 'google', 'drive', 'icloud', 'cloud', 'folder'],
+    available: settingsNav('sync'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -601,6 +642,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.sync_devices',
     icon: Cloud,
     keywords: ['settings', 'sync', 'devices'],
+    available: () => capabilities.syncAdmin && isSettingsCategoryAvailable('sync', capabilities),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -616,6 +658,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.sync_schedule',
     icon: Cloud,
     keywords: ['settings', 'sync', 'schedule', 'automatic'],
+    available: () => capabilities.syncAdmin && isSettingsCategoryAvailable('sync', capabilities),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -634,6 +677,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     // The Embedding tab merged into Models — keep its keywords so the old
     // search terms still land somewhere useful.
     keywords: ['settings', 'ai', 'models', 'chat', 'image', 'embed', 'embedding'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -649,6 +693,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.ai_features',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai', 'features'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -664,6 +709,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.ai_general',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai', 'general'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -679,6 +725,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.ai_providers',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai', 'providers'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -694,6 +741,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.ai_memories',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai', 'memories'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -709,6 +757,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.ai_persona',
     icon: AiCommandIcon,
     keywords: ['settings', 'ai', 'persona'],
+    available: settingsNav('ai'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -725,6 +774,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.templates_custom',
     icon: LayoutTemplate,
     keywords: ['settings', 'templates', 'custom'],
+    available: settingsNav('templates'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -740,6 +790,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.templates_builtin',
     icon: LayoutTemplate,
     keywords: ['settings', 'templates', 'builtin'],
+    available: settingsNav('templates'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -756,6 +807,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.data_import',
     icon: Code2,
     keywords: ['settings', 'data', 'import'],
+    available: settingsNav('data'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -771,6 +823,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.data_export',
     icon: Code2,
     keywords: ['settings', 'data', 'export'],
+    available: settingsNav('data'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -786,6 +839,7 @@ const SETTINGS_SUBTAB_COMMANDS: Command[] = [
     labelKey: 'settings.data_downloads',
     icon: Code2,
     keywords: ['settings', 'data', 'downloads', 'models', 'map', 'storage', 'cache'],
+    available: settingsNav('data'),
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -813,6 +867,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.new_journal',
     icon: BookPlus,
     keywords: ['create', 'notebook', 'add'],
+    available: () => capabilities.taxonomyEdits,
     run: () => useUiStore.getState().setNewJournalModalOpen(true),
   },
   {
@@ -875,7 +930,7 @@ const ACTION_COMMANDS: Command[] = [
     keywords: ['second', 'lock', 'privacy', 'hidden', 'reveal'],
     available: () => {
       const state = useSecondLockStore.getState()
-      return state.isEnabled && !state.isSessionUnlocked
+      return capabilities.secondLock && state.isEnabled && !state.isSessionUnlocked
     },
     run: () => {
       window.dispatchEvent(new CustomEvent(SECOND_LOCK_UNLOCK_REQUEST_EVENT))
@@ -889,7 +944,7 @@ const ACTION_COMMANDS: Command[] = [
     keywords: ['second', 'lock', 'privacy', 'hide'],
     available: () => {
       const state = useSecondLockStore.getState()
-      return state.isEnabled && state.isSessionUnlocked
+      return capabilities.secondLock && state.isEnabled && state.isSessionUnlocked
     },
     run: () => {
       useSecondLockStore.getState().lockSession()
@@ -901,6 +956,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.unlock_invisible',
     icon: EyeOff,
     keywords: ['invisible', 'hidden', 'privacy', 'reveal'],
+    available: () => capabilities.secondLock,
     run: () => {
       window.dispatchEvent(new CustomEvent(INVISIBLE_UNLOCK_REQUEST_EVENT))
     },
@@ -911,7 +967,8 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.lock_invisible',
     icon: EyeOff,
     keywords: ['invisible', 'hidden', 'privacy', 'hide'],
-    available: () => useInvisibleLockStore.getState().activeVaultId != null,
+    available: () =>
+      capabilities.secondLock && useInvisibleLockStore.getState().activeVaultId != null,
     run: () => {
       useInvisibleLockStore.getState().lockSession()
     },
@@ -933,6 +990,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.export_data',
     icon: Download,
     keywords: ['export', 'backup', 'data'],
+    available: () => capabilities.importExport,
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -948,6 +1006,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.import_data',
     icon: Upload,
     keywords: ['import', 'restore', 'data'],
+    available: () => capabilities.importExport,
     run: () => {
       useTabStore.getState().updateActiveTab({
         activeView: 'settings',
@@ -984,6 +1043,9 @@ interface PillSetting {
   set: (value: string) => void | Promise<void>
   available?: () => boolean
   deepLink?: () => void
+  /** Same override as ToggleSetting.deepLinkAvailable — suppress the
+   *  fallback deep-link row when the capability itself is off. */
+  deepLinkAvailable?: () => boolean
 }
 
 interface SettingDeepLink {
@@ -992,6 +1054,7 @@ interface SettingDeepLink {
   keywords: readonly string[]
   icon: ComponentType<{ className?: string }> | LucideIcon
   run: () => void
+  available?: () => boolean
 }
 
 // Helper: sanitize option values for i18n key paths (replace dots with underscores)
@@ -1009,7 +1072,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['startup', 'launch', 'boot', 'autostart'],
     get: getStartAtLogin,
     set: (next) => void setStartAtLogin(next),
-    available: isStartAtLoginHydrated,
+    available: () => capabilities.updater && isStartAtLoginHydrated(),
   },
   // ── Editor · general ──
   {
@@ -1101,8 +1164,12 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['sync', 'cloud', 'enable', 'automatic'],
     get: () => useSyncStore.getState().status?.enabled ?? false,
     set: (next) => void useSyncStore.getState().setEnabled(next),
-    available: () => !!useSyncStore.getState().status?.provider,
+    available: () => capabilities.syncAdmin && !!useSyncStore.getState().status?.provider,
     deepLink: () => navigateToSetting('sync', { syncTab: 'schedule' }),
+    // Suppress the fallback deep-link row under !syncAdmin too — the palette
+    // shortcut is gated here; the schedule tab itself is gated in-panel by
+    // T19 (plan 2026-10-05-web-beta-polish phase 4).
+    deepLinkAvailable: () => capabilities.syncAdmin && !useSyncStore.getState().status?.provider,
   },
   {
     id: 'sync_on_save',
@@ -1113,8 +1180,9 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
       const s = useSyncStore.getState().settings
       if (s) void useSyncStore.getState().updateSettings({ ...s, onSave: next })
     },
-    available: () => !!useSyncStore.getState().status?.provider,
+    available: () => capabilities.syncAdmin && !!useSyncStore.getState().status?.provider,
     deepLink: () => navigateToSetting('sync', { syncTab: 'schedule' }),
+    deepLinkAvailable: () => capabilities.syncAdmin && !useSyncStore.getState().status?.provider,
   },
   {
     id: 'sync_on_launch',
@@ -1125,8 +1193,9 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
       const s = useSyncStore.getState().settings
       if (s) void useSyncStore.getState().updateSettings({ ...s, onLaunch: next })
     },
-    available: () => !!useSyncStore.getState().status?.provider,
+    available: () => capabilities.syncAdmin && !!useSyncStore.getState().status?.provider,
     deepLink: () => navigateToSetting('sync', { syncTab: 'schedule' }),
+    deepLinkAvailable: () => capabilities.syncAdmin && !useSyncStore.getState().status?.provider,
   },
   // ── Location · default ──
   {
@@ -1135,6 +1204,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['location', 'default', 'gps'],
     get: getDefaultLocationEnabled,
     set: (next) => void setDefaultLocationEnabledImperative(next),
+    available: () => capabilities.maps,
   },
   // ── AI · features ──
   ...(
@@ -1162,6 +1232,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
       get: () => getAiFeatureEnabled(feature),
       set: (next) => void setAiFeatureImperative(feature, next),
       available: () => {
+        if (!capabilities.ai) return false
         if (!isAiFeatureActionable(feature)) return false
         // image_generation additionally gated on genSupportsImage
         if (feature === 'image_generation') {
@@ -1176,8 +1247,9 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
       deepLink: () => navigateToSetting('ai', { aiTab: 'features' }),
       // When a provider is configured but cannot generate images, the settings UI
       // hides the row entirely — so only offer the deep-link when the feature is
-      // unreachable due to setup (not actionable), never for image-incapable providers.
-      deepLinkAvailable: () => !isAiFeatureActionable(feature),
+      // unreachable due to setup (not actionable), never for image-incapable
+      // providers, and never when AI itself is unavailable on this platform.
+      deepLinkAvailable: () => capabilities.ai && !isAiFeatureActionable(feature),
     }),
   ),
   // ── AI · nested ──
@@ -1187,7 +1259,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['ai', 'chat', 'memory', 'remember'],
     get: () => getAiFeatureEnabled('chat_memory'),
     set: (next) => void setAiFeatureImperative('chat_memory', next),
-    available: getUserMemoryEnabled,
+    available: () => capabilities.ai && getUserMemoryEnabled(),
   },
   {
     id: 'daily_chat_ai_title',
@@ -1195,6 +1267,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['ai', 'title', 'daily', 'chat', 'auto'],
     get: getDailyChatAiTitle,
     set: (next) => void setDailyChatAiTitleImperative(next),
+    available: () => capabilities.ai,
   },
   {
     id: 'show_message_meta',
@@ -1202,6 +1275,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['message', 'meta', 'model', 'info'],
     get: getShowMessageMeta,
     set: (next) => void setShowMessageMetaImperative(next),
+    available: () => capabilities.ai,
   },
   // ── AI · memories ──
   {
@@ -1210,7 +1284,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['ai', 'memory', 'master', 'user'],
     get: getUserMemoryEnabled,
     set: (next) => void setUserMemoryEnabledImperative(next),
-    available: isAiSettingsHydrated,
+    available: () => capabilities.ai && isAiSettingsHydrated(),
   },
   // ── AI · persona ──
   {
@@ -1219,8 +1293,13 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
     keywords: ['ai', 'persona', 'voice', 'style'],
     get: getPersonaEnabled,
     set: (next) => void setPersonaEnabledImperative(next),
-    available: () => isAiSettingsHydrated() && isAiFeatureActionable('go_deeper'),
+    available: () =>
+      capabilities.ai && isAiSettingsHydrated() && isAiFeatureActionable('go_deeper'),
     deepLink: () => navigateToSetting('ai', { aiTab: 'persona' }),
+    // Default fallback would show the deep-link whenever `available()` is false —
+    // without `ai` the persona tab is hidden entirely, so suppress it there too.
+    deepLinkAvailable: () =>
+      capabilities.ai && !(isAiSettingsHydrated() && isAiFeatureActionable('go_deeper')),
   },
   // ── Security · device ──
   {
@@ -1232,7 +1311,7 @@ export const TOGGLE_SETTINGS: readonly ToggleSetting[] = [
       void setSetting('second_lock_show_existence', next ? 'true' : 'false')
       useSecondLockStore.getState().setShowExistence(next)
     },
-    available: () => useSecondLockStore.getState().isEnabled,
+    available: () => capabilities.secondLock && useSecondLockStore.getState().isEnabled,
   },
 ]
 
@@ -1263,7 +1342,7 @@ export const PILL_SETTINGS: readonly PillSetting[] = [
     options: [{ value: '3' }, { value: '7' }, { value: '15' }],
     get: () => String(getVersionRetention() ?? 3),
     set: (v) => void setVersionRetentionImperative(Number(v)),
-    available: isVersionRetentionHydrated,
+    available: () => capabilities.versions && isVersionRetentionHydrated(),
   },
   // ── Editor · layout ──
   {
@@ -1326,8 +1405,9 @@ export const PILL_SETTINGS: readonly PillSetting[] = [
     options: [{ value: 'keyword' }, { value: 'meaning' }],
     get: getDefaultSearchMode,
     set: (v) => void setDefaultSearchModeImperative(v as SearchMode),
-    available: () => getAiFeatureEnabled('semantic_search'),
+    available: () => capabilities.ai && getAiFeatureEnabled('semantic_search'),
     deepLink: () => navigateToSetting('ai', { aiTab: 'features' }),
+    deepLinkAvailable: () => capabilities.ai && !getAiFeatureEnabled('semantic_search'),
   },
 ]
 
@@ -1347,6 +1427,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.sync_interval',
     keywords: ['sync', 'interval', 'frequency', 'schedule'],
     icon: Cloud,
+    available: () => capabilities.syncAdmin,
     run: () => navigateToSetting('sync', { syncTab: 'schedule' }, SETTINGS_ANCHORS.syncInterval),
   },
   {
@@ -1361,6 +1442,8 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.compression_mode',
     keywords: ['compression', 'mode', 'quality', 'media'],
     icon: Image,
+    // MediaCompressionSettings calls set_media_upload_limits — syncAdmin scope.
+    available: () => capabilities.syncAdmin,
     run: () => navigateToSetting('media', {}, SETTINGS_ANCHORS.compressionMode),
   },
   {
@@ -1368,6 +1451,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.upload_limits',
     keywords: ['upload', 'limit', 'size', 'media'],
     icon: Image,
+    available: () => capabilities.syncAdmin,
     run: () => navigateToSetting('media', {}, SETTINGS_ANCHORS.uploadLimits),
   },
   {
@@ -1375,6 +1459,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.geocoding_provider',
     keywords: ['geocoding', 'provider', 'nominatim', 'mapbox', 'maptiler', 'google'],
     icon: MapPin,
+    available: () => capabilities.maps,
     run: () =>
       navigateToSetting(
         'location',
@@ -1387,6 +1472,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.geocoding_api_key',
     keywords: ['geocoding', 'api', 'key'],
     icon: MapPin,
+    available: () => capabilities.maps,
     run: () =>
       navigateToSetting('location', { locationTab: 'geocoding' }, SETTINGS_ANCHORS.geocodingApiKey),
   },
@@ -1395,6 +1481,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.biometric',
     keywords: ['biometric', 'fingerprint', 'face', 'touch'],
     icon: Lock,
+    available: () => capabilities.biometric,
     run: () =>
       navigateToSetting('security', { securityTab: 'device_password' }, SETTINGS_ANCHORS.biometric),
   },
@@ -1403,6 +1490,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.change_password',
     keywords: ['change', 'password', 'security'],
     icon: Lock,
+    available: () => capabilities.vaultAdmin,
     run: () =>
       navigateToSetting(
         'security',
@@ -1415,6 +1503,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.second_lock_auto_lock',
     keywords: ['second', 'lock', 'auto', 'timeout'],
     icon: Lock,
+    available: () => capabilities.secondLock,
     run: () =>
       navigateToSetting(
         'security',
@@ -1427,6 +1516,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.invisible_lock_auto_lock',
     keywords: ['invisible', 'lock', 'auto', 'timeout'],
     icon: Lock,
+    available: () => capabilities.secondLock,
     run: () =>
       navigateToSetting(
         'security',
@@ -1439,6 +1529,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_response_language',
     keywords: ['ai', 'response', 'language'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () => navigateToSetting('ai', { aiTab: 'general' }, SETTINGS_ANCHORS.responseLanguage),
   },
   {
@@ -1446,6 +1537,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_emotion_language',
     keywords: ['ai', 'emotion', 'language'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () => navigateToSetting('ai', { aiTab: 'features' }, SETTINGS_ANCHORS.emotionLanguage),
   },
   {
@@ -1453,6 +1545,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_daily_chat_persona',
     keywords: ['ai', 'daily', 'chat', 'persona', 'style'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () => navigateToSetting('ai', { aiTab: 'features' }, SETTINGS_ANCHORS.dailyChatPersona),
   },
   {
@@ -1460,6 +1553,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_memory_include_protected',
     keywords: ['ai', 'memory', 'protected', 'locked'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () =>
       navigateToSetting('ai', { aiTab: 'memories' }, SETTINGS_ANCHORS.memoryIncludeProtected),
   },
@@ -1468,6 +1562,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_memory_model_gen',
     keywords: ['ai', 'memory', 'model', 'generation'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () => navigateToSetting('ai', { aiTab: 'memories' }, SETTINGS_ANCHORS.memoryModelGen),
   },
   {
@@ -1475,6 +1570,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.ai_memory_model_embed',
     keywords: ['ai', 'memory', 'model', 'embedding'],
     icon: AiCommandIcon,
+    available: () => capabilities.ai,
     run: () => navigateToSetting('ai', { aiTab: 'memories' }, SETTINGS_ANCHORS.memoryModelEmbed),
   },
   {
@@ -1503,6 +1599,7 @@ export const SETTING_DEEPLINKS: readonly SettingDeepLink[] = [
     labelKey: 'settings.saved_locations',
     keywords: ['saved', 'locations', 'places', 'favorite'],
     icon: MapPin,
+    available: () => capabilities.maps,
     run: () => navigateToSetting('location', { locationTab: 'saved' }),
   },
 ]
@@ -1568,7 +1665,7 @@ function generatePillCommands(): Command[] {
         labelKey: `settings_value.${pill.id}.go`,
         icon: pill.icon,
         keywords: [...pill.keywords],
-        available: () => pill.available?.() === false,
+        available: pill.deepLinkAvailable ?? (() => pill.available?.() === false),
         run: dl,
       })
     }
@@ -1596,6 +1693,7 @@ export function getCommands(): Command[] {
         labelKey: dl.labelKey,
         icon: dl.icon,
         keywords: [...dl.keywords],
+        available: dl.available,
         run: dl.run,
       }),
     ),
