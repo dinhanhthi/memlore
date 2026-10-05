@@ -16,8 +16,10 @@
   --color-paper: oklch(0.145 0.004 55);
   --color-panel: oklch(0.185 0.004 55);
   --color-raised: oklch(0.205 0.004 55);
-  --color-rule: oklch(1 0 0 / 0.08);
-  --color-rule-strong: oklch(1 0 0 / 0.16);
+  --color-rule: oklch(1 0 0 / 0.045);
+  --color-rule-strong: oklch(1 0 0 / 0.1);
+  /* Hairlines inside dense illustration grids, clearer than the page frame. */
+  --color-rule-grid: oklch(1 0 0 / 0.16);
   --color-ink: oklch(0.985 0.002 55);
   --color-muted: oklch(0.708 0.01 55);
   /* Reading text on docs pages: brighter than muted, softer than ink. */
