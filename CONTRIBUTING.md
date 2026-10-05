@@ -82,14 +82,15 @@ One-time setup:
 
    Without it, sign-in fails with `500` on `/api/oauth/start`.
 
-Then, in two terminals:
+Then one command runs the OAuth Worker (:8787) and the web app (:5176) together, each with a coloured prefix. Ctrl+C stops both:
 
 ```bash
-pnpm web-auth:dev                      # OAuth Worker on :8787 (add --var WEB_WRITES_ENABLED:1 for writes)
-pnpm web:build && pnpm web:preview     # production bundle + production headers on :5176
+pnpm web:local          # hot reload, for coding (no CSP headers)
+pnpm web:local --prod   # production bundle + the CSP from web/static/_headers, for testing
+pnpm web:local --var WEB_WRITES_ENABLED:1   # extra args go to the Worker: here, writes on
 ```
 
-Open `http://localhost:5176` in Chrome or Firefox (not `127.0.0.1`). This is the production setup: the built bundle, the CSP from `web/static/_headers`, and the Worker on the same origin under `/api`. For hot reload while coding, run `pnpm web:dev` instead of the second command (no CSP headers, so test with the preview before shipping).
+Open `http://localhost:5176` in Chrome or Firefox (not `127.0.0.1`). The web app calls the Worker under `/api` on the same origin, as in production, so it never works without it. Test with `--prod` before shipping. To run the two halves in separate terminals instead: `pnpm web-auth:dev` and `pnpm web:dev` (or `pnpm web:build && pnpm web:preview`). `pnpm web:local` and `pnpm web-auth:dev` stop this repo's earlier local runs on those ports; another program there is reported, not killed.
 
 Signing in with your real Google account opens your real vault; test writes with a throwaway account and vault.
 
