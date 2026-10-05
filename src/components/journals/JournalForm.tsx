@@ -19,6 +19,7 @@ import { Button } from '../common/Button'
 import { Toggle } from '../settings/Toggle'
 import { cn } from '../../lib/cn'
 import { useTags } from '../../hooks/useTags'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { listJournalAutoTags } from '../../lib/tauri'
 import { canCreateTagName, filterTagSuggestions, sortTagsByName } from '../../lib/tagPicker'
 import { randomTagColor, isHex6 } from '../../lib/tagColors'
@@ -46,6 +47,7 @@ function dotColor(tag: Tag): string {
 export function JournalForm({ journal, onSave, onCancel, externalError }: JournalFormProps) {
   const { t } = useTranslation('settings')
   const { tags, createTag, refresh: refreshTags } = useTags()
+  const caps = useCapabilities()
 
   const [name, setName] = useState(journal?.name ?? '')
   const [color, setColor] = useState(() =>
@@ -155,7 +157,14 @@ export function JournalForm({ journal, onSave, onCancel, externalError }: Journa
     () => filterTagSuggestions(pickerTags, { query: tagQuery, excludeIds: selectedAutoTagIds }),
     [pickerTags, selectedAutoTagIds, tagQuery],
   )
-  const canCreateTag = canCreateTagName(pickerTags, tagQuery)
+  // create_tag is unsupported on web — picking existing tags stays.
+  const canCreateTag = canCreateTagName(pickerTags, tagQuery) && caps.taxonomyEdits
+
+  // Defensive: create_journal is unsupported on web, so never render the
+  // modal in create mode there. Callers are the palette's action.new_journal
+  // (taxonomyEdits-gated) and JournalsSettings' "New journal" button (gated
+  // in phase 4/T20); this guard covers any path the gates miss.
+  if (journal === null && !caps.taxonomyEdits) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

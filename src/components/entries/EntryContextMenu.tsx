@@ -47,6 +47,7 @@ import { useAiDailyChatEnabled } from '../../hooks/useAiDailyChatEnabled'
 import { useAiImageGenerationEnabled } from '../../hooks/useAiImageGenerationEnabled'
 import { useSecondLock } from '../../hooks/useSecondLock'
 import { useInvisibleLock } from '../../hooks/useInvisibleLock'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEditorMetricsStore } from '../../stores/editorMetricsStore'
 import { useJournalStore } from '../../stores/journalStore'
 import { useTabStore } from '../../stores/tabStore'
@@ -148,6 +149,7 @@ export function EntryContextMenu({
   const imageGenEnabled = useAiImageGenerationEnabled() === 'enabled'
   const secondLock = useSecondLock(false)
   const invisibleLock = useInvisibleLock(false)
+  const caps = useCapabilities()
   const queryClient = useQueryClient()
   const { start: startTitleStream } = useTitleStream()
   const setEntryDateUserEdited = useEditorMetricsStore((s) => s.setEntryDateUserEdited)
@@ -576,15 +578,17 @@ export function EntryContextMenu({
               onClick={handleOpenInNewTab}
               onMouseEnter={closeSubmenu}
             />
-            <MenuItem
-              buttonRef={lockItemRef}
-              icon={<Lock className="size-3.5" />}
-              label={t('entry_context.lock', { defaultValue: 'Lock' })}
-              active={submenu === 'lock'}
-              onClick={() => openSubmenu('lock')}
-              onMouseEnter={() => openSubmenu('lock')}
-              hasSubmenu
-            />
+            {caps.secondLock && (
+              <MenuItem
+                buttonRef={lockItemRef}
+                icon={<Lock className="size-3.5" />}
+                label={t('entry_context.lock', { defaultValue: 'Lock' })}
+                active={submenu === 'lock'}
+                onClick={() => openSubmenu('lock')}
+                onMouseEnter={() => openSubmenu('lock')}
+                hasSubmenu
+              />
+            )}
             <div className="bg-border-default my-1 h-px" />
             <MenuItem
               icon={<Calendar className="size-3.5" />}
@@ -608,12 +612,14 @@ export function EntryContextMenu({
                 hasSubmenu
               />
             )}
-            <MenuItem
-              icon={<History className="size-3.5" />}
-              label={t('entry_context.version_history', { defaultValue: 'Version history' })}
-              onClick={handleVersionHistory}
-              onMouseEnter={closeSubmenu}
-            />
+            {caps.versions && (
+              <MenuItem
+                icon={<History className="size-3.5" />}
+                label={t('entry_context.version_history', { defaultValue: 'Version history' })}
+                onClick={handleVersionHistory}
+                onMouseEnter={closeSubmenu}
+              />
+            )}
             <MenuItem
               icon={<Tag className="size-3.5" />}
               label={t('entry_context.add_tags', { defaultValue: 'Add tags' })}
@@ -631,15 +637,17 @@ export function EntryContextMenu({
               onMouseEnter={() => openSubmenu('emotion')}
               hasSubmenu
             />
-            <MenuItem
-              buttonRef={locationItemRef}
-              icon={<MapPin className="size-3.5" />}
-              label={t('entry_context.set_location', { defaultValue: 'Set location' })}
-              active={submenu === 'location'}
-              onClick={() => openSubmenu('location')}
-              onMouseEnter={() => openSubmenu('location')}
-              hasSubmenu
-            />
+            {caps.maps && (
+              <MenuItem
+                buttonRef={locationItemRef}
+                icon={<MapPin className="size-3.5" />}
+                label={t('entry_context.set_location', { defaultValue: 'Set location' })}
+                active={submenu === 'location'}
+                onClick={() => openSubmenu('location')}
+                onMouseEnter={() => openSubmenu('location')}
+                hasSubmenu
+              />
+            )}
             {targetJournals.length > 0 && (
               <MenuItem
                 buttonRef={journalItemRef}
@@ -653,7 +661,7 @@ export function EntryContextMenu({
                 hasSubmenu
               />
             )}
-            {onDelete && (
+            {onDelete && caps.deleteEntries && (
               <>
                 <div className="bg-border-default my-1 h-px" />
                 <MenuItem

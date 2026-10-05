@@ -502,6 +502,9 @@ export class Vault {
       const baseTs = Number(f.base)
       if (base.metadata.updated_at === f.base_updated_at || base.metadata.entry_date === baseTs) {
         m.entry_date = valTs
+        // Mirrors the desktop importer (`outbox_import.rs`): applying an entry_date
+        // change marks `entry_date_user_edited` — the intent carries no flag of its own.
+        m.entry_date_user_edited = true
       }
     }
 
@@ -620,6 +623,10 @@ export class Vault {
       vault_id: null,
       tag_ids: tagIds,
       media: mediaList,
+      // Created-on-web intents always carry entry_date; the importer marks the
+      // flag for any created entry that has one (`outbox_import.rs`).
+      entry_date_user_edited:
+        intent.fields.entry_date !== null && intent.fields.entry_date !== undefined,
     }
 
     return {

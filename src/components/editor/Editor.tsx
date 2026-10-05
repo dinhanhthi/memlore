@@ -32,6 +32,7 @@ import { BODY_OVERLAY_HOST_ID } from '../../lib/overlayHost'
 import { FileViewerModal } from '../media/FileViewerModal'
 import { downloadAttachment } from '../../lib/attachmentDownload'
 import { toast } from '../../lib/toast'
+import { isWeb } from '../../lib/platform'
 import {
   createInlineMediaDeletionTracker,
   type InlineMediaDeletionTracker,
@@ -52,6 +53,7 @@ import { MentionSuggestion } from './extensions/MentionSuggestion'
 import { EmojiShortcodes } from './extensions/EmojiShortcodes'
 import { EditorDropIndicator } from './extensions/EditorDropIndicator'
 
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEditorMathEnabled } from '../../hooks/useEditorMathEnabled'
 import { useEditorEmojiShortcodesEnabled } from '../../hooks/useEditorEmojiShortcodesEnabled'
 import { useEditorFixedTitleEnabled } from '../../hooks/useEditorFixedTitleEnabled'
@@ -239,6 +241,7 @@ export function Editor({
   const justifyEnabled = useEditorJustifyEnabled()
   const rightToLeftEnabled = useEditorRightToLeftEnabled()
   const typography = useEditorTypography()
+  const caps = useCapabilities()
   const distractionMode = useEditorDistractionStore((s) => s.distractionMode)
   const [mathEdit, setMathEdit] = useState<MathEditRequest | null>(null)
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
@@ -509,9 +512,14 @@ export function Editor({
   // the caret while the mode-picker popover is open.
   const pasteSelectionRef = useRef<number | null>(null)
 
-  const handlePasteModeSelect = async (mode: 'inline' | 'attached') => {
+  // `images` defaults to pendingPasteImages for the popover path; the web
+  // paste path passes the just-saved list directly (state is not yet set).
+  const handlePasteModeSelect = async (
+    mode: 'inline' | 'attached',
+    images: { mediaId: string; localPath: string }[] = pendingPasteImages,
+  ) => {
     if (mode === 'inline') {
-      for (const { mediaId, localPath } of pendingPasteImages) {
+      for (const { mediaId, localPath } of images) {
         if (editor) {
           // Restore the original paste position before each insertion so
           // burst-paste images land sequentially from the caret, not at
@@ -533,7 +541,7 @@ export function Editor({
       }
     } else {
       await Promise.allSettled(
-        pendingPasteImages.map(({ mediaId }) => updateMediaInsertionMode(mediaId, 'attached')),
+        images.map(({ mediaId }) => updateMediaInsertionMode(mediaId, 'attached')),
       )
       attachments.refetch()
       refreshAllMedia()
@@ -546,8 +554,13 @@ export function Editor({
     // Any image that just landed (inline or attached) may have set
     // `cover_media_id` on the server — refetch the entry so the
     // entry-list card cover thumbnail catches up.
-    if (pendingPasteImages.length > 0) onCoverMaybeChanged?.()
+    if (images.length > 0) onCoverMaybeChanged?.()
   }
+
+  // Same stability trick as the other refs above: the paste handler (created
+  // once inside useEditor) always calls the latest version.
+  const handlePasteModeSelectRef = useRef(handlePasteModeSelect)
+  handlePasteModeSelectRef.current = handlePasteModeSelect
 
   const handlePasteDismiss = async () => {
     // Use allSettled so a single failing deleteMedia (e.g. already-deleted
@@ -677,9 +690,16 @@ export function Editor({
             void triggerCheckRef.current()
             void triggerLocationCheckRef.current()
 
-            // Open the mode-picker popover anchored to the caret.
-            setPastePopoverAnchor(caretRect)
-            setPendingPasteImages(saved)
+            // TODO(later): see docs/LATER.md — the web outbox intent cannot
+            // record a media insertion mode, so on web there is no attach
+            // choice; pasted images go straight inline.
+            if (isWeb) {
+              void handlePasteModeSelectRef.current('inline', saved)
+            } else {
+              // Open the mode-picker popover anchored to the caret.
+              setPastePopoverAnchor(caretRect)
+              setPendingPasteImages(saved)
+            }
           })()
 
           // Prevent TipTap from handling the paste as an inline base64 image
@@ -1076,7 +1096,7 @@ export function Editor({
             }}
           />
         )}
-        {editable && editor && entry && (
+        {editable && editor && entry && caps.maps && (
           <EntryLocationRow entry={entry} onLocationSelect={onLocationSelect ?? (() => {})} />
         )}
         {playingAudioId && (

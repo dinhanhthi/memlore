@@ -425,6 +425,7 @@ describe('write commands', () => {
       ['update_entry_emotion', { id: id(1), emotion: 'good' }],
       ['toggle_favorite', { id: id(1) }],
       ['move_entry_to_journal', { id: id(1), journalId: 'j2' }],
+      ['mark_entry_date_user_edited', { id: id(1) }],
       ['add_tag_to_entry', { entryId: id(1), tagId: 't1' }],
       ['remove_tag_from_entry', { entryId: id(1), tagId: 't1' }],
       ['pick_image', { entryId: id(1) }],
@@ -439,7 +440,10 @@ describe('write commands', () => {
 
   it('get_media_upload_limits returns default caps even when write flag is disabled', async () => {
     setWriteFlagForTest(false)
-    const limits = await call<{ photoBytes: number; videoBytes: number }>('get_media_upload_limits', {})
+    const limits = await call<{ photoBytes: number; videoBytes: number }>(
+      'get_media_upload_limits',
+      {},
+    )
     expect(limits.photoBytes).toBe(5 * 1024 * 1024)
     expect(limits.videoBytes).toBe(100 * 1024 * 1024)
   })
@@ -531,7 +535,9 @@ describe('write commands', () => {
     installFakeSession([], { taxonomy: TAXONOMY })
 
     await expect(call('create_entry', { journalId: '' })).rejects.toThrow('journalId is required')
-    await expect(call('create_entry', { journalId: 'unknown_j' })).rejects.toThrow('Journal not found')
+    await expect(call('create_entry', { journalId: 'unknown_j' })).rejects.toThrow(
+      'Journal not found',
+    )
   })
 
   it('save_entry_content updates Yjs doc, contentText, and draft', async () => {
@@ -598,13 +604,18 @@ describe('write commands', () => {
     expect(withNull.emotion).toBe(null)
     expect(vault.getEntry(id(1)).metadata.emotion).toBe(null)
 
-    await expect(call('update_entry_emotion', { id: id(1), emotion: 'ecstatic' })).rejects.toThrow('invalid emotion')
+    await expect(call('update_entry_emotion', { id: id(1), emotion: 'ecstatic' })).rejects.toThrow(
+      'invalid emotion',
+    )
   })
 
   it('toggle_favorite flips is_favorite and returns new boolean', async () => {
     setWriteFlagForTest(true)
     setKeyRing({ lock: () => undefined } as unknown as KeyRing)
-    const { vault } = installFakeSession(many(1, () => ({ favorite: false })), { taxonomy: TAXONOMY })
+    const { vault } = installFakeSession(
+      many(1, () => ({ favorite: false })),
+      { taxonomy: TAXONOMY },
+    )
 
     const first = await call<boolean>('toggle_favorite', { id: id(1) })
     expect(first).toBe(true)
@@ -618,18 +629,76 @@ describe('write commands', () => {
   it('move_entry_to_journal moves entry to visible journal, rejecting unknown journals', async () => {
     setWriteFlagForTest(true)
     setKeyRing({ lock: () => undefined } as unknown as KeyRing)
-    const { vault } = installFakeSession(many(1, () => ({ journal: 'j1' })), { taxonomy: TAXONOMY })
+    const { vault } = installFakeSession(
+      many(1, () => ({ journal: 'j1' })),
+      { taxonomy: TAXONOMY },
+    )
 
     await call('move_entry_to_journal', { id: id(1), journalId: 'j2' })
     expect(vault.getEntry(id(1)).metadata.journal_id).toBe('j2')
 
-    await expect(call('move_entry_to_journal', { id: id(1), journalId: 'bad_j' })).rejects.toThrow('Journal not found')
+    await expect(call('move_entry_to_journal', { id: id(1), journalId: 'bad_j' })).rejects.toThrow(
+      'Journal not found',
+    )
+  })
+
+  it('mark_entry_date_user_edited records the flag on the intent and reports it in the overlay', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted, db } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    await call('mark_entry_date_user_edited', { id: id(1) })
+
+    // The intent carries no flag field of its own: `entry_date_user_edited`
+    // rides on an entry_date change — the desktop importer sets the flag when
+    // it applies one, and the overlay mirrors that. A bare mark confirms the
+    // current date (value === base, so the importer reports it "reflected").
+    const intent = vault.getOutboxIntent(id(1))
+    expect(intent?.fields.entry_date?.value).toBe('100')
+    expect(intent?.fields.entry_date?.base).toBe('100')
+    expect(vault.getEntry(id(1)).metadata.entry_date_user_edited).toBe(true)
+    expect((await call<Entry>('get_entry', { id: id(1) }))?.entry_date_user_edited).toBe(true)
+    expect(await db.drafts.get(id(1))).toBeDefined()
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('mark_entry_date_user_edited after a date edit leaves the recorded change intact', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault, emitted } = installFakeSession(many(1), { taxonomy: TAXONOMY })
+
+    await call('update_entry_date', { id: id(1), entryDate: 1711111111 })
+    await call('mark_entry_date_user_edited', { id: id(1) })
+
+    // The user's date change keeps its original base and change_seq —
+    // overwriting it would turn a conflict-detectable edit into a no-op.
+    const intent = vault.getOutboxIntent(id(1))
+    expect(intent?.fields.entry_date?.value).toBe('1711111111')
+    expect(intent?.fields.entry_date?.base).toBe('100')
+    expect(vault.getEntry(id(1)).metadata.entry_date_user_edited).toBe(true)
+    expect(emitted).toContain('memlore:entries-changed')
+  })
+
+  it('mark_entry_date_user_edited rejects an entry the vault cannot serve', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    installFakeSession([...many(1), { id: 'l', updatedAt: 1, locked: true }], {
+      taxonomy: TAXONOMY,
+    })
+
+    await expect(call('mark_entry_date_user_edited', { id: 'nope' })).rejects.toThrow(
+      MSG_UNAVAILABLE,
+    )
+    await expect(call('mark_entry_date_user_edited', { id: 'l' })).rejects.toThrow(MSG_UNAVAILABLE)
   })
 
   it('add_tag_to_entry and remove_tag_from_entry modify existing tags only', async () => {
     setWriteFlagForTest(true)
     setKeyRing({ lock: () => undefined } as unknown as KeyRing)
-    const { vault } = installFakeSession(many(1, () => ({ tags: [] })), { taxonomy: TAXONOMY })
+    const { vault } = installFakeSession(
+      many(1, () => ({ tags: [] })),
+      { taxonomy: TAXONOMY },
+    )
 
     await call('add_tag_to_entry', { entryId: id(1), tagId: 't1' })
     expect(vault.getEntry(id(1)).metadata.tag_ids).toContain('t1')
@@ -637,7 +706,9 @@ describe('write commands', () => {
     await call('remove_tag_from_entry', { entryId: id(1), tagId: 't1' })
     expect(vault.getEntry(id(1)).metadata.tag_ids).not.toContain('t1')
 
-    await expect(call('add_tag_to_entry', { entryId: id(1), tagId: 'nonexistent' })).rejects.toThrow('Tag not found')
+    await expect(
+      call('add_tag_to_entry', { entryId: id(1), tagId: 'nonexistent' }),
+    ).rejects.toThrow('Tag not found')
   })
 
   it('pick_image returns null when user cancels file picker', async () => {

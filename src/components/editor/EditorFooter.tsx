@@ -56,6 +56,7 @@ import { useVideoInsertPicker } from '../../hooks/useVideoInsertPicker'
 import type { InsertVideoActionId } from '../../hooks/useVideoInsertPicker'
 import { InsertVideoPopover } from './InsertVideoPopover'
 import { useFilePicker } from '../../hooks/useFilePicker'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useTemplates } from '../../hooks/useTemplates'
 import { TemplatePicker } from '../templates/TemplatePicker'
 import { Star } from '../common/primitives'
@@ -212,6 +213,7 @@ export function EditorFooter({
     attachFromPhotoLibrary: attachVideoFromPhotoLibrary,
   } = useVideoInsertPicker()
   const { attachFiles } = useFilePicker()
+  const caps = useCapabilities()
   const { templates } = useTemplates()
   const [showActions, setShowActions] = useState(false)
   const [showAiMenu, setShowAiMenu] = useState(false)
@@ -802,22 +804,26 @@ export function EditorFooter({
                   onMouseEnter={() => openSubmenu('video')}
                   onClick={() => openSubmenu('video')}
                 />
-                <ActionRow
-                  icon={Mic}
-                  label={t('more.voice_memo')}
-                  onClick={() => {
-                    setShowRecorder(true)
-                    setShowActions(false)
-                    setSubmenu(null)
-                  }}
-                  onMouseEnter={closeSubmenu}
-                />
-                <ActionRow
-                  icon={Paperclip}
-                  label={t('more.attach_files')}
-                  onClick={() => void handleAttachFiles()}
-                  onMouseEnter={closeSubmenu}
-                />
+                {caps.audioRecording && (
+                  <ActionRow
+                    icon={Mic}
+                    label={t('more.voice_memo')}
+                    onClick={() => {
+                      setShowRecorder(true)
+                      setShowActions(false)
+                      setSubmenu(null)
+                    }}
+                    onMouseEnter={closeSubmenu}
+                  />
+                )}
+                {caps.fileAttachments && (
+                  <ActionRow
+                    icon={Paperclip}
+                    label={t('more.attach_files')}
+                    onClick={() => void handleAttachFiles()}
+                    onMouseEnter={closeSubmenu}
+                  />
+                )}
 
                 {/* Format group */}
                 <div className="text-fg-muted text-2xs px-2.5 pt-2.5 pb-1 font-bold tracking-[0.6px] uppercase">
@@ -901,6 +907,7 @@ export function EditorFooter({
             }}
             onSelect={(action) => void handleInsertImageAction(action)}
             photoLibraryAvailable={photoLibraryAvailable}
+            attachAvailable={caps.fileAttachments}
           />
 
           <InsertVideoPopover
@@ -912,6 +919,7 @@ export function EditorFooter({
             }}
             onSelect={(action) => void handleInsertVideoAction(action)}
             photoLibraryAvailable={videoLibraryAvailable}
+            attachAvailable={caps.fileAttachments}
           />
 
           {isInsertingPhoto && (

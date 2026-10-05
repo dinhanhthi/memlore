@@ -24,6 +24,9 @@ interface InsertVideoPopoverProps {
   onSelect: (action: InsertVideoActionId) => void
   /** Whether to render the macOS-only "From Photo Library" options. */
   photoLibraryAvailable: boolean
+  /** Whether to render the "attach" (non-inline) options — false on web,
+   *  where attached insertion mode is unsupported. */
+  attachAvailable: boolean
 }
 
 interface PopoverRowProps {
@@ -65,6 +68,7 @@ export function InsertVideoPopover({
   onOpenChange,
   onSelect,
   photoLibraryAvailable,
+  attachAvailable,
 }: InsertVideoPopoverProps) {
   const { t } = useTranslation('editor')
   const { refs, floatingStyles, context } = useFloating({
@@ -99,11 +103,13 @@ export function InsertVideoPopover({
           label={t('more.inline_video')}
           onClick={() => onSelect('inline-rfd')}
         />
-        <PopoverRow
-          icon={<Paperclip className="size-4" />}
-          label={t('more.attach_video')}
-          onClick={() => onSelect('attached-rfd')}
-        />
+        {attachAvailable && (
+          <PopoverRow
+            icon={<Paperclip className="size-4" />}
+            label={t('more.attach_video')}
+            onClick={() => onSelect('attached-rfd')}
+          />
+        )}
         {photoLibraryAvailable && (
           <>
             <PopoverRow
@@ -111,11 +117,13 @@ export function InsertVideoPopover({
               label={t('more.photo_library_video_inline')}
               onClick={() => onSelect('photo-library-inline')}
             />
-            <PopoverRow
-              icon={<Images className="size-4" />}
-              label={t('more.photo_library_video_attached')}
-              onClick={() => onSelect('photo-library-attached')}
-            />
+            {attachAvailable && (
+              <PopoverRow
+                icon={<Images className="size-4" />}
+                label={t('more.photo_library_video_attached')}
+                onClick={() => onSelect('photo-library-attached')}
+              />
+            )}
           </>
         )}
       </div>
