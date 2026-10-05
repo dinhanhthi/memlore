@@ -5,6 +5,7 @@
   <p>
     <a href="https://memlore.app">Website</a> ·
     <a href="https://dl.memlore.app/mac">Download for Mac</a> ·
+    <a href="https://web.memlore.app">Web version</a> ·
     <a href="https://memlore.app/#demo">Live demo</a> ·
     <a href="https://youtu.be/Mv3LZ_P5lwg">Intro Video</a>
   </p>
