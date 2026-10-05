@@ -102,6 +102,7 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   second_lock_status: false,
   // Needs the whole history, which the web never loads at once (the read commands are in commands/).
   get_streak: { current_streak: 0, longest_streak: 0, last_entry_date: null },
+  recalculate_streak: { current_streak: 0, longest_streak: 0, last_entry_date: null },
   // Media.
   list_media_for_entry: [],
   list_all_media_paged: EMPTY_PAGE,
@@ -407,7 +408,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'pick_images_from_library',
   'pick_videos_from_library',
   'push_entry',
-  'recalculate_streak',
   'set_media_upload_limits',
   'set_sync_enabled',
   'set_sync_settings',

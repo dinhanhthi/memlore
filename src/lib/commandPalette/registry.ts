@@ -39,6 +39,7 @@ import { useSecondLockStore } from '../../stores/secondLockStore'
 import { useInvisibleLockStore } from '../../stores/invisibleLockStore'
 import { AiIcon } from '../../components/common/AiIcon'
 import { canLock, lockApp } from '../lock'
+import { capabilities } from '../platform'
 import { triggerNewEntry } from '../newEntry'
 import {
   coerceDesignSystem,
@@ -136,6 +137,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.dashboard',
     icon: LayoutDashboard,
     keywords: ['home', 'overview', 'cards'],
+    available: () => capabilities.dashboard,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'dashboard', selectedEntryId: null }),
   },
@@ -198,6 +200,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.stats',
     icon: BarChart3,
     keywords: ['analytics', 'insights', 'charts'],
+    available: () => capabilities.stats,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'stats', selectedEntryId: null }),
   },

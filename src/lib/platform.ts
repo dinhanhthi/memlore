@@ -35,6 +35,7 @@ export interface Capabilities {
   icloud: boolean
   ai: boolean
   dashboard: boolean
+  stats: boolean
   maps: boolean
   chat: boolean
   reminders: boolean
@@ -54,6 +55,7 @@ export const capabilities: Capabilities = {
   icloud: !isWeb,
   ai: !isWeb,
   dashboard: !isWeb,
+  stats: !isWeb,
   maps: !isWeb,
   chat: !isWeb,
   reminders: !isWeb,

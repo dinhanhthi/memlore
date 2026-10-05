@@ -64,7 +64,10 @@ export function Sidebar() {
   // Splice AI nav items before Settings when their toggles are on.
   // `null` (initial probe pending) suppresses the item — avoids a paint flash.
   const beforeSettings = NAV_ITEMS.slice(0, -1).filter(
-    (item) => (item.view !== 'dashboard' || caps.dashboard) && (item.view !== 'map' || caps.maps),
+    (item) =>
+      (item.view !== 'dashboard' || caps.dashboard) &&
+      (item.view !== 'stats' || caps.stats) &&
+      (item.view !== 'map' || caps.maps),
   )
   const settingsItem = NAV_ITEMS[NAV_ITEMS.length - 1]
   const aiItems: NavItem[] = []

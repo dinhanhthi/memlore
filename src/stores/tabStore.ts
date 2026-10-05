@@ -17,6 +17,7 @@ import { coerceDataTab } from './uiStore'
 import type { PaginatedViewKey } from '../types/pagination'
 import { patchAffectsNav, snapshotFromTab, useTabHistoryStore } from './tabHistoryStore'
 import { randomId } from '../lib/randomId'
+import { capabilities } from '../lib/platform'
 
 export interface Tab {
   id: string
@@ -107,11 +108,17 @@ interface TabState {
   togglePinTab: (id: string) => void
 }
 
+// Dashboard and Statistics are off on the web (docs/LATER.md), so tabs open on Entries there.
+const HOME_VIEW: ActiveView = capabilities.dashboard ? 'dashboard' : 'entries'
+
+const isUnavailableView = (view: ActiveView): boolean =>
+  (view === 'dashboard' && !capabilities.dashboard) || (view === 'stats' && !capabilities.stats)
+
 export function makeDefaultTab(): Tab {
   return {
     id: randomId(),
     journalId: null,
-    activeView: 'dashboard',
+    activeView: HOME_VIEW,
     selectedEntryId: null,
     selectedCalendarDate: null,
     selectedTagId: null,
@@ -173,7 +180,7 @@ export const useTabStore = create<TabState>()(
         // override the id — each tab must be uniquely identifiable).
         const tab: Tab = {
           journalId: activeTab?.journalId ?? null,
-          activeView: 'dashboard',
+          activeView: HOME_VIEW,
           selectedEntryId: null,
           selectedCalendarDate: null,
           selectedTagId: null,
@@ -479,16 +486,19 @@ export const useTabStore = create<TabState>()(
 /** One-shot per process. Wired from App.tsx in Phase 4.6. */
 let launchViewApplied = false
 
-/** Flip the active tab to dashboard once per launch. Uses raw `setState`
- *  (not `updateActiveTab`) so tab history, selection, pin, and order stay put. */
+/** Flip the active tab to the home view once per launch, and move persisted tabs off views this
+ *  build lacks. Uses raw `setState` (not `updateActiveTab`) so tab history, selection, pin, and
+ *  order stay put. */
 export function applyLaunchView(): void {
   if (launchViewApplied) return
   launchViewApplied = true
   const { tabs, activeTabId } = useTabStore.getState()
-  const active = tabs.find((t) => t.id === activeTabId)
-  if (!active || active.activeView === 'dashboard') return
+  if (!tabs.some((t) => t.id === activeTabId)) return
+  const needsHome = (t: Tab) =>
+    (t.id === activeTabId || isUnavailableView(t.activeView)) && t.activeView !== HOME_VIEW
+  if (!tabs.some(needsHome)) return
   useTabStore.setState({
-    tabs: tabs.map((t) => (t.id === activeTabId ? { ...t, activeView: 'dashboard' } : t)),
+    tabs: tabs.map((t) => (needsHome(t) ? { ...t, activeView: HOME_VIEW } : t)),
   })
 }
 

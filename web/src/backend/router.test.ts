@@ -118,6 +118,12 @@ describe('route', () => {
     await expect(route('get_sync_status')).resolves.toMatchObject({ enabled: false })
   })
 
+  it('answers recalculate_streak with the empty streak, like get_streak', async () => {
+    const empty = { current_streak: 0, longest_streak: 0, last_entry_date: null }
+    await expect(route('recalculate_streak')).resolves.toEqual(empty)
+    await expect(route('get_streak')).resolves.toEqual(empty)
+  })
+
   it('serves the read commands from the handler table, which reject while locked', async () => {
     for (const cmd of ['list_journals', 'list_all_entries_paged', 'get_entry', 'search_entries']) {
       expect(implemented.has(cmd)).toBe(true)
