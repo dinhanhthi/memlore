@@ -354,6 +354,9 @@ export class Puller {
   }
 
   async #refresh(): Promise<PullResult> {
+    // Folder ids are reused between reads, never across refreshes: the authority check below
+    // must see a deleted or recreated `devices` folder, not a cached id.
+    this.#reader.clearFolderCache()
     const core = await this.#getCore()
     const versions = readVersions(core)
     this.#assertUnlocked()

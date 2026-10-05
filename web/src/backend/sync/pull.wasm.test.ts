@@ -295,6 +295,23 @@ describe('warmStart', () => {
 })
 
 describe('refresh', () => {
+  it('starts every run with a fresh folder cache, so the slot check never sees stale ids', async () => {
+    const env = await setup()
+    const real = env.reader.clearFolderCache.bind(env.reader)
+    const requestsAtClear: number[] = []
+    const clear = vi.spyOn(env.reader, 'clearFolderCache').mockImplementation(() => {
+      requestsAtClear.push(env.drive.requests.length)
+      real()
+    })
+    const before = env.drive.requests.length
+    await env.puller.refresh()
+    const afterFirst = env.drive.requests.length
+    await env.puller.refresh()
+    expect(clear).toHaveBeenCalledTimes(2)
+    // Each clear runs before that refresh's authority check issues its first request.
+    expect(requestsAtClear).toEqual([before, afterFirst])
+  })
+
   it('caches manifests, acks, journals, tags and templates; never settings or media', async () => {
     const env = await setup()
     const folder = env.drive.find(['Memlore', 'generations', 'g-0', env.desktop])
