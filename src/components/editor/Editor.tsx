@@ -721,6 +721,12 @@ export function Editor({
     [doc, mathExtensions, emojiShortcodesEnabled],
   )
 
+  // `editable` is not a useEditor dep, so a later flip (the web write flag
+  // arrives after unlock) is applied here. No update event: nothing changed.
+  useEffect(() => {
+    if (editor && editor.isEditable !== editable) editor.setEditable(editable, false)
+  }, [editor, editable])
+
   const handleMathConfirm = useCallback(
     (latex: string) => {
       if (!editor || !mathEdit) return
