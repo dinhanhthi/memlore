@@ -212,9 +212,15 @@ export function TwoPanelLayout() {
             <div
               className={cn(
                 'flex shrink-0 flex-col',
-                isClay
-                  ? 'overflow-visible bg-transparent'
-                  : 'bg-panel-3 overflow-hidden dark:bg-transparent',
+                // Unsupported pages have no view of their own. On Clay the
+                // editor is a rounded tray; paint that same tray here so the
+                // placeholder is not the bare chrome. Signature and Clean
+                // already share the editor surface via the classes below.
+                unsupported && isClay
+                  ? 'xj-main-panel bg-elevated min-h-0 overflow-hidden rounded-2xl shadow-(--shadow-panel)'
+                  : isClay
+                    ? 'overflow-visible bg-transparent'
+                    : 'bg-panel-3 overflow-hidden dark:bg-transparent',
                 !isFullWidth && DISTRACTION_PANEL_TRANSITION,
                 isFullWidth
                   ? 'flex-1'
