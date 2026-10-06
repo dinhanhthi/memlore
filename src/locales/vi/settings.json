@@ -889,6 +889,8 @@
         "question": "Chuyện gì đang xảy ra?",
         "stuck_title": "Đồng bộ có vẻ bị kẹt hoặc một số mục không bao giờ tải lên",
         "stuck_hint": "Tải lại những mục do thiết bị này quản lý trong lần đồng bộ tới. Không xóa gì ở bất kỳ đâu.",
+        "missing_title": "Một số entry hoặc journal bị thiếu trên thiết bị khác hoặc bản web",
+        "missing_hint": "Đăng lên mọi thứ trên máy này mà chưa thiết bị nào sở hữu. Không xoá gì cả.",
         "device_wrong_title": "Thiết bị này sai — {{provider}} có bản tôi tin cậy",
         "device_wrong_hint": "Tải xuống và kiểm tra bản đám mây, rồi thay thế dữ liệu đồng bộ trên thiết bị này.",
         "cloud_wrong_title": "{{provider}} sai — thiết bị này có bản tôi tin cậy",
@@ -906,6 +908,16 @@
       "reset": {
         "running": "Đang đặt lại trạng thái đồng bộ…",
         "done_title": "Đã đặt lại trạng thái đồng bộ"
+      },
+      "repair": {
+        "confirm_title": "Khắc phục từ thiết bị này?",
+        "confirm_body": "Đăng các mục nhật ký và sổ trên thiết bị này mà chưa thiết bị nào sở hữu, để chúng tải lên trong lần đồng bộ tới. Không xóa gì trên thiết bị này hoặc bản đám mây.",
+        "confirm_button": "Khắc phục",
+        "running": "Đang khắc phục từ thiết bị này…",
+        "done_title": "Đã khắc phục",
+        "success": "{{entries}} mục nhật ký và {{journals}} sổ sẽ được tải lên trong lần đồng bộ tới.",
+        "queued": "Đã xếp hàng khắc phục. Thao tác sẽ chạy khi lượt đồng bộ hiện tại hoàn tất.",
+        "error": "Khắc phục thất bại: {{message}}"
       },
       "disconnect": {
         "running": "Đang ngắt kết nối {{provider}}…",

@@ -889,6 +889,8 @@
         "question": "What is going wrong?",
         "stuck_title": "Sync seems stuck or some items never upload",
         "stuck_hint": "Re-upload what this device owns on the next sync. Nothing is deleted anywhere.",
+        "missing_title": "Some entries or journals are missing on my other devices or the web",
+        "missing_hint": "Publish everything on this device that no other device owns. Nothing is deleted.",
         "device_wrong_title": "This device is wrong — {{provider}} has the copy I trust",
         "device_wrong_hint": "Download and verify the cloud copy, then replace synced data on this device.",
         "cloud_wrong_title": "{{provider}} is wrong — this device has the copy I trust",
@@ -906,6 +908,16 @@
       "reset": {
         "running": "Resetting sync status…",
         "done_title": "Sync status reset"
+      },
+      "repair": {
+        "confirm_title": "Repair from this device?",
+        "confirm_body": "Publishes entries and journals on this device that no other device owns, so they upload on the next sync. Nothing is deleted on this device or the cloud copy.",
+        "confirm_button": "Repair",
+        "running": "Repairing from this device…",
+        "done_title": "Repair complete",
+        "success": "{{entries}} entries and {{journals}} journals will upload on the next sync.",
+        "queued": "Repair queued. It will run when the current sync finishes.",
+        "error": "Repair failed: {{message}}"
       },
       "disconnect": {
         "running": "Disconnecting {{provider}}…",

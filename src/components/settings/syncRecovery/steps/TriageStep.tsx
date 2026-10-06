@@ -8,7 +8,7 @@ import type { SecureWizardStepProps } from '../../secureWizard/types'
 
 type TriageChoice = Extract<
   SyncRecoveryWizardChoice,
-  'sync_stuck' | 'device_wrong' | 'cloud_wrong' | 'stop_syncing'
+  'sync_stuck' | 'missing_elsewhere' | 'device_wrong' | 'cloud_wrong' | 'stop_syncing'
 >
 
 interface TriageOption {
@@ -22,6 +22,11 @@ const OPTIONS: TriageOption[] = [
     choice: 'sync_stuck',
     titleKey: 'gdrive.recovery_wizard.triage.stuck_title',
     hintKey: 'gdrive.recovery_wizard.triage.stuck_hint',
+  },
+  {
+    choice: 'missing_elsewhere',
+    titleKey: 'gdrive.recovery_wizard.triage.missing_title',
+    hintKey: 'gdrive.recovery_wizard.triage.missing_hint',
   },
   {
     choice: 'device_wrong',
