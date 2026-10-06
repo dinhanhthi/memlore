@@ -25,7 +25,7 @@ export function SiteFooterBar({
         </div>
         <nav
           className="footer-links"
-          aria-label="About, changelog, docs, privacy, terms, and GitHub"
+          aria-label="About, changelog, docs, privacy, terms, llms.txt, and GitHub"
         >
           <a href="/about" aria-current={current === 'about' ? 'page' : undefined}>
             About
@@ -42,6 +42,7 @@ export function SiteFooterBar({
           <a href="/terms" aria-current={current === 'terms' ? 'page' : undefined}>
             Terms
           </a>
+          <a href="/llms.txt">llms.txt</a>
           <a href={githubUrl} target="_blank" rel="noreferrer">
             GitHub <ArrowUpRight className="size-4" />
           </a>

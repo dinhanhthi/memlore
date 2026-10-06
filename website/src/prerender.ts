@@ -22,13 +22,14 @@ export const prerenderCopy = {
   syncTitle: 'Your cloud. Your account. Your key.',
   syncBody:
     'Entries are encrypted on your device, then synced through your own Google Drive or iCloud Drive. We never hold your files, your account, or your key.',
-  linksAria: 'About, changelog, docs, privacy, terms, and GitHub',
+  linksAria: 'About, changelog, docs, privacy, terms, llms.txt, and GitHub',
   wordmark: 'Memlore',
   aboutLink: 'About',
   changelogLink: 'Changelog',
   docsLink: 'Docs',
   privacyLink: 'Privacy',
   termsLink: 'Terms',
+  llmsLink: 'llms.txt',
   github: 'GitHub',
 } as const
 
@@ -54,6 +55,7 @@ export function renderLandingStaticHtml(): string {
     `<a href="docs/index.html">${escapeHtml(c.docsLink)}</a>`,
     `<a href="privacy.html">${escapeHtml(c.privacyLink)}</a>`,
     `<a href="terms.html">${escapeHtml(c.termsLink)}</a>`,
+    `<a href="llms.txt">${escapeHtml(c.llmsLink)}</a>`,
     `<a href="${escapeHtml(githubUrl)}">${escapeHtml(c.github)}</a>`,
     '</nav>',
     '</main>',

@@ -5,7 +5,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { applyMarketingShell, twinKindFor } from './src/bootShell'
 import { DOCS_PAGES, docsShellFile } from './src/docs/manifest'
-import { renderLegalStaticHtml } from './src/legal/markdown'
+import { parseLegalMarkdown, renderLegalStaticHtml } from './src/legal/markdown'
+import { buildLlmsTxt } from './src/llms'
 import { renderLandingStaticHtml } from './src/prerender'
 import { buildRobots, buildSitemap, renderSocialMeta } from './src/seo'
 
@@ -79,15 +80,38 @@ function injectSocialMeta(): Plugin {
   }
 }
 
+function llmsTxtSource(): string {
+  return buildLlmsTxt({
+    about: parseLegalMarkdown(readUtf8('./src/legal/about.md')).meta.description,
+    privacy: parseLegalMarkdown(readUtf8('./src/legal/privacy.md')).meta.description,
+    terms: parseLegalMarkdown(readUtf8('./src/legal/terms.md')).meta.description,
+  })
+}
+
 // Emitted from the bundle rather than dropped in `publicDir`, which points at the
 // repo-root `public/` the Tauri app also bundles — crawler files have no business
 // inside the desktop binary.
 function emitSeoFiles(): Plugin {
   return {
     name: 'emit-seo-files',
+    // In the hook body (pre), before Vite's htmlFallbackMiddleware. A returned
+    // post-hook would already have rewritten a browser's Accept: text/html
+    // request for /llms.txt into /index.html.
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const pathname = req.url?.split('?')[0]
+        if (pathname !== '/llms.txt' || (req.method !== 'GET' && req.method !== 'HEAD')) {
+          next()
+          return
+        }
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+        res.end(req.method === 'HEAD' ? undefined : llmsTxtSource())
+      })
+    },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: buildRobots() })
       this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: buildSitemap() })
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsTxtSource() })
     },
   }
 }

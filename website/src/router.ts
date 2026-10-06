@@ -23,14 +23,23 @@ const ROUTE_BY_PATH = new Map<string, RouteName>(
   (Object.keys(ROUTES) as RouteName[]).map((name) => [ROUTES[name].path, name]),
 )
 
-/** `/privacy`, `/privacy.html` and `/privacy/` are the same route; `/docs` is the overview. Anything unknown is home. */
-export function normalizePath(pathname: string): RouteName {
+/**
+ * `/privacy`, `/privacy.html` and `/privacy/` are the same route; `/docs` is the overview.
+ * Unknown paths are null so a click can leave the browser to load the real file
+ * (`/llms.txt`) instead of swapping the SPA to home.
+ */
+export function matchRoute(pathname: string): RouteName | null {
   const path = pathname
     .replace(/index\.html$/, '')
     .replace(/\.html$/, '')
     .replace(/\/+$/, '')
   if (path === '') return 'home'
-  return ROUTE_BY_PATH.get(path) ?? 'home'
+  return ROUTE_BY_PATH.get(path) ?? null
+}
+
+/** Unknown paths are home for the initial load and for back/forward. */
+export function normalizePath(pathname: string): RouteName {
+  return matchRoute(pathname) ?? 'home'
 }
 
 export function useRoute(): RouteName {
@@ -66,7 +75,9 @@ export function useRoute(): RouteName {
       const url = new URL(anchor.href, window.location.href)
       if (url.origin !== window.location.origin) return
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return
-      const next = normalizePath(url.pathname)
+      const next = matchRoute(url.pathname)
+      // Unknown paths (`/llms.txt`, other files) are real navigations, not SPA swaps to home.
+      if (next === null) return
       // A link to the route we are already on (e.g. `/#demo` while on `/`) is a native
       // fragment jump the browser handles without a reload — never intercept it.
       if (next === route) return
