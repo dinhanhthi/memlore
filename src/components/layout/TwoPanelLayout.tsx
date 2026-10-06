@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEditorDistractionStore } from '../../stores/editorDistractionStore'
 import { useActiveView, useSelectedEntryId } from '../../hooks/useActiveTab'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useTabStore } from '../../stores/tabStore'
 import type { ActiveView } from '../../stores/uiStore'
 import { useUiStore } from '../../stores/uiStore'
@@ -21,6 +23,8 @@ import { OnThisDayView } from '../entries/OnThisDayView'
 import { MediaGalleryView } from '../media/MediaGalleryView'
 import { MediaGalleryFullView } from '../media/MediaGalleryFullView'
 import { BODY_OVERLAY_HOST_ID } from '../../lib/overlayHost'
+import { isViewAvailable } from '../../lib/viewAvailability'
+import { UnsupportedOnWeb } from '../common/UnsupportedOnWeb'
 import { LocationsMapView } from '../map/LocationsMapView'
 import { StatisticsView } from '../stats/StatisticsView'
 import { DailyChatView } from '../chat/DailyChatView'
@@ -69,13 +73,17 @@ const DISTRACTION_PANEL_TRANSITION =
  * FooterBar wrap this component in App.tsx.
  */
 export function TwoPanelLayout() {
+  const { t } = useTranslation('nav')
   const { sidebarRight, panelAfterMain } = useLayoutFlags()
   const activeView = useActiveView()
   const activeTabId = useTabStore((s) => s.activeTabId)
   const selectedEntryId = useSelectedEntryId()
+  const caps = useCapabilities()
+  // Views the build doesn't support stay navigable but render a placeholder.
+  const unsupported = !isViewAvailable(activeView, caps)
   const mediaViewMode = useMediaViewMode()
   const mediaFullPage = activeView === 'media' && mediaViewMode === 'full'
-  const isFullWidth = FULL_WIDTH_VIEWS.has(activeView) || mediaFullPage
+  const isFullWidth = unsupported || FULL_WIDTH_VIEWS.has(activeView) || mediaFullPage
   const distractionMode = useEditorDistractionStore((s) => s.distractionMode)
   const setDistractionMode = useEditorDistractionStore((s) => s.setDistractionMode)
   const designSystem = useUiStore((s) => s.designSystem)
@@ -84,7 +92,9 @@ export function TwoPanelLayout() {
 
   // Full-page media has no editor column — never collapse sidebar over it.
   const editorDistractionActive =
-    isEditorDistractionShellActive(distractionMode, selectedEntryId, activeView) && !mediaFullPage
+    isEditorDistractionShellActive(distractionMode, selectedEntryId, activeView) &&
+    !mediaFullPage &&
+    !unsupported
 
   // Unmount sidebar + entry-list content after the hide animation completes so
   // hidden panels don't keep virtualizing in the background.
@@ -217,6 +227,11 @@ export function TwoPanelLayout() {
             >
               {distractionShellMounted &&
                 (() => {
+                  // Unsupported views render a placeholder — checked first so
+                  // they never reach the real panel (which fires Tauri invokes).
+                  if (unsupported) {
+                    return <UnsupportedOnWeb key={activeTabId} title={t(activeView)} />
+                  }
                   // Media full-page replaces the 2-panel gallery; map stays static.
                   if (activeView === 'media') {
                     const Panel = mediaFullPage ? MediaGalleryFullView : MediaGalleryView

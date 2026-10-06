@@ -112,6 +112,8 @@ export class FakeVault implements VaultApi {
         entry_date: intent.fields.entry_date
           ? Number(intent.fields.entry_date.value)
           : intent.web_updated_at_secs,
+        entry_date_user_edited:
+          intent.fields.entry_date !== null && intent.fields.entry_date !== undefined,
         created_at: intent.web_updated_at_secs,
         journal_id: intent.fields.journal_id?.value ?? 'j1',
         journal_name: null,
@@ -140,7 +142,10 @@ export class FakeVault implements VaultApi {
       if (intent) {
         const m = { ...entry.metadata }
         if (intent.fields.title) m.title = intent.fields.title.value
-        if (intent.fields.entry_date) m.entry_date = Number(intent.fields.entry_date.value)
+        if (intent.fields.entry_date) {
+          m.entry_date = Number(intent.fields.entry_date.value)
+          m.entry_date_user_edited = true
+        }
         if (intent.fields.emotion) m.emotion = intent.fields.emotion.value
         if (intent.fields.is_favorite) m.is_favorite = intent.fields.is_favorite.value
         if (intent.fields.journal_id) m.journal_id = intent.fields.journal_id.value

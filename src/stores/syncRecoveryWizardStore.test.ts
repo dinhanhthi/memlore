@@ -153,6 +153,7 @@ describe('syncRecoveryWizardStore', () => {
   )
 
   it.each([
+    ['missing_elsewhere', 'repair_confirm'],
     ['device_wrong', 'cloud_to_local_confirm'],
     ['cloud_wrong', 'local_to_cloud_confirm'],
     ['stop_syncing', 'stop_choice'],

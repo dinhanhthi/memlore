@@ -19,6 +19,7 @@ import { addTagToEntry, getTagsForEntry, removeTagFromEntry } from '../../lib/ta
 import { useTags, emitTagsChanged } from '../../hooks/useTags'
 import { useSuggestTags } from '../../hooks/useSuggestTags'
 import { useAiTagSuggestionsEnabled } from '../../hooks/useAiTagSuggestionsEnabled'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { canCreateTagName, filterTagSuggestions } from '../../lib/tagPicker'
 import { randomTagColor } from '../../lib/tagColors'
 import { useInvisibleLockStore } from '../../stores/invisibleLockStore'
@@ -50,6 +51,7 @@ export function EntryTagsPill({ entryId }: EntryTagsPillProps) {
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
   const { tags: allTags, createTag, refresh: refreshTags } = useTags()
   const tagSuggestionsEnabled = useAiTagSuggestionsEnabled()
+  const caps = useCapabilities()
   const {
     state: suggestState,
     suggest,
@@ -133,7 +135,8 @@ export function EntryTagsPill({ entryId }: EntryTagsPillProps) {
   )
 
   const trimmedQuery = query.trim()
-  const canCreate = canCreateTagName(allTags, query)
+  // create_tag is unsupported on web — picking existing tags stays.
+  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyEdits
 
   async function handleAddExisting(tag: Tag) {
     if (!entryId) return
@@ -161,6 +164,8 @@ export function EntryTagsPill({ entryId }: EntryTagsPillProps) {
       removeSuggestion(name)
       return
     }
+    // Adding an existing tag is supported on web; creating a new one is not.
+    if (!caps.taxonomyEdits) return
     const targetEntry = entryId
     let created: Tag
     try {

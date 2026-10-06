@@ -12,6 +12,7 @@ import { emitStreakRefresh } from '../../hooks/useStreaks'
 import { useEditorMetricsStore } from '../../stores/editorMetricsStore'
 import { useEditorDistractionStore } from '../../stores/editorDistractionStore'
 import { useEditorDistractionEnabled } from '../../hooks/useEditorDistractionEnabled'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEditorEmbedded } from './EditorEmbedContext'
 import { cn } from '../../lib/cn'
 import { editorContentColumnClass } from '../../lib/editorLayout'
@@ -48,6 +49,7 @@ export function EditorHeader({
   const setEntryDateUserEdited = useEditorMetricsStore((s) => s.setEntryDateUserEdited)
   const distractionFeatureEnabled = useEditorDistractionEnabled()
   const isEmbedded = useEditorEmbedded()
+  const caps = useCapabilities()
   const distractionMode = useEditorDistractionStore((s) => s.distractionMode)
   const toggleDistractionMode = useEditorDistractionStore((s) => s.toggleDistractionMode)
   const setDistractionMode = useEditorDistractionStore((s) => s.setDistractionMode)
@@ -169,16 +171,34 @@ export function EditorHeader({
     ? `${entry.weather_summary} · ${t('pills.weather_refetch_tooltip')}`
     : t('pills.weather_refetch_tooltip')
   const weatherButton = entry.weather_icon ? (
-    <Tooltip content={weatherTooltip} placement="bottom">
-      <button
-        type="button"
-        aria-label={weatherTooltip}
-        onClick={onRefetchWeather}
-        className="hover:bg-surface-subtle inline-flex size-7 shrink-0 items-center justify-center rounded-md text-base leading-none transition-colors outline-none"
+    caps.maps ? (
+      <Tooltip content={weatherTooltip} placement="bottom">
+        <button
+          type="button"
+          aria-label={weatherTooltip}
+          onClick={onRefetchWeather}
+          className="hover:bg-surface-subtle inline-flex size-7 shrink-0 items-center justify-center rounded-md text-base leading-none transition-colors outline-none"
+        >
+          <span aria-hidden>{entry.weather_icon}</span>
+        </button>
+      </Tooltip>
+    ) : (
+      // Web: fetch_weather is unsupported, so there is no refetch button —
+      // render the stored weather as a static icon (summary on hover).
+      <Tooltip
+        content={entry.weather_summary ?? ''}
+        placement="bottom"
+        disabled={!entry.weather_summary}
       >
-        <span aria-hidden>{entry.weather_icon}</span>
-      </button>
-    </Tooltip>
+        <span
+          role="img"
+          aria-label={entry.weather_summary ?? undefined}
+          className="inline-flex size-7 shrink-0 items-center justify-center text-base leading-none"
+        >
+          <span aria-hidden>{entry.weather_icon}</span>
+        </span>
+      </Tooltip>
+    )
   ) : null
 
   const emotionButton = (
@@ -270,7 +290,9 @@ export function EditorHeader({
               value={entry.entry_date}
               onChange={handleDateChange}
               onCancel={() => setShowDatePicker(false)}
-              onExtractFromMedia={handleExtractFromMedia}
+              // collect_entry_exif_dates is unsupported on web — hide the
+              // button entirely rather than letting it throw per click.
+              onExtractFromMedia={caps.maps ? handleExtractFromMedia : undefined}
             />
           </div>
         </FloatingPortal>

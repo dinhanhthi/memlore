@@ -20,7 +20,8 @@ import { useStartAtLogin } from '../../hooks/useStartAtLogin'
 import { useVersionRetention } from '../../hooks/useVersionRetention'
 import { cn } from '../../lib/cn'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
-import { useTabStore } from '../../stores/tabStore'
+import { isSettingsCategoryAvailable } from '../../lib/settingsAvailability'
+import { DEFAULT_SETTINGS_CATEGORY, useTabStore } from '../../stores/tabStore'
 import {
   type NewEntryMode,
   type UpdateChannel,
@@ -29,6 +30,7 @@ import {
   useUiStore,
 } from '../../stores/uiStore'
 import { RestoredScroll } from '../common/RestoredScroll'
+import { UnsupportedOnWeb } from '../common/UnsupportedOnWeb'
 import { AiIcon } from '../common/AiIcon'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { Button } from '../common/Button'
@@ -106,6 +108,7 @@ const CATEGORIES: CategoryMeta[] = [
 
 function GeneralDetail() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const timeFormat = useUiStore((s) => s.timeFormat)
   const setTimeFormat = useUiStore((s) => s.setTimeFormat)
   const newEntryMode = useUiStore((s) => s.newEntryMode)
@@ -165,19 +168,21 @@ function GeneralDetail() {
           </SettingsGroup>
 
           <SettingsGroup title={t('general.groups.app')}>
-            <SettingsRow
-              className={rowClass}
-              divider={false}
-              title={t('general.start_at_login.title')}
-              hint={t('general.start_at_login.hint')}
-            >
-              <Toggle
-                ariaLabel={t('general.start_at_login.title')}
-                checked={startAtLogin}
-                onChange={toggleStartAtLogin}
-                disabled={startAtLoginLoading}
-              />
-            </SettingsRow>
+            {caps.updater && (
+              <SettingsRow
+                className={rowClass}
+                divider={false}
+                title={t('general.start_at_login.title')}
+                hint={t('general.start_at_login.hint')}
+              >
+                <Toggle
+                  ariaLabel={t('general.start_at_login.title')}
+                  checked={startAtLogin}
+                  onChange={toggleStartAtLogin}
+                  disabled={startAtLoginLoading}
+                />
+              </SettingsRow>
+            )}
 
             <SettingsRow
               className={rowClass}
@@ -196,68 +201,76 @@ function GeneralDetail() {
               />
             </SettingsRow>
 
-            <SettingsRow
-              className={rowClass}
-              divider={false}
-              title={t('general.auto_check_updates.title')}
-              hint={t('general.auto_check_updates.hint')}
-            >
-              <Toggle
-                ariaLabel={t('general.auto_check_updates.title')}
-                checked={autoCheckUpdates}
-                onChange={setAutoCheckUpdates}
-              />
-            </SettingsRow>
+            {caps.updater && (
+              <>
+                <SettingsRow
+                  className={rowClass}
+                  divider={false}
+                  title={t('general.auto_check_updates.title')}
+                  hint={t('general.auto_check_updates.hint')}
+                >
+                  <Toggle
+                    ariaLabel={t('general.auto_check_updates.title')}
+                    checked={autoCheckUpdates}
+                    onChange={setAutoCheckUpdates}
+                  />
+                </SettingsRow>
 
-            {/* Deliberately stays enabled when auto-check is off: the channel
-                still decides what `Memlore > Check For Updates…` looks at. */}
-            <SettingsRow
-              className={rowClass}
-              divider={false}
-              title={t('general.update_channel.title')}
-              hint={t('general.update_channel.hint')}
-            >
-              <SegmentedControl<UpdateChannel>
-                ariaLabel={t('general.update_channel.radiogroup_label')}
-                value={updateChannel}
-                onChange={setUpdateChannel}
-                options={(['stable', 'beta'] as UpdateChannel[]).map((opt) => ({
-                  value: opt,
-                  label: t(`general.update_channel.${opt}`),
-                }))}
-              />
-            </SettingsRow>
+                {/* Deliberately stays enabled when auto-check is off: the channel
+                    still decides what `Memlore > Check For Updates…` looks at. */}
+                <SettingsRow
+                  className={rowClass}
+                  divider={false}
+                  title={t('general.update_channel.title')}
+                  hint={t('general.update_channel.hint')}
+                >
+                  <SegmentedControl<UpdateChannel>
+                    ariaLabel={t('general.update_channel.radiogroup_label')}
+                    value={updateChannel}
+                    onChange={setUpdateChannel}
+                    options={(['stable', 'beta'] as UpdateChannel[]).map((opt) => ({
+                      value: opt,
+                      label: t(`general.update_channel.${opt}`),
+                    }))}
+                  />
+                </SettingsRow>
+              </>
+            )}
 
-            <SettingsRow
-              className={rowClass}
-              divider={false}
-              title={t('version_history.title')}
-              hint={t('version_history.hint')}
-            >
-              <SegmentedControl<'3' | '7' | '15'>
-                ariaLabel={t('version_history.title')}
-                value={String(retentionDays ?? 7) as '3' | '7' | '15'}
-                onChange={(next) => void setRetentionDays(Number(next))}
-                options={(['3', '7', '15'] as const).map((opt) => ({
-                  value: opt,
-                  label: t('version_history.days', { count: Number(opt) }),
-                }))}
-              />
-            </SettingsRow>
+            {caps.versions && (
+              <SettingsRow
+                className={rowClass}
+                divider={false}
+                title={t('version_history.title')}
+                hint={t('version_history.hint')}
+              >
+                <SegmentedControl<'3' | '7' | '15'>
+                  ariaLabel={t('version_history.title')}
+                  value={String(retentionDays ?? 7) as '3' | '7' | '15'}
+                  onChange={(next) => void setRetentionDays(Number(next))}
+                  options={(['3', '7', '15'] as const).map((opt) => ({
+                    value: opt,
+                    label: t('version_history.days', { count: Number(opt) }),
+                  }))}
+                />
+              </SettingsRow>
+            )}
           </SettingsGroup>
 
-          <SettingsGroup title={t('general.groups.danger')}>
-            <SettingsRow
-              className={rowClass}
-              divider={false}
-              title={t('general.uninstall.title')}
-              hint={t('general.uninstall.hint')}
-            >
-              <Button variant="destructive" size="sm" onClick={() => setUninstallOpen(true)}>
-                {t('general.uninstall.button')}
-              </Button>
-            </SettingsRow>
-          </SettingsGroup>
+          {caps.updater && (
+            <SettingsGroup title={t('general.groups.danger')}>
+              <SettingsRow
+                className={rowClass}
+                divider={false}
+                title={t('general.uninstall.title')}
+                hint={t('general.uninstall.hint')}
+              >
+                <Button variant="destructive" size="sm" onClick={() => setUninstallOpen(true)}>
+                  {t('general.uninstall.button')}
+                </Button>
+              </SettingsRow>
+            </SettingsGroup>
+          )}
         </div>
       </RestoredScroll>
 
@@ -320,16 +333,15 @@ function panelId(id: SettingsCategory): string {
 export function SettingsPanel() {
   const { t } = useTranslation('settings')
   const caps = useCapabilities()
-  const categories = CATEGORIES.filter(
-    (c) =>
-      (c.id !== 'ai' || caps.ai) &&
-      (c.id !== 'reminders' || caps.reminders) &&
-      (c.id !== 'location' || caps.maps) &&
-      (c.id !== 'data' || caps.importExport),
-  )
+  // Every category shows in the rail on every platform — an unavailable one
+  // (e.g. security on web) renders an "unsupported on web" placeholder in the
+  // detail pane instead of being hidden. `isSettingsCategoryAvailable` stays
+  // the single source of truth shared with the palette's settings.* deep
+  // links (which still hide unavailable categories).
+  const categories = CATEGORIES
   const active = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
-    return tab?.settingsCategory ?? 'security'
+    return tab?.settingsCategory ?? DEFAULT_SETTINGS_CATEGORY
   })
   const setActive = (category: SettingsCategory) =>
     useTabStore.getState().updateActiveTab({ settingsCategory: category })
@@ -525,7 +537,11 @@ export function SettingsPanel() {
             isClay ? 'xj-main-panel bg-elevated rounded-2xl' : 'bg-panel-3 dark:bg-transparent',
           )}
         >
-          <DetailContent category={activeMeta.id} />
+          {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+            <DetailContent category={activeMeta.id} />
+          ) : (
+            <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />
+          )}
         </div>
       ) : (
         <div
@@ -548,7 +564,11 @@ export function SettingsPanel() {
                   {t(`categories.${activeMeta.id}.description`)}
                 </p>
               </div>
-              <DetailContent category={activeMeta.id} />
+              {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+                <DetailContent category={activeMeta.id} />
+              ) : (
+                <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />
+              )}
             </div>
           </div>
         </div>

@@ -292,6 +292,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Drive returns int64 quota and file sizes as decimal strings. Anything else is absent. */
+function parseQuotaBytes(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null
+  const n = Number(value)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+/** Account snapshot from Drive `about`: signed-in email plus quota, in bytes. */
+export interface DriveAbout {
+  email: string | null
+  usage: number | null
+  limit: number | null
+}
+
 /** Drive ids are opaque but url-safe; refuse anything else before it enters a URL or query. */
 function assertDriveId(id: unknown, what: string): string {
   if (typeof id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(id)) {
@@ -349,9 +363,51 @@ export interface ResolvedFile {
 
 export class DriveReader {
   readonly #t: Transport
+  /**
+   * Folder ids found by the composite READ lookups (`findFolderPath`, `resolvePath`,
+   * `readDeviceFile`, `listDevices`, `listDeviceFiles`), keyed `<parentId>/<name>`. Without it
+   * every read re-walks Memlore → generations → g-N → device → subfolder (about 8 sequential
+   * requests per file). Only found ids are kept, so a folder created later is still found; the
+   * puller clears it at the start of every refresh; other readers (push session, auth/onboard
+   * flows) never clear it, so their cached ids can be stale. The public `findRootId` /
+   * `findFolder` that the writer uses and `readSharedFile` (authority files, recovery fence)
+   * never read it.
+   */
+  readonly #folders = new Map<string, Promise<string | null>>()
 
   constructor(deps: DriveDeps) {
     this.#t = makeTransport(deps)
+  }
+
+  /** Forget every cached folder id (the next read walks the path again). */
+  clearFolderCache(): void {
+    this.#folders.clear()
+  }
+
+  async #cachedFolder(name: string, parentId: string): Promise<string | null> {
+    const key = `${parentId}/${name}`
+    const hit = this.#folders.get(key)
+    if (hit !== undefined) return hit
+    const lookup = this.findFolder(name, parentId)
+    this.#folders.set(key, lookup)
+    const forget = () => {
+      if (this.#folders.get(key) === lookup) this.#folders.delete(key)
+    }
+    lookup.then((id) => {
+      if (id === null) forget()
+    }, forget)
+    return lookup
+  }
+
+  #cachedRootId(): Promise<string | null> {
+    return this.#cachedFolder(ROOT_FOLDER_NAME, APPDATA_PARENT)
+  }
+
+  /** `generations/g-<N>` folder id, or null when `generations` or `g-<N>` is missing. */
+  async #cachedGenerationRoot(rootId: string, generation: number): Promise<string | null> {
+    const generations = await this.#cachedFolder(GENERATIONS_FOLDER, rootId)
+    if (generations === null) return null
+    return this.#cachedFolder(generationFolderName(generation), generations)
   }
 
   /**
@@ -430,12 +486,83 @@ export class DriveReader {
 
   /** Walk folder segments from the Memlore root. Null when the root or any segment is missing. */
   async findFolderPath(segments: readonly string[]): Promise<string | null> {
-    let current = await this.findRootId()
+    let current = await this.#cachedRootId()
     for (const segment of segments) {
       if (current === null) return null
-      current = await this.findFolder(segment, current)
+      current = await this.#cachedFolder(segment, current)
     }
     return current
+  }
+
+  /**
+   * Account quota and the signed-in email via Drive `about`.
+   * `about.user.emailAddress` is available under `drive.appdata`. The OAuth
+   * userinfo endpoint is not used: this app does not request `openid` / `email`.
+   */
+  async fetchDriveAbout(): Promise<DriveAbout> {
+    const params = new URLSearchParams({ fields: 'user(emailAddress),storageQuota' })
+    const response = await send(
+      this.#t,
+      `${this.#t.apiBase}/drive/v3/about?${params.toString()}`,
+      { method: 'GET' },
+      true,
+    )
+    ensureOk(response, 'about')
+    const body = await readJson(response)
+    if (!isRecord(body) || !isRecord(body.storageQuota)) {
+      throw new DriveProtocolError('about response has no storageQuota')
+    }
+    const user = body.user
+    const rawEmail =
+      isRecord(user) && typeof user.emailAddress === 'string' ? user.emailAddress : ''
+    return {
+      email: rawEmail === '' ? null : rawEmail,
+      usage: parseQuotaBytes(body.storageQuota.usage),
+      limit: parseQuotaBytes(body.storageQuota.limit),
+    }
+  }
+
+  /**
+   * Bytes this app occupies in Drive `appDataFolder`: the sum of every non-folder
+   * file's `size`. That space is exclusive to this OAuth client, so the total is
+   * Memlore only — not Photos, Gmail, or other Drive apps.
+   */
+  async fetchAppdataUsageBytes(): Promise<number> {
+    const q = `trashed = false and mimeType != '${FOLDER_MIME}'`
+    let total = 0
+    let pageToken: string | null = null
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const params = new URLSearchParams({
+        q,
+        fields: 'nextPageToken,files(size)',
+        spaces: APPDATA_PARENT,
+        pageSize: '1000',
+      })
+      if (pageToken !== null) params.set('pageToken', pageToken)
+      const response = await send(
+        this.#t,
+        `${this.#t.apiBase}/drive/v3/files?${params.toString()}`,
+        { method: 'GET' },
+        true,
+      )
+      ensureOk(response, 'appdata usage')
+      const body = await readJson(response)
+      if (!isRecord(body) || !Array.isArray(body.files)) {
+        throw new DriveProtocolError('list response has no files array')
+      }
+      for (const item of body.files) {
+        if (!isRecord(item)) throw new DriveProtocolError('list entry is not an object')
+        const size = parseQuotaBytes(item.size)
+        if (size !== null) total += size
+      }
+      const next = body.nextPageToken
+      if (next === undefined || next === null || next === '') return total
+      if (typeof next !== 'string' || next === pageToken) {
+        throw new DriveProtocolError('bad nextPageToken')
+      }
+      pageToken = next
+    }
+    throw new DriveProtocolError('too many pages')
   }
 
   /** Child entries of a folder: sub-folders or non-folder files. */
@@ -503,19 +630,23 @@ export class DriveReader {
     return bytes
   }
 
-  /** Read an allowlisted shared file (control.json, keyring files, device slots). */
+  /**
+   * Read an allowlisted shared file (control.json, keyring files, device slots). Always walks the
+   * path fresh, never through the folder cache: the recovery fence reads these on the push
+   * session's reader, which no refresh clears, and a stale `.meta` id would pause writes.
+   */
   async readSharedFile(path: string): Promise<Uint8Array> {
     if (!isAllowedSharedReadPath(path)) throw new RangeError(`not a shared path: ${path}`)
-    const resolved = await this.resolvePath(path)
-    if (resolved === null) throw new DriveNotFoundError(path)
-    return this.getFile(resolved.id)
-  }
-
-  /** `generations/g-<N>` folder id, or null when `generations` or `g-<N>` is missing. */
-  async findGenerationRoot(rootId: string, generation: number): Promise<string | null> {
-    const generations = await this.findFolder(GENERATIONS_FOLDER, rootId)
-    if (generations === null) return null
-    return this.findFolder(generationFolderName(generation), generations)
+    const split = splitPath(path)
+    if (split === null) throw new RangeError(`unsafe path: ${JSON.stringify(path)}`)
+    let parentId = await this.findRootId()
+    for (const segment of split.folders) {
+      if (parentId === null) break
+      parentId = await this.findFolder(segment, parentId)
+    }
+    const file = parentId === null ? null : await this.findFile(split.name, parentId)
+    if (file === null) throw new DriveNotFoundError(path)
+    return this.getFile(file.id)
   }
 
   async #deviceNamesUnder(parentId: string): Promise<string[]> {
@@ -528,10 +659,10 @@ export class DriveReader {
    * root's devices (legacy layout); with no `generations/g-<N>` only the flat root. Sorted.
    */
   async listDevices(generation: number): Promise<string[]> {
-    const rootId = await this.findRootId()
+    const rootId = await this.#cachedRootId()
     if (rootId === null) return []
     const names = new Set<string>()
-    const genRoot = await this.findGenerationRoot(rootId, generation)
+    const genRoot = await this.#cachedGenerationRoot(rootId, generation)
     if (genRoot !== null) {
       for (const name of await this.#deviceNamesUnder(genRoot)) names.add(name)
     }
@@ -551,12 +682,12 @@ export class DriveReader {
     device: string,
   ): Promise<string[]> {
     const folders: string[] = []
-    const genRoot = await this.findGenerationRoot(rootId, generation)
+    const genRoot = await this.#cachedGenerationRoot(rootId, generation)
     if (genRoot !== null) {
-      const inGen = await this.findFolder(device, genRoot)
+      const inGen = await this.#cachedFolder(device, genRoot)
       if (inGen !== null) folders.push(inGen)
     }
-    const flat = await this.findFolder(device, rootId)
+    const flat = await this.#cachedFolder(device, rootId)
     if (flat !== null && !folders.includes(flat)) folders.push(flat)
     return folders
   }
@@ -574,18 +705,18 @@ export class DriveReader {
     if (!isSafeComponent(device) || (subfolder !== null && !isSafeComponent(subfolder))) {
       throw new RangeError('unsafe device or subfolder')
     }
-    const rootId = await this.findRootId()
+    const rootId = await this.#cachedRootId()
     if (rootId === null) return []
     const names = new Set<string>()
     if (subfolder === null) {
-      const genRoot = await this.findGenerationRoot(rootId, generation)
-      const deviceFolder = genRoot === null ? null : await this.findFolder(device, genRoot)
+      const genRoot = await this.#cachedGenerationRoot(rootId, generation)
+      const deviceFolder = genRoot === null ? null : await this.#cachedFolder(device, genRoot)
       if (deviceFolder !== null) {
         for (const f of await this.listFolder(deviceFolder, 'files')) names.add(f.name)
       }
     } else {
       for (const folder of await this.#deviceFoldersForRead(rootId, generation, device)) {
-        const sub = await this.findFolder(subfolder, folder)
+        const sub = await this.#cachedFolder(subfolder, folder)
         if (sub === null) continue
         for (const f of await this.listFolder(sub, 'files')) names.add(f.name)
       }
@@ -604,11 +735,11 @@ export class DriveReader {
   ): Promise<Uint8Array> {
     const parsed = parseLogicalPath(path)
     if (parsed === null) throw new RangeError(`invalid logical path: ${JSON.stringify(path)}`)
-    const rootId = await this.findRootId()
+    const rootId = await this.#cachedRootId()
     if (rootId === null) throw new DriveNotFoundError(path)
     for (const folder of await this.#deviceFoldersForRead(rootId, generation, parsed.device)) {
       const parent =
-        parsed.subfolder === null ? folder : await this.findFolder(parsed.subfolder, folder)
+        parsed.subfolder === null ? folder : await this.#cachedFolder(parsed.subfolder, folder)
       if (parent === null) continue
       const file = await this.findFile(parsed.filename, parent)
       if (file !== null) return this.getFile(file.id, maxBytes)

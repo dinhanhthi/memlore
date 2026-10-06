@@ -4,7 +4,9 @@ import type { Core } from '../../core/core'
 import { setWriteFlagForTest } from '../config'
 import { VaultLockedError } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import type { IndexEntry } from '../sync/entryIndex'
 import { isFormatGuardLatched, latchFormatGuard, resetFormatGuardLatch } from '../sync/formatGuard'
+import { PullTransientError } from '../sync/pull'
 import { createEmptyOutboxFields, type OutboxEntryV1 } from '../sync/outbox'
 import { entryHandlers } from './entries'
 import { configureReadEnv, createReadSession, type ReadSession } from './readSession'
@@ -27,7 +29,12 @@ vi.mock('../keys', async (importOriginal) => ({
   },
   getKeyRing: () => ({}),
 }))
-vi.mock('../sync/pull', () => ({ createPuller: () => fakes.puller }))
+vi.mock('../sync/pull', async (importOriginal) => ({
+  // The real error classes (PullTransientError's instanceof drives the warm-start swallow);
+  // only the puller construction is faked.
+  ...(await importOriginal<typeof import('../sync/pull')>()),
+  createPuller: () => fakes.puller,
+}))
 vi.mock('../vault', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../vault')>()),
   createVault: (deps: unknown) => {
@@ -56,30 +63,65 @@ const journalFile = JSON.stringify({
 
 interface Rig {
   session: ReadSession
+  puller: { index: Map<string, IndexEntry> | null }
   pathsGate: { current: Gate | null }
   warmGate: { current: Gate | null }
+  refreshGate: { current: Gate | null }
+  warmError: { current: unknown }
+  refreshRows: { current: Array<[string, number]> }
   paths: ReturnType<typeof vi.fn>
   warmStart: ReturnType<typeof vi.fn>
+  primeFromCache: ReturnType<typeof vi.fn>
+  refresh: ReturnType<typeof vi.fn>
   setExcluded: ReturnType<typeof vi.fn>
   lock: () => void
 }
 
+const indexOf = (rows: Array<[string, number]>): Map<string, IndexEntry> =>
+  new Map(
+    rows.map(([id, updatedAt]) => [
+      id,
+      { entryId: id, authorDevice: 'devA', updatedAt, isDeleted: false },
+    ]),
+  )
+
 async function rig(): Promise<Rig> {
   const pathsGate: Rig['pathsGate'] = { current: null }
   const warmGate: Rig['warmGate'] = { current: null }
+  const refreshGate: Rig['refreshGate'] = { current: null }
+  const warmError: Rig['warmError'] = { current: undefined }
+  const refreshRows: Rig['refreshRows'] = { current: [['e1', 1]] }
   const paths = vi.fn(async () => {
     await pathsGate.current?.promise
     return ['devA/journals/j1.bin']
   })
   const warmStart = vi.fn(async () => {
     await warmGate.current?.promise
+    if (warmError.current !== undefined) throw warmError.current
     return [] as string[]
   })
   const setExcluded = vi.fn()
-  const index = new Map([
-    ['e1', { entryId: 'e1', authorDevice: 'devA', updatedAt: 1, isDeleted: false }],
-  ])
-  fakes.puller = { index, refresh: async () => ({}), warmStart, foreignIntents: [] }
+  // The session reads `puller.index` live; the fake keeps one object for the whole test.
+  const puller = {
+    index: null as Map<string, IndexEntry> | null,
+    foreignIntents: [] as never[],
+    desktops: { manifests: [] as string[], slots: null, tombstones: new Set<string>() },
+    getDegradedDevices: () => [] as Array<{ device: string; reason: string }>,
+    primeFromCache: null as unknown as ReturnType<typeof vi.fn>,
+    refresh: null as unknown as ReturnType<typeof vi.fn>,
+    warmStart,
+  }
+  // Primes from "the cache": assigns the index (a reload has none) and resolves true.
+  puller.primeFromCache = vi.fn(async () => {
+    puller.index = indexOf([['e1', 1]])
+    return true
+  })
+  puller.refresh = vi.fn(async () => {
+    await refreshGate.current?.promise
+    puller.index = indexOf(refreshRows.current)
+    return { stale: [] as string[] }
+  })
+  fakes.puller = puller
   fakes.vault = {
     setExcludedJournalIds: setExcluded,
     load: async () => ({}),
@@ -94,10 +136,16 @@ async function rig(): Promise<Rig> {
   const session = await createReadSession({ db, reader: {} as never, core })
   return {
     session,
+    puller,
     pathsGate,
     warmGate,
+    refreshGate,
+    warmError,
+    refreshRows,
     paths,
     warmStart,
+    primeFromCache: puller.primeFromCache,
+    refresh: puller.refresh,
     setExcluded,
     lock: () => {
       for (const hook of [...fakes.hooks]) hook()
@@ -118,7 +166,8 @@ describe('read session and lock races', () => {
     r.pathsGate.current = new Gate()
     const pending = r.session.ready()
     const outcome = expect(pending).rejects.toBeInstanceOf(VaultLockedError)
-    await Promise.resolve()
+    // Let ready() reach the taxonomy read (it may prime or refresh the index first).
+    for (let i = 0; i < 20; i++) await Promise.resolve()
     r.lock()
     r.pathsGate.current.open()
     await outcome
@@ -194,6 +243,92 @@ describe('read session and lock races', () => {
   })
 })
 
+describe('read session priming', () => {
+  it('ready() serves a primed index without waiting for refresh', async () => {
+    const r = await rig()
+    r.refreshGate.current = new Gate() // stays closed: refresh must not be needed
+    const taxonomy = await r.session.ready()
+    expect(r.primeFromCache).toHaveBeenCalledTimes(1)
+    expect(r.refresh).not.toHaveBeenCalled()
+    expect(taxonomy.excludedJournalIds).toEqual(['j1'])
+  })
+
+  it('ready() awaits refresh on a first-ever unlock (prime finds nothing)', async () => {
+    const r = await rig()
+    r.primeFromCache.mockResolvedValue(false)
+    r.refreshGate.current = new Gate()
+    const pending = r.session.ready()
+    let settled = false
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    expect(r.primeFromCache).toHaveBeenCalledTimes(1)
+    expect(r.refresh).toHaveBeenCalledTimes(1)
+    expect(settled, 'ready() resolved while the refresh was still held').toBe(false)
+    r.refreshGate.current.open()
+    await pending
+    expect(r.puller.index).not.toBeNull()
+  })
+
+  it('pull() compares against the primed index even when it starts before any list call', async () => {
+    const r = await rig()
+    r.refreshRows.current = [['e1', 2]] // a changed row lands in the refresh
+    const outcome = await r.session.pull()
+    expect(outcome.changed).toBe(true)
+
+    const same = await rig() // prime and refresh carry identical rows
+    expect((await same.session.pull()).changed).toBe(false)
+  })
+
+  it('prime runs once per unlock and again after a lock', async () => {
+    const r = await rig()
+    await r.session.ready()
+    await r.session.ready()
+    await r.session.pull() // prime is memoised for the unlock
+    expect(r.primeFromCache).toHaveBeenCalledTimes(1)
+    r.lock()
+    r.puller.index = null // the index survives a lock; a reload's puller starts with none
+    await r.session.ready()
+    expect(r.primeFromCache).toHaveBeenCalledTimes(2)
+  })
+
+  it('a lock during prime rejects ready() with VaultLockedError and caches nothing', async () => {
+    const r = await rig()
+    r.primeFromCache.mockRejectedValueOnce(new VaultLockedError())
+    await expect(r.session.ready()).rejects.toBeInstanceOf(VaultLockedError)
+    expect(r.paths).not.toHaveBeenCalled()
+    expect(r.setExcluded).not.toHaveBeenCalled()
+    // The prime memo cleared itself: the next ready() primes again and proceeds.
+    const taxonomy = await r.session.ready()
+    expect(r.primeFromCache).toHaveBeenCalledTimes(2)
+    expect(taxonomy.excludedJournalIds).toEqual(['j1'])
+  })
+
+  it('a warm-start transient failure on a primed index does not reject ready()', async () => {
+    const r = await rig()
+    r.warmError.current = new PullTransientError('offline')
+    await r.session.ready() // the cached list is served; the warm failure is swallowed
+    expect(r.warmStart).toHaveBeenCalledTimes(1)
+    await r.session.ready() // the memo cleared itself: the warm start retries
+    expect(r.warmStart).toHaveBeenCalledTimes(2)
+    // Only a transient failure is swallowed: a different error still rejects.
+    r.warmError.current = new Error('corrupt')
+    await expect(r.session.ready()).rejects.toThrow('corrupt')
+
+    // On a refreshed (not primed) index the old behaviour is unchanged: transient rejects.
+    const refreshed = await rig()
+    refreshed.primeFromCache.mockResolvedValue(false)
+    refreshed.warmError.current = new PullTransientError('offline')
+    await expect(refreshed.session.ready()).rejects.toBeInstanceOf(PullTransientError)
+  })
+})
+
 describe('drafts rehydrate the outbox overlay', () => {
   const dec = new TextDecoder()
 
@@ -231,6 +366,7 @@ describe('drafts rehydrate the outbox overlay', () => {
     fakes.vault = vault
     fakes.puller = {
       index: new Map(),
+      primeFromCache: async () => true, // index already set: a no-op, like the real puller
       refresh: async () => ({ stale: [] }),
       warmStart: async () => [] as string[],
       getDegradedDevices: () => [],

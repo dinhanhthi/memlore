@@ -139,13 +139,29 @@ export function onWriteFlagOn(listener: () => void): () => void {
   }
 }
 
+const flagChangeListeners = new Set<(writes: boolean) => void>()
+
+/** Called each time the cached flag changes, either way (the UI's read-only gate). */
+export function onWriteFlagChange(listener: (writes: boolean) => void): () => void {
+  flagChangeListeners.add(listener)
+  return () => {
+    flagChangeListeners.delete(listener)
+  }
+}
+
+function setCached(value: boolean): void {
+  if (value === cached) return
+  cached = value
+  for (const listener of [...flagChangeListeners]) listener(value)
+}
+
 /** Fetches the flag and stores it for display. Returns the fresh value. */
 export async function refreshWriteFlag(options: WriteFlagOptions = {}): Promise<boolean> {
   const gen = generation
   const value = await fetchWriteFlag(options)
   if (gen === generation) {
     const turnedOn = value && !cached
-    cached = value
+    setCached(value)
     if (turnedOn) for (const listener of [...flagOnListeners]) listener()
   }
   return value
@@ -153,7 +169,7 @@ export async function refreshWriteFlag(options: WriteFlagOptions = {}): Promise<
 
 function resetWriteFlag(): void {
   generation++
-  cached = false
+  setCached(false)
 }
 
 let autostartInstalled = false

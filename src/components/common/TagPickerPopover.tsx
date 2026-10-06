@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Tag as TagIcon, X } from 'lucide-react'
 import { addTagToEntry, getTagsForEntry, removeTagFromEntry } from '../../lib/tauri'
 import { useTags, emitTagsChanged } from '../../hooks/useTags'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { canCreateTagName, filterTagSuggestions } from '../../lib/tagPicker'
 import { randomTagColor } from '../../lib/tagColors'
 import { useInvisibleLockStore } from '../../stores/invisibleLockStore'
@@ -30,6 +31,7 @@ export function TagPickerPopover({ entryId, onClose }: TagPickerPopoverProps) {
   const { t } = useTranslation('editor')
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
   const { tags: allTags, createTag, refresh: refreshTags } = useTags()
+  const caps = useCapabilities()
 
   const [entryTags, setEntryTags] = useState<Tag[]>([])
   const [query, setQuery] = useState('')
@@ -60,7 +62,8 @@ export function TagPickerPopover({ entryId, onClose }: TagPickerPopoverProps) {
   )
 
   const trimmedQuery = query.trim()
-  const canCreate = canCreateTagName(allTags, query)
+  // create_tag is unsupported on web — picking existing tags stays.
+  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyEdits
 
   async function handleAddExisting(tag: Tag) {
     const targetEntry = entryIdRef.current

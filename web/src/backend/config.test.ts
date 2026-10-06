@@ -5,6 +5,7 @@ import {
   fetchWriteFlag,
   getCachedWriteFlag,
   getCapabilities,
+  onWriteFlagChange,
   onWriteFlagOn,
   refreshWriteFlag,
 } from './config'
@@ -203,6 +204,20 @@ describe('cached flag', () => {
     await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
   })
 
+  it('notifies onWriteFlagChange only when the cached flag changes, either way', async () => {
+    const seen = vi.fn()
+    const off = onWriteFlagChange(seen)
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
+    expect(seen.mock.calls).toEqual([[true], [false]])
+    off()
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: true }) })
+    expect(seen).toHaveBeenCalledTimes(2)
+    await refreshWriteFlag({ fetchImpl: async () => json({ writes: false }) })
+  })
+
   it('a bare fetchWriteFlag does not touch the cache', async () => {
     await run(async () => json({ writes: true }))
     expect(getCachedWriteFlag()).toBe(false)
@@ -242,6 +257,19 @@ describe('autostart', () => {
     expect(config.getCachedWriteFlag()).toBe(true)
     keys.lock('manual')
     expect(config.getCachedWriteFlag()).toBe(false)
+    keys.dispose()
+  })
+
+  it('lock notifies onWriteFlagChange with false', async () => {
+    fetchSpy.mockImplementation(async () => json({ writes: true }))
+    const { keys, config, event } = await boot()
+    const seen = vi.fn()
+    config.onWriteFlagChange(seen)
+    keys.setKeyRing(ring)
+    event.emitFromBackend('app:unlocked')
+    await settle()
+    keys.lock('manual')
+    expect(seen.mock.calls).toEqual([[true], [false]])
     keys.dispose()
   })
 

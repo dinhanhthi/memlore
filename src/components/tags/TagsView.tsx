@@ -9,6 +9,7 @@ import { Button } from '../common/Button'
 import { Tooltip } from '../common/Tooltip'
 import { cn } from '../../lib/cn'
 import { useIsTruncated } from '../../hooks/useIsTruncated'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { EntryList, type EntryListTagFilter } from '../layout/EntryList'
 import { SecondPanel } from '../layout/SecondPanel'
 import { isHex6 } from '../../lib/tagColors'
@@ -22,6 +23,8 @@ interface TableRowProps {
   tag: Tag
   count: number
   selected: boolean
+  /** taxonomyEdits capability — hides the edit affordance on web. */
+  canEdit: boolean
   onEdit: (tag: Tag) => void
   onClick: () => void
 }
@@ -30,6 +33,7 @@ const TagTableRow = memo(function TagTableRow({
   tag,
   count,
   selected,
+  canEdit,
   onEdit,
   onClick,
 }: TableRowProps) {
@@ -75,17 +79,19 @@ const TagTableRow = memo(function TagTableRow({
       </td>
       <td className="text-fg-muted px-3 py-2 text-right text-sm">{count}</td>
       <td className="px-3 py-2 text-right">
-        <button
-          type="button"
-          aria-label={`Edit tag ${tag.name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit(tag)
-          }}
-          className="text-fg-muted hover:text-fg hover:bg-accent-soft inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 transition-colors duration-(--motion-duration-fast)"
-        >
-          <Pencil className="size-4" />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            aria-label={`Edit tag ${tag.name}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(tag)
+            }}
+            className="text-fg-muted hover:text-fg hover:bg-accent-soft inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 transition-colors duration-(--motion-duration-fast)"
+          >
+            <Pencil className="size-4" />
+          </button>
+        )}
       </td>
     </tr>
   )
@@ -98,6 +104,7 @@ type EditorState = { mode: 'create' } | { mode: 'edit'; tag: Tag; count: number 
 export function TagsView() {
   const { t } = useTranslation('nav')
   const { tagsWithCounts, isLoading, error, createTag, updateTag, deleteTag } = useTags()
+  const caps = useCapabilities()
   const updateActiveTab = useUpdateActiveTab()
   const activeTab = useActiveTab()
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -244,14 +251,16 @@ export function TagsView() {
             <div className="flex h-full flex-col items-center justify-center gap-3 px-5 text-center">
               <p className="font-display text-fg text-xl font-bold">{t('tags_view.empty_title')}</p>
               <p className="text-fg-muted text-sm">{t('tags_view.empty_hint')}</p>
-              <Button
-                variant="primary"
-                size="sm"
-                icon={<Plus className="size-4" />}
-                onClick={() => setEditor({ mode: 'create' })}
-              >
-                {t('tags_view.new_tag')}
-              </Button>
+              {caps.taxonomyEdits && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus className="size-4" />}
+                  onClick={() => setEditor({ mode: 'create' })}
+                >
+                  {t('tags_view.new_tag')}
+                </Button>
+              )}
             </div>
           )}
 
@@ -289,16 +298,18 @@ export function TagsView() {
                       <span className="text-fg-muted ml-1 font-normal">{totalEntries}</span>
                     </th>
                     <th scope="col" className="py-2 pr-3">
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          aria-label={t('tags_view.new_tag')}
-                          onClick={() => setEditor({ mode: 'create' })}
-                          className="gradient-primary shadow-primary-glow text-fg-inverse inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-[filter] duration-(--motion-duration-fast) hover:brightness-[1.07]"
-                        >
-                          <Plus className="size-4" />
-                        </button>
-                      </div>
+                      {caps.taxonomyEdits && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            aria-label={t('tags_view.new_tag')}
+                            onClick={() => setEditor({ mode: 'create' })}
+                            className="gradient-primary shadow-primary-glow text-fg-inverse inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-[filter] duration-(--motion-duration-fast) hover:brightness-[1.07]"
+                          >
+                            <Plus className="size-4" />
+                          </button>
+                        </div>
+                      )}
                     </th>
                   </tr>
                 </thead>
@@ -317,6 +328,7 @@ export function TagsView() {
                         tag={tag}
                         count={count}
                         selected={tag.id === selectedTagId}
+                        canEdit={caps.taxonomyEdits}
                         onEdit={handleEdit}
                         onClick={() => handleSelectTag(tag)}
                       />

@@ -43,7 +43,26 @@ export interface Capabilities {
   versions: boolean
   secondLock: boolean
   onDeviceModels: boolean
+  /** App updates; also covers start-at-login and uninstall. */
   updater: boolean
+  /** Gallery media view. */
+  gallery: boolean
+  /** "On this day" lookback. */
+  lookback: boolean
+  /** Journal/tag/template create, edit, delete. */
+  taxonomyEdits: boolean
+  /** Soft-deleting entries. */
+  deleteEntries: boolean
+  /** Voice memo recording. */
+  audioRecording: boolean
+  /** Attaching files to entries. */
+  fileAttachments: boolean
+  /** Custom Google font download and font cache. */
+  fontDownloads: boolean
+  /** Sync admin: disconnect, recovery wizard, schedule, devices, upload limits, compression, sync toggles. */
+  syncAdmin: boolean
+  /** Security settings: password, rotation, recovery. */
+  vaultAdmin: boolean
   writes: boolean
 }
 
@@ -64,5 +83,14 @@ export const capabilities: Capabilities = {
   secondLock: !isWeb,
   onDeviceModels: !isWeb,
   updater: !isWeb,
+  gallery: !isWeb,
+  lookback: !isWeb,
+  taxonomyEdits: !isWeb,
+  deleteEntries: !isWeb,
+  audioRecording: !isWeb,
+  fileAttachments: !isWeb,
+  fontDownloads: !isWeb,
+  syncAdmin: !isWeb,
+  vaultAdmin: !isWeb,
   writes: !isWeb,
 }

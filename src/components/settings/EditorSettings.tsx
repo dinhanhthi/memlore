@@ -2,6 +2,7 @@ import { Minus, Plus, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEditorEmojiShortcodesSetting } from '../../hooks/useEditorEmojiShortcodesEnabled'
 import { useEditorDistractionSetting } from '../../hooks/useEditorDistractionEnabled'
 import { useEditorFixedTitleSetting } from '../../hooks/useEditorFixedTitleEnabled'
@@ -303,6 +304,7 @@ function FontControlBar({
 /// `EditorSettings` — General (features), Layout (typography), and Font tabs.
 export function EditorSettings() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const { mathEnabled, setMathEnabled } = useEditorMathSetting()
   const { emojiShortcodesEnabled, setEmojiShortcodesEnabled } = useEditorEmojiShortcodesSetting()
   const { includeLocked, setIncludeLocked } = useMentionIncludeLockedSetting()
@@ -343,6 +345,11 @@ export function EditorSettings() {
     EDITOR_TABS.map((tab) => tab.id),
     activeTab,
   )
+
+  // 'custom' needs download_google_font — hide it on web (fontDownloads).
+  // A persisted fontFamily === 'custom' still falls back via the existing
+  // loader logic in useThemeCustomization.
+  const fontOptions = FONT_OPTIONS.filter((opt) => opt.id !== 'custom' || caps.fontDownloads)
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -575,7 +582,7 @@ export function EditorSettings() {
                         aria-label={t('editor.font.radiogroup_label')}
                         className="flex flex-col gap-2"
                       >
-                        {FONT_OPTIONS.map((opt) => {
+                        {fontOptions.map((opt) => {
                           const isCustom = opt.id === 'custom'
                           const customConfigured = isCustom && !!customGoogleFontFamily
                           const isSelected = fontFamily === opt.id
@@ -628,7 +635,7 @@ export function EditorSettings() {
                     </div>
                   </SettingsSection>
 
-                  {fontFamily === 'custom' && <FontCacheSettings />}
+                  {caps.fontDownloads && fontFamily === 'custom' && <FontCacheSettings />}
                 </div>
               )}
             </RestoredScroll>
@@ -636,7 +643,7 @@ export function EditorSettings() {
         })}
       </div>
 
-      {customFontModalOpen && (
+      {caps.fontDownloads && customFontModalOpen && (
         <CustomGoogleFontModal
           onClose={() => setCustomFontModalOpen(false)}
           currentFamily={customGoogleFontFamily}

@@ -5,6 +5,7 @@ import { emitJournalsChanged, useJournals } from '../../hooks/useJournals'
 import { emitEntriesChanged } from '../../hooks/useEntries'
 import { useSecondLock } from '../../hooks/useSecondLock'
 import { useInvisibleLock } from '../../hooks/useInvisibleLock'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { RestoredScroll } from '../common/RestoredScroll'
 import { Button } from '../common/Button'
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal'
@@ -29,6 +30,7 @@ export function JournalsSettings() {
     useJournals()
   const secondLock = useSecondLock(false)
   const invisibleLock = useInvisibleLock(false)
+  const caps = useCapabilities()
 
   const [showForm, setShowForm] = useState(false)
   const [editingJournal, setEditingJournal] = useState<Journal | null>(null)
@@ -180,35 +182,37 @@ export function JournalsSettings() {
                   </div>
 
                   <div className="flex shrink-0 gap-1">
-                    <Tooltip
-                      content={t(
-                        journal.is_locked
-                          ? 'journals_section.unlock_tooltip'
-                          : 'journals_section.lock_tooltip',
-                        { name: journal.name },
-                      )}
-                      placement="top"
-                    >
-                      <Button
-                        variant="ghost"
-                        size="md"
-                        className="h-8! w-8! shrink-0 justify-center px-0!"
-                        aria-label={t(
+                    {caps.secondLock && (
+                      <Tooltip
+                        content={t(
                           journal.is_locked
-                            ? 'journals_section.unlock_aria'
-                            : 'journals_section.lock_aria',
+                            ? 'journals_section.unlock_tooltip'
+                            : 'journals_section.lock_tooltip',
                           { name: journal.name },
                         )}
-                        onClick={() => void handleToggleJournalLock(journal)}
+                        placement="top"
                       >
-                        {journal.is_locked ? (
-                          <LockKeyhole className="text-accent size-4" />
-                        ) : (
-                          <LockKeyholeOpen className="size-4" />
-                        )}
-                      </Button>
-                    </Tooltip>
-                    {invisibleLock.isSessionUnlocked && (
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          className="h-8! w-8! shrink-0 justify-center px-0!"
+                          aria-label={t(
+                            journal.is_locked
+                              ? 'journals_section.unlock_aria'
+                              : 'journals_section.lock_aria',
+                            { name: journal.name },
+                          )}
+                          onClick={() => void handleToggleJournalLock(journal)}
+                        >
+                          {journal.is_locked ? (
+                            <LockKeyhole className="text-accent size-4" />
+                          ) : (
+                            <LockKeyholeOpen className="size-4" />
+                          )}
+                        </Button>
+                      </Tooltip>
+                    )}
+                    {caps.secondLock && invisibleLock.isSessionUnlocked && (
                       <Tooltip
                         content={journal.is_invisible ? 'Remove from invisible' : 'Make invisible'}
                         placement="top"
@@ -228,46 +232,52 @@ export function JournalsSettings() {
                         </Button>
                       </Tooltip>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      className="h-8! w-8! shrink-0 justify-center px-0!"
-                      aria-label={t('journals_section.edit_aria', { name: journal.name })}
-                      onClick={() => {
-                        setEditingJournal(journal)
-                        setShowForm(true)
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      className="h-8! w-8! shrink-0 justify-center px-0!"
-                      aria-label={t('journals_section.delete_aria', { name: journal.name })}
-                      onClick={() => void handleDeleteClick(journal)}
-                    >
-                      <Trash2 className="text-danger size-4" />
-                    </Button>
+                    {caps.taxonomyEdits && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          className="h-8! w-8! shrink-0 justify-center px-0!"
+                          aria-label={t('journals_section.edit_aria', { name: journal.name })}
+                          onClick={() => {
+                            setEditingJournal(journal)
+                            setShowForm(true)
+                          }}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          className="h-8! w-8! shrink-0 justify-center px-0!"
+                          aria-label={t('journals_section.delete_aria', { name: journal.name })}
+                          onClick={() => void handleDeleteClick(journal)}
+                        >
+                          <Trash2 className="text-danger size-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))
             )}
           </SettingsSurfaceCard>
 
-          <div className="mt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditingJournal(null)
-                setShowForm(true)
-              }}
-            >
-              <Plus className="size-4" />
-              {t('journals_section.new')}
-            </Button>
-          </div>
+          {caps.taxonomyEdits && (
+            <div className="mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditingJournal(null)
+                  setShowForm(true)
+                }}
+              >
+                <Plus className="size-4" />
+                {t('journals_section.new')}
+              </Button>
+            </div>
+          )}
         </div>
       </RestoredScroll>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { type MediaViewMode, useMediaViewModeSetting } from '../../hooks/useMediaViewMode'
 import { errMsg } from '../../lib/errMsg'
 import {
@@ -34,6 +35,7 @@ function formatBytes(n: number): string {
 /// Owns its page chrome (header + scroll) to match AI / General card groups.
 export function MediaCacheSettings() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const { mediaViewMode, setMediaViewMode } = useMediaViewModeSetting()
   const [stats, setStats] = useState<MediaCacheStats | null>(null)
   const [busy, setBusy] = useState(false)
@@ -114,25 +116,29 @@ export function MediaCacheSettings() {
         className="min-h-0 flex-1 overflow-y-auto p-6 pt-2 outline-none"
       >
         <div className="max-w-180 space-y-5">
-          <SettingsGroup title={t('media_groups.gallery')}>
-            <SettingsRow
-              className={ROW}
-              divider={false}
-              title={t('media_view.title')}
-              hint={t('media_view.description')}
-            >
-              <SegmentedControl<MediaViewMode>
-                ariaLabel={t('media_view.title')}
-                value={mediaViewMode}
-                onChange={(v) => void handleSetViewMode(v)}
-                commitOnArrow={false}
-                options={[
-                  { value: 'full', label: t('media_view.full'), testId: 'media-view-full' },
-                  { value: 'panel', label: t('media_view.panel'), testId: 'media-view-panel' },
-                ]}
-              />
-            </SettingsRow>
-          </SettingsGroup>
+          {/* Gallery view mode — only consumed by the media view
+              (activeView === 'media'), which caps.gallery blocks on web. */}
+          {caps.gallery && (
+            <SettingsGroup title={t('media_groups.gallery')}>
+              <SettingsRow
+                className={ROW}
+                divider={false}
+                title={t('media_view.title')}
+                hint={t('media_view.description')}
+              >
+                <SegmentedControl<MediaViewMode>
+                  ariaLabel={t('media_view.title')}
+                  value={mediaViewMode}
+                  onChange={(v) => void handleSetViewMode(v)}
+                  commitOnArrow={false}
+                  options={[
+                    { value: 'full', label: t('media_view.full'), testId: 'media-view-full' },
+                    { value: 'panel', label: t('media_view.panel'), testId: 'media-view-panel' },
+                  ]}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+          )}
 
           <SettingsGroup title={t('media_groups.cache')}>
             <SettingsRow
@@ -188,8 +194,9 @@ export function MediaCacheSettings() {
           )}
 
           {/* Photo compression — applied before media bytes land on disk, so
-              it reduces both local storage AND iCloud/Google Drive sync size. */}
-          <MediaCompressionSettings />
+              it reduces both local storage AND iCloud/Google Drive sync size.
+              Hidden on web: it writes via set_media_upload_limits (syncAdmin). */}
+          {caps.syncAdmin && <MediaCompressionSettings />}
         </div>
       </RestoredScroll>
     </div>

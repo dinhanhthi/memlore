@@ -3,6 +3,9 @@ export type SyncRecoveryWizardStep =
   | 'reset_confirm'
   | 'reset_running'
   | 'reset_done'
+  | 'repair_confirm'
+  | 'repair_running'
+  | 'repair_done'
   | 'cloud_to_local_confirm'
   | 'local_to_cloud_confirm'
   | 'stop_choice'
@@ -15,6 +18,7 @@ export type SyncRecoveryWizardStep =
 
 export type SyncRecoveryWizardChoice =
   | 'sync_stuck'
+  | 'missing_elsewhere'
   | 'device_wrong'
   | 'cloud_wrong'
   | 'stop_syncing'
@@ -44,6 +48,7 @@ export function nextStep(
   switch (state.step) {
     case 'triage':
       if (choice === 'sync_stuck') return moveTo(state, 'reset_confirm')
+      if (choice === 'missing_elsewhere') return moveTo(state, 'repair_confirm')
       if (choice === 'device_wrong') return moveTo(state, 'cloud_to_local_confirm')
       if (choice === 'cloud_wrong') return moveTo(state, 'local_to_cloud_confirm')
       if (choice === 'stop_syncing') return moveTo(state, 'stop_choice')
@@ -53,6 +58,11 @@ export function nextStep(
       return choice === 'next' ? moveTo(state, 'reset_running') : state
     case 'reset_running':
       return choice === 'next' ? moveTo(state, 'reset_done') : state
+
+    case 'repair_confirm':
+      return choice === 'next' ? moveTo(state, 'repair_running') : state
+    case 'repair_running':
+      return choice === 'next' ? moveTo(state, 'repair_done') : state
 
     case 'stop_choice':
       if (choice === 'keep_cloud') return moveTo(state, 'disconnect_confirm')
@@ -72,6 +82,7 @@ export function nextStep(
     case 'cloud_to_local_confirm':
     case 'local_to_cloud_confirm':
     case 'reset_done':
+    case 'repair_done':
     case 'disconnect_done':
     case 'delete_done':
       return state
@@ -92,6 +103,12 @@ export function prevStep(state: SyncRecoveryWizardState): SyncRecoveryWizardStat
     case 'reset_running':
       return moveTo(state, 'reset_confirm')
     case 'reset_done':
+      return state
+    case 'repair_confirm':
+      return moveTo(state, 'triage')
+    case 'repair_running':
+      return moveTo(state, 'repair_confirm')
+    case 'repair_done':
       return state
     case 'cloud_to_local_confirm':
       return moveTo(state, 'triage')

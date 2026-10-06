@@ -14,6 +14,15 @@ describe('opener', () => {
     expect(win).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer')
   })
 
+  it('hands mailto URLs to the mail client without opening a tab', async () => {
+    const open = vi.fn()
+    const assign = vi.fn()
+    vi.stubGlobal('window', { open, location: { assign } })
+    await openUrl('mailto:contact@memlore.app')
+    expect(assign).toHaveBeenCalledWith('mailto:contact@memlore.app')
+    expect(open).not.toHaveBeenCalled()
+  })
+
   it.each(['http://example.com', 'javascript:alert(1)', 'file:///etc/passwd', 'not a url'])(
     'rejects %s',
     async (url) => {

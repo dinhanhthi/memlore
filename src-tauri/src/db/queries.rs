@@ -8110,6 +8110,40 @@ pub fn adopt_all_local_journals(conn: &Connection) -> Result<usize> {
     )
 }
 
+/// Adopts only local journals whose ID is NOT in `owned_by_peers`.
+/// When `owned_by_peers` is empty (network unavailable), falls back to
+/// `adopt_all_local_journals` — identical to the pre-cloud-aware behavior.
+pub fn adopt_unowned_local_journals(
+    conn: &Connection,
+    owned_by_peers: &std::collections::HashSet<String>,
+) -> Result<usize> {
+    if owned_by_peers.is_empty() {
+        return adopt_all_local_journals(conn);
+    }
+
+    // Build NOT IN (?, ?, ...) dynamically.
+    // Safe: all values are journal UUIDs from our own DB — no SQL injection risk.
+    let placeholders = owned_by_peers
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "INSERT INTO journal_sync_state (journal_id, local_version, sync_status)
+         SELECT j.id, 1, 'pending'
+         FROM journals j
+         WHERE j.id NOT IN ({placeholders})
+         ON CONFLICT(journal_id) DO UPDATE SET sync_status = 'pending'"
+    );
+    let params: Vec<Box<dyn rusqlite::ToSql>> = owned_by_peers
+        .iter()
+        .map(|s| Box::new(s.clone()) as Box<dyn rusqlite::ToSql>)
+        .collect();
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|b| b.as_ref()).collect();
+    let rows = conn.execute(&sql, params_refs.as_slice())?;
+    Ok(rows)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MediaLocalPathRow {
     pub id: String,
@@ -26297,6 +26331,139 @@ mod keyring_v2_tests {
             )
             .unwrap();
         assert_eq!(orphan_status, "pending", "new INSERT must be pending");
+    }
+
+    // ── adopt_unowned_local_journals ──────────────────────────────────────
+
+    /// Legacy journal row: present in `journals`, absent from `journal_sync_state`.
+    fn seed_legacy_journal(conn: &Connection, journal_id: &str, is_deleted: i64) {
+        conn.execute(
+            "INSERT INTO journals (id, name, created_at, updated_at, is_deleted) \
+             VALUES (?1, ?1, 0, 0, ?2)",
+            rusqlite::params![journal_id, is_deleted],
+        )
+        .unwrap();
+    }
+
+    fn journal_sync_status(conn: &Connection, journal_id: &str) -> Option<String> {
+        conn.query_row(
+            "SELECT sync_status FROM journal_sync_state WHERE journal_id = ?1",
+            [journal_id],
+            |r| r.get(0),
+        )
+        .ok()
+    }
+
+    #[test]
+    fn adopt_unowned_journals_skips_peer_owned() {
+        let conn = setup();
+        seed_legacy_journal(&conn, "j-local", 0);
+        seed_legacy_journal(&conn, "j-peer", 0);
+
+        let owned: std::collections::HashSet<String> = ["j-peer".to_string()].into_iter().collect();
+
+        adopt_unowned_local_journals(&conn, &owned).unwrap();
+
+        assert_eq!(
+            journal_sync_status(&conn, "j-local").as_deref(),
+            Some("pending"),
+            "unowned journal must be adopted as pending"
+        );
+        assert_eq!(
+            journal_sync_status(&conn, "j-peer"),
+            None,
+            "peer-owned journal must not gain a journal_sync_state row"
+        );
+    }
+
+    #[test]
+    fn adopt_unowned_journals_fallback_when_set_is_empty() {
+        let conn = setup();
+        seed_legacy_journal(&conn, "j-orphan", 0);
+        seed_legacy_journal(&conn, "j-synced", 0);
+        conn.execute(
+            "INSERT INTO journal_sync_state (journal_id, local_version, sync_status) \
+             VALUES ('j-synced', 4, 'synced')",
+            [],
+        )
+        .unwrap();
+
+        adopt_unowned_local_journals(&conn, &std::collections::HashSet::new()).unwrap();
+
+        assert_eq!(
+            journal_sync_status(&conn, "j-orphan").as_deref(),
+            Some("pending"),
+            "empty set must adopt journals that have no sync row"
+        );
+        assert_eq!(
+            journal_sync_status(&conn, "j-synced").as_deref(),
+            Some("pending"),
+            "empty set must flip an existing synced row to pending"
+        );
+    }
+
+    #[test]
+    fn adopt_unowned_journals_flips_synced_to_pending() {
+        let conn = setup();
+        seed_legacy_journal(&conn, "j-flip", 0);
+        conn.execute(
+            "INSERT INTO journal_sync_state (journal_id, local_version, sync_status) \
+             VALUES ('j-flip', 3, 'synced')",
+            [],
+        )
+        .unwrap();
+
+        // Non-empty set that does not include j-flip, so this hits the
+        // NOT IN + ON CONFLICT path rather than the empty-set fallback.
+        let owned: std::collections::HashSet<String> =
+            ["peer-journal".to_string()].into_iter().collect();
+
+        adopt_unowned_local_journals(&conn, &owned).unwrap();
+
+        assert_eq!(
+            journal_sync_status(&conn, "j-flip").as_deref(),
+            Some("pending"),
+            "DO UPDATE must flip synced → pending"
+        );
+        let version: i64 = conn
+            .query_row(
+                "SELECT local_version FROM journal_sync_state WHERE journal_id = 'j-flip'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, 3, "status flip must not rewrite local_version");
+    }
+
+    #[test]
+    fn adopt_unowned_journals_includes_tombstones() {
+        let conn = setup();
+        seed_legacy_journal(&conn, "j-tomb", 1);
+        seed_legacy_journal(&conn, "j-peer-tomb", 1);
+
+        let owned: std::collections::HashSet<String> =
+            ["j-peer-tomb".to_string()].into_iter().collect();
+
+        adopt_unowned_local_journals(&conn, &owned).unwrap();
+
+        assert_eq!(
+            journal_sync_status(&conn, "j-tomb").as_deref(),
+            Some("pending"),
+            "a local tombstone must be adopted"
+        );
+        assert_eq!(
+            journal_sync_status(&conn, "j-peer-tomb"),
+            None,
+            "a peer-owned tombstone must stay unadopted"
+        );
+        let still_deleted: i64 = conn
+            .query_row(
+                "SELECT is_deleted FROM journals WHERE id = 'j-tomb'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(still_deleted, 1, "adoption must not resurrect the journal");
     }
 
     /// Regression test (Codex P1): a pulled tombstone (is_deleted=1, no

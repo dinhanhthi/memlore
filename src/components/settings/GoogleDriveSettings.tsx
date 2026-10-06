@@ -2,6 +2,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Clock, Cloud, HardDrive, Mail, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
 import { useIcloudAvailability } from '../../hooks/useIcloudAvailability'
 import { usePickFolder } from '../../hooks/usePickFolder'
@@ -126,6 +127,7 @@ function recoveryStatusLabelKey(status: string): string {
  */
 export function GoogleDriveSettings() {
   const { t } = useTranslation('settings')
+  const caps = useCapabilities()
   const { available: icloudAvailable, loading: icloudLoading } = useIcloudAvailability()
   const pickFolder = usePickFolder()
   const lastErrorAction = useSyncStore((s) => s.lastErrorAction)
@@ -505,12 +507,26 @@ export function GoogleDriveSettings() {
   const actionsDisabled = isBusy || recoveryBlocksActions
 
   const showOpenSyncHelp =
+    caps.syncAdmin &&
     isConnected &&
     !!lastError &&
     lastErrorAction?.kind !== 'gdrive_token_revoked' &&
     lastErrorAction?.kind !== 'cross_mode_needs_password' &&
     lastErrorAction?.kind !== 'cross_mode_needs_no_password' &&
     lastErrorAction?.kind !== 'force_re_pair_required'
+
+  // The Security category is hidden when !vaultAdmin (web) — hide the deep
+  // link too rather than rely on the panel's silent fallback to categories[0].
+  const securityCta = caps.vaultAdmin ? (
+    <Button
+      variant="primary"
+      size="sm"
+      onClick={() => setSettingsCategory('security')}
+      data-testid="cross-mode-goto-security"
+    >
+      {t('gdrive.cross_mode.cta')}
+    </Button>
+  ) : undefined
 
   const storageUsage =
     status?.storageUsed != null && status.storageTotal != null
@@ -569,19 +585,19 @@ export function GoogleDriveSettings() {
           tone="danger"
           className="mb-4"
           title={t('gdrive.cross_mode.needs_password_title')}
-          action={
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setSettingsCategory('security')}
-              data-testid="cross-mode-goto-security"
-            >
-              {t('gdrive.cross_mode.cta')}
-            </Button>
-          }
+          action={securityCta}
         >
-          <p>{t('gdrive.cross_mode.needs_password_body')}</p>
-          <p className="mt-1">{t('gdrive.cross_mode.needs_password_note')}</p>
+          {/* Web has no Security tab and no disconnect — the *_web body leads
+              with the only viable path (fix the mode on the desktop device);
+              the desktop note is hidden since its steps need both. */}
+          <p>
+            {t(
+              caps.vaultAdmin
+                ? 'gdrive.cross_mode.needs_password_body'
+                : 'gdrive.cross_mode.needs_password_body_web',
+            )}
+          </p>
+          {caps.vaultAdmin && <p className="mt-1">{t('gdrive.cross_mode.needs_password_note')}</p>}
         </Callout>
       )}
       {provider === 'gdrive' && lastErrorAction?.kind === 'cross_mode_needs_no_password' && (
@@ -589,19 +605,18 @@ export function GoogleDriveSettings() {
           tone="danger"
           className="mb-4"
           title={t('gdrive.cross_mode.needs_no_password_title')}
-          action={
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setSettingsCategory('security')}
-              data-testid="cross-mode-goto-security"
-            >
-              {t('gdrive.cross_mode.cta')}
-            </Button>
-          }
+          action={securityCta}
         >
-          <p>{t('gdrive.cross_mode.needs_no_password_body')}</p>
-          <p className="mt-1">{t('gdrive.cross_mode.needs_no_password_note')}</p>
+          <p>
+            {t(
+              caps.vaultAdmin
+                ? 'gdrive.cross_mode.needs_no_password_body'
+                : 'gdrive.cross_mode.needs_no_password_body_web',
+            )}
+          </p>
+          {caps.vaultAdmin && (
+            <p className="mt-1">{t('gdrive.cross_mode.needs_no_password_note')}</p>
+          )}
         </Callout>
       )}
 
@@ -890,26 +905,30 @@ export function GoogleDriveSettings() {
           className="mt-4 mb-2"
           isConnecting={false}
           actions={
-            <>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={actionsDisabled || isSyncing}
-                onClick={() => setDisconnectConfirmOpen(true)}
-                data-testid="cloud-disconnect"
-              >
-                {t('gdrive.disconnect')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={actionsDisabled}
-                onClick={() => useSyncRecoveryWizardStore.getState().openWizard()}
-                data-testid="gdrive-recovery-wizard-open"
-              >
-                {t('gdrive.recovery_wizard.card_button')}
-              </Button>
-            </>
+            // Disconnect and the recovery wizard are sync-admin operations —
+            // unsupported on web. SyncStatus still shows status + Sync now.
+            caps.syncAdmin ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={actionsDisabled || isSyncing}
+                  onClick={() => setDisconnectConfirmOpen(true)}
+                  data-testid="cloud-disconnect"
+                >
+                  {t('gdrive.disconnect')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={actionsDisabled}
+                  onClick={() => useSyncRecoveryWizardStore.getState().openWizard()}
+                  data-testid="gdrive-recovery-wizard-open"
+                >
+                  {t('gdrive.recovery_wizard.card_button')}
+                </Button>
+              </>
+            ) : undefined
           }
         />
       )}

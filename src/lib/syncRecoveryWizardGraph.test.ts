@@ -22,11 +22,14 @@ describe('syncRecoveryWizardGraph', () => {
   describe('nextStep', () => {
     it.each([
       ['triage', 'sync_stuck', 'reset_confirm'],
+      ['triage', 'missing_elsewhere', 'repair_confirm'],
       ['triage', 'device_wrong', 'cloud_to_local_confirm'],
       ['triage', 'cloud_wrong', 'local_to_cloud_confirm'],
       ['triage', 'stop_syncing', 'stop_choice'],
       ['reset_confirm', 'next', 'reset_running'],
       ['reset_running', 'next', 'reset_done'],
+      ['repair_confirm', 'next', 'repair_running'],
+      ['repair_running', 'next', 'repair_done'],
       ['stop_choice', 'keep_cloud', 'disconnect_confirm'],
       ['stop_choice', 'delete_cloud', 'delete_confirm'],
       ['disconnect_confirm', 'next', 'disconnect_running'],
@@ -44,6 +47,9 @@ describe('syncRecoveryWizardGraph', () => {
       'reset_confirm',
       'reset_running',
       'reset_done',
+      'repair_confirm',
+      'repair_running',
+      'repair_done',
       'cloud_to_local_confirm',
       'local_to_cloud_confirm',
       'stop_choice',
@@ -61,7 +67,12 @@ describe('syncRecoveryWizardGraph', () => {
       },
     )
 
-    it.each(['reset_done', 'disconnect_done', 'delete_done'] satisfies SyncRecoveryWizardStep[])(
+    it.each([
+      'reset_done',
+      'repair_done',
+      'disconnect_done',
+      'delete_done',
+    ] satisfies SyncRecoveryWizardStep[])(
       'treats %s as terminal — next is a no-op',
       (step) => {
         const state = at(step)
@@ -97,12 +108,14 @@ describe('syncRecoveryWizardGraph', () => {
   describe('prevStep', () => {
     it.each([
       ['reset_confirm', 'triage'],
+      ['repair_confirm', 'triage'],
       ['cloud_to_local_confirm', 'triage'],
       ['local_to_cloud_confirm', 'triage'],
       ['stop_choice', 'triage'],
       ['disconnect_confirm', 'stop_choice'],
       ['delete_confirm', 'stop_choice'],
       ['reset_running', 'reset_confirm'],
+      ['repair_running', 'repair_confirm'],
       ['disconnect_running', 'disconnect_confirm'],
       ['delete_running', 'delete_confirm'],
     ] satisfies [SyncRecoveryWizardStep, SyncRecoveryWizardStep][])(
@@ -115,6 +128,7 @@ describe('syncRecoveryWizardGraph', () => {
     it.each([
       'triage',
       'reset_done',
+      'repair_done',
       'disconnect_done',
       'delete_done',
     ] satisfies SyncRecoveryWizardStep[])('treats %s as terminal for back navigation', (step) => {
@@ -132,6 +146,9 @@ describe('syncRecoveryWizardGraph', () => {
         reset_confirm: true,
         reset_running: true,
         reset_done: true,
+        repair_confirm: true,
+        repair_running: true,
+        repair_done: true,
         cloud_to_local_confirm: true,
         local_to_cloud_confirm: true,
         stop_choice: true,

@@ -5,6 +5,7 @@ import { useSyncRecoveryWizardStore } from '../../../stores/syncRecoveryWizardSt
 import { Button } from '../../common/Button'
 import { Modal } from '../../common/Modal'
 import type { SecureWizardStepProps, SecureWizardStepView } from '../secureWizard/types'
+import { RepairSteps } from './steps/RepairSteps'
 import { ReplaceSteps } from './steps/ReplaceSteps'
 import { ResetSteps } from './steps/ResetSteps'
 import { StopSteps } from './steps/StopSteps'
@@ -34,6 +35,11 @@ function WizardStep({ step, render, onStatusChanged, onRecoveryConfirmed }: Wiza
     case 'reset_running':
     case 'reset_done':
       return <ResetSteps render={render} />
+
+    case 'repair_confirm':
+    case 'repair_running':
+    case 'repair_done':
+      return <RepairSteps render={render} />
 
     case 'cloud_to_local_confirm':
     case 'local_to_cloud_confirm':

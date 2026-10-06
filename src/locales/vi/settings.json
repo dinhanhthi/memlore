@@ -481,10 +481,23 @@
   "about_section": {
     "heading_title": "Memlore",
     "version": "Phiên bản {{version}}",
+    "web": {
+      "title": "Về phiên bản web",
+      "intro": "Memlore Web là bản đồng hành của ứng dụng desktop. Nó mở nhật ký đã mã hóa mà bạn đồng bộ lên Google Drive, ngay trong trình duyệt — nhưng có ít chức năng hơn bản desktop.",
+      "limits": {
+        "vault": "Cần một nhật ký được tạo trong ứng dụng desktop và đồng bộ qua Google Drive. Không hỗ trợ iCloud Drive.",
+        "online": "Các mục được tải từ Google Drive khi bạn mở; khi ngoại tuyến bạn chỉ đọc được những gì đã lưu đệm.",
+        "editing": "Bạn có thể viết và sửa mục, nhưng không xóa được; nhật ký, thẻ và mẫu chỉ quản lý được trên desktop.",
+        "features": "Không có AI, bảng điều khiển, thống kê, thư viện ảnh, \"Ngày này năm xưa\", nhắc nhở, lịch sử phiên bản, nhập/xuất, ghi âm hay đính kèm tệp.",
+        "security": "Không mở khóa sinh trắc học, đổi mật khẩu hay công cụ khôi phục."
+      },
+      "recommend": "Để dùng đầy đủ chức năng — ngoại tuyến, AI, thống kê và mọi thứ khác — hãy dùng <desktopLink>ứng dụng Memlore desktop</desktopLink>."
+    },
     "description": "Một đời bé nhỏ. Một câu chuyện ở lại. Nhật ký đa nền tảng, ưu tiên riêng tư, ưu tiên cục bộ — với AI phong phú, tùy chọn.",
     "principles_title": "Nguyên tắc cốt lõi",
     "principles": {
       "local_first": "Ưu tiên cục bộ — hoạt động hoàn toàn ngoại tuyến. Các mục nằm trên thiết bị của bạn.",
+      "local_first_web": "Mã hóa ngay trong trình duyệt — các mục chỉ được giải mã trong tab này; bộ nhớ đệm trình duyệt và Google Drive chỉ chứa dữ liệu đã mã hóa.",
       "private": "Riêng tư — mã hóa khi lưu. Không máy chủ Memlore, không tài khoản, không telemetry.",
       "ai_optional": "AI tùy chọn — tắt cho đến khi bạn bật. Nhà cung cấp của bạn, kể cả trên thiết bị.",
       "yours": "Của bạn — đồng bộ qua Drive của riêng bạn nếu muốn. Xuất bất cứ lúc nào."
@@ -876,6 +889,8 @@
         "question": "Chuyện gì đang xảy ra?",
         "stuck_title": "Đồng bộ có vẻ bị kẹt hoặc một số mục không bao giờ tải lên",
         "stuck_hint": "Tải lại những mục do thiết bị này quản lý trong lần đồng bộ tới. Không xóa gì ở bất kỳ đâu.",
+        "missing_title": "Một số entry hoặc journal bị thiếu trên thiết bị khác hoặc bản web",
+        "missing_hint": "Đăng lên mọi thứ trên máy này mà chưa thiết bị nào sở hữu. Không xoá gì cả.",
         "device_wrong_title": "Thiết bị này sai — {{provider}} có bản tôi tin cậy",
         "device_wrong_hint": "Tải xuống và kiểm tra bản đám mây, rồi thay thế dữ liệu đồng bộ trên thiết bị này.",
         "cloud_wrong_title": "{{provider}} sai — thiết bị này có bản tôi tin cậy",
@@ -893,6 +908,16 @@
       "reset": {
         "running": "Đang đặt lại trạng thái đồng bộ…",
         "done_title": "Đã đặt lại trạng thái đồng bộ"
+      },
+      "repair": {
+        "confirm_title": "Khắc phục từ thiết bị này?",
+        "confirm_body": "Đăng các mục nhật ký và sổ trên thiết bị này mà chưa thiết bị nào sở hữu, để chúng tải lên trong lần đồng bộ tới. Không xóa gì trên thiết bị này hoặc bản đám mây.",
+        "confirm_button": "Khắc phục",
+        "running": "Đang khắc phục từ thiết bị này…",
+        "done_title": "Đã khắc phục",
+        "success": "{{entries}} mục nhật ký và {{journals}} sổ sẽ được tải lên trong lần đồng bộ tới.",
+        "queued": "Đã xếp hàng khắc phục. Thao tác sẽ chạy khi lượt đồng bộ hiện tại hoàn tất.",
+        "error": "Khắc phục thất bại: {{message}}"
       },
       "disconnect": {
         "running": "Đang ngắt kết nối {{provider}}…",
@@ -917,9 +942,11 @@
     "cross_mode": {
       "needs_password_title": "Thư mục đồng bộ đang được mã hóa bằng mật khẩu",
       "needs_password_body": "Thiết bị này đang ở chế độ không mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị có bảo vệ bằng mật khẩu. Hãy đặt một mật khẩu trong Bảo mật để mở khóa các mục đã đồng bộ — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_password_body_web": "Thiết bị này đang ở chế độ không mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị có bảo vệ bằng mật khẩu. Để đọc các mục đã đồng bộ, hãy mở ứng dụng Memlore trên máy tính ở thiết bị đã tạo thư mục đồng bộ, bỏ mật khẩu trong Cài đặt → Bảo mật, rồi đồng bộ một lần — ứng dụng web không thể tự đặt mật khẩu hay ngắt kết nối.",
       "needs_password_note": "Muốn thư mục trên Drive cũng không có mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật bỏ mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
       "needs_no_password_title": "Thư mục đồng bộ không được mã hóa",
       "needs_no_password_body": "Thiết bị này đang ở chế độ mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị không có mật khẩu. Hãy bỏ mật khẩu trong Bảo mật để đọc các mục này — hoặc ngắt kết nối khỏi thư mục này.",
+      "needs_no_password_body_web": "Thiết bị này đang ở chế độ mật khẩu, nhưng thư mục trên Drive được tạo bởi một thiết bị không có mật khẩu. Để đọc các mục này, hãy mở ứng dụng Memlore trên máy tính ở thiết bị đã tạo thư mục đồng bộ, đặt cùng mật khẩu vault với thiết bị này trong Cài đặt → Bảo mật, rồi đồng bộ một lần — ứng dụng web không thể tự đổi cài đặt mật khẩu hay ngắt kết nối.",
       "needs_no_password_note": "Muốn thư mục trên Drive cũng được bảo vệ bằng mật khẩu? Mở thiết bị đã tạo thư mục đồng bộ, vào Cài đặt → Bảo mật đặt mật khẩu, rồi đồng bộ một lần. Sau đó thiết bị này có thể ngắt kết nối, vào drive.google.com xóa thủ công dữ liệu ẩn của Memlore, và kết nối lại.",
       "cta": "Mở cài đặt Bảo mật"
     }

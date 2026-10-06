@@ -401,9 +401,7 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'delete_media',
   'ensure_video_thumbnail',
   'gdrive_disconnect',
-  'gdrive_refresh_storage_quota',
   'gdrive_test_connection',
-  'mark_entry_date_user_edited',
   'pick_files_to_attach',
   'pick_images_from_library',
   'pick_videos_from_library',
@@ -411,6 +409,7 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'set_media_upload_limits',
   'set_sync_enabled',
   'set_sync_settings',
+  // TODO(later): see docs/LATER.md - Attached media insertion mode (no insertion_mode field in the frozen outbox payload)
   'update_media_insertion_mode',
 ]
 

@@ -1,8 +1,9 @@
 import { IDBFactory } from 'fake-indexeddb'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { oauth } from '../drive/oauth'
 import { createDraftManager, resetDraftsAutostartForTest, type DraftManager } from '../drafts'
 import { dispose, lock, setKeyRing, type KeyRing } from '../keys'
-import { openWebDb } from '../storage/idb'
+import { WRAPPED_MASTER_HEX_LEN, openWebDb } from '../storage/idb'
 import type { PushResult } from '../sync/push'
 import type { PullOutcome } from './readSession'
 import {
@@ -617,6 +618,133 @@ describe('status and settings', () => {
   })
 })
 
+describe('gdrive_refresh_storage_quota', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  /** A connected browser: OAuth session plus an enrolled device record. */
+  async function connect(): Promise<void> {
+    vi.spyOn(oauth, 'isConnected').mockReturnValue(true)
+    vi.spyOn(oauth, 'getAccessToken').mockResolvedValue('tok')
+    const factory = new IDBFactory()
+    vi.stubGlobal('indexedDB', factory)
+    const db = await openWebDb({ factory })
+    await db.device.put({
+      deviceId: 'web-1234',
+      wrappedMasterHex: 'ab'.repeat(WRAPPED_MASTER_HEX_LEN / 2),
+      kekSaltHex: 'cd'.repeat(16),
+      recoveryGeneration: 1,
+      masterFingerprint: 'fp-1',
+      name: 'Memlore Web',
+    })
+    db.close()
+  }
+
+  function scriptDrive(about: Response, pages: Response[]): string[] {
+    const urls: string[] = []
+    let page = 0
+    vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
+      urls.push(String(input))
+      const auth = new Headers(init?.headers).get('authorization')
+      if (auth !== 'Bearer tok') return new Response('unauthorized', { status: 401 })
+      if (String(input).includes('/drive/v3/about')) return about
+      if (String(input).includes('/drive/v3/files')) {
+        const next = pages[page]
+        page += 1
+        return next ?? new Response('missing page', { status: 500 })
+      }
+      return new Response('unexpected', { status: 500 })
+    })
+    return urls
+  }
+
+  const aboutOk = (email = 'ada@example.com', usage = '1000', limit?: string) =>
+    Response.json({
+      user: { emailAddress: email },
+      storageQuota: { usage, ...(limit === undefined ? {} : { limit }) },
+    })
+
+  it('reports the signed-in email, Drive quota, and bytes Memlore occupies', async () => {
+    const h = harness()
+    await connect()
+    startSyncSchedule()
+    await h.settle()
+    const urls = scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '40' }, { size: 'nope' }], nextPageToken: 'p2' }),
+      Response.json({ files: [{ size: '2' }, {}] }),
+    ])
+
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).resolves.toEqual({
+      connected: true,
+      provider: 'gdrive',
+      lastSync: 1_800_000_000,
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+    expect(
+      urls.some((url) => url.includes('/drive/v3/about') && url.includes('emailAddress')),
+    ).toBe(true)
+    const lists = urls.filter((url) => url.includes('/drive/v3/files'))
+    expect(lists).toHaveLength(2)
+    expect(lists.every((url) => url.includes('spaces=appDataFolder'))).toBe(true)
+    expect(lists[1]).toContain('pageToken=p2')
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toMatchObject({
+      connected: true,
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+  })
+
+  it('keeps the last good quota when about fails, and the last Memlore usage when the file sum fails', async () => {
+    harness()
+    await connect()
+    scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '42' }] }),
+    ])
+    await syncHandlers.gdrive_refresh_storage_quota({})
+
+    scriptDrive(new Response('down', { status: 400 }), [])
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).rejects.toThrow()
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toMatchObject({
+      email: 'ada@example.com',
+      storageUsed: 1000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+
+    scriptDrive(aboutOk('', '2000'), [new Response('list down', { status: 400 })])
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).resolves.toEqual({
+      connected: true,
+      provider: 'gdrive',
+      email: 'ada@example.com',
+      storageUsed: 2000,
+      storageTotal: 5000,
+      storageAppUsed: 42,
+    })
+  })
+
+  it('rejects when Drive is not connected and forgets the cached account', async () => {
+    harness()
+    await connect()
+    scriptDrive(aboutOk('ada@example.com', '1000', '5000'), [
+      Response.json({ files: [{ size: '42' }] }),
+    ])
+    await syncHandlers.gdrive_refresh_storage_quota({})
+
+    vi.mocked(oauth.isConnected).mockReturnValue(false)
+    await expect(syncHandlers.gdrive_refresh_storage_quota({})).rejects.toThrow(
+      'Not connected to Google Drive',
+    )
+    await expect(syncHandlers.gdrive_get_status({})).resolves.toEqual({ connected: false })
+  })
+})
+
 // ---------------------------------------------------------------------------------------------
 // Push (Phase 16.5)
 // ---------------------------------------------------------------------------------------------
@@ -737,6 +865,126 @@ describe('push triggers', () => {
     await h.advance(PUSH_DEBOUNCE_MS)
     expect(h.pushes).toBe(1)
     h.online()
+    await h.settle()
+    expect(h.pushes).toBe(2)
+  })
+})
+
+describe('push gate', () => {
+  it('gates save, visible, online and flag-on pushes while the unlock pull is still in flight', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    const drafts = await draftManager()
+    startSyncSchedule()
+    await h.settle()
+    expect(h.pulls).toBe(1) // the unlock pull is in flight, held
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    h.online()
+    h.flagOn()
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    gate.resolve(NOOP)
+    await h.settle()
+    expect(h.pushes).toBe(1) // the first success pushes the pending drafts
+  })
+
+  it('the first successful pull pushes pending drafts exactly once, whatever ran it', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    startSyncSchedule()
+    await h.settle()
+    gate.resolve(NOOP)
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    await h.advance(INTERVAL_MS) // an interval pull does not push again
+    await h.settle()
+    expect(h.pushes).toBe(1)
+
+    // A 'retry' success after a transient failure is also the epoch's first: one push.
+    const h2 = harness()
+    h2.flag = true
+    h2.pending = 1
+    h2.queue(async () => {
+      throw named('PullTransientError', 'offline')
+    })
+    startSyncSchedule()
+    await h2.settle()
+    expect(h2.pushes).toBe(0)
+    await h2.advance(BACKOFF_BASE_MS) // the retry pull succeeds
+    expect(h2.pushes).toBe(1)
+  })
+
+  it('a pull failing with a revocation halts the schedule and no push ever runs', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 3
+    h.queue(async () => {
+      lock('revoked')
+      throw named('ReonboardRequiredError', 'This browser must be re-enrolled (slot-missing).')
+    })
+    startSyncSchedule()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'error' })
+    h.online()
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    h.flagOn()
+    await h.advance(PUSH_DEBOUNCE_MS * 3)
+    expect(h.pushes).toBe(0)
+  })
+
+  it('a transient pull failure keeps pushes gated until a later pull succeeds', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    const drafts = await draftManager()
+    h.queue(async () => {
+      throw named('PullTransientError', 'offline')
+    })
+    startSyncSchedule()
+    await h.settle()
+    // Every trigger fires while no pull has ever succeeded: still gated.
+    await drafts.saveDraft('a', new Uint8Array([1]))
+    await h.advance(PUSH_DEBOUNCE_MS)
+    h.online()
+    h.setVisible('hidden')
+    h.setVisible('visible')
+    await h.settle()
+    expect(h.pushes).toBe(0)
+    // The backoff retry pulls and succeeds: the gate opens and the drafts go out.
+    h.pushResult = { pushed: 2, skipped: 0, pending: 0 }
+    await h.advance(BACKOFF_BASE_MS)
+    await h.settle()
+    expect(h.pushes).toBe(1)
+  })
+
+  it('the gate resets on stop/start: a new epoch pushes nothing until its pull lands', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = PUSHED_ALL
+    startSyncSchedule()
+    await h.settle()
+    expect(h.pushes).toBe(1)
+    h.pending = 1
+    const gate = new Deferred<PullOutcome>()
+    h.queue(() => gate.promise)
+    stopSyncSchedule()
+    startSyncSchedule()
+    await h.settle()
+    h.online()
+    await h.settle()
+    expect(h.pushes).toBe(1) // gated again under the new epoch
+    gate.resolve(NOOP)
     await h.settle()
     expect(h.pushes).toBe(2)
   })
@@ -1001,11 +1249,13 @@ describe('push status', () => {
   it('a successful push does not hide a pull error', async () => {
     const h = harness()
     h.flag = true
+    startSyncSchedule() // the unlock pull succeeds: automatic pushes are ungated
+    await h.settle()
     h.queue(async () => {
       throw new Error('offline')
     })
-    startSyncSchedule()
-    await h.settle()
+    const summary = (await syncHandlers.sync_now({})) as { errors: string[] }
+    expect(summary.errors).toEqual(['offline'])
     h.online()
     await h.settle()
     expect(h.pushes).toBe(1)

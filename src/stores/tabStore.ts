@@ -18,6 +18,8 @@ import type { PaginatedViewKey } from '../types/pagination'
 import { patchAffectsNav, snapshotFromTab, useTabHistoryStore } from './tabHistoryStore'
 import { randomId } from '../lib/randomId'
 import { capabilities } from '../lib/platform'
+import { isSettingsCategoryAvailable } from '../lib/settingsAvailability'
+import { isViewAvailable } from '../lib/viewAvailability'
 
 export interface Tab {
   id: string
@@ -111,8 +113,14 @@ interface TabState {
 // Dashboard and Statistics are off on the web (docs/LATER.md), so tabs open on Entries there.
 const HOME_VIEW: ActiveView = capabilities.dashboard ? 'dashboard' : 'entries'
 
-const isUnavailableView = (view: ActiveView): boolean =>
-  (view === 'dashboard' && !capabilities.dashboard) || (view === 'stats' && !capabilities.stats)
+// New tabs default to Security on desktop; on web that category is a
+// placeholder, so land on the first functional one instead.
+export const DEFAULT_SETTINGS_CATEGORY: SettingsCategory = isSettingsCategoryAvailable(
+  'security',
+  capabilities,
+)
+  ? 'security'
+  : 'general'
 
 export function makeDefaultTab(): Tab {
   return {
@@ -125,7 +133,7 @@ export function makeDefaultTab(): Tab {
     selectedChatSessionId: null,
     dirty: false,
     pinned: false,
-    settingsCategory: 'security',
+    settingsCategory: DEFAULT_SETTINGS_CATEGORY,
     securityTab: 'device_password',
     locationTab: 'geocoding',
     aiTab: 'chat',
@@ -187,7 +195,7 @@ export const useTabStore = create<TabState>()(
           selectedChatSessionId: null,
           dirty: false,
           pinned: false,
-          settingsCategory: 'security',
+          settingsCategory: DEFAULT_SETTINGS_CATEGORY,
           securityTab: 'device_password',
           locationTab: 'geocoding',
           aiTab: 'chat',
@@ -417,7 +425,7 @@ export const useTabStore = create<TabState>()(
         const validStats: StatsTab[] = ['charts', 'insights', 'reviews', 'usage', 'audit']
 
         state.tabs = state.tabs.map((t) => {
-          let settingsCategory: SettingsCategory = t.settingsCategory ?? 'security'
+          let settingsCategory: SettingsCategory = t.settingsCategory ?? DEFAULT_SETTINGS_CATEGORY
           if (!validCategory.includes(settingsCategory)) settingsCategory = 'appearance'
 
           let securityTab: SecurityTab = t.securityTab ?? 'device_password'
@@ -495,7 +503,7 @@ export function applyLaunchView(): void {
   const { tabs, activeTabId } = useTabStore.getState()
   if (!tabs.some((t) => t.id === activeTabId)) return
   const needsHome = (t: Tab) =>
-    (t.id === activeTabId || isUnavailableView(t.activeView)) && t.activeView !== HOME_VIEW
+    (t.id === activeTabId || !isViewAvailable(t.activeView)) && t.activeView !== HOME_VIEW
   if (!tabs.some(needsHome)) return
   useTabStore.setState({
     tabs: tabs.map((t) => (needsHome(t) ? { ...t, activeView: HOME_VIEW } : t)),

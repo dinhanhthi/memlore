@@ -112,6 +112,9 @@ export default defineConfig({
   build: {
     outDir: here('./dist'),
     emptyOutDir: true,
+    // font-src 'self' in web/static/_headers forbids data: fonts — never inline woff/woff2,
+    // emit them as real files. `undefined` keeps the default 4 KB limit for other assets.
+    assetsInlineLimit: (filePath) => (/\.woff2?$/.test(filePath) ? false : undefined),
     rollupOptions: {
       input: here('./index.html'),
     },

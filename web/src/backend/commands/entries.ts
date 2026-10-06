@@ -592,11 +592,7 @@ const saveEntryContent = outboxWrite(async (args, lock) => {
 
   const rawYjs = args.yjsDoc
   const localDocBytes =
-    rawYjs instanceof Uint8Array
-      ? rawYjs
-      : Array.isArray(rawYjs)
-        ? new Uint8Array(rawYjs)
-        : null
+    rawYjs instanceof Uint8Array ? rawYjs : Array.isArray(rawYjs) ? new Uint8Array(rawYjs) : null
 
   const contentText = typeof args.contentText === 'string' ? args.contentText : null
   const previewText = typeof args.previewText === 'string' ? args.previewText : null
@@ -655,10 +651,10 @@ const updateEntry = outboxWrite(async (args, lock) => {
   if (typeof args.title === 'string') {
     const base = priorIntent?.fields.title
       ? priorIntent.fields.title.base
-      : syncedEntry?.metadata.title ?? ''
+      : (syncedEntry?.metadata.title ?? '')
     const baseUpdatedAt = priorIntent?.fields.title
       ? priorIntent.fields.title.base_updated_at
-      : syncedEntry?.metadata.updated_at ?? 0
+      : (syncedEntry?.metadata.updated_at ?? 0)
     newFields.title = {
       value: args.title,
       base,
@@ -730,13 +726,89 @@ const updateEntryDate = outboxWrite(async (args, lock) => {
     : String(syncedEntry?.metadata.entry_date ?? nowSecs)
   const baseUpdatedAt = priorIntent?.fields.entry_date
     ? priorIntent.fields.entry_date.base_updated_at
-    : syncedEntry?.metadata.updated_at ?? 0
+    : (syncedEntry?.metadata.updated_at ?? 0)
 
   const newFields: Partial<OutboxFields> = {
     entry_date: {
       value: String(Math.floor(entryDate)),
       base,
       base_updated_at: baseUpdatedAt,
+      change_seq: changeSeq,
+      changed_at_secs: nowSecs,
+    },
+  }
+
+  const updatedIntent = buildOutboxIntent({
+    entryId: id,
+    webDeviceId: device.deviceId,
+    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+    baseSyncedDocBytes: baseDocBytes,
+    priorIntent,
+    localDocBytes: null,
+    contentText: null,
+    previewText: null,
+    newFields,
+    nowSecs,
+  })
+
+  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+  const draftManager = createDraftManager({ db })
+  await draftManager.saveDraft(id, sealed)
+
+  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== id)
+  vault.setOutboxIntents([...currentIntents, updatedIntent])
+  readEnv().emit('memlore:entries-changed')
+})
+
+/**
+ * `mark_entry_date_user_edited` (desktop `queries.rs:2754`, a flag-flip that never touches
+ * `entry_date`). The intent format has no flag field of its own: the flag rides on
+ * `fields.entry_date` — the desktop importer marks `entry_date_user_edited` whenever it
+ * applies an entry_date change (`outbox_import.rs`), and the vault overlay mirrors it.
+ * Every web caller marks right after `update_entry_date`, so the intent normally carries
+ * the change already; a bare mark confirm-writes the current date (same value — the
+ * importer reports it "reflected", so the flag stays a local overlay signal) so the
+ * record still exists. A recorded change is never rewritten: its base and change_seq
+ * are what the conflict rules compare against.
+ */
+const markEntryDateUserEdited = outboxWrite(async (args, lock) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  if (!id) throw new Error('id is required')
+
+  const { vault, db, core } = await openForWrite()
+  const ring = getKeyRing()
+
+  if ((await loadVisible(vault, id)) === null) throw new EntryNotAvailableError()
+  await lock()
+
+  const priorIntent = vault.getOutboxIntent(id) ?? null
+  if (priorIntent?.fields.entry_date) {
+    // The flag is already recorded on the intent's date change.
+    readEnv().emit('memlore:entries-changed')
+    return
+  }
+
+  // Throws ForeignEntryReadOnlyError for an entry known only from another browser's outbox.
+  const writeView = vault.getWriteView(id)
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+  const changeSeq = await db.device.allocateChangeSeq()
+  const nowSecs = correctedNowSecs()
+
+  let baseDocBytes: Uint8Array | null = null
+  if (!priorIntent?.created_on_web) {
+    const rawBase = vault.getWriteView(id).content
+    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+  }
+
+  const entryDate = writeView.metadata.entry_date
+  const newFields: Partial<OutboxFields> = {
+    entry_date: {
+      value: String(entryDate),
+      base: String(entryDate),
+      base_updated_at: writeView.metadata.updated_at,
       change_seq: changeSeq,
       changed_at_secs: nowSecs,
     },
@@ -802,10 +874,10 @@ const updateEntryEmotion = outboxWrite(async (args, lock) => {
 
   const base = priorIntent?.fields.emotion
     ? priorIntent.fields.emotion.base
-    : syncedEntry?.metadata.emotion ?? null
+    : (syncedEntry?.metadata.emotion ?? null)
   const baseUpdatedAt = priorIntent?.fields.emotion
     ? priorIntent.fields.emotion.base_updated_at
-    : syncedEntry?.metadata.updated_at ?? 0
+    : (syncedEntry?.metadata.updated_at ?? 0)
 
   const newFields: Partial<OutboxFields> = {
     emotion: {
@@ -873,12 +945,10 @@ const toggleFavorite = outboxWrite(async (args, lock) => {
     if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
   }
 
-  const base = priorIntent?.fields.is_favorite
-    ? priorIntent.fields.is_favorite.base
-    : currentFav
+  const base = priorIntent?.fields.is_favorite ? priorIntent.fields.is_favorite.base : currentFav
   const baseUpdatedAt = priorIntent?.fields.is_favorite
     ? priorIntent.fields.is_favorite.base_updated_at
-    : syncedEntry?.metadata.updated_at ?? 0
+    : (syncedEntry?.metadata.updated_at ?? 0)
 
   const newFields: Partial<OutboxFields> = {
     is_favorite: {
@@ -946,10 +1016,10 @@ const moveEntryToJournal = outboxWrite(async (args, lock) => {
 
   const base = priorIntent?.fields.journal_id
     ? priorIntent.fields.journal_id.base
-    : syncedEntry?.metadata.journal_id ?? ''
+    : (syncedEntry?.metadata.journal_id ?? '')
   const baseUpdatedAt = priorIntent?.fields.journal_id
     ? priorIntent.fields.journal_id.base_updated_at
-    : syncedEntry?.metadata.updated_at ?? 0
+    : (syncedEntry?.metadata.updated_at ?? 0)
 
   const newFields: Partial<OutboxFields> = {
     journal_id: {
@@ -1140,124 +1210,122 @@ const getMediaUploadLimits: Handler = async () => ({
 
 const pickMedia = (kind: 'image' | 'video'): Handler =>
   outboxWrite(async (args, lock) => {
-  assertWritesEnabled()
-  const entryId = String(args.entryId ?? '')
-  if (!entryId) throw new Error('entryId is required')
-  const mode = String(args.insertionMode ?? 'inline')
-  if (mode !== 'inline' && mode !== 'attached') {
-    throw new Error(`invalid insertionMode: ${mode}`)
-  }
-
-  const { vault, db, core } = await openForWrite()
-  const ring = getKeyRing()
-
-  await ensureLoaded(vault, entryId)
-  if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
-    throw new EntryNotAvailableError()
-  }
-
-  const accept = kind === 'image' ? 'image/*' : 'video/*'
-  const file = await promptForFile(accept)
-  if (!file) return null
-
-  const maxBytes =
-    kind === 'image'
-      ? DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES
-      : DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES
-  if (file.size > maxBytes) {
-    if (kind === 'image') {
-      throw new Error(formatImageTooLargeError(file.size, maxBytes))
-    } else {
-      throw new Error(formatVideoTooLargeError(file.name, maxBytes))
+    assertWritesEnabled()
+    const entryId = String(args.entryId ?? '')
+    if (!entryId) throw new Error('entryId is required')
+    const mode = String(args.insertionMode ?? 'inline')
+    if (mode !== 'inline' && mode !== 'attached') {
+      throw new Error(`invalid insertionMode: ${mode}`)
     }
-  }
 
-  const mediaPlain = new Uint8Array(await file.arrayBuffer())
-  const rawMime = (file.type || '').trim().toLowerCase()
-  const mimeType = rawMime || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
-  if (!isAllowedMimeType(mimeType)) {
-    throw new Error(`unsupported mime type: ${mimeType}`)
-  }
-  if (kind === 'image' && !mimeType.startsWith('image/')) {
-    throw new Error(`expected image mime type, got: ${mimeType}`)
-  }
-  if (kind === 'video' && !mimeType.startsWith('video/')) {
-    throw new Error(`expected video mime type, got: ${mimeType}`)
-  }
+    const { vault, db, core } = await openForWrite()
+    const ring = getKeyRing()
 
-  const { thumbnailBytes } =
-    kind === 'image'
-      ? await generateImageThumbnail(mediaPlain, mimeType)
-      : await generateVideoThumbnail(mediaPlain, mimeType)
+    await ensureLoaded(vault, entryId)
+    if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
+      throw new EntryNotAvailableError()
+    }
 
-  const mediaId = crypto.randomUUID()
-  const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
-  const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
+    const accept = kind === 'image' ? 'image/*' : 'video/*'
+    const file = await promptForFile(accept)
+    if (!file) return null
 
-  // Outbox mutex from here (not across the picker or the thumbnail): re-read the intent,
-  // a retention pass may have dropped it meanwhile.
-  await lock()
-  const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
-  await db.blobs.put({
-    path: `outbox/m-${mediaId}`,
-    bytes: sealedMedia,
-    size: sealedMedia.length,
-    lastAccess: Date.now(),
+    const maxBytes =
+      kind === 'image' ? DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES : DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES
+    if (file.size > maxBytes) {
+      if (kind === 'image') {
+        throw new Error(formatImageTooLargeError(file.size, maxBytes))
+      } else {
+        throw new Error(formatVideoTooLargeError(file.name, maxBytes))
+      }
+    }
+
+    const mediaPlain = new Uint8Array(await file.arrayBuffer())
+    const rawMime = (file.type || '').trim().toLowerCase()
+    const mimeType = rawMime || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
+    if (!isAllowedMimeType(mimeType)) {
+      throw new Error(`unsupported mime type: ${mimeType}`)
+    }
+    if (kind === 'image' && !mimeType.startsWith('image/')) {
+      throw new Error(`expected image mime type, got: ${mimeType}`)
+    }
+    if (kind === 'video' && !mimeType.startsWith('video/')) {
+      throw new Error(`expected video mime type, got: ${mimeType}`)
+    }
+
+    const { thumbnailBytes } =
+      kind === 'image'
+        ? await generateImageThumbnail(mediaPlain, mimeType)
+        : await generateVideoThumbnail(mediaPlain, mimeType)
+
+    const mediaId = crypto.randomUUID()
+    const sealedMedia = core.sealOutboxMedia(ring, mediaPlain)
+    const sealedThumb = core.sealOutboxThumb(ring, thumbnailBytes)
+
+    // Outbox mutex from here (not across the picker or the thumbnail): re-read the intent,
+    // a retention pass may have dropped it meanwhile.
+    await lock()
+    const priorIntent = vault.getOutboxIntent(entryId) ?? null
+    if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
+    await db.blobs.put({
+      path: `outbox/m-${mediaId}`,
+      bytes: sealedMedia,
+      size: sealedMedia.length,
+      lastAccess: Date.now(),
+    })
+    await db.blobs.put({
+      path: `outbox/m-${mediaId}.thumb`,
+      bytes: sealedThumb,
+      size: sealedThumb.length,
+      lastAccess: Date.now(),
+    })
+
+    const mediaRef: OutboxMediaRef = {
+      media_id: mediaId,
+      file_name: file.name,
+      file_type: mimeType,
+      size: file.size,
+      has_thumb: true,
+    }
+
+    const device = await db.device.get()
+    if (!device) throw new Error('Device record missing')
+    const nowSecs = correctedNowSecs()
+
+    let baseDocBytes: Uint8Array | null = null
+    if (!priorIntent?.created_on_web) {
+      const rawBase = vault.getWriteView(entryId).content
+      if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
+    }
+
+    const updatedIntent = buildOutboxIntent({
+      entryId,
+      webDeviceId: device.deviceId,
+      createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
+      baseSyncedDocBytes: baseDocBytes,
+      priorIntent,
+      localDocBytes: null,
+      contentText: null,
+      previewText: null,
+      newFields: {},
+      mediaRefs: [mediaRef],
+      nowSecs,
+    })
+
+    const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
+    const draftManager = createDraftManager({ db })
+    await draftManager.saveDraft(entryId, sealed)
+
+    const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
+    vault.setOutboxIntents([...currentIntents, updatedIntent])
+    readEnv().emit('memlore:entries-changed')
+    readEnv().emit('media-changed')
+
+    return {
+      mediaId,
+      localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
+    }
   })
-  await db.blobs.put({
-    path: `outbox/m-${mediaId}.thumb`,
-    bytes: sealedThumb,
-    size: sealedThumb.length,
-    lastAccess: Date.now(),
-  })
-
-  const mediaRef: OutboxMediaRef = {
-    media_id: mediaId,
-    file_name: file.name,
-    file_type: mimeType,
-    size: file.size,
-    has_thumb: true,
-  }
-
-  const device = await db.device.get()
-  if (!device) throw new Error('Device record missing')
-  const nowSecs = correctedNowSecs()
-
-  let baseDocBytes: Uint8Array | null = null
-  if (!priorIntent?.created_on_web) {
-    const rawBase = vault.getWriteView(entryId).content
-    if (rawBase && rawBase.length > 0) baseDocBytes = rawBase
-  }
-
-  const updatedIntent = buildOutboxIntent({
-    entryId,
-    webDeviceId: device.deviceId,
-    createdOnWeb: priorIntent ? priorIntent.created_on_web : false,
-    baseSyncedDocBytes: baseDocBytes,
-    priorIntent,
-    localDocBytes: null,
-    contentText: null,
-    previewText: null,
-    newFields: {},
-    mediaRefs: [mediaRef],
-    nowSecs,
-  })
-
-  const sealed = core.sealOutboxEntry(ring, JSON.stringify(updatedIntent))
-  const draftManager = createDraftManager({ db })
-  await draftManager.saveDraft(entryId, sealed)
-
-  const currentIntents = vault.getOutboxIntents().filter((i) => i.entry_id !== entryId)
-  vault.setOutboxIntents([...currentIntents, updatedIntent])
-  readEnv().emit('memlore:entries-changed')
-  readEnv().emit('media-changed')
-
-  return {
-    mediaId,
-    localPath: `${WEB_MEDIA_PATH_PREFIX}${mediaId}`,
-  }
-})
 
 const savePastedImage = outboxWrite(async (args, lock) => {
   assertWritesEnabled()
@@ -1288,9 +1356,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   }
 
   const rawMime =
-    typeof args.mime === 'string' && args.mime.trim()
-      ? args.mime.trim().toLowerCase()
-      : 'image/png'
+    typeof args.mime === 'string' && args.mime.trim() ? args.mime.trim().toLowerCase() : 'image/png'
   if (!isAllowedMimeType(rawMime) || !rawMime.startsWith('image/')) {
     throw new Error(`unsupported mime type: ${rawMime}`)
   }
@@ -1382,6 +1448,7 @@ export const entryHandlers: Record<string, Handler> = {
   save_entry_content: saveEntryContent,
   update_entry: updateEntry,
   update_entry_date: updateEntryDate,
+  mark_entry_date_user_edited: markEntryDateUserEdited,
   update_entry_emotion: updateEntryEmotion,
   toggle_favorite: toggleFavorite,
   move_entry_to_journal: moveEntryToJournal,

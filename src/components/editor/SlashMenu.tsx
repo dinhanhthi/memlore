@@ -13,6 +13,7 @@ import {
   shiftLocalDate,
 } from '../../lib/slashDateTime'
 import { filterSlashItems } from '../../lib/slashMenuQuery'
+import { capabilities } from '../../lib/platform'
 import {
   Heading1,
   Heading2,
@@ -194,16 +195,22 @@ export function buildSlashMenuItems(
         // when they mount the extension. The default is a no-op.
       },
     },
-    {
-      key: 'attach' as const,
-      label: t('slash.attach_image'),
-      icon: Paperclip,
-      command: ({ editor: ed, range }) => {
-        ed.chain().focus().deleteRange(range).run()
-        // Consumers (Editor.tsx) supply the concrete handler via onAttachImage.
-        // The default is a no-op.
-      },
-    },
+    // Web cannot attach (pick_image ignores `attached` + list_media_for_entry
+    // is a stub), so the item is dropped entirely instead of dead-ending.
+    ...(capabilities.fileAttachments
+      ? ([
+          {
+            key: 'attach' as const,
+            label: t('slash.attach_image'),
+            icon: Paperclip,
+            command: ({ editor: ed, range }) => {
+              ed.chain().focus().deleteRange(range).run()
+              // Consumers (Editor.tsx) supply the concrete handler via onAttachImage.
+              // The default is a no-op.
+            },
+          },
+        ] satisfies SlashMenuItem[])
+      : []),
     {
       key: 'divider' as const,
       label: t('slash.divider'),

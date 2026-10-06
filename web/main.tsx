@@ -7,6 +7,13 @@ import './styles.css'
 import '../src/lib/i18n'
 import App from '../src/App'
 import { queryClient, bridgeWindowEvents } from '../src/lib/queryClient'
+import { useCapabilitiesStore } from '../src/stores/capabilitiesStore'
+import { getCachedWriteFlag, onWriteFlagChange } from './src/backend/config'
+
+// Fail-closed: the editor is read-only until the Worker's write flag says otherwise.
+const { setWrites } = useCapabilitiesStore.getState()
+setWrites(getCachedWriteFlag())
+onWriteFlagChange(setWrites)
 
 function QueryBridge() {
   useEffect(() => bridgeWindowEvents(queryClient), [])

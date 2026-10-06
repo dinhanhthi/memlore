@@ -89,7 +89,7 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error'
 export function EditorPanel({ entryId }: EditorPanelProps) {
   const { t } = useTranslation('editor')
   const { t: tAi } = useTranslation('ai')
-  const { writes } = useCapabilities()
+  const { writes, versions } = useCapabilities()
   const [entry, setEntry] = useState<Awaited<ReturnType<typeof getEntry>>>(null)
   const [notFound, setNotFound] = useState(false)
   const [title, setTitle] = useState('')
@@ -641,6 +641,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       sessionSnapshotTakenRef.current = false
     }
     if (
+      versions &&
       !sessionSnapshotTakenRef.current &&
       baselineBytesRef.current &&
       baselineBytesRef.current.length > 0
@@ -674,7 +675,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
         triggerAutoSave(docRef.current, entryIdRef.current)
       }
     }, AUTO_SAVE_DEBOUNCE_MS)
-  }, [triggerAutoSave])
+  }, [triggerAutoSave, versions])
 
   // Save title changes via updateEntry
   const handleTitleSave = useCallback(
@@ -923,7 +924,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
     if (currentDoc && restoreEntryId) {
       const currentDocBytes = serializeYDoc(currentDoc)
       const currentPreview = extractPlainText(currentDoc).slice(0, 150)
-      if (currentDocBytes.length > 0 && currentPreview.length > 0) {
+      if (versions && currentDocBytes.length > 0 && currentPreview.length > 0) {
         const currentBytes = Array.from(currentDocBytes)
         snapshotEntryVersion(restoreEntryId, currentBytes, currentPreview)
           .then(() => emitEntryVersionsChanged(restoreEntryId))
@@ -950,7 +951,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
         console.error('[EditorPanel] Failed to restore version:', err)
         toast(t('versionHistory.restore_failed'))
       })
-  }, [t])
+  }, [t, versions])
 
   // Keep the forward-declared ref in sync so `handleEditorReady` and the
   // restore-event listener (registered once, below) can call the latest

@@ -24,6 +24,9 @@ interface InsertImagePopoverProps {
   onSelect: (action: InsertImageActionId) => void
   /** Whether to render the macOS-only "From Photo Library" options. */
   photoLibraryAvailable: boolean
+  /** Whether to render the "attach" (non-inline) options — false on web,
+   *  where attached insertion mode is unsupported. */
+  attachAvailable: boolean
 }
 
 interface PopoverRowProps {
@@ -55,6 +58,7 @@ export function InsertImagePopover({
   onOpenChange,
   onSelect,
   photoLibraryAvailable,
+  attachAvailable,
 }: InsertImagePopoverProps) {
   const { t } = useTranslation('editor')
   const { refs, floatingStyles, context } = useFloating({
@@ -89,11 +93,13 @@ export function InsertImagePopover({
           label={t('more.inline_image')}
           onClick={() => onSelect('inline-rfd')}
         />
-        <PopoverRow
-          icon={<Paperclip className="size-4" />}
-          label={t('more.attach_image')}
-          onClick={() => onSelect('attached-rfd')}
-        />
+        {attachAvailable && (
+          <PopoverRow
+            icon={<Paperclip className="size-4" />}
+            label={t('more.attach_image')}
+            onClick={() => onSelect('attached-rfd')}
+          />
+        )}
         {photoLibraryAvailable && (
           <>
             <PopoverRow
@@ -101,11 +107,13 @@ export function InsertImagePopover({
               label={t('more.photo_library_inline')}
               onClick={() => onSelect('photo-library-inline')}
             />
-            <PopoverRow
-              icon={<Images className="size-4" />}
-              label={t('more.photo_library_attached')}
-              onClick={() => onSelect('photo-library-attached')}
-            />
+            {attachAvailable && (
+              <PopoverRow
+                icon={<Images className="size-4" />}
+                label={t('more.photo_library_attached')}
+                onClick={() => onSelect('photo-library-attached')}
+              />
+            )}
           </>
         )}
       </div>

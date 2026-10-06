@@ -999,6 +999,107 @@ describe('reader: desktop namespace rules', () => {
   })
 })
 
+describe('reader: folder id cache (read paths only)', () => {
+  const folderLookups = (h: Harness): number =>
+    h.drive.requests.filter((r) =>
+      (r.url.searchParams.get('q') ?? '').includes(`mimeType = '${FOLDER}'`),
+    ).length
+
+  function seedDevice(h: Harness): string {
+    const { genRoot } = seedVault(h.drive)
+    const dev = h.drive.add('dev-aaaa', genRoot as string)
+    const entries = h.drive.add('entries', dev)
+    h.drive.addFile('e1.bin', entries, 'one')
+    h.drive.addFile('e2.bin', entries, 'two')
+    return entries
+  }
+
+  it('walks the folder path once, then reads further files with a file lookup and a download', async () => {
+    const h = makeHarness()
+    seedDevice(h)
+    expect(text(await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin'))).toBe('one')
+    const lookups = folderLookups(h)
+    const before = h.drive.requests.length
+    expect(text(await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e2.bin'))).toBe('two')
+    // Only the absent legacy flat `Memlore/dev-aaaa` folder is asked again (a missing folder is
+    // never cached); root, generations, g-0, the device and `entries` come from the cache.
+    expect(folderLookups(h)).toBe(lookups + 1)
+    expect(h.drive.requests.length - before).toBe(3)
+  })
+
+  it('reads a file with only a file lookup and a download when every folder exists', async () => {
+    const h = makeHarness()
+    seedDevice(h)
+    const root = h.drive.find(['Memlore'])?.id as string
+    h.drive.add('dev-aaaa', root)
+    await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin')
+    const before = h.drive.requests.length
+    expect(text(await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e2.bin'))).toBe('two')
+    // The generation copy holds the file, so the flat folder is never searched.
+    expect(h.drive.requests.length - before).toBe(2)
+  })
+
+  it('clearFolderCache makes the next read walk the path again', async () => {
+    const h = makeHarness()
+    seedDevice(h)
+    await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin')
+    const lookups = folderLookups(h)
+    h.reader.clearFolderCache()
+    await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e2.bin')
+    expect(folderLookups(h)).toBeGreaterThan(lookups)
+  })
+
+  it('never caches a missing folder: one created later is found without a clear', async () => {
+    const h = makeHarness()
+    const { genRoot } = seedVault(h.drive)
+    const dev = h.drive.add('dev-aaaa', genRoot as string)
+    await expect(h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin')).rejects.toBeInstanceOf(
+      DriveNotFoundError,
+    )
+    h.drive.addFile('e1.bin', h.drive.add('entries', dev), 'late')
+    expect(text(await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin'))).toBe('late')
+  })
+
+  it('leaves the public lookups the writer uses uncached', async () => {
+    const h = makeHarness()
+    seedDevice(h)
+    await h.reader.readDeviceFile(0, 'dev-aaaa/entries/e1.bin')
+    const lookups = folderLookups(h)
+    await h.reader.findRootId()
+    expect(folderLookups(h)).toBe(lookups + 1)
+  })
+
+  it('readSharedFile always resolves fresh: a replaced .meta folder is found without a clear', async () => {
+    // The recovery fence reads control/_meta through readSharedFile on the push session's
+    // reader, which no refresh ever clears. A cached `.meta` id would pause writes for good.
+    const h = makeHarness()
+    seedVault(h.drive)
+    const keyring = h.drive.find(['Memlore', '.meta', 'keyring'])?.id as string
+    h.drive.addFile('_meta.json', keyring, 'old')
+    expect(text(await h.reader.readSharedFile('.meta/keyring/_meta.json'))).toBe('old')
+    // Desktop deletes the cloud data and re-uploads: `.meta` comes back with new ids.
+    const oldMeta = h.drive.find(['Memlore', '.meta'])?.id as string
+    h.drive.files = h.drive.files.filter((f) => f.id !== oldMeta && !f.parents.includes(oldMeta))
+    h.drive.files = h.drive.files.filter((f) => f.id !== keyring && !f.parents.includes(keyring))
+    const root = h.drive.find(['Memlore'])?.id as string
+    const freshKeyring = h.drive.add('keyring', h.drive.add('.meta', root))
+    h.drive.addFile('_meta.json', freshKeyring, 'new')
+    expect(text(await h.reader.readSharedFile('.meta/keyring/_meta.json'))).toBe('new')
+  })
+
+  it('resolvePath reuses the cached folder chain', async () => {
+    const h = makeHarness()
+    seedVault(h.drive)
+    const devices = h.drive.find(['Memlore', '.meta', 'keyring', 'devices'])?.id as string
+    h.drive.addFile('a.json', devices, '{}')
+    h.drive.addFile('b.json', devices, '{}')
+    expect(await h.reader.resolvePath('.meta/keyring/devices/a.json')).not.toBeNull()
+    const lookups = folderLookups(h)
+    expect(await h.reader.resolvePath('.meta/keyring/devices/b.json')).not.toBeNull()
+    expect(folderLookups(h)).toBe(lookups)
+  })
+})
+
 describe('no delete / trash / remove anywhere', () => {
   function namesOf(target: object): string[] {
     const names = new Set<string>()

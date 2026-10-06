@@ -5,7 +5,7 @@
   <p>
     <a href="https://memlore.app">Website</a> ·
     <a href="https://dl.memlore.app/mac">Download for Mac</a> ·
-    <a href="https://web.memlore.app">Web version</a> ·
+    <a href="https://web.memlore.app">Web version (beta)</a> ·
     <a href="https://memlore.app/#demo">Live demo</a> ·
     <a href="https://youtu.be/Mv3LZ_P5lwg">Intro Video</a>
   </p>
@@ -33,9 +33,9 @@
 
 **macOS** (desktop) is the primary supported target today. Windows, Linux, iOS, and Android are planned.
 
-## 🌐 Memlore Web
+## 🌐 Memlore Web (beta)
 
-Memlore Web ([web.memlore.app](https://web.memlore.app)) is an in-browser companion to the desktop app. It allows reading, searching, and writing entries from any modern browser by connecting directly to your Google Drive `appDataFolder` without any Memlore intermediary server.
+Memlore Web ([web.memlore.app](https://web.memlore.app)) is an in-browser companion to the desktop app, currently in beta. It allows reading, searching, and writing entries from any modern browser by connecting directly to your Google Drive `appDataFolder` without any Memlore intermediary server.
 
 - **Zero-knowledge:** Master encryption keys are handled in WebAssembly memory and never leave the browser.
 - **Safety first:** Uses an outbox intent model (`OutboxEntryV1`) — the web never mutates sync manifests directly; desktop imports and merges all changes with CRDT conflict resolution.
@@ -47,7 +47,7 @@ Memlore Web ([web.memlore.app](https://web.memlore.app)) is an in-browser compan
 | Layer  | Technology                                                                           |
 | ------ | ------------------------------------------------------------------------------------ |
 | App    | Tauri 2 (Rust) + React 19 + TypeScript + Vite                                        |
-| Web    | React 19 + WebAssembly (Rust memlore-wasm) + IndexedDB + Cloudflare Worker            |
+| Web    | React 19 + WebAssembly (Rust memlore-wasm) + IndexedDB + Cloudflare Worker           |
 | UI     | Tailwind CSS v4, Zustand, i18next, Leaflet, Recharts                                 |
 | Editor | TipTap + Yjs (CRDT)                                                                  |
 | Data   | SQLite / SQLCipher, FTS5                                                             |
@@ -125,10 +125,10 @@ travels with the repo (`.coding-friend/config.json` stays local).
 
 Memlore ships two platforms, each with its own version and tags:
 
-| Platform                        | Ship with        | Version file                | Tag          | Pipeline                                      |
-| ------------------------------- | ---------------- | --------------------------- | ------------ | --------------------------------------------- |
-| Desktop app (macOS)             | `/cf-ship --mac` | `src-tauri/tauri.conf.json` | `v0.2.1`     | `release.yml`: signed, notarized `.dmg`       |
-| Web companion (web.memlore.app) | `/cf-ship --web` | `web/version.json`          | `web-v0.1.0` | `deploy-web.yml`: Cloudflare Pages (+ Worker) |
+| Platform                              | Ship with        | Version file                | Tag          | Pipeline                                      |
+| ------------------------------------- | ---------------- | --------------------------- | ------------ | --------------------------------------------- |
+| Desktop app (macOS)                   | `/cf-ship --mac` | `src-tauri/tauri.conf.json` | `v0.2.1`     | `release.yml`: signed, notarized `.dmg`       |
+| Web companion (beta; web.memlore.app) | `/cf-ship --web` | `web/version.json`          | `web-v0.1.0` | `deploy-web.yml`: Cloudflare Pages (+ Worker) |
 
 `/cf-ship --all` ships every platform that has changes; plain `/cf-ship` asks
 which one. The web is deployed only by pushing a `web-v*` tag, never by hand.

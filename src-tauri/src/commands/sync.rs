@@ -7,7 +7,9 @@ use tauri::{AppHandle, Emitter, State};
 use zeroize::Zeroizing;
 
 use crate::db;
-use crate::sync::engine::{CatchupProgressEvent, ProgressReporter, SyncProgressEvent};
+use crate::sync::engine::{
+    CatchupProgressEvent, PeerOwnedIds, ProgressReporter, SyncProgressEvent,
+};
 use crate::sync::gdrive_provider::GDriveProvider;
 use crate::sync::{
     CloudProvider, LocalSyncProvider, SyncEngine, SyncProvider, SyncSummary, SyncTrigger,
@@ -839,12 +841,12 @@ pub(crate) fn drain_deferred_sync_ux_actions_inner(state: &AppState) {
                         continue;
                     }
                 };
-                let owned_by_peers = match engine_opt {
-                    Some(engine) => block_on(engine.collect_peer_entry_ids()),
-                    None => std::collections::HashSet::new(),
+                let owned = match engine_opt {
+                    Some(engine) => block_on(engine.collect_peer_owned_ids()),
+                    None => PeerOwnedIds::default(),
                 };
                 let result = state.lock().map_err(|e| e.to_string()).and_then(|conn| {
-                    run_repair_from_this_device(&conn, &owned_by_peers).map_err(|e| e.to_string())
+                    run_repair_from_this_device(&conn, &owned).map_err(|e| e.to_string())
                 });
                 if let Err(e) = result {
                     log::warn!("drain_deferred_sync_ux_actions: repair failed: {e}");
@@ -1429,6 +1431,15 @@ pub struct SyncMaintenanceResult<T> {
     pub result: Option<T>,
 }
 
+/// Entry and journal ownership rows inserted or flipped to pending by
+/// repair-from-this-device. Media reset is unconditional and returns no count,
+/// so this is not [`ResetCounts`].
+#[derive(Serialize, Debug, Clone, PartialEq)]
+pub struct RepairCounts {
+    pub entries: u64,
+    pub journals: u64,
+}
+
 /// Payload for the `xj://force-re-pair` event. The frontend `useForceRePair`
 /// listener reads `event.payload.reason`, so the event MUST carry an object —
 /// emitting a bare string would surface `reason` as `undefined`.
@@ -1475,7 +1486,7 @@ pub(crate) fn reset_local_sync_state(conn: &rusqlite::Connection) -> rusqlite::R
     })
 }
 
-fn queue_repair_if_sync_in_progress() -> Option<SyncMaintenanceResult<usize>> {
+fn queue_repair_if_sync_in_progress() -> Option<SyncMaintenanceResult<RepairCounts>> {
     if !is_sync_in_progress() {
         return None;
     }
@@ -1546,17 +1557,20 @@ pub fn sync_reset_local_state(
 /// Inner logic for `sync_repair_from_this_device`, extracted so tests can call
 /// it directly on a raw `&Connection` without going through `tauri::State`.
 ///
-/// Runs atomically: adopts local entries NOT owned by peers into `sync_state`
-/// as `'pending'` AND resets all media rows to `upload_status = 'pending'`.
-/// When `owned_by_peers` is empty (network unavailable or sync not configured),
-/// falls back to adopting ALL local entries — identical to the pre-cloud-aware
-/// behavior. Returns the number of `sync_state` rows inserted or updated.
+/// Runs atomically: adopts local entries and journals NOT owned by peers into
+/// `sync_state` / `journal_sync_state` as `'pending'`, and in the same
+/// transaction resets media and version upload status and clears surface
+/// hashes and pull revisions. When a set inside `owned` is empty (network
+/// unavailable or sync not configured), that set falls back to adopting every
+/// local row of that kind. Returns how many entry and journal ownership rows
+/// were inserted or updated.
 pub(crate) fn run_repair_from_this_device(
     conn: &rusqlite::Connection,
-    owned_by_peers: &std::collections::HashSet<String>,
-) -> rusqlite::Result<usize> {
+    owned: &PeerOwnedIds,
+) -> rusqlite::Result<RepairCounts> {
     let tx = conn.unchecked_transaction()?;
-    let adopted = db::adopt_unowned_local_entries(&tx, owned_by_peers)?;
+    let entries = db::adopt_unowned_local_entries(&tx, &owned.entries)? as u64;
+    let journals = db::adopt_unowned_local_journals(&tx, &owned.journals)? as u64;
     db::reset_all_media_upload_status_to_pending(&tx)?;
     db::reset_all_version_upload_status_to_pending(&tx)?;
     // Repair forces a full re-publish of owned content; clear surface hashes
@@ -1566,7 +1580,7 @@ pub(crate) fn run_repair_from_this_device(
     db::clear_all_pull_revisions(&tx)?;
     tx.commit()?;
     crate::sync::engine::reset_session_own_cloud_reconciled();
-    Ok(adopted)
+    Ok(RepairCounts { entries, journals })
 }
 
 /// Guard-aware seam for the adopt-local repair. Checks `SYNC_IN_PROGRESS`
@@ -1576,28 +1590,28 @@ pub(crate) fn run_repair_from_this_device(
 /// command queues instead, before doing any peer/network work.
 pub(crate) fn run_repair_guarded(
     conn: &rusqlite::Connection,
-    owned_by_peers: &std::collections::HashSet<String>,
-) -> Result<usize, String> {
+    owned: &PeerOwnedIds,
+) -> Result<RepairCounts, String> {
     if SYNC_IN_PROGRESS.load(Ordering::Acquire) {
         return Err(SYNC_IN_PROGRESS_ERR.to_string());
     }
-    run_repair_from_this_device(conn, owned_by_peers).map_err(|e| e.to_string())
+    run_repair_from_this_device(conn, owned).map_err(|e| e.to_string())
 }
 
 pub(crate) fn sync_repair_from_this_device_inner(
     conn: &rusqlite::Connection,
-    owned_by_peers: &std::collections::HashSet<String>,
-) -> Result<SyncMaintenanceResult<usize>, String> {
+    owned: &PeerOwnedIds,
+) -> Result<SyncMaintenanceResult<RepairCounts>, String> {
     if let Some(queued) = queue_repair_if_sync_in_progress() {
         return Ok(queued);
     }
     // Sync may have started between the outer guard check and here (e.g. during
-    // collect_peer_entry_ids().await) or between this check and the DB write.
+    // collect_peer_owned_ids().await) or between this check and the DB write.
     // Queue instead of rejecting — preserves the "defer not reject" contract.
-    match run_repair_guarded(conn, owned_by_peers) {
-        Ok(count) => Ok(SyncMaintenanceResult {
+    match run_repair_guarded(conn, owned) {
+        Ok(counts) => Ok(SyncMaintenanceResult {
             queued: false,
-            result: Some(count),
+            result: Some(counts),
         }),
         Err(e) if e == SYNC_IN_PROGRESS_ERR => {
             enqueue_deferred_sync_ux_action(DeferredSyncUxAction::RepairFromThisDevice);
@@ -1610,38 +1624,40 @@ pub(crate) fn sync_repair_from_this_device_inner(
     }
 }
 
-/// Adopt ALL local entries — live and soft-deleted (tombstones) — into
-/// `sync_state` as `'pending'`, and reset all media `upload_status` to
-/// `'pending'` as well.
+/// Adopt local entries and journals — live and soft-deleted (tombstones) —
+/// that no live peer already owns into `sync_state` / `journal_sync_state`
+/// as `'pending'`, and reset all media `upload_status` to `'pending'` as well.
 ///
-/// This is the explicit user-triggered repair for the "pulled-entry orphan"
-/// bug: after a cloud wipe, entries received via sync exist only in `entries`
-/// with no `sync_state` row, so the normal push queue never sees them.
-/// Calling this command makes the device re-publish everything it holds —
-/// including tombstones — on the next sync tick. `push_single_entry`
-/// serializes `is_deleted` into `EntryMetadata`, so tombstones are published
-/// as deletions, not as live entries.
+/// This is the explicit user-triggered repair for the pulled-orphan bug:
+/// after a cloud wipe, rows received via sync exist only in `entries` /
+/// `journals` with no ownership-ledger row, so the normal push queue never
+/// sees them. Calling this command makes the device re-publish everything it
+/// holds — including tombstones — on the next sync tick. `push_single_entry`
+/// serializes `is_deleted` into `EntryMetadata`, so entry tombstones are
+/// published as deletions, not as live entries. Journals are adopted in the
+/// same transaction so `push_journals` can see them.
 ///
 /// **NOT automatic.** This must only run on explicit user action — calling it
-/// during normal sync would cause pull→push ping-pong. UI wiring is a
-/// follow-up; the command is available for manual invocation in the interim.
+/// during normal sync would cause pull→push ping-pong.
 ///
-/// Returns the number of `sync_state` rows inserted or flipped to pending.
+/// Returns how many entry and journal ownership rows were inserted or flipped
+/// to pending. An empty peer-owned set (network down or sync not configured)
+/// adopts every local entry and every local journal, per set.
 #[tauri::command]
 pub async fn sync_repair_from_this_device(
     state: State<'_, AppState>,
-) -> Result<SyncMaintenanceResult<usize>, String> {
+) -> Result<SyncMaintenanceResult<RepairCounts>, String> {
     if let Some(queued) = queue_repair_if_sync_in_progress() {
         return Ok(queued);
     }
 
-    // Fetch the set of entry IDs already owned by at least one peer before
-    // acquiring the DB lock or the sync guard. Drop the connection guard before
-    // the .await so the future remains Send and Tauri can register it.
-    // On any error (network unavailable, sync not configured), `owned_by_peers`
-    // is empty and repair falls back to adopting all entries —
-    // identical to the pre-cloud-aware behavior.
-    let owned_by_peers = {
+    // Fetch entry and journal ids already owned by at least one live peer
+    // before acquiring the DB lock or the sync guard. Drop the connection
+    // guard before the .await so the future remains Send and Tauri can
+    // register it. On any error (network unavailable, sync not configured),
+    // `owned` is empty and repair falls back to adopting all entries and
+    // journals — identical to the pre-cloud-aware behavior.
+    let owned = {
         let engine_opt = {
             let conn = state.lock()?;
             let provider = make_configured_provider(&conn)?;
@@ -1649,12 +1665,12 @@ pub async fn sync_repair_from_this_device(
             provider.map(|p| SyncEngine::new(p, device_id))
         }; // conn guard dropped here, before the .await
         match engine_opt {
-            Some(engine) => engine.collect_peer_entry_ids().await,
-            None => std::collections::HashSet::new(),
+            Some(engine) => engine.collect_peer_owned_ids().await,
+            None => PeerOwnedIds::default(),
         }
     };
     let conn = state.lock()?;
-    sync_repair_from_this_device_inner(&conn, &owned_by_peers)
+    sync_repair_from_this_device_inner(&conn, &owned)
 }
 
 // ─── Scope upgrade (drive.file → drive.appdata migration) ───────────────────
@@ -2695,6 +2711,8 @@ mod tests {
     }
     use rusqlite::Connection;
 
+    use crate::sync::engine::PeerOwnedIds;
+
     fn make_state() -> AppState {
         let conn = Connection::open_in_memory().expect("in-memory db");
         migrate(&conn).expect("migrate");
@@ -3389,7 +3407,7 @@ mod tests {
         let conn = state.lock().unwrap();
         seed_all_surface_push_hashes(&conn);
 
-        run_repair_from_this_device(&conn, &std::collections::HashSet::new()).unwrap();
+        run_repair_from_this_device(&conn, &PeerOwnedIds::default()).unwrap();
 
         assert_all_surface_push_hashes_cleared(&conn);
     }
@@ -3663,8 +3681,7 @@ mod tests {
         let conn = state.lock().unwrap();
         let _held = SyncInProgressGuard::try_acquire().expect("guard must be free");
 
-        let result =
-            sync_repair_from_this_device_inner(&conn, &std::collections::HashSet::new()).unwrap();
+        let result = sync_repair_from_this_device_inner(&conn, &PeerOwnedIds::default()).unwrap();
 
         assert!(result.queued, "repair must queue while sync is active");
         assert!(
@@ -4703,9 +4720,8 @@ mod tests {
             db::insert_entry_version(&conn, "orphan-e1", b"yjs", "preview", "device-a").unwrap();
         db::mark_version_uploaded(&conn, &version_id, "device-a/versions/v1.bin").unwrap();
 
-        let adopted =
-            run_repair_from_this_device(&conn, &std::collections::HashSet::new()).unwrap();
-        assert_eq!(adopted, 1, "one orphaned entry must be adopted");
+        let adopted = run_repair_from_this_device(&conn, &PeerOwnedIds::default()).unwrap();
+        assert_eq!(adopted.entries, 1, "one orphaned entry must be adopted");
 
         // sync_state row must now be pending.
         let status: String = conn
@@ -4757,9 +4773,8 @@ mod tests {
         )
         .unwrap();
 
-        let adopted =
-            run_repair_from_this_device(&conn, &std::collections::HashSet::new()).unwrap();
-        assert_eq!(adopted, 1, "synced row must be flipped to pending");
+        let adopted = run_repair_from_this_device(&conn, &PeerOwnedIds::default()).unwrap();
+        assert_eq!(adopted.entries, 1, "synced row must be flipped to pending");
 
         let status: String = conn
             .query_row(
@@ -4790,11 +4805,277 @@ mod tests {
         // Call the production guard seam directly — removing or breaking the
         // guard in run_repair_guarded will cause this assertion to fail.
         let conn = state.lock().unwrap();
-        let blocked = run_repair_guarded(&conn, &std::collections::HashSet::new());
+        let blocked = run_repair_guarded(&conn, &PeerOwnedIds::default());
 
         match blocked {
             Err(msg) => assert_eq!(msg, SYNC_IN_PROGRESS_ERR),
             Ok(_) => panic!("repair must be rejected while sync is in progress"),
         }
+    }
+
+    /// Pulled journal with no `journal_sync_state` row — the v0.1.0 shape
+    /// after a pull. `is_initial_placeholder = 0` so it is not the schema seed.
+    fn seed_pulled_journal(
+        conn: &Connection,
+        id: &str,
+        name: &str,
+        updated_at: i64,
+        is_deleted: i64,
+    ) {
+        conn.execute(
+            "INSERT INTO journals \
+             (id, name, created_at, updated_at, is_deleted, is_initial_placeholder) \
+             VALUES (?1, ?2, ?3, ?3, ?4, 0)",
+            rusqlite::params![id, name, updated_at, is_deleted],
+        )
+        .unwrap();
+    }
+
+    /// Pulled entry with no `sync_state` row.
+    fn seed_pulled_entry(
+        conn: &Connection,
+        id: &str,
+        journal_id: &str,
+        title: &str,
+        updated_at: i64,
+        is_deleted: i64,
+    ) {
+        conn.execute(
+            "INSERT INTO entries \
+             (id, journal_id, title, entry_date, created_at, updated_at, is_deleted) \
+             VALUES (?1, ?2, ?3, ?4, ?4, ?4, ?5)",
+            rusqlite::params![id, journal_id, title, updated_at, is_deleted],
+        )
+        .unwrap();
+    }
+
+    fn journal_row_identity(conn: &Connection, id: &str) -> (String, i64, i64) {
+        conn.query_row(
+            "SELECT name, IFNULL(is_deleted, 0), updated_at FROM journals WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap()
+    }
+
+    fn entry_row_identity(conn: &Connection, id: &str) -> (Option<String>, i64, i64) {
+        conn.query_row(
+            "SELECT title, IFNULL(is_deleted, 0), updated_at FROM entries WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap()
+    }
+
+    fn journal_ids_pending_and_push(conn: &Connection) -> (Vec<String>, Vec<String>) {
+        let pending = db::list_pending_journal_ids(conn).unwrap();
+        let push = db::list_local_journal_summaries_for_push(conn)
+            .unwrap()
+            .into_iter()
+            .map(|summary| summary.journal_id)
+            .collect();
+        (pending, push)
+    }
+
+    /// Repair on a post-pull v0.1.0 database adopts journals no peer owns,
+    /// leaves peer-owned journals out of the push ledger, and does not rewrite
+    /// the journal or entry rows themselves.
+    #[test]
+    fn repair_adopts_pulled_journals_on_legacy_db() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+
+        seed_pulled_journal(&conn, "j-owned", "Peer Journal", 1_700_000_001, 0);
+        seed_pulled_journal(&conn, "j-unowned", "Local Journal", 1_700_000_002, 0);
+        seed_pulled_entry(
+            &conn,
+            "e-owned-host",
+            "j-owned",
+            "Kept entry",
+            1_700_000_003,
+            0,
+        );
+        seed_pulled_entry(
+            &conn,
+            "e-unowned-host",
+            "j-unowned",
+            "Adopted entry",
+            1_700_000_004,
+            0,
+        );
+
+        let placeholder_id: String = conn
+            .query_row(
+                "SELECT id FROM journals WHERE is_initial_placeholder = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let journals_before = (
+            journal_row_identity(&conn, "j-owned"),
+            journal_row_identity(&conn, "j-unowned"),
+            journal_row_identity(&conn, &placeholder_id),
+        );
+        let entries_before = (
+            entry_row_identity(&conn, "e-owned-host"),
+            entry_row_identity(&conn, "e-unowned-host"),
+        );
+        let seeded_sync_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_state \
+                 WHERE entry_id IN ('e-owned-host', 'e-unowned-host')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let seeded_journal_sync_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM journal_sync_state \
+                 WHERE journal_id IN ('j-owned', 'j-unowned')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(seeded_sync_rows, 0, "pulled entries have no sync_state");
+        assert_eq!(
+            seeded_journal_sync_rows, 0,
+            "pulled journals have no journal_sync_state"
+        );
+
+        let mut owned = PeerOwnedIds::default();
+        owned.journals.insert("j-owned".to_string());
+        let journal_total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM journals", [], |r| r.get(0))
+            .unwrap();
+
+        let counts = run_repair_from_this_device(&conn, &owned).unwrap();
+
+        assert_eq!(
+            journal_row_identity(&conn, "j-owned"),
+            journals_before.0,
+            "peer-owned journal row must survive unchanged"
+        );
+        assert_eq!(
+            journal_row_identity(&conn, "j-unowned"),
+            journals_before.1,
+            "unowned journal row must survive unchanged"
+        );
+        assert_eq!(
+            journal_row_identity(&conn, &placeholder_id),
+            journals_before.2,
+            "placeholder journal row must survive unchanged"
+        );
+        assert_eq!(
+            entry_row_identity(&conn, "e-owned-host"),
+            entries_before.0,
+            "entry row must survive unchanged"
+        );
+        assert_eq!(
+            entry_row_identity(&conn, "e-unowned-host"),
+            entries_before.1,
+            "entry row must survive unchanged"
+        );
+
+        let (pending, push) = journal_ids_pending_and_push(&conn);
+        assert!(
+            pending.contains(&"j-unowned".to_string()),
+            "unowned journal must be pending, got {pending:?}"
+        );
+        assert!(
+            push.contains(&"j-unowned".to_string()),
+            "unowned journal must be publishable, got {push:?}"
+        );
+        assert!(
+            !pending.contains(&"j-owned".to_string()),
+            "peer-owned journal must stay out of the pending ledger, got {pending:?}"
+        );
+        assert!(
+            !push.contains(&"j-owned".to_string()),
+            "peer-owned journal must stay out of the push manifest, got {push:?}"
+        );
+        assert!(
+            pending.contains(&placeholder_id),
+            "schema placeholder is not peer-owned, so repair adopts it"
+        );
+
+        let pending_entries = db::list_pending_entry_ids(&conn).unwrap();
+        assert!(pending_entries.contains(&"e-owned-host".to_string()));
+        assert!(pending_entries.contains(&"e-unowned-host".to_string()));
+        // Empty entry set adopts every entry; journal ownership is independent.
+        assert_eq!(counts.entries, 2);
+        // j-owned is the only journal excluded. The placeholder (and any other
+        // non-peer journal migrate seeded) is adopted with j-unowned.
+        assert_eq!(counts.journals, (journal_total - 1) as u64);
+    }
+
+    /// An empty peer set (network down / sync not configured) adopts every
+    /// journal, including ones a peer would otherwise own.
+    #[test]
+    fn repair_with_empty_peer_set_adopts_all_journals() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+
+        seed_pulled_journal(&conn, "j-peer", "Would Be Peer", 1_700_000_011, 0);
+        seed_pulled_journal(&conn, "j-local", "Would Be Local", 1_700_000_012, 0);
+
+        let journal_total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM journals", [], |r| r.get(0))
+            .unwrap();
+
+        let counts = run_repair_from_this_device(&conn, &PeerOwnedIds::default()).unwrap();
+
+        let (pending, push) = journal_ids_pending_and_push(&conn);
+        for id in ["j-peer", "j-local"] {
+            assert!(
+                pending.contains(&id.to_string()),
+                "{id} must be pending when the peer set is empty, got {pending:?}"
+            );
+            assert!(
+                push.contains(&id.to_string()),
+                "{id} must be publishable when the peer set is empty, got {push:?}"
+            );
+        }
+        assert_eq!(
+            counts.journals, journal_total as u64,
+            "empty journal set adopts every journal, including peer-owned ones"
+        );
+    }
+
+    /// Queued repair drains through the no-provider path, which adopts every
+    /// local journal. Peer-id injection needs a configured sync engine; this
+    /// harness has none, so the test pins the adopt-all drain fallback.
+    #[test]
+    fn queued_repair_drain_adopts_journals() {
+        let _lock = crate::commands::sync::SYNC_GUARD_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        clear_deferred_sync_ux_actions_for_tests();
+        let state = make_state();
+        {
+            let conn = state.lock().unwrap();
+            seed_pulled_journal(&conn, "j-drain-peer", "Drain Peer", 1_700_000_021, 0);
+            seed_pulled_journal(&conn, "j-drain-local", "Drain Local", 1_700_000_022, 0);
+        }
+        enqueue_deferred_sync_ux_action(DeferredSyncUxAction::RepairFromThisDevice);
+
+        drain_deferred_sync_ux_actions_inner(&state);
+
+        let conn = state.lock().unwrap();
+        let (pending, push) = journal_ids_pending_and_push(&conn);
+        for id in ["j-drain-peer", "j-drain-local"] {
+            assert!(
+                pending.contains(&id.to_string()),
+                "{id} must be pending after the queued repair drains, got {pending:?}"
+            );
+            assert!(
+                push.contains(&id.to_string()),
+                "{id} must be publishable after the queued repair drains, got {push:?}"
+            );
+        }
+        assert!(
+            pending_deferred_sync_ux_actions_for_tests().is_empty(),
+            "drain must consume the queued repair"
+        );
+        clear_deferred_sync_ux_actions_for_tests();
     }
 }

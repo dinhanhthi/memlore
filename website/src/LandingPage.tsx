@@ -1302,7 +1302,7 @@ const comparisonRows = [
   },
   {
     id: 'web',
-    label: 'Web app',
+    label: 'Web app (beta)',
     description: 'Read and write your journal from any browser, still end-to-end encrypted.',
     marks: {
       Memlore: webAppLive ? 'partial' : 'soon',
@@ -1344,7 +1344,7 @@ const platformItems = [
   { name: 'macOS' as const, status: 'Download', href: downloadUrl },
   {
     name: 'Web' as const,
-    status: webAppLive ? 'Open' : 'Coming soon',
+    status: webAppLive ? 'Beta' : 'Coming soon',
     href: webAppLive ? webAppUrl : undefined,
   },
   { name: 'Windows & Linux' as const, status: 'Coming soon' },
@@ -1369,7 +1369,7 @@ function PageActions({
       />
       {webAppLive && (
         <a className="button" data-variant="secondary" href={webAppUrl}>
-          <Globe className="size-4" /> Web
+          <Globe className="size-4" /> Web (beta)
         </a>
       )}
       <a className="button" href="#demo" data-variant="secondary">
@@ -1522,7 +1522,8 @@ export default function LandingPage() {
           />
           <LedgerRule area="r4" />
           <p className="hero-meta">
-            No account · Encrypted on your device · {webAppLive ? 'macOS and web today' : 'macOS today'}
+            No account · Encrypted on your device ·{' '}
+            {webAppLive ? 'macOS and web (beta) today' : 'macOS today'}
           </p>
         </section>
         <LedgerRule />
@@ -1908,7 +1909,7 @@ export default function LandingPage() {
             <h2>Multiple platforms supported</h2>
             <p>
               {webAppLive
-                ? 'macOS and the web today. Follow along as Memlore grows.'
+                ? 'macOS and the web (beta) today. Follow along as Memlore grows.'
                 : 'We’re starting with macOS and taking the time to make it feel right. Follow along as Memlore grows.'}
             </p>
           </div>

@@ -13,6 +13,7 @@ import { SettingsTabList } from './SettingsTabList'
 import { useTabSlideDirection } from './useTabSlideDirection'
 import { useTabStore } from '../../stores/tabStore'
 import { type TemplatesTab } from '../../stores/uiStore'
+import { useCapabilities } from '../../hooks/useCapabilities'
 
 /// Settings → Templates — full CRUD list, replaces the standalone sidebar
 /// TemplateManager view. Two horizontal tabs:
@@ -42,6 +43,7 @@ export function TemplatesSettings() {
   // whichever supported UI language is active.
   const { t: tEditor } = useTranslation('editor')
   const { templates, isLoading, createTemplate, updateTemplate, deleteTemplate } = useTemplates()
+  const caps = useCapabilities()
 
   const [showForm, setShowForm] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
@@ -194,45 +196,51 @@ export function TemplatesSettings() {
                                 <p className="text-fg-muted mt-0.5 text-xs">{tpl.description}</p>
                               )}
                             </div>
-                            <div className="flex shrink-0 gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                aria-label={t('templates_section.edit_aria', { name: tpl.name })}
-                                onClick={() => {
-                                  setEditingTemplate(tpl)
-                                  setShowForm(true)
-                                }}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                aria-label={t('templates_section.delete_aria', { name: tpl.name })}
-                                onClick={() => setDeleteTarget(tpl)}
-                              >
-                                <Trash2 className="text-danger size-4" />
-                              </Button>
-                            </div>
+                            {caps.taxonomyEdits && (
+                              <div className="flex shrink-0 gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label={t('templates_section.edit_aria', { name: tpl.name })}
+                                  onClick={() => {
+                                    setEditingTemplate(tpl)
+                                    setShowForm(true)
+                                  }}
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label={t('templates_section.delete_aria', {
+                                    name: tpl.name,
+                                  })}
+                                  onClick={() => setDeleteTarget(tpl)}
+                                >
+                                  <Trash2 className="text-danger size-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </SettingsSurfaceCard>
                     )}
 
-                    <div className="mt-3">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingTemplate(null)
-                          setShowForm(true)
-                        }}
-                      >
-                        <Plus className="size-4" />
-                        {t('templates_section.new')}
-                      </Button>
-                    </div>
+                    {caps.taxonomyEdits && (
+                      <div className="mt-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingTemplate(null)
+                            setShowForm(true)
+                          }}
+                        >
+                          <Plus className="size-4" />
+                          {t('templates_section.new')}
+                        </Button>
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
