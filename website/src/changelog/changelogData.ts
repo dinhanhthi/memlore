@@ -30,6 +30,49 @@ export type ChangelogRelease = {
 /** Newest release first. */
 export const releases: ChangelogRelease[] = [
   {
+    version: '0.2.2',
+    date: '2026-10-06',
+    stable: true,
+    items: [
+      {
+        kind: 'new',
+        text: 'If entries or journals are on this Mac but missing on your other devices or on the web, Settings → Sync can repair from this device. It publishes what no other device owns so the next sync uploads it, and nothing is deleted.',
+      },
+      {
+        kind: 'new',
+        text: 'Edits and new entries you make in Memlore Web are imported the next time this Mac syncs. If the same thing changed in both places, this Mac wins.',
+      },
+      {
+        kind: 'improved',
+        text: 'Home AI cards load with a softer animation and a cleaner list, with a little more space when you hover a row.',
+      },
+    ],
+  },
+  {
+    version: '0.1.1',
+    date: '2026-10-06',
+    stable: true,
+    platform: 'web',
+    items: [
+      {
+        kind: 'improved',
+        text: 'Memlore Web opens faster. Entries you have already loaded appear right away, and refreshing from Google Drive takes less time.',
+      },
+      {
+        kind: 'new',
+        text: 'Sync settings show the Google account you are signed in with and how much Drive storage is left.',
+      },
+      {
+        kind: 'improved',
+        text: 'The app introduces itself as Memlore Web. Pages it cannot do, such as the dashboard and statistics, explain that instead of opening empty, and About lists what the web version can and cannot do.',
+      },
+      {
+        kind: 'fixed',
+        text: 'When editing on the web is turned off, the editor stays read-only, entry cards no longer offer delete, and signing in with Google no longer opens an extra browser window after the popup.',
+      },
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-10-05',
     stable: true,
