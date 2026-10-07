@@ -90,7 +90,6 @@ run-ds-validate.sh
 
 # docs/ is deny-by-default. Opt in later with !/docs/foo (and !/docs/foo/** for a folder).
 /docs/*
-!/docs/.gitkeep
 !/docs/mapkit-js-setup.md
 !/docs/gdrive-oauth-setup.md
 !/docs/download-stats-setup.md
