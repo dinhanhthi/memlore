@@ -1630,6 +1630,7 @@ async fn golden_outbox_behind_desktop_and_crash_recovery() {
             .unwrap(),
         ),
         created: false,
+        applied_from_updated_at: None,
     };
     db::queries::outbox_import_record(&conn, &pending_rec).unwrap();
 

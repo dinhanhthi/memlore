@@ -6138,7 +6138,9 @@ fn build_local_manifest(
         memory_present,
         generated_at: now_unix(),
         index_present: false,
-        outbox_versions: None,
+        // Advertises the outbox versions `outbox_import` reads so the web
+        // only writes v2 intents once some desktop can apply them.
+        outbox_versions: Some(memlore_core::outbox::SUPPORTED_OUTBOX_VERSIONS.to_vec()),
     })
 }
 
@@ -7134,6 +7136,66 @@ mod tests {
             serde_json::from_slice(&std::fs::read(dir.path().join("dev-a/metadata.json")).unwrap())
                 .unwrap();
         assert!(manifest.index_present);
+    }
+
+    /// The pushed `metadata.json` advertises the outbox versions this
+    /// importer reads, and a v0.2.x desktop (whose `DeviceMetadata` predates
+    /// `index_present` / `outbox_versions` / `trashed_at`) still parses it.
+    #[tokio::test]
+    async fn pushed_manifest_advertises_outbox_versions_and_parses_as_pre_phase_1() {
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct OldEntrySummary {
+            entry_id: String,
+            updated_at: i64,
+            local_version: i64,
+            is_deleted: bool,
+        }
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct OldJournalSummary {
+            journal_id: String,
+            updated_at: i64,
+            local_version: i64,
+            is_deleted: bool,
+        }
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct OldDeviceMetadata {
+            device_id: String,
+            #[serde(default)]
+            recovery_generation: u64,
+            entries: Vec<OldEntrySummary>,
+            journals: Vec<OldJournalSummary>,
+            #[serde(default)]
+            chats_present: bool,
+            #[serde(default)]
+            memory_present: bool,
+            generated_at: i64,
+        }
+
+        let key = test_key();
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        make_entry_with_content(&conn, &key, "entry-0");
+        engine
+            .push_local(&conn, &key, &key_state_from_key(&key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        let bytes = std::fs::read(dir.path().join("dev-a/metadata.json")).unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["outbox_versions"], serde_json::json!([1, 2]));
+        let manifest: DeviceMetadata = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            manifest.outbox_versions.as_deref(),
+            Some(memlore_core::outbox::SUPPORTED_OUTBOX_VERSIONS)
+        );
+
+        let old: OldDeviceMetadata = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(old.device_id, "dev-a");
+        assert_eq!(old.entries.len(), 1);
     }
 
     #[tokio::test]

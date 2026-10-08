@@ -8,7 +8,14 @@
 //! The web companion operates under a strict "outbox" model:
 //! 1. The web NEVER writes sync-protocol files (`metadata.json`, `entries/`, `media/`, `journals/`).
 //! 2. The web writes sealed intents into `generations/g-<N>/<webId>/outbox/`:
-//!    - `outbox/<entryId>.bin`: one intent file per entry, updated in place.
+//!    - `outbox/<entryId>.bin`: one entry intent (frame v1) per entry, updated in place.
+//!    - Frame v2 intents, one file per target, updated in place: `outbox/j-<journalId>.bin`
+//!      (create journal), `outbox/t-<tagId>.bin` (create tag), `outbox/p-<templateId>.bin`
+//!      (upsert or delete template), `outbox/d-<entryId>.bin` (move entry to Trash). The
+//!      file name must match the body's kind and id, or the file is `corrupt`.
+//!    - Apply order in one cycle, across all web devices: `t-` → `j-` → `p-` → entry
+//!      intents → `d-`, so a journal finds the auto tags created with it and an entry
+//!      finds the journal / tags created with it.
 //!    - `outbox/m-<mediaId>` and `outbox/m-<mediaId>.thumb`: flat layout, 3-part logical paths
 //!      (`<dev>/outbox/<file>`), compliant with `parse_drive_path` (`gdrive_provider.rs:1729-1742`).
 //! 3. Desktop is primary: desktops apply intents through their own local code paths, then
@@ -129,7 +136,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bincode::Options;
 use rusqlite::Connection;
@@ -142,7 +149,8 @@ use crate::ai::provider::settings_keys;
 use crate::commands::entries::{
     maybe_detect_language_after_save, maybe_mark_entry_embedding_dirty_after_save,
     move_entry_to_journal_impl, save_entry_content_impl, snapshot_entry_version_impl,
-    toggle_favorite_impl, update_entry_date_impl, update_entry_emotion_impl, update_entry_impl,
+    soft_delete_entry_impl, toggle_favorite_impl, update_entry_date_impl,
+    update_entry_emotion_impl, update_entry_impl,
 };
 use crate::commands::mcp::{
     load_yjs_doc, require_writable_entry, validate_emotion, visible_journal,
@@ -160,13 +168,22 @@ use crate::AppState;
 use memlore_core::envelope::open_media;
 use memlore_core::key_state::ContentKeyList;
 use memlore_core::outbox::{
-    open_outbox_acks, open_outbox_entry, seal_outbox_acks, FieldChange, OutboxAckEntry,
-    OutboxAcksV1, OutboxEntryV1, OutboxError, OutboxFieldDecision, OUTBOX_SCHEMA_VERSION,
+    check_intent_name, open_outbox_acks, open_outbox_intent, parse_intent_name, seal_outbox_acks,
+    FieldChange, OutboxAckEntry, OutboxAcksV1, OutboxEntryV1, OutboxError, OutboxFieldDecision,
+    OutboxIntent as WireIntent, OutboxIntentPrefix, OutboxIntentV2, SUPPORTED_OUTBOX_VERSIONS,
 };
 
 const PREVIEW_MAX_CHARS: usize = 200;
 /// Refusal reason (ack `refused_reason`) for a v1 edit to an entry in Trash.
 const ENTRY_TRASHED: &str = "entry_trashed";
+/// Refusal reasons for v2 intents (ack `refused_reason`).
+const NAME_TAKEN: &str = "name_taken";
+const CHANGED_ON_DESKTOP: &str = "changed_on_desktop";
+/// A deterministic validation failure (bad color, name, base64, size, …): final.
+const INVALID: &str = "invalid";
+/// The target is unknown here and not live on any peer (shared with v1). v2 trash also
+/// uses it for every locked, invisible or purged target, so a refusal reveals nothing.
+const ABSENT: &str = "absent";
 
 fn sync_io(e: impl ToString) -> SyncError {
     SyncError::Io(e.to_string())
@@ -456,7 +473,7 @@ pub fn apply_intent_full(
     intent: &OutboxIntent,
 ) -> ApplyResult {
     // 0. Schema version and payload validation
-    if intent.entry.schema_version != OUTBOX_SCHEMA_VERSION {
+    if !SUPPORTED_OUTBOX_VERSIONS.contains(&intent.entry.schema_version) {
         let rec = WebOutboxImportRecord {
             path: intent.path.clone(),
             revision: intent.revision.clone(),
@@ -469,6 +486,7 @@ pub fn apply_intent_full(
             pending_revision: None,
             pending_plan: Some(intent.entry.schema_version.to_string()),
             created: false,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &rec);
         return ApplyResult {
@@ -491,6 +509,7 @@ pub fn apply_intent_full(
             pending_revision: None,
             pending_plan: Some(e.to_string()),
             created: false,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &rec);
         return ApplyResult {
@@ -569,6 +588,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: Some("absent".to_string()),
                 created: sticky_created,
+                applied_from_updated_at: None,
             };
             let _ = outbox_import_record(conn, &rec);
             return ApplyResult {
@@ -592,6 +612,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: Some("absent".to_string()),
                 created: sticky_created,
+                applied_from_updated_at: None,
             };
             let _ = outbox_import_record(conn, &rec);
             return ApplyResult {
@@ -620,6 +641,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: Some("absent".to_string()),
                 created: true,
+                applied_from_updated_at: None,
             };
             let _ = outbox_import_record(conn, &rec);
             return ApplyResult {
@@ -651,6 +673,7 @@ pub fn apply_intent_full(
                     pending_revision: None,
                     pending_plan: Some("no_journal".to_string()),
                     created: sticky_created,
+                    applied_from_updated_at: None,
                 };
                 let _ = outbox_import_record(conn, &rec);
                 return ApplyResult {
@@ -693,6 +716,7 @@ pub fn apply_intent_full(
             })
             .ok(),
             created: sticky_created,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &pending_rec);
 
@@ -901,6 +925,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: None,
                 created: true,
+                applied_from_updated_at: Some(APPLIED_FROM_CREATED),
             };
             let _ = outbox_import_record(conn, &rec);
 
@@ -940,6 +965,7 @@ pub fn apply_intent_full(
             pending_revision: None,
             pending_plan: Some(ENTRY_TRASHED.to_string()),
             created: sticky_created,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &rec);
         return ApplyResult {
@@ -963,6 +989,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: Some(e),
                 created: sticky_created,
+                applied_from_updated_at: None,
             };
             let _ = outbox_import_record(conn, &rec);
             return ApplyResult {
@@ -999,6 +1026,7 @@ pub fn apply_intent_full(
             pending_revision: None,
             pending_plan: Some("journal_locked_or_invisible".to_string()),
             created: sticky_created,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &rec);
         return ApplyResult {
@@ -1022,6 +1050,7 @@ pub fn apply_intent_full(
                 pending_revision: None,
                 pending_plan: Some(e),
                 created: sticky_created,
+                applied_from_updated_at: None,
             };
             let _ = outbox_import_record(conn, &rec);
             return ApplyResult {
@@ -1081,6 +1110,7 @@ pub fn apply_intent_full(
             pending_revision: None,
             pending_plan: Some("empty_base".to_string()),
             created: sticky_created,
+            applied_from_updated_at: None,
         };
         let _ = outbox_import_record(conn, &rec);
         return ApplyResult {
@@ -1111,6 +1141,7 @@ pub fn apply_intent_full(
         })
         .ok(),
         created: sticky_created,
+        applied_from_updated_at: None,
     };
     let _ = outbox_import_record(conn, &pending_rec);
 
@@ -1478,6 +1509,17 @@ pub fn apply_intent_full(
         pending_revision: None,
         pending_plan: None,
         created: sticky_created || intent.entry.created_on_web,
+        // The web base this apply fast-forwarded from (see `fast_forward_from`): the
+        // row's stamp before it, or, when only this importer's own applies touched the
+        // row since (`untouched`), the base the previous apply recorded.
+        applied_from_updated_at: if untouched {
+            existing_import
+                .as_ref()
+                .and_then(|r| r.applied_from_updated_at)
+                .or(Some(local_before))
+        } else {
+            Some(local_before)
+        },
     };
     let _ = outbox_import_record(conn, &rec);
 
@@ -1540,6 +1582,8 @@ pub trait OutboxEventSink: Send + Sync {
     fn emit_bridge_event(&self, event: &OutboxBridgeEvent);
     fn emit_progress(&self, current: u32, total: u32);
     fn mark_embedding_dirty(&self, entry_id: &str);
+    /// Called right before an intent is applied, in apply order. Test hook.
+    fn on_intent_dispatched(&self, _path: &str) {}
 }
 
 /// Production sink backed by Tauri AppHandle and AppState.
@@ -1649,6 +1693,494 @@ pub fn collect_known_ids_from_manifests(
     known
 }
 
+/// Whether a recorded row must be re-read even though its file did not change: a
+/// crash-interrupted apply, or an intent skipped for a version this build now reads (after
+/// a desktop upgrade; v0.2.2 recorded every v2 file as `skipped_version` / "2"). Refused,
+/// corrupt and other skipped_version rows also fill `pending_plan` (with their reason), but
+/// they are final until the intent file changes.
+fn is_pending(r: &WebOutboxImportRecord) -> bool {
+    match r.outcome.as_str() {
+        "pending" => r.pending_plan.is_some(),
+        "skipped_version" => r
+            .pending_plan
+            .as_deref()
+            .and_then(|v| v.parse::<u16>().ok())
+            .is_some_and(|v| SUPPORTED_OUTBOX_VERSIONS.contains(&v)),
+        _ => false,
+    }
+}
+
+/// Apply rank of an intent kind. Baked into installed builds: tags run before the
+/// journals whose `auto_tag_ids` reference them, creates run before the entry intents
+/// that reference them, and trash runs last.
+const RANK_TAG: u8 = 0;
+const RANK_JOURNAL: u8 = 1;
+const RANK_TEMPLATE: u8 = 2;
+const RANK_ENTRY: u8 = 3;
+const RANK_TRASH: u8 = 4;
+
+fn prefix_rank(prefix: OutboxIntentPrefix) -> u8 {
+    match prefix {
+        OutboxIntentPrefix::Journal => RANK_JOURNAL,
+        OutboxIntentPrefix::Tag => RANK_TAG,
+        OutboxIntentPrefix::Template => RANK_TEMPLATE,
+        OutboxIntentPrefix::Trash => RANK_TRASH,
+    }
+}
+
+/// File name (last segment) of an outbox path.
+fn outbox_file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+/// Rank guessed from the file name alone, used for the READ order so that a budget cut
+/// drops trash and entries, never the creates they depend on.
+fn path_rank(path: &str) -> u8 {
+    parse_intent_name(outbox_file_name(path)).map_or(RANK_ENTRY, |(p, _)| prefix_rank(p))
+}
+
+/// A decoded intent waiting for the apply pass.
+enum Decoded {
+    V1(Box<OutboxEntryV1>),
+    V2(OutboxIntentV2),
+}
+
+struct DecodedIntent {
+    path: String,
+    content_hash: String,
+    revision: Option<String>,
+    body: Decoded,
+}
+
+impl DecodedIntent {
+    fn sort_key(&self) -> (u8, i64, &str) {
+        match &self.body {
+            Decoded::V1(e) => (RANK_ENTRY, e.web_updated_at_secs, &self.path),
+            Decoded::V2(i) => (prefix_rank(i.prefix()), v2_updated_at_secs(i), &self.path),
+        }
+    }
+}
+
+fn v2_updated_at_secs(intent: &OutboxIntentV2) -> i64 {
+    match intent {
+        OutboxIntentV2::CreateJournal {
+            web_updated_at_secs,
+            ..
+        }
+        | OutboxIntentV2::CreateTag {
+            web_updated_at_secs,
+            ..
+        }
+        | OutboxIntentV2::UpsertTemplate {
+            web_updated_at_secs,
+            ..
+        }
+        | OutboxIntentV2::DeleteTemplate {
+            web_updated_at_secs,
+            ..
+        }
+        | OutboxIntentV2::TrashEntry {
+            web_updated_at_secs,
+            ..
+        } => *web_updated_at_secs,
+    }
+}
+
+/// Check the decoded body against its file name: a v2 body needs the `<prefix><id>.bin`
+/// name of its kind and id; a v1 body must not carry an intent prefix.
+fn decode_named_intent(path: &str, intent: WireIntent) -> Result<Decoded, String> {
+    let name = outbox_file_name(path);
+    match intent {
+        WireIntent::V1(entry) => match parse_intent_name(name) {
+            Ok(_) => Err(format!("entry intent under an intent prefix: {name}")),
+            Err(_) => Ok(Decoded::V1(Box::new(entry))),
+        },
+        WireIntent::V2(v2) => check_intent_name(name, &v2)
+            .map(|()| Decoded::V2(v2))
+            .map_err(|e| e.to_string()),
+    }
+}
+
+/// `applied_from_updated_at` of an apply that created the row: there was no desktop
+/// state for the web to miss, so any base fast-forwards. A legacy template row whose
+/// `updated_at` is still the column default 0 records the same value; that only
+/// loosens the check while the row is unchanged since the web's own write, which is
+/// harmless, so leave it (the v1 crash-resume create path also restores 0).
+const APPLIED_FROM_CREATED: i64 = 0;
+
+/// Final decision for one v2 intent, before it is recorded.
+enum V2Decision {
+    /// Journal / tag created, or already present under this id.
+    Created,
+    /// Template / trash applied or already reflected. `at`: the row's `updated_at`
+    /// after; `from`: the web base this write fast-forwarded from (see
+    /// `fast_forward_from`), `None` when nothing was written.
+    Applied { at: i64, from: Option<i64> },
+    /// Final refusal with its ack reason code.
+    Refused(String),
+    /// Retry next cycle, nothing recorded.
+    Transient,
+}
+
+/// Why a v2 decision could not be reached.
+#[derive(Debug)]
+enum DecideError {
+    /// Deterministic: the same bytes fail the same way every cycle. Recorded as a
+    /// final `invalid` refusal so a poison intent is read once, not every cycle.
+    Invalid(String),
+    /// DB / IO failure: retry next cycle, nothing recorded.
+    Io(String),
+}
+
+impl From<rusqlite::Error> for DecideError {
+    fn from(e: rusqlite::Error) -> Self {
+        match e {
+            // The db layer's input-validation error (tag name / color, template caps).
+            rusqlite::Error::InvalidParameterName(m) => Self::Invalid(m),
+            other => Self::Io(other.to_string()),
+        }
+    }
+}
+
+impl std::fmt::Display for DecideError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Invalid(m) => write!(f, "invalid: {m}"),
+            Self::Io(m) => f.write_str(m),
+        }
+    }
+}
+
+/// Desktop-wins guard shared by template and trash intents. Passes when the web's
+/// base is the row's current stamp, or when the only change since that base is the
+/// web's own edit, which this importer applied from `own_path`: nothing touched the
+/// row after that apply (row == recorded stamp) AND the apply fast-forwarded from the
+/// same base (or created the row). A refused or merged edit records the row's stamp
+/// too, but its `applied_from_updated_at` is the desktop's stamp, not the web's base.
+///
+/// Returns the web base the write fast-forwards from (record it as the new
+/// `applied_from_updated_at`, so a chain of web edits from one base keeps passing),
+/// or `None` when the desktop changed the row since the web's base.
+///
+/// TODO(later): see docs/LATER.md "Phase 14 review notes" — an upgrade/downgrade/re-upgrade
+/// can leave a stale `applied_from_updated_at` next to a v0.2.2-written stamp.
+fn fast_forward_from(
+    conn: &Connection,
+    base_updated_at: Option<i64>,
+    row_updated_at: i64,
+    own_path: &str,
+) -> rusqlite::Result<Option<i64>> {
+    if base_updated_at == Some(row_updated_at) {
+        return Ok(base_updated_at);
+    }
+    Ok(outbox_import_get(conn, own_path)?.and_then(|r| {
+        let from = r.applied_from_updated_at?;
+        let chained = r.outcome == "applied"
+            && r.last_applied_updated_at == Some(row_updated_at)
+            && (from == APPLIED_FROM_CREATED || Some(from) == base_updated_at);
+        chained.then_some(from)
+    }))
+}
+
+fn decode_template_content(content_b64: Option<&str>) -> Result<Option<Vec<u8>>, DecideError> {
+    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    content_b64
+        .map(|c| {
+            B64.decode(c)
+                .map_err(|_| DecideError::Invalid("content_b64: invalid base64".to_string()))
+        })
+        .transpose()
+}
+
+fn template_updated_at(conn: &Connection, id: &str) -> Result<i64, DecideError> {
+    db::queries::get_template_for_import(conn, id)?
+        .map(|r| r.updated_at)
+        .ok_or_else(|| DecideError::Io(format!("template {id} vanished")))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decide_upsert_template(
+    conn: &Connection,
+    path: &str,
+    id: &str,
+    name: &str,
+    description: Option<&str>,
+    content_b64: Option<&str>,
+    sort_order: i64,
+    base_updated_at: Option<i64>,
+) -> Result<V2Decision, DecideError> {
+    let content = decode_template_content(content_b64)?;
+    let Some(row) = db::queries::get_template_for_import(conn, id)? else {
+        if base_updated_at.is_some() {
+            return Ok(V2Decision::Refused(ABSENT.to_string()));
+        }
+        db::queries::create_template_with_id(
+            conn,
+            id,
+            name,
+            description,
+            content.as_deref(),
+            sort_order,
+        )?;
+        return Ok(V2Decision::Applied {
+            at: template_updated_at(conn, id)?,
+            from: Some(APPLIED_FROM_CREATED),
+        });
+    };
+    if row.is_predefined || row.is_deleted {
+        return Ok(V2Decision::Refused(CHANGED_ON_DESKTOP.to_string()));
+    }
+    if row.name == name
+        && row.description.as_deref() == description
+        && row.content == content
+        && row.sort_order == sort_order
+    {
+        return Ok(V2Decision::Applied {
+            at: row.updated_at,
+            from: None,
+        });
+    }
+    let Some(from) = fast_forward_from(conn, base_updated_at, row.updated_at, path)? else {
+        return Ok(V2Decision::Refused(CHANGED_ON_DESKTOP.to_string()));
+    };
+    db::queries::update_template_with_sort_order(
+        conn,
+        id,
+        name,
+        description,
+        content.as_deref(),
+        sort_order,
+    )?;
+    Ok(V2Decision::Applied {
+        at: template_updated_at(conn, id)?,
+        from: Some(from),
+    })
+}
+
+fn decide_delete_template(
+    conn: &Connection,
+    path: &str,
+    id: &str,
+    base_updated_at: i64,
+) -> Result<V2Decision, DecideError> {
+    let Some(row) = db::queries::get_template_for_import(conn, id)? else {
+        // Upsert and delete share `p-<id>.bin`: a template created and deleted on the
+        // web before any import arrives as a delete of a row that never existed here.
+        return Ok(V2Decision::Applied {
+            at: base_updated_at,
+            from: None,
+        });
+    };
+    if row.is_deleted {
+        return Ok(V2Decision::Applied {
+            at: row.updated_at,
+            from: None,
+        });
+    }
+    if row.is_predefined {
+        return Ok(V2Decision::Refused(CHANGED_ON_DESKTOP.to_string()));
+    }
+    let Some(from) = fast_forward_from(conn, Some(base_updated_at), row.updated_at, path)? else {
+        return Ok(V2Decision::Refused(CHANGED_ON_DESKTOP.to_string()));
+    };
+    db::queries::delete_template(conn, id)?;
+    Ok(V2Decision::Applied {
+        at: template_updated_at(conn, id)?,
+        from: Some(from),
+    })
+}
+
+fn decide_trash_entry(
+    conn: &Connection,
+    ctx: &ApplyContext,
+    path: &str,
+    entry_id: &str,
+    base_updated_at: i64,
+) -> Result<V2Decision, DecideError> {
+    let Some(raw) = db::queries::get_entry_raw(conn, entry_id)? else {
+        // Same presence rules as a v1 intent: live on a peer but not pulled yet → wait.
+        return Ok(match ctx.known_ids.get(entry_id) {
+            Some(false) => V2Decision::Transient,
+            _ => V2Decision::Refused(ABSENT.to_string()),
+        });
+    };
+    // Visibility first, and one reason for every hidden or gone target, so a refusal
+    // (or the already-trashed shortcut below) never reveals that a locked or invisible
+    // entry exists, nor its stamp.
+    let journal_ok = db::queries::get_journal(conn, &raw.journal_id)?
+        .is_some_and(|j| !j.is_deleted && !j.is_invisible && !j.is_locked);
+    if raw.is_locked || raw.is_invisible || !journal_ok {
+        return Ok(V2Decision::Refused(ABSENT.to_string()));
+    }
+    if raw.is_deleted {
+        return Ok(match raw.trashed_at {
+            // Already trashed, e.g. pulled from another desktop that applied this intent.
+            Some(_) => V2Decision::Applied {
+                at: raw.updated_at,
+                from: None,
+            },
+            // Purged.
+            None => V2Decision::Refused(ABSENT.to_string()),
+        });
+    }
+    let entry = raw;
+    // The same web device's `<entryId>.bin`, next to this `d-<entryId>.bin`.
+    let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+    let own_edit_path = format!("{dir}/{entry_id}.bin");
+    let Some(from) = fast_forward_from(
+        conn,
+        Some(base_updated_at),
+        entry.updated_at,
+        &own_edit_path,
+    )?
+    else {
+        return Ok(V2Decision::Refused(CHANGED_ON_DESKTOP.to_string()));
+    };
+    soft_delete_entry_impl(conn, entry_id).map_err(DecideError::Io)?;
+    let stamp =
+        db::queries::get_entry_raw(conn, entry_id)?.map_or(entry.updated_at, |e| e.updated_at);
+    Ok(V2Decision::Applied {
+        at: stamp,
+        from: Some(from),
+    })
+}
+
+fn decide_intent_v2(
+    conn: &Connection,
+    ctx: &ApplyContext,
+    path: &str,
+    intent: &OutboxIntentV2,
+) -> Result<V2Decision, DecideError> {
+    let created = |o: db::queries::CreateWithIdOutcome| match o {
+        db::queries::CreateWithIdOutcome::Created | db::queries::CreateWithIdOutcome::Exists => {
+            V2Decision::Created
+        }
+        db::queries::CreateWithIdOutcome::NameTaken => V2Decision::Refused(NAME_TAKEN.to_string()),
+    };
+    // Already checked when the file was opened; repeated here so this entry point
+    // never writes an intent the wire contract rejects.
+    intent
+        .validate()
+        .map_err(|e| DecideError::Invalid(e.to_string()))?;
+    match intent {
+        OutboxIntentV2::CreateJournal {
+            journal_id,
+            name,
+            color,
+            auto_tag_ids,
+            ..
+        } => db::queries::create_journal_with_id(
+            conn,
+            journal_id,
+            name,
+            color.as_deref(),
+            auto_tag_ids,
+        )
+        .map(created)
+        .map_err(DecideError::from),
+        OutboxIntentV2::CreateTag {
+            tag_id,
+            name,
+            color,
+            ..
+        } => db::queries::create_tag_with_id(conn, tag_id, name, color.as_deref())
+            .map(created)
+            .map_err(DecideError::from),
+        OutboxIntentV2::UpsertTemplate {
+            template_id,
+            name,
+            description,
+            content_b64,
+            sort_order,
+            base_updated_at,
+            ..
+        } => decide_upsert_template(
+            conn,
+            path,
+            template_id,
+            name,
+            description.as_deref(),
+            content_b64.as_deref(),
+            *sort_order,
+            *base_updated_at,
+        ),
+        OutboxIntentV2::DeleteTemplate {
+            template_id,
+            base_updated_at,
+            ..
+        } => decide_delete_template(conn, path, template_id, *base_updated_at),
+        OutboxIntentV2::TrashEntry {
+            entry_id,
+            base_updated_at,
+            ..
+        } => decide_trash_entry(conn, ctx, path, entry_id, *base_updated_at),
+    }
+}
+
+/// Apply one decoded v2 intent and record its outcome in `web_outbox_imports` the
+/// way v1 does, so applied / refused are final until the file changes and the ack
+/// carries `created` (creates), `applied_updated_at` (template / trash) or
+/// `refused_reason`. Every apply is idempotent, so a crash between the write and
+/// the record replays to the same result. A validation failure is a final `invalid`
+/// refusal; transient and DB / IO errors record nothing and retry next cycle.
+pub(crate) fn apply_intent_v2(
+    conn: &Connection,
+    ctx: &ApplyContext,
+    path: &str,
+    content_hash: &str,
+    revision: Option<String>,
+    intent: &OutboxIntentV2,
+) -> Outcome {
+    // Desktop behind its peers: a base comparison could refuse on stale rows.
+    if !ctx.pull_clean {
+        return Outcome::Transient;
+    }
+    let decision = match decide_intent_v2(conn, ctx, path, intent) {
+        Ok(d) => d,
+        Err(e @ DecideError::Invalid(_)) => {
+            log::warn!("outbox_import: v2 intent {path} refused: {e}");
+            V2Decision::Refused(INVALID.to_string())
+        }
+        Err(DecideError::Io(e)) => {
+            log::warn!("outbox_import: v2 intent {path} failed: {e}");
+            return Outcome::Transient;
+        }
+    };
+    let (outcome, applied_at, applied_from, created, reason) = match decision {
+        V2Decision::Transient => return Outcome::Transient,
+        V2Decision::Created => (Outcome::Applied, None, None, true, None),
+        V2Decision::Applied { at, from } => (Outcome::Applied, Some(at), from, false, None),
+        V2Decision::Refused(code) => (
+            Outcome::Refused(code.clone()),
+            None,
+            None,
+            false,
+            Some(code),
+        ),
+    };
+    let rec = WebOutboxImportRecord {
+        path: path.to_string(),
+        revision,
+        content_hash: content_hash.to_string(),
+        outcome: if reason.is_some() {
+            "refused"
+        } else {
+            "applied"
+        }
+        .to_string(),
+        imported_at: chrono::Utc::now().timestamp(),
+        last_applied_updated_at: applied_at,
+        post_import_fingerprint: None,
+        decided_fields: None,
+        pending_revision: None,
+        pending_plan: reason,
+        created,
+        applied_from_updated_at: applied_from,
+    };
+    let _ = outbox_import_record(conn, &rec);
+    outcome
+}
+
 /// Execute a full outbox import cycle against the given provider.
 pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
     provider: &(dyn SyncProvider + Send + Sync),
@@ -1690,7 +2222,8 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
             }
         }
     }
-    intent_paths.sort();
+    // Read in apply-rank order (see `path_rank`).
+    intent_paths.sort_by(|a, b| path_rank(a).cmp(&path_rank(b)).then_with(|| a.cmp(b)));
 
     // 3. Check table rows & Read Own Acks
     let table_has_imports = access.with_conn(|conn| {
@@ -1732,13 +2265,21 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
     }
 
     // 4. Per-Intent Processing Loop
-    let start_time = Instant::now();
+    let start_time = tokio::time::Instant::now();
     const MAX_WALL_CLOCK: Duration = Duration::from_secs(60);
+    // The read pass stops here, so the apply pass always has time to record what was
+    // read; otherwise slow reads could fill the budget and every cycle would re-read
+    // the same files without applying any.
+    const MAX_READ_WALL_CLOCK: Duration = Duration::from_secs(30);
+    // Sealed bytes held for the apply pass (one intent is at most
+    // MAX_OUTBOX_PAYLOAD_BYTES = 32 MiB, so 20 of them alone could reach 640 MiB).
+    const MAX_DECODED_BYTES: usize = 64 * 1024 * 1024;
     const MAX_CHANGED_INTENTS: usize = 20;
     const MAX_MEDIA_BYTES: u64 = 200 * 1024 * 1024;
     const MAX_THUMB_BYTES: u64 = 2 * 1024 * 1024;
 
     let mut changed_intents_count = 0;
+    let mut decoded_bytes: usize = 0;
     let mut total_media_bytes: u64 = 0;
     let mut summary_out = OutboxImportSummary {
         candidates_checked: candidates.len(),
@@ -1754,8 +2295,17 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
 
     let effective_pull_clean = pull_clean && !own_acks_failed;
 
+    // 4a. Read + decode pass. Corrupt and unknown-version files are recorded here (final,
+    // order-irrelevant); readable intents wait for the apply pass. Reading stops at
+    // MAX_CHANGED_INTENTS files, MAX_READ_WALL_CLOCK, or once the held intents reach
+    // MAX_DECODED_BYTES (checked before each read, so one intent may overshoot it by at
+    // most MAX_OUTBOX_PAYLOAD_BYTES), so memory stays bounded.
+    let mut decoded: Vec<DecodedIntent> = Vec::new();
     for intent_path in intent_paths {
-        if start_time.elapsed() >= MAX_WALL_CLOCK || changed_intents_count >= MAX_CHANGED_INTENTS {
+        if start_time.elapsed() >= MAX_READ_WALL_CLOCK
+            || changed_intents_count >= MAX_CHANGED_INTENTS
+            || decoded_bytes >= MAX_DECODED_BYTES
+        {
             log::info!("outbox_import: budget reached, deferring remaining intents to next cycle");
             break;
         }
@@ -1763,19 +2313,7 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
         let recorded =
             access.with_conn(|conn| outbox_import_get(conn, &intent_path).map_err(sync_io))?;
         let recorded_revision = recorded.as_ref().and_then(|r| r.revision.as_deref());
-        // Re-read unconditionally only a crash-interrupted apply, or an intent skipped for a
-        // version this build now understands (after a desktop upgrade). Refused, corrupt and
-        // skipped_version rows also fill `pending_plan` (with their reason), but they are final
-        // until the intent file changes.
-        let is_pending = recorded.as_ref().is_some_and(|r| match r.outcome.as_str() {
-            "pending" => r.pending_plan.is_some(),
-            "skipped_version" => r
-                .pending_plan
-                .as_deref()
-                .and_then(|v| v.parse::<u16>().ok())
-                .is_some_and(|v| v == OUTBOX_SCHEMA_VERSION),
-            _ => false,
-        });
+        let is_pending = recorded.as_ref().is_some_and(is_pending);
 
         let (bytes, revision): (Vec<u8>, Option<String>) = if is_pending {
             match provider.read_file(&intent_path).await {
@@ -1807,13 +2345,24 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
             }
         };
 
+        let content_hash = hex::encode(sha2::Sha256::digest(&bytes));
+        let opened = open_outbox_intent(key_list, &bytes)
+            .map_err(|e| match e {
+                // A supported frame version whose body disagrees is malformed, not newer.
+                OutboxError::UnsupportedVersion(v) if SUPPORTED_OUTBOX_VERSIONS.contains(&v) => {
+                    Err(format!("body version {v} does not match its frame"))
+                }
+                OutboxError::UnsupportedVersion(v) => Ok(v),
+                other => Err(other.to_string()),
+            })
+            .and_then(|intent| decode_named_intent(&intent_path, intent).map_err(Err));
+
         changed_intents_count += 1;
         sink.emit_progress(changed_intents_count as u32, 20);
 
-        let content_hash = hex::encode(sha2::Sha256::digest(&bytes));
-        let entry = match open_outbox_entry(key_list, &bytes) {
-            Ok(e) => e,
-            Err(OutboxError::UnsupportedVersion(v)) => {
+        let body = match opened {
+            Ok(body) => body,
+            Err(Ok(v)) => {
                 log::warn!("outbox_import: intent {intent_path} unsupported version {v}");
                 let rec = WebOutboxImportRecord {
                     path: intent_path.clone(),
@@ -1827,12 +2376,13 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                     pending_revision: None,
                     pending_plan: Some(v.to_string()),
                     created: false,
+                    applied_from_updated_at: None,
                 };
                 let _ = access.with_conn(|conn| outbox_import_record(conn, &rec).map_err(sync_io));
                 summary_out.intents_refused += 1;
                 continue;
             }
-            Err(e) => {
+            Err(Err(e)) => {
                 log::warn!("outbox_import: intent {intent_path} corrupt: {e}");
                 let rec = WebOutboxImportRecord {
                     path: intent_path.clone(),
@@ -1846,9 +2396,62 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                     pending_revision: None,
                     pending_plan: None,
                     created: false,
+                    applied_from_updated_at: None,
                 };
                 let _ = access.with_conn(|conn| outbox_import_record(conn, &rec).map_err(sync_io));
                 summary_out.intents_refused += 1;
+                continue;
+            }
+        };
+
+        decoded_bytes += bytes.len();
+        decoded.push(DecodedIntent {
+            path: intent_path,
+            content_hash,
+            revision,
+            body,
+        });
+    }
+
+    // 4b. Apply pass, across all web devices: create_tag → create_journal → templates →
+    // v1 entry intents → trash_entry; within a kind by `web_updated_at_secs`, then path.
+    // Baked into installed builds: a journal must find its auto tags, and an entry the
+    // journal / tags created with it.
+    decoded.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));
+    let ctx = ApplyContext {
+        known_ids,
+        pull_clean: effective_pull_clean,
+        own_acks: own_acks_map,
+        media_dir: media_dir.to_path_buf(),
+    };
+    for DecodedIntent {
+        path: intent_path,
+        content_hash,
+        revision,
+        body,
+    } in decoded
+    {
+        // No wall-clock cut here: v2 and media-less v1 applies are local and cheap, and
+        // the media download below defers its own intent (unrecorded) past the budget.
+        let entry = match body {
+            Decoded::V1(entry) => *entry,
+            Decoded::V2(v2) => {
+                sink.on_intent_dispatched(&intent_path);
+                let outcome = access.with_conn(|conn| {
+                    Ok(apply_intent_v2(
+                        conn,
+                        &ctx,
+                        &intent_path,
+                        &content_hash,
+                        revision,
+                        &v2,
+                    ))
+                })?;
+                match outcome {
+                    Outcome::Applied => summary_out.intents_applied += 1,
+                    Outcome::Transient => summary_out.intents_transient += 1,
+                    _ => summary_out.intents_refused += 1,
+                }
                 continue;
             }
         };
@@ -1958,13 +2561,7 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
             media_thumb_payloads,
         };
 
-        let ctx = ApplyContext {
-            known_ids: known_ids.clone(),
-            pull_clean: effective_pull_clean,
-            own_acks: own_acks_map.clone(),
-            media_dir: media_dir.to_path_buf(),
-        };
-
+        sink.on_intent_dispatched(&intent.path);
         let apply_res = access.with_conn(|conn| Ok(apply_intent_full(conn, &ctx, &intent)))?;
 
         for entry_id in &apply_res.touched_entry_ids {
@@ -2008,6 +2605,7 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                         pending_revision: row.get(8)?,
                         pending_plan: row.get(9)?,
                         created: row.get(10)?,
+                        applied_from_updated_at: None,
                     })
                 })
                 .map_err(sync_io)?
@@ -2105,6 +2703,7 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                     pending_revision: None,
                     pending_plan: None,
                     created: false,
+                    applied_from_updated_at: None,
                 };
                 access.with_conn(|conn| outbox_import_record(conn, &marker).map_err(sync_io))?;
                 summary_out.acks_written = true;
@@ -3286,6 +3885,7 @@ mod tests {
         progress_events: std::sync::Mutex<Vec<(u32, u32)>>,
         bridge_events: std::sync::Mutex<Vec<OutboxBridgeEvent>>,
         dirty_entries: std::sync::Mutex<Vec<String>>,
+        dispatched: std::sync::Mutex<Vec<String>>,
     }
 
     impl OutboxEventSink for TestOutboxSink {
@@ -3300,6 +3900,9 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(entry_id.to_string());
+        }
+        fn on_intent_dispatched(&self, path: &str) {
+            self.dispatched.lock().unwrap().push(path.to_string());
         }
     }
 
@@ -3685,7 +4288,9 @@ mod tests {
         };
         let unknown = cycle_with_skipped_version("999").await;
         assert_eq!(unknown.intents_skipped_unchanged, 25);
-        let now_known = cycle_with_skipped_version(&OUTBOX_SCHEMA_VERSION.to_string()).await;
+        let now_known =
+            cycle_with_skipped_version(&memlore_core::outbox::OUTBOX_SCHEMA_VERSION.to_string())
+                .await;
         assert_eq!(now_known.intents_skipped_unchanged, 24);
         assert_eq!(now_known.intents_refused, 1);
     }
@@ -3800,5 +4405,1621 @@ mod tests {
         );
         let healed_bytes = sync_p.read_file(&acks_path).await.unwrap();
         assert!(!healed_bytes.is_empty());
+    }
+
+    // ---- Phase 14.1: version dispatch + apply order ----
+
+    const V2_OWN: &str = "11111111-1111-1111-1111-111111111111";
+    const V2_WEB_A: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const V2_WEB_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+    /// Provider with a device slot for every given web device.
+    async fn v2_fixture(
+        web_ids: &[&str],
+    ) -> (
+        tempfile::TempDir,
+        crate::sync::local_provider::LocalSyncProvider,
+        PathBuf,
+    ) {
+        use memlore_core::keyring_types::{DeviceSlotV2, KEYRING_V2_VERSION};
+        let temp_dir = tempfile::tempdir().unwrap();
+        let provider = crate::sync::golden_fixtures::fenced_provider(temp_dir.path(), 0);
+        let media_dir = temp_dir.path().join("media");
+        std::fs::create_dir_all(&media_dir).unwrap();
+        for id in web_ids {
+            let slot = DeviceSlotV2 {
+                version: KEYRING_V2_VERSION,
+                device_id: id.to_string(),
+                name: "Web Companion".to_string(),
+                created_at: 1000,
+                last_seen_at: 1000,
+            };
+            crate::sync::keyring_v2::io::write_device_slot(&provider, &slot)
+                .await
+                .unwrap();
+        }
+        (temp_dir, provider, media_dir)
+    }
+
+    async fn v2_cycle(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        media_dir: &Path,
+        conn: &Connection,
+        sink: &TestOutboxSink,
+    ) -> OutboxImportSummary {
+        let summary = SyncSummary {
+            pull_clean: true,
+            ..Default::default()
+        };
+        run_outbox_import_cycle(
+            provider,
+            provider,
+            V2_OWN,
+            &test_key_list(),
+            HashMap::new(),
+            true,
+            &summary,
+            media_dir,
+            conn,
+            sink,
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn write_v2(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        path: &str,
+        intent: &memlore_core::outbox::OutboxIntentV2,
+    ) {
+        let sealed = memlore_core::outbox::seal_outbox_intent_v2(&test_key_list(), intent).unwrap();
+        let p: &(dyn SyncProvider + Send + Sync) = provider;
+        p.write_file(path, &sealed).await.unwrap();
+    }
+
+    async fn write_v1(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        path: &str,
+        entry: &OutboxEntryV1,
+    ) {
+        let sealed = memlore_core::outbox::seal_outbox_entry(&test_key_list(), entry).unwrap();
+        let p: &(dyn SyncProvider + Send + Sync) = provider;
+        p.write_file(path, &sealed).await.unwrap();
+    }
+
+    fn v2_journal(web: &str, id: &str, ts: i64) -> memlore_core::outbox::OutboxIntentV2 {
+        memlore_core::outbox::OutboxIntentV2::CreateJournal {
+            web_device_id: web.to_string(),
+            web_updated_at_secs: ts,
+            journal_id: id.to_string(),
+            name: format!("Journal {id}"),
+            color: None,
+            auto_tag_ids: vec![],
+        }
+    }
+
+    fn v2_tag(web: &str, id: &str, ts: i64) -> memlore_core::outbox::OutboxIntentV2 {
+        memlore_core::outbox::OutboxIntentV2::CreateTag {
+            web_device_id: web.to_string(),
+            web_updated_at_secs: ts,
+            tag_id: id.to_string(),
+            name: format!("Tag {id}"),
+            color: None,
+        }
+    }
+
+    fn v1_edit(web: &str, entry_id: &str, ts: i64) -> OutboxEntryV1 {
+        let fields = OutboxFields {
+            title: Some(FieldChange {
+                value: "Edited".to_string(),
+                base: "".to_string(),
+                base_updated_at: 0,
+                change_seq: 1,
+                changed_at_secs: ts,
+            }),
+            ..Default::default()
+        };
+        OutboxEntryV1 {
+            schema_version: 1,
+            entry_id: entry_id.to_string(),
+            web_device_id: web.to_string(),
+            created_on_web: false,
+            web_updated_at_secs: ts,
+            base_state_vector: vec![],
+            yjs_full_state: make_test_yjs("Body"),
+            content_text: Some("Body".to_string()),
+            preview_text: Some("Body".to_string()),
+            fields,
+            media: vec![],
+        }
+    }
+
+    fn import_row(conn: &Connection, path: &str) -> Option<WebOutboxImportRecord> {
+        outbox_import_get(conn, path).unwrap()
+    }
+
+    #[test]
+    fn test_is_pending_skipped_version_rows_follow_supported_versions() {
+        let row = |outcome: &str, plan: Option<&str>| WebOutboxImportRecord {
+            path: "p".to_string(),
+            revision: None,
+            content_hash: "h".to_string(),
+            outcome: outcome.to_string(),
+            imported_at: 0,
+            last_applied_updated_at: None,
+            post_import_fingerprint: None,
+            decided_fields: None,
+            pending_revision: None,
+            pending_plan: plan.map(str::to_string),
+            created: false,
+            applied_from_updated_at: None,
+        };
+        assert!(is_pending(&row("skipped_version", Some("1"))));
+        assert!(is_pending(&row("skipped_version", Some("2"))));
+        assert!(!is_pending(&row("skipped_version", Some("3"))));
+        assert!(!is_pending(&row("skipped_version", Some("999"))));
+        assert!(!is_pending(&row("skipped_version", Some("abc"))));
+        assert!(!is_pending(&row("skipped_version", None)));
+        assert!(is_pending(&row("pending", Some("{}"))));
+        assert!(!is_pending(&row("pending", None)));
+        assert!(!is_pending(&row("corrupt", Some("2"))));
+        assert!(!is_pending(&row("refused", Some("2"))));
+    }
+
+    /// v1 files go through the v1 apply path, v2 files through the v2 one; both are
+    /// recorded, so neither is re-read next cycle.
+    #[tokio::test]
+    async fn test_cycle_dispatches_per_version() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let eid = "entry-dispatch-0001";
+        let jid = "journal-dispatch-01";
+        let v1_path = format!("{V2_WEB_A}/outbox/{eid}.bin");
+        let v2_path = format!("{V2_WEB_A}/outbox/j-{jid}.bin");
+        write_v1(&provider, &v1_path, &v1_edit(V2_WEB_A, eid, 1000)).await;
+        write_v2(&provider, &v2_path, &v2_journal(V2_WEB_A, jid, 1000)).await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+
+        assert_eq!(res.intents_listed, 2);
+        assert_eq!(res.intents_refused, 1, "v1 edit of an unknown entry");
+        assert_eq!(res.intents_applied, 1, "v2 journal create");
+        assert_eq!(import_row(&conn, &v1_path).unwrap().outcome, "refused");
+        assert_eq!(import_row(&conn, &v2_path).unwrap().outcome, "applied");
+        assert_eq!(
+            *sink.dispatched.lock().unwrap(),
+            vec![v2_path.clone(), v1_path.clone()]
+        );
+
+        let sink2 = TestOutboxSink::default();
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink2).await;
+        assert_eq!(res2.intents_skipped_unchanged, 2);
+        assert!(sink2.dispatched.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cycle_name_kind_mismatch_is_corrupt() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let tid = "tag-mismatch-00001";
+        // Tag body under a journal prefix.
+        let wrong_prefix = format!("{V2_WEB_A}/outbox/j-{tid}.bin");
+        write_v2(&provider, &wrong_prefix, &v2_tag(V2_WEB_A, tid, 1)).await;
+        // Right prefix, other id.
+        let wrong_id = format!("{V2_WEB_A}/outbox/t-tag-other-000001.bin");
+        write_v2(&provider, &wrong_id, &v2_tag(V2_WEB_A, tid, 1)).await;
+        // v2 body in a bare entry name.
+        let bare = format!("{V2_WEB_A}/outbox/{tid}.bin");
+        write_v2(&provider, &bare, &v2_tag(V2_WEB_A, tid, 1)).await;
+        // v1 body under an intent prefix.
+        let eid = "entry-mismatch-0001";
+        let v1_prefixed = format!("{V2_WEB_A}/outbox/d-{eid}.bin");
+        write_v1(&provider, &v1_prefixed, &v1_edit(V2_WEB_A, eid, 1)).await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+
+        assert_eq!(res.intents_refused, 4);
+        for path in [&wrong_prefix, &wrong_id, &bare, &v1_prefixed] {
+            assert_eq!(
+                import_row(&conn, path).unwrap().outcome,
+                "corrupt",
+                "{path}"
+            );
+        }
+        assert!(sink.dispatched.lock().unwrap().is_empty());
+
+        // Corrupt is final until the file changes.
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res2.intents_skipped_unchanged, 4);
+    }
+
+    #[tokio::test]
+    async fn test_cycle_unknown_version_3_is_skipped_version() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let jid = "journal-version-03";
+        let path = format!("{V2_WEB_A}/outbox/j-{jid}.bin");
+        let mut sealed = memlore_core::outbox::seal_outbox_intent_v2(
+            &test_key_list(),
+            &v2_journal(V2_WEB_A, jid, 1),
+        )
+        .unwrap();
+        // Frame version is the u16 right after the 4-byte magic (bincode fixint, LE).
+        sealed[4..6].copy_from_slice(&3u16.to_le_bytes());
+        let p: &(dyn SyncProvider + Send + Sync) = &provider;
+        p.write_file(&path, &sealed).await.unwrap();
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        v2_cycle(&provider, &media_dir, &conn, &sink).await;
+
+        let row = import_row(&conn, &path).unwrap();
+        assert_eq!(row.outcome, "skipped_version");
+        assert_eq!(row.pending_plan.as_deref(), Some("3"));
+
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(
+            res2.intents_skipped_unchanged, 1,
+            "unknown version stays skipped"
+        );
+    }
+
+    /// A v1 frame whose inner body claims version 2 is malformed, not "newer": it must be
+    /// final `corrupt`, or the now-supported "2" would re-read it every cycle forever.
+    #[tokio::test]
+    async fn test_cycle_v1_frame_with_inner_version_2_is_corrupt() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let eid = "entry-inner-v2-0001";
+        let path = format!("{V2_WEB_A}/outbox/{eid}.bin");
+        let mut entry = v1_edit(V2_WEB_A, eid, 1);
+        entry.schema_version = 2;
+        write_v1(&provider, &path, &entry).await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(import_row(&conn, &path).unwrap().outcome, "corrupt");
+
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res2.intents_skipped_unchanged, 1);
+    }
+
+    /// v0.2.2 recorded v2 files as `skipped_version` / "2" with the file's revision. After
+    /// the upgrade that row is pending again: re-read and dispatched although unchanged.
+    #[tokio::test]
+    async fn test_cycle_rereads_skipped_version_2_row() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let jid = "journal-old-skip-1";
+        let path = format!("{V2_WEB_A}/outbox/j-{jid}.bin");
+        write_v2(&provider, &path, &v2_journal(V2_WEB_A, jid, 1)).await;
+        let p: &(dyn SyncProvider + Send + Sync) = &provider;
+        let revision = match p.read_file_if_changed(&path, None).await.unwrap() {
+            ConditionalRead::Changed { revision, .. } => revision,
+            ConditionalRead::Unchanged => unreachable!(),
+        };
+        assert!(revision.is_some());
+
+        let conn = setup_test_db();
+        let old_row = WebOutboxImportRecord {
+            path: path.clone(),
+            revision: revision.clone(),
+            content_hash: "old-hash".to_string(),
+            outcome: "skipped_version".to_string(),
+            imported_at: 1,
+            last_applied_updated_at: None,
+            post_import_fingerprint: None,
+            decided_fields: None,
+            pending_revision: None,
+            pending_plan: Some("2".to_string()),
+            created: false,
+            applied_from_updated_at: None,
+        };
+        outbox_import_record(&conn, &old_row).unwrap();
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_skipped_unchanged, 0);
+        assert_eq!(*sink.dispatched.lock().unwrap(), vec![path.clone()]);
+        let row = import_row(&conn, &path).unwrap();
+        assert_eq!(row.outcome, "applied");
+        assert!(row.created);
+        assert_eq!(row.revision, revision);
+        assert!(db::queries::get_journal(&conn, jid).unwrap().is_some());
+
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res2.intents_skipped_unchanged, 1, "applied is final");
+    }
+
+    /// Across all web devices: tags → journals → templates → v1 entries → trash; within a
+    /// kind by `web_updated_at_secs`, then path.
+    #[tokio::test]
+    async fn test_cycle_applies_in_kind_order_across_web_devices() {
+        use memlore_core::outbox::OutboxIntentV2;
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A, V2_WEB_B]).await;
+        let path = |web: &str, name: &str| format!("{web}/outbox/{name}.bin");
+
+        let trash_a = path(V2_WEB_A, "d-entry-order-00001");
+        write_v2(
+            &provider,
+            &trash_a,
+            &OutboxIntentV2::TrashEntry {
+                web_device_id: V2_WEB_A.to_string(),
+                web_updated_at_secs: 1,
+                entry_id: "entry-order-00001".to_string(),
+                base_updated_at: 1,
+            },
+        )
+        .await;
+        let entry_a = path(V2_WEB_A, "entry-order-00001");
+        write_v1(
+            &provider,
+            &entry_a,
+            &v1_edit(V2_WEB_A, "entry-order-00001", 2),
+        )
+        .await;
+        let entry_b = path(V2_WEB_B, "entry-order-00002");
+        write_v1(
+            &provider,
+            &entry_b,
+            &v1_edit(V2_WEB_B, "entry-order-00002", 1),
+        )
+        .await;
+        let tpl_a = path(V2_WEB_A, "p-template-order-1");
+        write_v2(
+            &provider,
+            &tpl_a,
+            &OutboxIntentV2::DeleteTemplate {
+                web_device_id: V2_WEB_A.to_string(),
+                web_updated_at_secs: 3,
+                template_id: "template-order-1".to_string(),
+                base_updated_at: 1,
+            },
+        )
+        .await;
+        let tag_a = path(V2_WEB_A, "t-tag-order-0001");
+        write_v2(&provider, &tag_a, &v2_tag(V2_WEB_A, "tag-order-0001", 400)).await;
+        let tag_b = path(V2_WEB_B, "t-tag-order-0002");
+        write_v2(&provider, &tag_b, &v2_tag(V2_WEB_B, "tag-order-0002", 300)).await;
+        let journal_a = path(V2_WEB_A, "j-journal-order-1");
+        write_v2(
+            &provider,
+            &journal_a,
+            &v2_journal(V2_WEB_A, "journal-order-1", 500),
+        )
+        .await;
+        let journal_b = path(V2_WEB_B, "j-journal-order-2");
+        write_v2(
+            &provider,
+            &journal_b,
+            &v2_journal(V2_WEB_B, "journal-order-2", 10),
+        )
+        .await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        v2_cycle(&provider, &media_dir, &conn, &sink).await;
+
+        assert_eq!(
+            *sink.dispatched.lock().unwrap(),
+            vec![tag_b, tag_a, journal_b, journal_a, tpl_a, entry_b, entry_a, trash_a]
+        );
+    }
+
+    /// Tags apply before journals: a journal's `auto_tag_ids` may name a tag created
+    /// in the same cycle, and `create_journal_with_id` drops unknown tag ids.
+    #[tokio::test]
+    async fn test_cycle_journal_auto_tag_created_same_cycle() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let tid = "tag-autotag-order-1";
+        let jid = "journal-autotag-ord1";
+        let tag = v2_tag(V2_WEB_A, tid, 900);
+        let mut journal = v2_journal(V2_WEB_A, jid, 1);
+        if let OutboxIntentV2::CreateJournal { auto_tag_ids, .. } = &mut journal {
+            auto_tag_ids.push(tid.to_string());
+        }
+        write_v2(&provider, &v2_path(&tag), &tag).await;
+        write_v2(&provider, &v2_path(&journal), &journal).await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_applied, 2, "{res:?}");
+        let auto: Vec<String> = db::queries::list_journal_auto_tags(&conn, jid)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.id)
+            .collect();
+        assert_eq!(auto, vec![tid.to_string()]);
+    }
+
+    // ---- Phase 14.2 / 14.3: apply each v2 kind, acks ----
+
+    const V2_HASH: &str = "hash-v2";
+    const V2_REV: &str = "rev-v2";
+
+    fn v2_path(intent: &OutboxIntentV2) -> String {
+        format!("{}/outbox/{}", intent.web_device_id(), intent.file_name())
+    }
+
+    fn v2_apply(conn: &Connection, ctx: &ApplyContext, intent: &OutboxIntentV2) -> Outcome {
+        apply_intent_v2(
+            conn,
+            ctx,
+            &v2_path(intent),
+            V2_HASH,
+            Some(V2_REV.to_string()),
+            intent,
+        )
+    }
+
+    fn v2_ctx() -> (tempfile::TempDir, ApplyContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = ApplyContext::new(dir.path().to_path_buf());
+        (dir, ctx)
+    }
+
+    fn v2_template(
+        id: &str,
+        name: &str,
+        content: &[u8],
+        base_updated_at: Option<i64>,
+    ) -> OutboxIntentV2 {
+        use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+        OutboxIntentV2::UpsertTemplate {
+            web_device_id: V2_WEB_A.to_string(),
+            web_updated_at_secs: 10,
+            template_id: id.to_string(),
+            name: name.to_string(),
+            description: Some("desc".to_string()),
+            content_b64: Some(B64.encode(content)),
+            sort_order: 2,
+            base_updated_at,
+        }
+    }
+
+    fn v2_delete_template(id: &str, base_updated_at: i64) -> OutboxIntentV2 {
+        OutboxIntentV2::DeleteTemplate {
+            web_device_id: V2_WEB_A.to_string(),
+            web_updated_at_secs: 11,
+            template_id: id.to_string(),
+            base_updated_at,
+        }
+    }
+
+    fn v2_trash(entry_id: &str, base_updated_at: i64) -> OutboxIntentV2 {
+        OutboxIntentV2::TrashEntry {
+            web_device_id: V2_WEB_A.to_string(),
+            web_updated_at_secs: 12,
+            entry_id: entry_id.to_string(),
+            base_updated_at,
+        }
+    }
+
+    fn live_entry(conn: &Connection, journal_id: &str) -> db::Entry {
+        crate::commands::entries::create_entry_impl(
+            conn,
+            journal_id,
+            Some("Desk"),
+            None,
+            None,
+            1_700_000_000,
+        )
+        .unwrap()
+    }
+
+    fn raw_entry(conn: &Connection, id: &str) -> db::Entry {
+        db::queries::get_entry_raw(conn, id).unwrap().unwrap()
+    }
+
+    fn assert_refused(conn: &Connection, intent: &OutboxIntentV2, outcome: Outcome, code: &str) {
+        assert_eq!(outcome, Outcome::Refused(code.to_string()));
+        let row = import_row(conn, &v2_path(intent)).unwrap();
+        assert_eq!(row.outcome, "refused");
+        assert_eq!(row.pending_plan.as_deref(), Some(code));
+        assert_eq!(row.revision.as_deref(), Some(V2_REV));
+        assert!(!row.created);
+    }
+
+    #[test]
+    fn test_v2_create_journal_happy_idempotent_and_name_taken() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let intent = v2_journal(V2_WEB_A, "journal-v2-happy-1", 5);
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+        let j = db::queries::get_journal(&conn, "journal-v2-happy-1")
+            .unwrap()
+            .unwrap();
+        assert_eq!(j.name, "Journal journal-v2-happy-1");
+        let row = import_row(&conn, &v2_path(&intent)).unwrap();
+        assert_eq!(row.outcome, "applied");
+        assert!(row.created);
+        assert_eq!(row.revision.as_deref(), Some(V2_REV));
+        assert_eq!(row.content_hash, V2_HASH);
+
+        // Replay (crash before the record, or a second desktop) → applied, created.
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+        assert!(import_row(&conn, &v2_path(&intent)).unwrap().created);
+
+        // Same name, other id → name_taken.
+        let clash = OutboxIntentV2::CreateJournal {
+            web_device_id: V2_WEB_A.to_string(),
+            web_updated_at_secs: 6,
+            journal_id: "journal-v2-happy-2".to_string(),
+            name: "Journal journal-v2-happy-1".to_string(),
+            color: None,
+            auto_tag_ids: vec![],
+        };
+        let out = v2_apply(&conn, &ctx, &clash);
+        assert_refused(&conn, &clash, out, "name_taken");
+        assert!(db::queries::get_journal(&conn, "journal-v2-happy-2")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_v2_create_tag_happy_idempotent_and_name_taken() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let intent = v2_tag(V2_WEB_A, "tag-v2-happy-0001", 5);
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+        assert_eq!(
+            existing_tag_ids(&conn, &["tag-v2-happy-0001"]).unwrap(),
+            vec!["tag-v2-happy-0001".to_string()]
+        );
+        assert!(import_row(&conn, &v2_path(&intent)).unwrap().created);
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+
+        db::queries::create_tag(&conn, "taken", None).unwrap();
+        let clash = OutboxIntentV2::CreateTag {
+            web_device_id: V2_WEB_A.to_string(),
+            web_updated_at_secs: 6,
+            tag_id: "tag-v2-happy-0002".to_string(),
+            name: "taken".to_string(),
+            color: None,
+        };
+        let out = v2_apply(&conn, &ctx, &clash);
+        assert_refused(&conn, &clash, out, "name_taken");
+    }
+
+    #[test]
+    fn test_v2_template_create_reflected_update_and_refused() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let id = "template-v2-0001";
+        let create = v2_template(id, "Daily", b"one", None);
+        assert_eq!(v2_apply(&conn, &ctx, &create), Outcome::Applied);
+        let row = db::queries::get_template_for_import(&conn, id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.name, "Daily");
+        assert_eq!(row.description.as_deref(), Some("desc"));
+        assert_eq!(row.content.as_deref(), Some(&b"one"[..]));
+        assert_eq!(row.sort_order, 2);
+        let rec = import_row(&conn, &v2_path(&create)).unwrap();
+        assert_eq!(rec.outcome, "applied");
+        assert_eq!(rec.last_applied_updated_at, Some(row.updated_at));
+
+        // Already reflected → applied without a write.
+        assert_eq!(v2_apply(&conn, &ctx, &create), Outcome::Applied);
+        let same = db::queries::get_template_for_import(&conn, id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(same.updated_at, row.updated_at);
+
+        // Update on the current base → applied.
+        let update = v2_template(id, "Weekly", b"two", Some(row.updated_at));
+        assert_eq!(v2_apply(&conn, &ctx, &update), Outcome::Applied);
+        let updated = db::queries::get_template_for_import(&conn, id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.name, "Weekly");
+        assert_eq!(
+            import_row(&conn, &v2_path(&update))
+                .unwrap()
+                .last_applied_updated_at,
+            Some(updated.updated_at)
+        );
+
+        // Desktop edits it, then a web edit on the old base → desktop wins.
+        conn.execute(
+            "UPDATE templates SET name = 'Desk', updated_at = updated_at + 100 WHERE id = ?1",
+            [id],
+        )
+        .unwrap();
+        let stale = v2_template(id, "Monthly", b"three", Some(row.updated_at));
+        let out = v2_apply(&conn, &ctx, &stale);
+        assert_refused(&conn, &stale, out, "changed_on_desktop");
+        assert_eq!(
+            db::queries::get_template_for_import(&conn, id)
+                .unwrap()
+                .unwrap()
+                .name,
+            "Desk"
+        );
+    }
+
+    #[test]
+    fn test_v2_template_in_place_edit_of_own_create_applies() {
+        // The web edits its own not-yet-reflected template in place: still base None.
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let id = "template-v2-0002";
+        assert_eq!(
+            v2_apply(&conn, &ctx, &v2_template(id, "Draft", b"a", None)),
+            Outcome::Applied
+        );
+        let edited = v2_template(id, "Draft 2", b"b", None);
+        assert_eq!(v2_apply(&conn, &ctx, &edited), Outcome::Applied);
+        // A second in-place edit, still base None: the chain carries the web's base.
+        let edited = v2_template(id, "Draft 2b", b"bb", None);
+        assert_eq!(v2_apply(&conn, &ctx, &edited), Outcome::Applied);
+        assert_eq!(
+            db::queries::get_template_for_import(&conn, id)
+                .unwrap()
+                .unwrap()
+                .name,
+            "Draft 2b"
+        );
+
+        // ...but not after a desktop edit.
+        conn.execute(
+            "UPDATE templates SET name = 'Desk', updated_at = updated_at + 100 WHERE id = ?1",
+            [id],
+        )
+        .unwrap();
+        let again = v2_template(id, "Draft 3", b"c", None);
+        let out = v2_apply(&conn, &ctx, &again);
+        assert_refused(&conn, &again, out, "changed_on_desktop");
+    }
+
+    #[test]
+    fn test_v2_template_upsert_of_unknown_or_predefined_row_refused() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let missing = v2_template("template-v2-0003", "X", b"x", Some(5));
+        let out = v2_apply(&conn, &ctx, &missing);
+        assert_refused(&conn, &missing, out, "absent");
+
+        let pre = db::queries::create_predefined_template(&conn, "Seeded", None, None, 0).unwrap();
+        let row = db::queries::get_template_for_import(&conn, &pre.id)
+            .unwrap()
+            .unwrap();
+        let edit = v2_template(&pre.id, "Mine", b"m", Some(row.updated_at));
+        let out = v2_apply(&conn, &ctx, &edit);
+        assert_refused(&conn, &edit, out, "changed_on_desktop");
+    }
+
+    #[test]
+    fn test_v2_template_delete_happy_idempotent_and_refused() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let id = "template-v2-0004";
+        db::queries::create_template_with_id(&conn, id, "T", None, None, 0).unwrap();
+        let row = db::queries::get_template_for_import(&conn, id)
+            .unwrap()
+            .unwrap();
+
+        // Stale base → refused, row kept.
+        let stale = v2_delete_template(id, row.updated_at - 1);
+        let out = v2_apply(&conn, &ctx, &stale);
+        assert_refused(&conn, &stale, out, "changed_on_desktop");
+        assert!(
+            !db::queries::get_template_for_import(&conn, id)
+                .unwrap()
+                .unwrap()
+                .is_deleted
+        );
+
+        let del = v2_delete_template(id, row.updated_at);
+        assert_eq!(v2_apply(&conn, &ctx, &del), Outcome::Applied);
+        let gone = db::queries::get_template_for_import(&conn, id)
+            .unwrap()
+            .unwrap();
+        assert!(gone.is_deleted);
+        assert_eq!(
+            import_row(&conn, &v2_path(&del))
+                .unwrap()
+                .last_applied_updated_at,
+            Some(gone.updated_at)
+        );
+
+        // Already deleted → applied, even with a stale base.
+        let again = v2_delete_template(id, 1);
+        assert_eq!(v2_apply(&conn, &ctx, &again), Outcome::Applied);
+
+        // Created then deleted on the web before any import: nothing to delete.
+        let never = v2_delete_template("template-v2-0005", 42);
+        assert_eq!(v2_apply(&conn, &ctx, &never), Outcome::Applied);
+        let rec = import_row(&conn, &v2_path(&never)).unwrap();
+        assert_eq!(rec.outcome, "applied");
+        assert_eq!(rec.last_applied_updated_at, Some(42));
+    }
+
+    /// A deterministic validation failure is a final `invalid` refusal, recorded once,
+    /// never a transient that re-reads (and spends budget on) the file every cycle.
+    #[test]
+    fn test_v2_invalid_intent_is_final_refused_invalid() {
+        use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let mut bad_color = v2_tag(V2_WEB_A, "tag-poison-color-1", 1);
+        if let OutboxIntentV2::CreateTag { color, .. } = &mut bad_color {
+            *color = Some("red".to_string());
+        }
+        let mut blank_journal = v2_journal(V2_WEB_A, "journal-poison-blank", 1);
+        if let OutboxIntentV2::CreateJournal { name, .. } = &mut blank_journal {
+            *name = "   ".to_string();
+        }
+        let mut bad_b64 = v2_template("template-poison-b64", "T", b"t", None);
+        if let OutboxIntentV2::UpsertTemplate { content_b64, .. } = &mut bad_b64 {
+            *content_b64 = Some("!!not base64!!".to_string());
+        }
+        let mut huge = v2_template("template-poison-big", "T", b"t", None);
+        if let OutboxIntentV2::UpsertTemplate { content_b64, .. } = &mut huge {
+            *content_b64 = Some(B64.encode(vec![
+                0u8;
+                memlore_core::outbox::MAX_TEMPLATE_CONTENT_BYTES
+                    + 1
+            ]));
+        }
+        for i in [&bad_color, &blank_journal, &bad_b64, &huge] {
+            let out = v2_apply(&conn, &ctx, i);
+            assert_refused(&conn, i, out, "invalid");
+            assert!(!is_pending(&import_row(&conn, &v2_path(i)).unwrap()));
+        }
+        assert!(db::queries::get_journal(&conn, "journal-poison-blank")
+            .unwrap()
+            .is_none());
+        assert!(
+            db::queries::get_template_for_import(&conn, "template-poison-b64")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_v2_trash_happy_marks_pending_and_records_stamp() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        db::queries::mark_entry_synced(&conn, &e.id, 1).ok();
+        let intent = v2_trash(&e.id, e.updated_at);
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+        let after = raw_entry(&conn, &e.id);
+        assert!(after.is_deleted && after.trashed_at.is_some());
+        assert!(after.updated_at > e.updated_at);
+        let status: String = conn
+            .query_row(
+                "SELECT sync_status FROM sync_state WHERE entry_id = ?1",
+                [&e.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, "pending");
+        let rec = import_row(&conn, &v2_path(&intent)).unwrap();
+        assert_eq!(rec.outcome, "applied");
+        assert_eq!(rec.last_applied_updated_at, Some(after.updated_at));
+        assert!(!rec.created);
+    }
+
+    #[test]
+    fn test_v2_trash_stale_base_refused_changed_on_desktop() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        let intent = v2_trash(&e.id, e.updated_at - 10);
+        let out = v2_apply(&conn, &ctx, &intent);
+        assert_refused(&conn, &intent, out, "changed_on_desktop");
+        assert!(!raw_entry(&conn, &e.id).is_deleted);
+    }
+
+    #[test]
+    fn test_v2_trash_already_trashed_is_applied() {
+        // A second v0.3.0 desktop already pulled the first one's trash.
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        crate::commands::entries::soft_delete_entry_impl(&conn, &e.id).unwrap();
+        let trashed = raw_entry(&conn, &e.id);
+        let intent = v2_trash(&e.id, e.updated_at - 10);
+        assert_eq!(v2_apply(&conn, &ctx, &intent), Outcome::Applied);
+        let rec = import_row(&conn, &v2_path(&intent)).unwrap();
+        assert_eq!(rec.outcome, "applied");
+        assert_eq!(rec.last_applied_updated_at, Some(trashed.updated_at));
+        assert_eq!(raw_entry(&conn, &e.id).updated_at, trashed.updated_at);
+    }
+
+    /// Every hidden or gone target refuses with the one reason `absent`, checked before
+    /// the already-trashed shortcut, so the ack never reveals that a locked or
+    /// invisible entry exists, nor its stamp.
+    #[test]
+    fn test_v2_trash_hidden_or_gone_targets_refused_absent() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let jid = default_journal_id(&conn);
+        let refuse = |id: &str| {
+            let e = raw_entry(&conn, id);
+            let i = v2_trash(id, e.updated_at);
+            let out = v2_apply(&conn, &ctx, &i);
+            assert_refused(&conn, &i, out, "absent");
+            let row = import_row(&conn, &v2_path(&i)).unwrap();
+            assert_eq!(row.last_applied_updated_at, None);
+            assert_eq!(raw_entry(&conn, id).updated_at, e.updated_at);
+        };
+
+        let locked = live_entry(&conn, &jid);
+        conn.execute(
+            "UPDATE entries SET is_locked = 1 WHERE id = ?1",
+            [&locked.id],
+        )
+        .unwrap();
+        refuse(&locked.id);
+        assert!(!raw_entry(&conn, &locked.id).is_deleted);
+
+        let invisible = live_entry(&conn, &jid);
+        conn.execute(
+            "UPDATE entries SET is_invisible = 1 WHERE id = ?1",
+            [&invisible.id],
+        )
+        .unwrap();
+        refuse(&invisible.id);
+
+        let inv_j = db::queries::create_journal(&conn, "Hidden", None).unwrap();
+        conn.execute(
+            "UPDATE journals SET is_invisible = 1 WHERE id = ?1",
+            [&inv_j.id],
+        )
+        .unwrap();
+        let in_inv_j = live_entry(&conn, &inv_j.id);
+        refuse(&in_inv_j.id);
+        assert!(!raw_entry(&conn, &in_inv_j.id).is_deleted);
+
+        let locked_j = db::queries::create_journal(&conn, "Locked", None).unwrap();
+        let in_locked_j = live_entry(&conn, &locked_j.id);
+        conn.execute(
+            "UPDATE journals SET is_locked = 1 WHERE id = ?1",
+            [&locked_j.id],
+        )
+        .unwrap();
+        refuse(&in_locked_j.id);
+        assert!(!raw_entry(&conn, &in_locked_j.id).is_deleted);
+
+        // Already trashed, but hidden: still `absent`, not the applied shortcut.
+        let trashed_locked = live_entry(&conn, &jid);
+        crate::commands::entries::soft_delete_entry_impl(&conn, &trashed_locked.id).unwrap();
+        conn.execute(
+            "UPDATE entries SET is_locked = 1 WHERE id = ?1",
+            [&trashed_locked.id],
+        )
+        .unwrap();
+        refuse(&trashed_locked.id);
+        let trashed_in_inv_j = live_entry(&conn, &inv_j.id);
+        crate::commands::entries::soft_delete_entry_impl(&conn, &trashed_in_inv_j.id).unwrap();
+        refuse(&trashed_in_inv_j.id);
+
+        let purged = live_entry(&conn, &jid);
+        crate::commands::entries::soft_delete_entry_impl(&conn, &purged.id).unwrap();
+        db::queries::purge_entry_mark(&conn, &purged.id).unwrap();
+        refuse(&purged.id);
+
+        let i = v2_trash("entry-v2-missing-01", 5);
+        let out = v2_apply(&conn, &ctx, &i);
+        assert_refused(&conn, &i, out, "absent");
+    }
+
+    #[test]
+    fn test_v2_trash_waits_when_target_not_pulled_or_pull_dirty() {
+        let conn = setup_test_db();
+        let (_d, mut ctx) = v2_ctx();
+        ctx.known_ids
+            .insert("entry-v2-unpulled-1".to_string(), false);
+        let i = v2_trash("entry-v2-unpulled-1", 5);
+        assert_eq!(v2_apply(&conn, &ctx, &i), Outcome::Transient);
+        assert!(import_row(&conn, &v2_path(&i)).is_none());
+
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        ctx.pull_clean = false;
+        let i = v2_trash(&e.id, e.updated_at);
+        assert_eq!(v2_apply(&conn, &ctx, &i), Outcome::Transient);
+        assert!(import_row(&conn, &v2_path(&i)).is_none());
+        assert!(!raw_entry(&conn, &e.id).is_deleted);
+    }
+
+    /// Edit then delete on one web device: the edit applies first and bumps
+    /// `updated_at`, so the trash's base (the pre-edit stamp the web saw) no longer
+    /// matches. The trash still applies, because the only change since that base is
+    /// the web's own edit, recorded for its `<entryId>.bin`.
+    #[tokio::test]
+    async fn test_cycle_edit_then_delete_from_one_web_device_applies() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let conn = setup_test_db();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        // An old stamp, so the web edit's `now` stamp always differs from the base.
+        let base = 1_000;
+        conn.execute(
+            "UPDATE entries SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![base, e.id],
+        )
+        .unwrap();
+
+        let mut edit = v1_edit(V2_WEB_A, &e.id, 2000);
+        if let Some(t) = edit.fields.title.as_mut() {
+            t.base = "Desk".to_string();
+            t.base_updated_at = base;
+        }
+        edit.base_state_vector = vec![0];
+        edit.yjs_full_state = vec![];
+        edit.content_text = None;
+        edit.preview_text = None;
+        let edit_path = format!("{V2_WEB_A}/outbox/{}.bin", e.id);
+        write_v1(&provider, &edit_path, &edit).await;
+        let trash = v2_trash(&e.id, base);
+        write_v2(&provider, &v2_path(&trash), &trash).await;
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_applied, 2, "{res:?}");
+        let after = raw_entry(&conn, &e.id);
+        assert_eq!(after.title.as_deref(), Some("Edited"));
+        assert!(after.is_deleted && after.trashed_at.is_some());
+        assert_eq!(
+            import_row(&conn, &v2_path(&trash)).unwrap().outcome,
+            "applied"
+        );
+    }
+
+    /// Two web edits from one base without a pull in between, then a trash from that
+    /// base: each edit chains on the web's own previous apply, so the trash applies.
+    #[tokio::test]
+    async fn test_cycle_two_edits_then_trash_from_one_base_applies() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let conn = setup_test_db();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        let base = 1_000;
+        conn.execute(
+            "UPDATE entries SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![base, e.id],
+        )
+        .unwrap();
+        let mut edit = v1_edit(V2_WEB_A, &e.id, 2000);
+        if let Some(t) = edit.fields.title.as_mut() {
+            t.base = "Desk".to_string();
+            t.base_updated_at = base;
+        }
+        edit.base_state_vector = vec![0];
+        edit.yjs_full_state = vec![];
+        edit.content_text = None;
+        edit.preview_text = None;
+        let edit_path = format!("{V2_WEB_A}/outbox/{}.bin", e.id);
+        write_v1(&provider, &edit_path, &edit).await;
+        let sink = TestOutboxSink::default();
+        assert_eq!(
+            v2_cycle(&provider, &media_dir, &conn, &sink)
+                .await
+                .intents_applied,
+            1
+        );
+
+        edit.fields.emotion = Some(FieldChange {
+            value: Some("good".to_string()),
+            base: None,
+            base_updated_at: base,
+            change_seq: 2,
+            changed_at_secs: 2001,
+        });
+        write_v1(&provider, &edit_path, &edit).await;
+        let trash = v2_trash(&e.id, base);
+        write_v2(&provider, &v2_path(&trash), &trash).await;
+        v2_cycle(&provider, &media_dir, &conn, &sink).await;
+
+        let after = raw_entry(&conn, &e.id);
+        assert_eq!(after.emotion.as_deref(), Some("good"));
+        assert!(after.is_deleted && after.trashed_at.is_some());
+        assert_eq!(
+            import_row(&conn, &v2_path(&trash)).unwrap().outcome,
+            "applied"
+        );
+    }
+
+    /// Desktop edits first, then the web edits and trashes from the same stale base in
+    /// one cycle. The edit is refused field by field, yet its record still carries the
+    /// row's stamp; that stamp must not let the trash through, desktop wins.
+    #[tokio::test]
+    async fn test_cycle_refused_edit_does_not_unlock_stale_trash() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let conn = setup_test_db();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        let base = 1_000;
+        conn.execute(
+            "UPDATE entries SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![base, e.id],
+        )
+        .unwrap();
+        crate::commands::entries::update_entry_impl(&conn, &e.id, Some("Desk 2"), None, None)
+            .unwrap();
+
+        let mut edit = v1_edit(V2_WEB_A, &e.id, 2000);
+        if let Some(t) = edit.fields.title.as_mut() {
+            t.base = "Desk".to_string();
+            t.base_updated_at = base;
+        }
+        edit.base_state_vector = vec![0];
+        edit.yjs_full_state = vec![];
+        edit.content_text = None;
+        edit.preview_text = None;
+        let edit_path = format!("{V2_WEB_A}/outbox/{}.bin", e.id);
+        write_v1(&provider, &edit_path, &edit).await;
+        let trash = v2_trash(&e.id, base);
+        write_v2(&provider, &v2_path(&trash), &trash).await;
+
+        let sink = TestOutboxSink::default();
+        v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        let after = raw_entry(&conn, &e.id);
+        assert_eq!(after.title.as_deref(), Some("Desk 2"));
+        assert!(!after.is_deleted, "desktop edit wins over the stale trash");
+        let row = import_row(&conn, &v2_path(&trash)).unwrap();
+        assert_eq!(row.outcome, "refused");
+        assert_eq!(row.pending_plan.as_deref(), Some("changed_on_desktop"));
+    }
+
+    /// A desktop edit after the web's own applied edit still wins over the trash.
+    #[test]
+    fn test_v2_trash_after_own_edit_refused_when_desktop_edited_since() {
+        let conn = setup_test_db();
+        let (_d, ctx) = v2_ctx();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        let sibling = format!("{V2_WEB_A}/outbox/{}.bin", e.id);
+        outbox_import_record(
+            &conn,
+            &WebOutboxImportRecord {
+                path: sibling,
+                revision: None,
+                content_hash: "h".to_string(),
+                outcome: "applied".to_string(),
+                imported_at: 1,
+                last_applied_updated_at: Some(e.updated_at),
+                post_import_fingerprint: None,
+                decided_fields: None,
+                pending_revision: None,
+                pending_plan: None,
+                created: false,
+                applied_from_updated_at: None,
+            },
+        )
+        .unwrap();
+        db::queries::touch_entry_updated_at(&conn, &e.id).unwrap();
+        let i = v2_trash(&e.id, e.updated_at - 50);
+        let out = v2_apply(&conn, &ctx, &i);
+        assert_refused(&conn, &i, out, "changed_on_desktop");
+    }
+
+    /// Creates run before entry intents in the same cycle: an entry created on the web
+    /// into a web-created journal with a web-created tag lands there with that tag.
+    #[tokio::test]
+    async fn test_cycle_entry_lands_in_journal_and_tag_created_same_cycle() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let conn = setup_test_db();
+        let new_jid = "journal-e2e-order-1";
+        let new_tid = "tag-e2e-order-0001";
+        let journal = v2_journal(V2_WEB_A, new_jid, 1);
+        let tag = v2_tag(V2_WEB_A, new_tid, 1);
+        write_v2(&provider, &v2_path(&journal), &journal).await;
+        write_v2(&provider, &v2_path(&tag), &tag).await;
+
+        let eid = "entry-e2e-order-001";
+        let mut entry = v1_edit(V2_WEB_A, eid, 1);
+        entry.created_on_web = true;
+        entry.fields.journal_id = Some(FieldChange {
+            value: new_jid.to_string(),
+            base: String::new(),
+            base_updated_at: 0,
+            change_seq: 2,
+            changed_at_secs: 1,
+        });
+        entry.fields.tags_add.insert(
+            new_tid.to_string(),
+            FieldChange {
+                value: true,
+                base: false,
+                base_updated_at: 0,
+                change_seq: 3,
+                changed_at_secs: 1,
+            },
+        );
+        let entry_path = format!("{V2_WEB_A}/outbox/{eid}.bin");
+        write_v1(&provider, &entry_path, &entry).await;
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_applied, 3, "{res:?}");
+        assert_eq!(res.intents_refused, 0);
+
+        let created = raw_entry(&conn, eid);
+        assert_eq!(created.journal_id, new_jid);
+        assert_ne!(created.journal_id, default_journal_id(&conn));
+        assert_eq!(
+            db::queries::get_tag_ids_for_entry(&conn, eid).unwrap(),
+            vec![new_tid.to_string()]
+        );
+        let rec = import_row(&conn, &entry_path).unwrap();
+        assert_eq!(rec.outcome, "applied");
+        let decided = rec.decided_fields.unwrap_or_default();
+        assert!(!decided.contains("tag_not_found"), "{decided}");
+        assert!(!decided.contains("\"journal\""), "{decided}");
+    }
+
+    /// Ack shape per outcome: created for creates, applied_updated_at for template and
+    /// trash applies, refused_reason for refusals.
+    #[tokio::test]
+    async fn test_cycle_v2_ack_shapes_per_outcome() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let conn = setup_test_db();
+        let jid = default_journal_id(&conn);
+        let e = live_entry(&conn, &jid);
+        db::queries::create_tag(&conn, "Tag tag-ack-taken-001", None).unwrap();
+
+        let journal = v2_journal(V2_WEB_A, "journal-ack-00001", 1);
+        let taken = v2_tag(V2_WEB_A, "tag-ack-taken-001", 1);
+        let tpl = v2_template("template-ack-0001", "T", b"t", None);
+        let trash = v2_trash(&e.id, e.updated_at);
+        let stale = v2_delete_template("template-ack-0002", 1);
+        db::queries::create_template_with_id(&conn, "template-ack-0002", "K", None, None, 0)
+            .unwrap();
+        for i in [&journal, &taken, &tpl, &trash, &stale] {
+            write_v2(&provider, &v2_path(i), i).await;
+        }
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert!(res.acks_written);
+        assert_eq!(res.intents_applied, 3, "{res:?}");
+        assert_eq!(res.intents_refused, 2, "{res:?}");
+
+        let p: &(dyn SyncProvider + Send + Sync) = &provider;
+        let bytes = p
+            .read_file(&format!("{V2_OWN}/outbox-acks.bin"))
+            .await
+            .unwrap();
+        let acks = open_outbox_acks(&test_key_list(), &bytes).unwrap();
+        let ack = |i: &OutboxIntentV2| {
+            acks.acks
+                .iter()
+                .find(|a| a.path == v2_path(i))
+                .unwrap_or_else(|| panic!("no ack for {}", v2_path(i)))
+                .clone()
+        };
+
+        let a = ack(&journal);
+        assert!(a.created);
+        assert_eq!(a.refused_reason, None);
+
+        let a = ack(&taken);
+        assert!(!a.created);
+        assert_eq!(a.refused_reason.as_deref(), Some("name_taken"));
+
+        let a = ack(&tpl);
+        let tpl_row = db::queries::get_template_for_import(&conn, "template-ack-0001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(a.applied_updated_at, Some(tpl_row.updated_at));
+        assert_eq!(a.refused_reason, None);
+
+        let a = ack(&trash);
+        assert_eq!(
+            a.applied_updated_at,
+            Some(raw_entry(&conn, &e.id).updated_at)
+        );
+        assert_eq!(a.refused_reason, None);
+
+        let a = ack(&stale);
+        assert_eq!(a.applied_updated_at, None);
+        assert_eq!(a.refused_reason.as_deref(), Some("changed_on_desktop"));
+    }
+
+    /// v2 reads count against the changed-intent budget again; because they are now
+    /// recorded (final), the backlog drains and the v1 intent is reached next cycle.
+    #[tokio::test]
+    async fn test_cycle_v2_budget_drains_then_reaches_v1() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        for i in 0..25 {
+            let id = format!("tag-budget-{i:04}");
+            let p = format!("{V2_WEB_A}/outbox/t-{id}.bin");
+            write_v2(&provider, &p, &v2_tag(V2_WEB_A, &id, i)).await;
+        }
+        let eid = "entry-budget-00001";
+        let v1_path = format!("{V2_WEB_A}/outbox/{eid}.bin");
+        write_v1(&provider, &v1_path, &v1_edit(V2_WEB_A, eid, 1)).await;
+
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_applied, 20);
+        assert!(
+            import_row(&conn, &v1_path).is_none(),
+            "deferred by the budget"
+        );
+
+        let res2 = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res2.intents_applied, 5);
+        assert_eq!(res2.intents_skipped_unchanged, 20);
+        assert_eq!(import_row(&conn, &v1_path).unwrap().outcome, "refused");
+    }
+
+    /// Provider whose outbox intent reads take `delay` of (paused) tokio time. Only
+    /// reads that return bytes are slow; an unchanged-revision check stays cheap.
+    struct SlowOutboxProvider<'a> {
+        inner: &'a crate::sync::local_provider::LocalSyncProvider,
+        delay: Duration,
+    }
+
+    #[async_trait::async_trait]
+    impl SyncProvider for SlowOutboxProvider<'_> {
+        async fn list_devices(&self) -> Result<Vec<String>, SyncError> {
+            SyncProvider::list_devices(self.inner).await
+        }
+        async fn list_files(
+            &self,
+            device_id: &str,
+            kind: FileKind,
+        ) -> Result<Vec<String>, SyncError> {
+            SyncProvider::list_files(self.inner, device_id, kind).await
+        }
+        async fn read_file(&self, path: &str) -> Result<Vec<u8>, SyncError> {
+            if path.contains("/outbox/") {
+                tokio::time::sleep(self.delay).await;
+            }
+            SyncProvider::read_file(self.inner, path).await
+        }
+        async fn read_file_if_changed(
+            &self,
+            path: &str,
+            known_revision: Option<&str>,
+        ) -> Result<ConditionalRead, SyncError> {
+            let res = SyncProvider::read_file_if_changed(self.inner, path, known_revision).await;
+            if matches!(res, Ok(ConditionalRead::Changed { .. })) {
+                tokio::time::sleep(self.delay).await;
+            }
+            res
+        }
+        async fn write_file(&self, path: &str, data: &[u8]) -> Result<(), SyncError> {
+            SyncProvider::write_file(self.inner, path, data).await
+        }
+        async fn delete_file(&self, path: &str) -> Result<(), SyncError> {
+            SyncProvider::delete_file(self.inner, path).await
+        }
+    }
+
+    /// Slow reads must not let the read pass eat the whole wall-clock budget: the
+    /// apply pass still records what was read, so every cycle makes progress instead
+    /// of re-reading the same files forever.
+    #[tokio::test(start_paused = true)]
+    async fn test_cycle_slow_reads_still_apply_each_cycle() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        for i in 0..5 {
+            let tag = v2_tag(V2_WEB_A, &format!("tag-slow-read-{i:04}"), i);
+            write_v2(&provider, &v2_path(&tag), &tag).await;
+        }
+        let slow = SlowOutboxProvider {
+            inner: &provider,
+            delay: Duration::from_secs(20),
+        };
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let summary = SyncSummary {
+            pull_clean: true,
+            ..Default::default()
+        };
+        let mut applied = 0;
+        for _ in 0..3 {
+            let res = run_outbox_import_cycle(
+                &slow,
+                &provider,
+                V2_OWN,
+                &test_key_list(),
+                HashMap::new(),
+                true,
+                &summary,
+                &media_dir,
+                &conn,
+                &sink,
+            )
+            .await
+            .unwrap();
+            assert!(res.intents_applied > 0, "no progress: {res:?}");
+            applied += res.intents_applied;
+            if applied == 5 {
+                break;
+            }
+        }
+        assert_eq!(applied, 5);
+    }
+
+    // ---- Phase 14.5: old-state and mixed-fleet ----
+
+    /// A second desktop still on v0.2.2 (no `outbox_versions` in its manifest).
+    const V022_DESKTOP: &str = "22222222-2222-2222-2222-222222222222";
+
+    /// Revision and sha256 hex of an outbox file, as v0.2.2 recorded them.
+    async fn file_revision_and_hash(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        path: &str,
+    ) -> (Option<String>, String) {
+        let p: &(dyn SyncProvider + Send + Sync) = provider;
+        match p.read_file_if_changed(path, None).await.unwrap() {
+            ConditionalRead::Changed { bytes, revision } => {
+                assert!(revision.is_some());
+                (revision, hex::encode(sha2::Sha256::digest(&bytes)))
+            }
+            ConditionalRead::Unchanged => unreachable!(),
+        }
+    }
+
+    /// The ack v0.2.2 emitted for a `skipped_version` row: no refusal, nothing created.
+    fn v022_skipped_ack(path: &str, content_hash: &str) -> OutboxAckEntry {
+        OutboxAckEntry {
+            path: path.to_string(),
+            content_hash: content_hash.to_string(),
+            applied_updated_at: None,
+            decided: vec![],
+            created: false,
+            refused_reason: None,
+        }
+    }
+
+    /// Write `{desktop}/outbox-acks.bin` as v0.2.2 did; returns the `__acks__` marker hash.
+    async fn write_v022_acks(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        desktop: &str,
+        acks: Vec<OutboxAckEntry>,
+    ) -> String {
+        let file = OutboxAcksV1 {
+            schema_version: 1,
+            desktop_device_id: desktop.to_string(),
+            acks,
+        };
+        let plain = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(&file)
+            .unwrap();
+        let sealed = seal_outbox_acks(&test_key_list(), &file).unwrap();
+        let p: &(dyn SyncProvider + Send + Sync) = provider;
+        p.write_file(&format!("{desktop}/outbox-acks.bin"), &sealed)
+            .await
+            .unwrap();
+        format!("1:{}", hex::encode(sha2::Sha256::digest(&plain)))
+    }
+
+    async fn own_ack(
+        provider: &crate::sync::local_provider::LocalSyncProvider,
+        path: &str,
+    ) -> OutboxAckEntry {
+        let p: &(dyn SyncProvider + Send + Sync) = provider;
+        let bytes = p
+            .read_file(&format!("{V2_OWN}/outbox-acks.bin"))
+            .await
+            .unwrap();
+        open_outbox_acks(&test_key_list(), &bytes)
+            .unwrap()
+            .acks
+            .into_iter()
+            .find(|a| a.path == path)
+            .unwrap_or_else(|| panic!("no ack for {path}"))
+    }
+
+    /// Upgrade from v0.2.2: its `skipped_version` row (real revision and hash,
+    /// `pending_plan = "2"`), its own ack and `__acks__` marker are all present. The
+    /// file is unchanged, yet it is re-read, applied, and the ack becomes `created`.
+    #[tokio::test]
+    async fn test_cycle_upgrades_v022_skipped_row_and_ack_to_applied() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let jid = "journal-v022-skip-1";
+        let path = format!("{V2_WEB_A}/outbox/j-{jid}.bin");
+        write_v2(&provider, &path, &v2_journal(V2_WEB_A, jid, 1)).await;
+        let (revision, content_hash) = file_revision_and_hash(&provider, &path).await;
+
+        let conn = setup_test_db();
+        outbox_import_record(
+            &conn,
+            &WebOutboxImportRecord {
+                path: path.clone(),
+                revision: revision.clone(),
+                content_hash: content_hash.clone(),
+                outcome: "skipped_version".to_string(),
+                imported_at: 1,
+                last_applied_updated_at: None,
+                post_import_fingerprint: None,
+                decided_fields: None,
+                pending_revision: None,
+                pending_plan: Some("2".to_string()),
+                created: false,
+                applied_from_updated_at: None,
+            },
+        )
+        .unwrap();
+        let marker_hash = write_v022_acks(
+            &provider,
+            V2_OWN,
+            vec![v022_skipped_ack(&path, &content_hash)],
+        )
+        .await;
+        outbox_import_record(
+            &conn,
+            &WebOutboxImportRecord {
+                path: "__acks__".to_string(),
+                revision: None,
+                content_hash: marker_hash,
+                outcome: "written".to_string(),
+                imported_at: 1,
+                last_applied_updated_at: None,
+                post_import_fingerprint: None,
+                decided_fields: None,
+                pending_revision: None,
+                pending_plan: None,
+                created: false,
+                applied_from_updated_at: None,
+            },
+        )
+        .unwrap();
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_skipped_unchanged, 0);
+        assert_eq!(res.intents_applied, 1);
+        assert!(res.acks_written);
+        let row = import_row(&conn, &path).unwrap();
+        assert_eq!(row.outcome, "applied");
+        assert_eq!(row.revision, revision);
+        assert!(db::queries::get_journal(&conn, jid).unwrap().is_some());
+
+        let ack = own_ack(&provider, &path).await;
+        assert!(ack.created);
+        assert_eq!(ack.refused_reason, None);
+        assert_eq!(ack.content_hash, content_hash);
+    }
+
+    /// A `corrupt` row stays final across the upgrade even for a now-valid v2 file
+    /// (`pending_plan` only revives `skipped_version` rows).
+    #[tokio::test]
+    async fn test_cycle_v022_corrupt_row_stays_final() {
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        let jid = "journal-v022-corrupt";
+        let path = format!("{V2_WEB_A}/outbox/j-{jid}.bin");
+        write_v2(&provider, &path, &v2_journal(V2_WEB_A, jid, 1)).await;
+        let (revision, content_hash) = file_revision_and_hash(&provider, &path).await;
+
+        let conn = setup_test_db();
+        outbox_import_record(
+            &conn,
+            &WebOutboxImportRecord {
+                path: path.clone(),
+                revision,
+                content_hash,
+                outcome: "corrupt".to_string(),
+                imported_at: 1,
+                last_applied_updated_at: None,
+                post_import_fingerprint: None,
+                decided_fields: None,
+                pending_revision: None,
+                pending_plan: Some("2".to_string()),
+                created: false,
+                applied_from_updated_at: None,
+            },
+        )
+        .unwrap();
+
+        let sink = TestOutboxSink::default();
+        let res = v2_cycle(&provider, &media_dir, &conn, &sink).await;
+        assert_eq!(res.intents_skipped_unchanged, 1);
+        assert_eq!(res.intents_applied, 0);
+        assert!(sink.dispatched.lock().unwrap().is_empty());
+        assert_eq!(import_row(&conn, &path).unwrap().outcome, "corrupt");
+        assert!(db::queries::get_journal(&conn, jid).unwrap().is_none());
+    }
+
+    /// Mixed fleet: this v0.3.0 desktop plus a v0.2.2 desktop whose folder holds a
+    /// pre-Phase-1 `metadata.json` and acks that skipped the web's v2 journal file.
+    /// The old desktop is not mistaken for a web device, its acks are ignored, and an
+    /// entry the web placed in a new journal lands in that journal here.
+    #[tokio::test]
+    async fn test_cycle_mixed_fleet_entry_lands_in_new_web_journal() {
+        use memlore_core::keyring_types::{DeviceSlotV2, KEYRING_V2_VERSION};
+        let (_tmp, provider, media_dir) = v2_fixture(&[V2_WEB_A]).await;
+        for (id, name) in [(V2_OWN, "Desktop 0.3.0"), (V022_DESKTOP, "Desktop 0.2.2")] {
+            let slot = DeviceSlotV2 {
+                version: KEYRING_V2_VERSION,
+                device_id: id.to_string(),
+                name: name.to_string(),
+                created_at: 1000,
+                last_seen_at: 1000,
+            };
+            crate::sync::keyring_v2::io::write_device_slot(&provider, &slot)
+                .await
+                .unwrap();
+        }
+
+        // Web: a v2 journal create and a v1 entry created into that journal.
+        let jid = "journal-mixed-fleet1";
+        let journal = v2_journal(V2_WEB_A, jid, 1);
+        let journal_path = v2_path(&journal);
+        write_v2(&provider, &journal_path, &journal).await;
+        let eid = "entry-mixed-fleet-01";
+        let mut entry = v1_edit(V2_WEB_A, eid, 2);
+        entry.created_on_web = true;
+        entry.fields.journal_id = Some(FieldChange {
+            value: jid.to_string(),
+            base: String::new(),
+            base_updated_at: 0,
+            change_seq: 2,
+            changed_at_secs: 2,
+        });
+        let entry_path = format!("{V2_WEB_A}/outbox/{eid}.bin");
+        write_v1(&provider, &entry_path, &entry).await;
+
+        // v0.2.2 desktop: pre-Phase-1 manifest (no index_present / outbox_versions /
+        // trashed_at), one unrelated entry, and acks that skipped the journal file.
+        let old_manifest_json = format!(
+            r#"{{"device_id":"{V022_DESKTOP}","recovery_generation":0,"entries":[{{"entry_id":"entry-v022-own-0001","updated_at":5,"local_version":1,"is_deleted":false}}],"journals":[],"chats_present":false,"memory_present":false,"generated_at":5}}"#
+        );
+        let p: &(dyn SyncProvider + Send + Sync) = &provider;
+        p.write_file(
+            &format!("{V022_DESKTOP}/metadata.json"),
+            old_manifest_json.as_bytes(),
+        )
+        .await
+        .unwrap();
+        let (_, journal_hash) = file_revision_and_hash(&provider, &journal_path).await;
+        write_v022_acks(
+            &provider,
+            V022_DESKTOP,
+            vec![v022_skipped_ack(&journal_path, &journal_hash)],
+        )
+        .await;
+        let old_manifest: DeviceMetadata = serde_json::from_str(&old_manifest_json).unwrap();
+        assert_eq!(old_manifest.outbox_versions, None);
+
+        // What the engine hands the importer after pulling the old desktop's manifest.
+        let known_ids =
+            collect_known_ids_from_manifests(&[(V022_DESKTOP.to_string(), old_manifest)]);
+        let summary = SyncSummary {
+            pull_clean: true,
+            fetched_manifests: vec![V022_DESKTOP.to_string()],
+            ..Default::default()
+        };
+        let conn = setup_test_db();
+        let sink = TestOutboxSink::default();
+        let res = run_outbox_import_cycle(
+            &provider,
+            &provider,
+            V2_OWN,
+            &test_key_list(),
+            known_ids,
+            true,
+            &summary,
+            &media_dir,
+            &conn,
+            &sink,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(res.candidates_checked, 1, "only the web device: {res:?}");
+        assert_eq!(res.intents_applied, 2, "{res:?}");
+        assert_eq!(res.intents_refused, 0);
+        let created = raw_entry(&conn, eid);
+        assert_eq!(created.journal_id, jid);
+        assert_ne!(created.journal_id, default_journal_id(&conn));
+        assert_eq!(import_row(&conn, &journal_path).unwrap().outcome, "applied");
+        assert_eq!(import_row(&conn, &entry_path).unwrap().outcome, "applied");
+        assert!(own_ack(&provider, &journal_path).await.created);
+        assert!(own_ack(&provider, &entry_path).await.created);
     }
 }

@@ -26093,13 +26093,17 @@ pub struct WebOutboxImportRecord {
     pub pending_revision: Option<String>,
     pub pending_plan: Option<String>,
     pub created: bool,
+    /// Web base (target row `updated_at`) this importer's applied write fast-forwarded
+    /// from; `0` when the write created the row; `None` when unknown or nothing was
+    /// written. See `fast_forward_from` in `sync/outbox_import.rs`.
+    pub applied_from_updated_at: Option<i64>,
 }
 
 pub fn outbox_import_get(conn: &Connection, path: &str) -> Result<Option<WebOutboxImportRecord>> {
     let mut stmt = conn.prepare(
         "SELECT path, revision, content_hash, outcome, imported_at,
                 last_applied_updated_at, post_import_fingerprint, decided_fields,
-                pending_revision, pending_plan, created
+                pending_revision, pending_plan, created, applied_from_updated_at
          FROM web_outbox_imports
          WHERE path = ?1",
     )?;
@@ -26118,6 +26122,7 @@ pub fn outbox_import_get(conn: &Connection, path: &str) -> Result<Option<WebOutb
             pending_revision: row.get(8)?,
             pending_plan: row.get(9)?,
             created: created_int != 0,
+            applied_from_updated_at: row.get(11)?,
         }))
     } else {
         Ok(None)
@@ -26129,8 +26134,8 @@ pub fn outbox_import_record(conn: &Connection, record: &WebOutboxImportRecord) -
         "INSERT INTO web_outbox_imports (
             path, revision, content_hash, outcome, imported_at,
             last_applied_updated_at, post_import_fingerprint, decided_fields,
-            pending_revision, pending_plan, created
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            pending_revision, pending_plan, created, applied_from_updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
         ON CONFLICT(path) DO UPDATE SET
             revision = excluded.revision,
             content_hash = excluded.content_hash,
@@ -26141,7 +26146,8 @@ pub fn outbox_import_record(conn: &Connection, record: &WebOutboxImportRecord) -
             decided_fields = excluded.decided_fields,
             pending_revision = excluded.pending_revision,
             pending_plan = excluded.pending_plan,
-            created = MAX(web_outbox_imports.created, excluded.created)",
+            created = MAX(web_outbox_imports.created, excluded.created),
+            applied_from_updated_at = excluded.applied_from_updated_at",
         rusqlite::params![
             record.path,
             record.revision,
@@ -26154,6 +26160,7 @@ pub fn outbox_import_record(conn: &Connection, record: &WebOutboxImportRecord) -
             record.pending_revision,
             record.pending_plan,
             if record.created { 1 } else { 0 },
+            record.applied_from_updated_at,
         ],
     )?;
     Ok(())
@@ -26187,9 +26194,193 @@ pub fn outbox_imports_list_all(conn: &Connection) -> Result<Vec<WebOutboxImportR
             pending_revision: row.get(8)?,
             pending_plan: row.get(9)?,
             created: created_int != 0,
+            applied_from_updated_at: None,
         })
     })?;
     rows.collect()
+}
+
+// ─── Web outbox v2 — id-keyed writes ────────────────────────────────────────
+//
+// The desktop applies web-created journals / tags / templates under the id the
+// web chose, so an entry intent that references them finds them. Idempotent on
+// id: a crash between the write and the import record replays safely.
+
+/// Result of a web-outbox create keyed by the web's id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreateWithIdOutcome {
+    Created,
+    /// A row with this id already exists (live or deleted); nothing written.
+    Exists,
+    /// Another id holds the name; nothing written.
+    NameTaken,
+}
+
+/// Create a journal with the web's `id`. Desktop allows duplicate journal
+/// names, so "taken" means a live, visible journal with the same trimmed
+/// name; invisible journals are skipped so a refusal cannot reveal them.
+/// `auto_tag_ids` that are unknown or deleted are dropped. Marks pending.
+pub fn create_journal_with_id(
+    conn: &Connection,
+    id: &str,
+    name: &str,
+    color: Option<&str>,
+    auto_tag_ids: &[String],
+) -> Result<CreateWithIdOutcome> {
+    let name = name.trim();
+    let tx = conn.unchecked_transaction()?;
+    let exists = tx
+        .prepare("SELECT 1 FROM journals WHERE id = ?1")?
+        .exists([id])?;
+    if exists {
+        return Ok(CreateWithIdOutcome::Exists);
+    }
+    let taken = tx
+        .prepare(
+            "SELECT 1 FROM journals WHERE trim(name) = ?1 \
+             AND is_deleted = 0 AND COALESCE(is_invisible, 0) = 0",
+        )?
+        .exists([name])?;
+    if taken {
+        return Ok(CreateWithIdOutcome::NameTaken);
+    }
+    let now = now_unix();
+    tx.execute(
+        "INSERT INTO journals (id, name, color, created_at, updated_at, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?4, 0)",
+        rusqlite::params![id, name, color, now],
+    )?;
+    {
+        let mut stmt = tx.prepare(
+            "INSERT OR IGNORE INTO journal_auto_tags (journal_id, tag_id)
+             SELECT ?1, id FROM tags WHERE id = ?2 AND is_deleted = 0",
+        )?;
+        for tag_id in auto_tag_ids {
+            stmt.execute(rusqlite::params![id, tag_id])?;
+        }
+    }
+    mark_journal_pending(&tx, id)?;
+    tx.commit()?;
+    Ok(CreateWithIdOutcome::Created)
+}
+
+/// Create a tag with the web's `id`. `tags.name` is UNIQUE across live and
+/// soft-deleted rows; unlike [`create_tag`] this never resurrects another
+/// id's row (the web's id would then point at nothing), it refuses instead.
+/// Stamps `updated_at`, which is what queues the hash-gated tags surface.
+pub fn create_tag_with_id(
+    conn: &Connection,
+    id: &str,
+    name: &str,
+    color: Option<&str>,
+) -> Result<CreateWithIdOutcome> {
+    let name = normalise_tag_name(name)?;
+    if let Some(c) = color {
+        if !is_valid_tag_color(c) {
+            return Err(rusqlite::Error::InvalidParameterName(format!(
+                "invalid tag color {c:?} — expected #RRGGBB"
+            )));
+        }
+    }
+    let tx = conn.unchecked_transaction()?;
+    if tx
+        .prepare("SELECT 1 FROM tags WHERE id = ?1")?
+        .exists([id])?
+    {
+        return Ok(CreateWithIdOutcome::Exists);
+    }
+    if tx
+        .prepare("SELECT 1 FROM tags WHERE name = ?1")?
+        .exists([&name])?
+    {
+        return Ok(CreateWithIdOutcome::NameTaken);
+    }
+    tx.execute(
+        "INSERT INTO tags (id, name, color, updated_at, is_deleted) VALUES (?1, ?2, ?3, ?4, 0)",
+        rusqlite::params![id, name, color, now_unix()],
+    )?;
+    tx.commit()?;
+    Ok(CreateWithIdOutcome::Created)
+}
+
+/// Template row for the outbox importer: includes deleted and predefined rows
+/// and the `updated_at` LWW key, which [`get_template`] hides.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TemplateImportRow {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub content: Option<Vec<u8>>,
+    pub sort_order: i64,
+    pub updated_at: i64,
+    pub is_deleted: bool,
+    pub is_predefined: bool,
+}
+
+pub fn get_template_for_import(conn: &Connection, id: &str) -> Result<Option<TemplateImportRow>> {
+    conn.query_row(
+        "SELECT id, name, description, content, COALESCE(sort_order, 0), updated_at, \
+                is_deleted, COALESCE(is_predefined, 0) \
+         FROM templates WHERE id = ?1",
+        [id],
+        |row| {
+            Ok(TemplateImportRow {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                content: row.get(3)?,
+                sort_order: row.get(4)?,
+                updated_at: row.get(5)?,
+                is_deleted: row.get::<_, i64>(6)? != 0,
+                is_predefined: row.get::<_, i64>(7)? != 0,
+            })
+        },
+    )
+    .optional()
+}
+
+/// Insert a user template under the web's `id`. Bumping `updated_at` queues
+/// the hash-gated templates surface.
+pub fn create_template_with_id(
+    conn: &Connection,
+    id: &str,
+    name: &str,
+    description: Option<&str>,
+    content: Option<&[u8]>,
+    sort_order: i64,
+) -> Result<()> {
+    check_template_size(description, content)?;
+    let now = now_unix();
+    conn.execute(
+        "INSERT INTO templates (id, name, description, content, is_predefined, sort_order, created_at, updated_at, is_deleted)
+         VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6, ?6, 0)",
+        rusqlite::params![id, name, description, content, sort_order, now],
+    )?;
+    Ok(())
+}
+
+/// [`update_template`] that also writes `sort_order`. The stamp is
+/// `max(updated_at + 1, now)` so the update outranks the row it replaces
+/// under LWW even when this clock is behind the one that wrote it.
+pub fn update_template_with_sort_order(
+    conn: &Connection,
+    id: &str,
+    name: &str,
+    description: Option<&str>,
+    content: Option<&[u8]>,
+    sort_order: i64,
+) -> Result<()> {
+    check_template_size(description, content)?;
+    let affected = conn.execute(
+        "UPDATE templates SET name = ?1, description = ?2, content = ?3, sort_order = ?4, \
+             updated_at = MAX(updated_at + 1, ?5)
+         WHERE id = ?6 AND is_predefined = 0 AND is_deleted = 0",
+        rusqlite::params![name, description, content, sort_order, now_unix(), id],
+    )?;
+    if affected == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
 }
 
 // ─── Keyring V2 — tests ──────────────────────────────────────────────────────
@@ -27588,6 +27779,7 @@ mod web_outbox_import_tests {
             pending_revision: None,
             pending_plan: None,
             created: true,
+            applied_from_updated_at: None,
         };
         outbox_import_record(&conn, &record1).unwrap();
 
@@ -27609,6 +27801,7 @@ mod web_outbox_import_tests {
             pending_revision: Some("pending-rev".to_string()),
             pending_plan: Some("{}".to_string()),
             created: false, // attempts to clear created
+            applied_from_updated_at: None,
         };
         outbox_import_record(&conn, &record2).unwrap();
 
@@ -27646,6 +27839,7 @@ mod web_outbox_import_tests {
             pending_revision: None,
             pending_plan: None,
             created: false,
+            applied_from_updated_at: None,
         };
         outbox_import_record(&conn, &acks_record).unwrap();
 
@@ -27669,6 +27863,7 @@ mod web_outbox_import_tests {
             pending_revision: None,
             pending_plan: None,
             created: true,
+            applied_from_updated_at: None,
         };
         outbox_import_record(&conn, &record).unwrap();
         assert!(outbox_import_get(&conn, "web1/outbox/e1.bin")
@@ -27700,6 +27895,7 @@ mod web_outbox_import_tests {
             pending_revision: None,
             pending_plan: None,
             created: true,
+            applied_from_updated_at: None,
         };
         outbox_import_record(&conn, &record).unwrap();
         assert!(outbox_import_get(&conn, "web1/outbox/e1.bin")
@@ -27938,6 +28134,193 @@ mod create_with_id_tests {
         assert_eq!(
             existing_tag_ids(&conn, &Vec::<String>::new()).unwrap(),
             Vec::<String>::new()
+        );
+    }
+
+    // ── Web outbox v2: id-keyed creates and template writes ─────────────────
+
+    fn journal_pending(conn: &Connection, id: &str) -> bool {
+        conn.query_row(
+            "SELECT sync_status = 'pending' FROM journal_sync_state WHERE journal_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .optional()
+        .unwrap()
+        .unwrap_or(false)
+    }
+
+    #[test]
+    fn create_journal_with_id_inserts_marks_pending_and_keeps_known_auto_tags() {
+        let conn = setup();
+        let tag = create_tag(&conn, "known", None).unwrap();
+        let out = create_journal_with_id(
+            &conn,
+            "journal-web-00001",
+            "  Travel ",
+            Some("#112233"),
+            &[tag.id.clone(), "tag-unknown-0001".to_string()],
+        )
+        .unwrap();
+        assert_eq!(out, CreateWithIdOutcome::Created);
+        let j = get_journal(&conn, "journal-web-00001").unwrap().unwrap();
+        assert_eq!(j.name, "Travel");
+        assert_eq!(j.color.as_deref(), Some("#112233"));
+        assert!(journal_pending(&conn, "journal-web-00001"));
+        assert_eq!(
+            list_journal_auto_tag_ids(&conn, "journal-web-00001").unwrap(),
+            vec![tag.id]
+        );
+    }
+
+    #[test]
+    fn create_journal_with_id_is_idempotent_on_id() {
+        let conn = setup();
+        create_journal_with_id(&conn, "journal-web-00002", "A", None, &[]).unwrap();
+        let again = create_journal_with_id(&conn, "journal-web-00002", "A", None, &[]).unwrap();
+        assert_eq!(again, CreateWithIdOutcome::Exists);
+        // A deleted journal with that id is still "this id exists": never resurrected.
+        conn.execute(
+            "UPDATE journals SET is_deleted = 1 WHERE id = 'journal-web-00002'",
+            [],
+        )
+        .unwrap();
+        let deleted = create_journal_with_id(&conn, "journal-web-00002", "A", None, &[]).unwrap();
+        assert_eq!(deleted, CreateWithIdOutcome::Exists);
+        assert!(
+            get_journal(&conn, "journal-web-00002")
+                .unwrap()
+                .unwrap()
+                .is_deleted
+        );
+    }
+
+    #[test]
+    fn create_journal_with_id_refuses_a_name_taken_by_another_visible_journal() {
+        let conn = setup();
+        create_journal(&conn, "Work", None).unwrap();
+        let out = create_journal_with_id(&conn, "journal-web-00003", " Work ", None, &[]).unwrap();
+        assert_eq!(out, CreateWithIdOutcome::NameTaken);
+        assert!(get_journal(&conn, "journal-web-00003").unwrap().is_none());
+    }
+
+    #[test]
+    fn create_journal_with_id_ignores_deleted_and_invisible_journal_names() {
+        let conn = setup();
+        let gone = create_journal(&conn, "Old", None).unwrap();
+        conn.execute(
+            "UPDATE journals SET is_deleted = 1 WHERE id = ?1",
+            [&gone.id],
+        )
+        .unwrap();
+        let hidden = create_journal(&conn, "Secret", None).unwrap();
+        conn.execute(
+            "UPDATE journals SET is_invisible = 1 WHERE id = ?1",
+            [&hidden.id],
+        )
+        .unwrap();
+        assert_eq!(
+            create_journal_with_id(&conn, "journal-web-00004", "Old", None, &[]).unwrap(),
+            CreateWithIdOutcome::Created
+        );
+        // An invisible journal's name must not leak through a `name_taken` refusal.
+        assert_eq!(
+            create_journal_with_id(&conn, "journal-web-00005", "Secret", None, &[]).unwrap(),
+            CreateWithIdOutcome::Created
+        );
+    }
+
+    #[test]
+    fn create_tag_with_id_inserts_trimmed_and_stamps_updated_at() {
+        let conn = setup();
+        let out = create_tag_with_id(&conn, "tag-web-000001", " travel ", Some("#aabbcc")).unwrap();
+        assert_eq!(out, CreateWithIdOutcome::Created);
+        let row = list_syncable_tags(&conn)
+            .unwrap()
+            .into_iter()
+            .find(|t| t.id == "tag-web-000001")
+            .unwrap();
+        assert_eq!(row.name, "travel");
+        assert_eq!(row.color.as_deref(), Some("#aabbcc"));
+        assert!(row.updated_at > 0);
+        assert!(!row.is_deleted);
+    }
+
+    #[test]
+    fn create_tag_with_id_is_idempotent_on_id_even_when_deleted() {
+        let conn = setup();
+        create_tag_with_id(&conn, "tag-web-000002", "a", None).unwrap();
+        assert_eq!(
+            create_tag_with_id(&conn, "tag-web-000002", "a", None).unwrap(),
+            CreateWithIdOutcome::Exists
+        );
+        delete_tag(&conn, "tag-web-000002").unwrap();
+        assert_eq!(
+            create_tag_with_id(&conn, "tag-web-000002", "a", None).unwrap(),
+            CreateWithIdOutcome::Exists
+        );
+    }
+
+    #[test]
+    fn create_tag_with_id_refuses_a_name_held_by_another_id_even_soft_deleted() {
+        let conn = setup();
+        create_tag(&conn, "work", None).unwrap();
+        assert_eq!(
+            create_tag_with_id(&conn, "tag-web-000003", " work", None).unwrap(),
+            CreateWithIdOutcome::NameTaken
+        );
+        let old = create_tag(&conn, "old", None).unwrap();
+        delete_tag(&conn, &old.id).unwrap();
+        assert_eq!(
+            create_tag_with_id(&conn, "tag-web-000004", "old", None).unwrap(),
+            CreateWithIdOutcome::NameTaken
+        );
+    }
+
+    #[test]
+    fn template_with_id_create_read_update() {
+        let conn = setup();
+        assert!(get_template_for_import(&conn, "tpl-web-000001")
+            .unwrap()
+            .is_none());
+        create_template_with_id(&conn, "tpl-web-000001", "Daily", Some("d"), Some(b"abc"), 3)
+            .unwrap();
+        let row = get_template_for_import(&conn, "tpl-web-000001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.name, "Daily");
+        assert_eq!(row.description.as_deref(), Some("d"));
+        assert_eq!(row.content.as_deref(), Some(&b"abc"[..]));
+        assert_eq!(row.sort_order, 3);
+        assert!(!row.is_deleted && !row.is_predefined);
+        let before = row.updated_at;
+
+        update_template_with_sort_order(&conn, "tpl-web-000001", "Weekly", None, None, 7).unwrap();
+        let row = get_template_for_import(&conn, "tpl-web-000001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.name, "Weekly");
+        assert_eq!(row.description, None);
+        assert_eq!(row.content, None);
+        assert_eq!(row.sort_order, 7);
+        assert!(
+            row.updated_at > before,
+            "update must outrank the row it replaces"
+        );
+
+        delete_template(&conn, "tpl-web-000001").unwrap();
+        let row = get_template_for_import(&conn, "tpl-web-000001")
+            .unwrap()
+            .unwrap();
+        assert!(row.is_deleted, "deleted rows stay readable for idempotency");
+    }
+
+    #[test]
+    fn template_with_id_rejects_oversized_content() {
+        let conn = setup();
+        let huge = vec![0u8; MAX_TEMPLATE_CONTENT_BYTES + 1];
+        assert!(
+            create_template_with_id(&conn, "tpl-web-000002", "Big", None, Some(&huge), 0).is_err()
         );
     }
 }

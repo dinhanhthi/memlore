@@ -1710,7 +1710,29 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             created                 INTEGER NOT NULL DEFAULT 0
         );",
     )?;
+    // Additive (2026-10-08): nullable, so v0.2.2 rows read as "unknown".
+    add_outbox_applied_from_column_if_missing(conn)?;
 
+    Ok(())
+}
+
+/// `web_outbox_imports.applied_from_updated_at`: the web base (target row
+/// `updated_at`) this importer's applied write fast-forwarded from (`0` when the write
+/// created the row), so a later trash / template intent from the same web device
+/// accepts the recorded stamp only when that write did not override a desktop change.
+/// NULL = unknown.
+fn add_outbox_applied_from_column_if_missing(conn: &Connection) -> Result<()> {
+    let has: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('web_outbox_imports') \
+         WHERE name='applied_from_updated_at'",
+        [],
+        |r| r.get(0),
+    )?;
+    if has == 0 {
+        conn.execute_batch(
+            "ALTER TABLE web_outbox_imports ADD COLUMN applied_from_updated_at INTEGER;",
+        )?;
+    }
     Ok(())
 }
 
@@ -4484,6 +4506,69 @@ mod tests {
         assert!(
             dup.is_err(),
             "same (kind, period_start, period_end) with a different model_id must violate the PK"
+        );
+    }
+
+    /// v0.2.2 shape of `web_outbox_imports` (no `applied_from_updated_at`): migrate
+    /// adds the column and every recorded import survives, the new column NULL.
+    #[test]
+    fn migrate_adds_applied_from_column_to_legacy_web_outbox_imports() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute_batch(
+            "DROP TABLE web_outbox_imports;
+             CREATE TABLE web_outbox_imports (
+                path                    TEXT PRIMARY KEY NOT NULL,
+                revision                TEXT,
+                content_hash            TEXT NOT NULL,
+                outcome                 TEXT NOT NULL,
+                imported_at             INTEGER NOT NULL,
+                last_applied_updated_at INTEGER,
+                post_import_fingerprint TEXT,
+                decided_fields          TEXT,
+                pending_revision        TEXT,
+                pending_plan            TEXT,
+                created                 INTEGER NOT NULL DEFAULT 0
+             );
+             INSERT INTO web_outbox_imports (path, revision, content_hash, outcome,
+                imported_at, last_applied_updated_at, post_import_fingerprint,
+                decided_fields, pending_revision, pending_plan, created)
+             VALUES ('web1/outbox/e1.bin', 'rev1', 'hash1', 'applied', 2000, 1999,
+                'fp1', '{}', NULL, NULL, 1);",
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+        migrate(&conn).unwrap();
+
+        let row: (String, String, i64, String, Option<i64>, i64) = conn
+            .query_row(
+                "SELECT revision, outcome, last_applied_updated_at, post_import_fingerprint, \
+                        applied_from_updated_at, created \
+                 FROM web_outbox_imports WHERE path = 'web1/outbox/e1.bin'",
+                [],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            row,
+            (
+                "rev1".to_string(),
+                "applied".to_string(),
+                1999,
+                "fp1".to_string(),
+                None,
+                1
+            )
         );
     }
 
