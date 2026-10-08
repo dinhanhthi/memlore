@@ -9,6 +9,7 @@ import {
   isIntentPathValid,
   packOutboxUploadIntents,
   resolveField,
+  resolveV2Ack,
   shouldRetainIntent,
   type RetainParams,
 } from './outbox'
@@ -808,6 +809,130 @@ describe('retention rules (desktop ack format)', () => {
         allAcks: [ack('desk-a', 'h', 'no_journal'), ack('desk-b', 'old', 'absent', true)],
       })
       expect(createdElsewhere.retain).toBe(true)
+    })
+  })
+})
+
+describe('v2 ack resolution against the capable set', () => {
+  const PATH = 'web-1/outbox/t-11111111-1111-4111-8111-111111111111.bin'
+  const HASH = 'h2'
+  const ackFile = (desktop: string, over: Partial<OutboxAcksV1['acks'][number]>): OutboxAcksV1 => ({
+    schema_version: 1,
+    desktop_device_id: desktop,
+    acks: [
+      {
+        path: PATH,
+        content_hash: HASH,
+        applied_updated_at: null,
+        decided: [],
+        created: false,
+        refused_reason: null,
+        ...over,
+      },
+    ],
+  })
+  const resolve = (allAcks: OutboxAcksV1[], capableDesktops: string[]) =>
+    resolveV2Ack({ allAcks, intentPath: PATH, contentHash: HASH, capableDesktops })
+
+  it('ignores a v0.2.2 null ack (skipped_version) for a v2 file', () => {
+    expect(resolve([ackFile('old', {})], ['new'])).toEqual({ kind: 'pending' })
+    // Even from a capable desktop, an all-null ack is "not decided yet".
+    expect(resolve([ackFile('new', {})], ['new'])).toEqual({ kind: 'pending' })
+  })
+
+  it('ignores every ack from a desktop outside the capable set', () => {
+    expect(resolve([ackFile('old', { created: true })], ['new'])).toEqual({ kind: 'pending' })
+    expect(resolve([ackFile('old', { refused_reason: 'name_taken' })], ['new'])).toEqual({
+      kind: 'pending',
+    })
+  })
+
+  it('a refusal from a capable desktop is final', () => {
+    expect(resolve([ackFile('new', { refused_reason: 'name_taken' })], ['new'])).toEqual({
+      kind: 'refused',
+      reason: 'name_taken',
+    })
+  })
+
+  it('a refusal is final only once every capable desktop refused', () => {
+    const refused = ackFile('a', { refused_reason: 'changed_on_desktop' })
+    expect(resolve([refused], ['a', 'b'])).toEqual({ kind: 'pending' })
+    expect(resolve([refused, ackFile('b', { refused_reason: 'absent' })], ['a', 'b'])).toEqual({
+      kind: 'refused',
+      reason: 'changed_on_desktop',
+    })
+  })
+
+  it('applied by one capable desktop beats a refusal by another', () => {
+    const refused = ackFile('a', { refused_reason: 'name_taken' })
+    expect(resolve([refused, ackFile('b', { created: true })], ['a', 'b'])).toEqual({
+      kind: 'applied',
+    })
+    expect(resolve([refused, ackFile('b', { applied_updated_at: 5 })], ['a', 'b'])).toEqual({
+      kind: 'applied',
+    })
+  })
+
+  it('`created` counts for any revision; an apply or refusal only for the current one', () => {
+    expect(resolve([ackFile('a', { created: true, content_hash: 'old' })], ['a'])).toEqual({
+      kind: 'applied',
+    })
+    expect(resolve([ackFile('a', { applied_updated_at: 5, content_hash: 'old' })], ['a'])).toEqual({
+      kind: 'pending',
+    })
+    expect(
+      resolve([ackFile('a', { refused_reason: 'invalid', content_hash: 'old' })], ['a']),
+    ).toEqual({ kind: 'pending' })
+  })
+
+  it('only acks of this path count', () => {
+    const other = ackFile('a', { created: true, path: 'web-2/outbox/t-x.bin' })
+    expect(resolve([other], ['a'])).toEqual({ kind: 'pending' })
+  })
+
+  it('no capable desktop: pending', () => {
+    expect(resolve([ackFile('a', { refused_reason: 'invalid' })], [])).toEqual({ kind: 'pending' })
+  })
+
+  describe('a malformed ack entry decides nothing (fail-safe: kept)', () => {
+    const without = (desktop: string, key: string, over = {}): OutboxAcksV1 => {
+      const file = ackFile(desktop, over)
+      const entry = { ...file.acks[0] } as Record<string, unknown>
+      delete entry[key]
+      return { ...file, acks: [entry as unknown as OutboxAcksV1['acks'][number]] }
+    }
+
+    it('a missing `applied_updated_at` is not an apply', () => {
+      expect(resolve([without('a', 'applied_updated_at')], ['a'])).toEqual({ kind: 'pending' })
+    })
+
+    it('a missing `refused_reason` is not a refusal', () => {
+      const refused = ackFile('a', { refused_reason: 'name_taken' })
+      expect(resolve([refused, without('b', 'refused_reason')], ['a', 'b'])).toEqual({
+        kind: 'pending',
+      })
+    })
+
+    it('a null or garbage entry is skipped without throwing', () => {
+      const garbage = [null, 42, 'x', { path: 7, created: true }] as unknown[]
+      const file: OutboxAcksV1 = {
+        ...ackFile('a', { refused_reason: 'name_taken' }),
+        acks: [
+          ...(garbage as OutboxAcksV1['acks']),
+          ...ackFile('a', { refused_reason: 'name_taken' }).acks,
+        ],
+      }
+      expect(resolve([file], ['a'])).toEqual({ kind: 'refused', reason: 'name_taken' })
+    })
+
+    it('`created` counts only for a journal or tag intent', () => {
+      for (const stem of ['p', 'd']) {
+        const path = `web-1/outbox/${stem}-11111111-1111-4111-8111-111111111111.bin`
+        const allAcks = [ackFile('a', { path, created: true, content_hash: 'old' })]
+        expect(
+          resolveV2Ack({ allAcks, intentPath: path, contentHash: HASH, capableDesktops: ['a'] }),
+        ).toEqual({ kind: 'pending' })
+      }
     })
   })
 })

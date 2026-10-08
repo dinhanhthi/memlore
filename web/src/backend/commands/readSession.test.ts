@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Core } from '../../core/core'
 import { setWriteFlagForTest } from '../config'
 import { VaultLockedError } from '../keys'
-import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import { WRAPPED_MASTER_HEX_LEN, openWebDb, type DraftRecord, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
 import { isFormatGuardLatched, latchFormatGuard, resetFormatGuardLatch } from '../sync/formatGuard'
 import { PullTransientError } from '../sync/pull'
@@ -389,8 +389,14 @@ describe('drafts rehydrate the outbox overlay', () => {
   })
 
   async function hydrationRig(
-    drafts: Array<{ entryId: string; sealed: Uint8Array; pushedHash?: string }>,
+    drafts: Array<{
+      entryId: string
+      sealed: Uint8Array
+      pushedHash?: string
+      kind?: DraftRecord['kind']
+    }>,
     desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() },
+    v2Desktops: ReadonlySet<string> = new Set<string>(),
   ) {
     const vault = Object.assign(new FakeVault([{ id: 'e1', updatedAt: 1 }]), {
       setExcludedJournalIds: vi.fn(),
@@ -404,7 +410,7 @@ describe('drafts rehydrate the outbox overlay', () => {
       getDegradedDevices: () => [],
       desktops,
       foreignIntents: [],
-      v2Desktops: new Set<string>(),
+      v2Desktops,
       indexSource: null,
     }
     const db = await openWebDb({ factory: new IDBFactory() })
@@ -426,6 +432,12 @@ describe('drafts rehydrate the outbox overlay', () => {
       openDeviceBin: (_r: unknown, b: Uint8Array) => b,
       openOutboxEntry,
       openOutboxAcks: (_r: unknown, b: Uint8Array) => dec.decode(b),
+      // A v2 body has a `kind`.
+      openOutboxIntent: (_r: unknown, b: Uint8Array) => {
+        const json = dec.decode(b)
+        const version = 'kind' in (JSON.parse(json) as object) ? 2 : 1
+        return { version, json, free: () => undefined }
+      },
       sealOutboxEntry: (_r: unknown, json: string) => enc.encode(json),
     } as unknown as Core
     const session = await createReadSession({ db, reader: {} as never, core })
@@ -436,6 +448,61 @@ describe('drafts rehydrate the outbox overlay', () => {
     configureReadEnv({})
     setWriteFlagForTest(false)
     vi.restoreAllMocks()
+  })
+
+  it("never decodes nor shows another browser's v2 intent ([jtpd]-); entry intents unchanged", async () => {
+    const r = await hydrationRig([])
+    const foreign = intent({ web_device_id: 'web-other' })
+    const prefixed = 't-11111111-1111-4111-8111-111111111111'
+    ;(fakes.puller as { foreignIntents: unknown[] }).foreignIntents = [
+      { device: 'web-other', entryId: 'e1', bytes: enc.encode(JSON.stringify(foreign)) },
+      { device: 'web-other', entryId: prefixed, bytes: enc.encode('{"kind":"create_tag"}') },
+    ]
+
+    await r.session.ready()
+
+    expect(r.vault.foreignIntents).toEqual([foreign])
+    expect(r.openOutboxEntry).toHaveBeenCalledTimes(1)
+  })
+
+  it('a pull drops a pushed tag draft whose tag the desktop created then deleted (v2 state wired)', async () => {
+    const TAG = '11111111-1111-4111-8111-111111111111'
+    const sealed = enc.encode(
+      JSON.stringify({
+        kind: 'create_tag',
+        web_device_id: 'web-1234',
+        web_updated_at_secs: 1,
+        tag_id: TAG,
+        name: 'Work',
+        color: null,
+      }),
+    )
+    const key = `t-${TAG}`
+    const draft = {
+      entryId: key,
+      kind: 'tag' as const,
+      sealed,
+      pushedHash: await sha256Hex(sealed),
+    }
+    const desktops = {
+      manifests: ['desk-a'],
+      slots: new Set(['desk-a']),
+      tombstones: new Set<string>(),
+    }
+    const r = await hydrationRig([draft], desktops, new Set(['desk-a']))
+    const tags = { tags: [{ id: TAG, name: 'Work', color: null, updated_at: 2, is_deleted: true }] }
+    await r.db.files.put({
+      path: 'desk-a/tags.bin',
+      ciphertext: enc.encode(JSON.stringify(tags)),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 0,
+      pinned: false,
+    })
+
+    await r.session.pull()
+
+    expect(await r.db.drafts.get(key)).toBeUndefined()
   })
 
   it('exposes every sealed draft through the overlay once ready() resolves', async () => {

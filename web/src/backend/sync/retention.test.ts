@@ -1,18 +1,24 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import type { Core } from '../../core/core'
+import type { Core, OutboxIntentV2 } from '../../core/core'
+import type { Template } from '../../../../src/types/template'
 import { FakeVault, type FakeSpec } from '../commands/readTestKit'
 import { sha256Hex } from '../drafts'
 import type { KeyRing } from '../keys'
-import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import { WRAPPED_MASTER_HEX_LEN, openWebDb, type DraftKind, type WebDb } from '../storage/idb'
 import {
   createEmptyOutboxFields,
   type FieldChange,
   type OutboxAckEntry,
   type OutboxEntryV1,
 } from './outbox'
-import { UNDECIDED_GRACE_SECS, runRetention, type RetentionDesktops } from './retention'
+import {
+  UNDECIDED_GRACE_SECS,
+  runRetention,
+  type RetentionDesktops,
+  type RetentionV2,
+} from './retention'
 
 const WEB = 'web-1'
 const DAY = 86400
@@ -24,6 +30,12 @@ const PATH = (id: string): string => `${WEB}/outbox/${id}.bin`
 /** Fake core: "sealed" bytes are the JSON text; a leading `!` fails to open. */
 const core = {
   openOutboxEntry: (_r: unknown, b: Uint8Array) => dec.decode(b),
+  // A v2 body has a `kind`; anything else is a v1 entry frame.
+  openOutboxIntent: (_r: unknown, b: Uint8Array) => {
+    const json = dec.decode(b)
+    const parsed = JSON.parse(json) as Record<string, unknown>
+    return { version: 'kind' in parsed ? 2 : 1, json, free: () => undefined }
+  },
   openOutboxAcks: (_r: unknown, b: Uint8Array) => {
     if (b[0] === 0x21) throw new Error('aead: tag mismatch')
     return dec.decode(b)
@@ -100,6 +112,8 @@ interface Rig {
   acks: (desktop: string, entries: OutboxAckEntry[] | 'corrupt') => Promise<void>
   /** A fresh vault over `specs` (a reload or a newer synced state), hydrated from the drafts. */
   reload: (specs: FakeSpec[]) => Promise<void>
+  /** Passed to the pass as `v2` when set. */
+  v2?: RetentionV2
   run: () => ReturnType<typeof runRetention>
 }
 
@@ -167,6 +181,7 @@ async function rig(specs: FakeSpec[], desktops: string[] = ['desk-a']): Promise<
         nowSecs: () => now.secs,
         desktops: d,
         vault: r.vault,
+        ...(r.v2 === undefined ? {} : { v2: r.v2 }),
       }),
   }
   return r
@@ -266,6 +281,18 @@ describe('intent retention', () => {
     r = await rig([{ id: 'e1', updatedAt: 1000, title: 'Old', text: 'x' }])
     await r.draft(intent('e1'))
     await r.acks('desk-a', [ack('e1', { decision: 'refused', reason: 'journal' })])
+    const res = await r.run()
+    expect(res.dropped).toEqual(['e1'])
+    expect(res.notices).toEqual([
+      { kind: 'refused', field: 'title', title: 'Old', reason: 'journal' },
+    ])
+  })
+
+  it('skips a malformed ack entry instead of failing the pass', async () => {
+    r = await rig([{ id: 'e1', updatedAt: 1000, title: 'Old', text: 'x' }])
+    await r.draft(intent('e1'))
+    const garbage = [null, 42, { path: PATH('e1') }] as unknown as OutboxAckEntry[]
+    await r.acks('desk-a', [...garbage, ack('e1', { decision: 'refused', reason: 'journal' })])
     const res = await r.run()
     expect(res.dropped).toEqual(['e1'])
     expect(res.notices).toEqual([
@@ -473,6 +500,297 @@ describe('intent retention', () => {
     it('a synced payload that cannot be read', async () => {
       await r.reload([{ id: 'e1', updatedAt: 1200, fails: true }])
       expect((await r.run()).dropped).toEqual([])
+    })
+  })
+})
+
+describe('outbox v2 retention (Phase 21)', () => {
+  const ID = '11111111-1111-4111-8111-111111111111'
+  const base = { web_device_id: WEB, web_updated_at_secs: T0 }
+  const tagIntent: OutboxIntentV2 = {
+    ...base,
+    kind: 'create_tag',
+    tag_id: ID,
+    name: 'Work',
+    color: null,
+  }
+  const journalIntent: OutboxIntentV2 = {
+    ...base,
+    kind: 'create_journal',
+    journal_id: ID,
+    name: 'Trips',
+    color: null,
+    auto_tag_ids: [],
+  }
+  const upsert: OutboxIntentV2 = {
+    ...base,
+    kind: 'upsert_template',
+    template_id: ID,
+    name: 'Daily',
+    description: null,
+    content_b64: btoa('abc'),
+    sort_order: 2,
+    base_updated_at: 1000,
+  }
+  const deleteTpl: OutboxIntentV2 = {
+    ...base,
+    kind: 'delete_template',
+    template_id: ID,
+    base_updated_at: 1000,
+  }
+  const trash: OutboxIntentV2 = {
+    ...base,
+    kind: 'trash_entry',
+    entry_id: ID,
+    base_updated_at: 1000,
+  }
+  const KIND: Record<OutboxIntentV2['kind'], [Exclude<DraftKind, 'entry'>, string]> = {
+    create_journal: ['journal', 'j'],
+    create_tag: ['tag', 't'],
+    upsert_template: ['template', 'p'],
+    delete_template: ['template', 'p'],
+    trash_entry: ['trash', 'd'],
+  }
+  const keyOf = (i: OutboxIntentV2): string => `${KIND[i.kind][1]}-${ID}`
+  const v2Path = (i: OutboxIntentV2): string => `${WEB}/outbox/${keyOf(i)}.bin`
+  const template = (over: Partial<Template> = {}): Template => ({
+    id: ID,
+    name: 'Daily',
+    description: null,
+    content: Array.from(enc.encode('abc')),
+    is_predefined: false,
+    sort_order: 2,
+    created_at: 1,
+    ...over,
+  })
+
+  type V2Case = [string, OutboxIntentV2, Partial<RetentionV2['taxonomy']>]
+
+  let r: Rig
+
+  function v2State(over: Partial<RetentionV2['taxonomy']> = {}, capable = ['desk-a']): RetentionV2 {
+    return {
+      desktops: new Set(capable),
+      taxonomy: {
+        knownJournalIds: [],
+        knownTagIds: [],
+        templates: [],
+        deletedTemplateIds: [],
+        ...over,
+      },
+    }
+  }
+
+  async function v2Draft(i: OutboxIntentV2, pushed = true): Promise<string> {
+    const sealed = enc.encode(JSON.stringify(i))
+    const hash = await sha256Hex(sealed)
+    await r.db.drafts.put({
+      entryId: keyOf(i),
+      kind: KIND[i.kind][0],
+      sealed,
+      updatedAt: 1,
+      ...(pushed ? { pushedHash: hash } : {}),
+    })
+    return hash
+  }
+
+  const v2Ack = (i: OutboxIntentV2, over: Partial<OutboxAckEntry>): OutboxAckEntry => ({
+    path: v2Path(i),
+    content_hash: 'any',
+    applied_updated_at: null,
+    decided: [],
+    created: false,
+    refused_reason: null,
+    ...over,
+  })
+
+  beforeEach(async () => {
+    r = await rig([], ['desk-a', 'desk-old'])
+    r.v2 = v2State()
+  })
+
+  describe('acks (21.1)', () => {
+    it('drops a pushed create acked `created` by a capable desktop, silently', async () => {
+      await v2Draft(tagIntent)
+      await r.acks('desk-a', [v2Ack(tagIntent, { created: true })])
+      expect(await r.run()).toEqual({ dropped: [keyOf(tagIntent)], notices: [], changed: true })
+      expect(await r.db.drafts.get(keyOf(tagIntent))).toBeUndefined()
+    })
+
+    it('ignores the null ack of a v0.2.2 desktop (not advertising v2)', async () => {
+      const hash = await v2Draft(tagIntent)
+      await r.acks('desk-old', [v2Ack(tagIntent, { content_hash: hash })])
+      expect(await r.run()).toEqual({ dropped: [], notices: [], changed: false })
+      // Not even a refusal from it counts.
+      await r.acks('desk-old', [v2Ack(tagIntent, { content_hash: hash, refused_reason: 'x' })])
+      expect((await r.run()).dropped).toEqual([])
+      expect(await r.db.drafts.get(keyOf(tagIntent))).toBeDefined()
+    })
+
+    it('a refusal from the capable desktop is final: dropped with a notice', async () => {
+      const hash = await v2Draft(tagIntent)
+      await r.acks('desk-a', [
+        v2Ack(tagIntent, { content_hash: hash, refused_reason: 'name_taken' }),
+      ])
+      expect(await r.run()).toEqual({
+        dropped: [keyOf(tagIntent)],
+        notices: [{ kind: 'refused', field: 'create_tag', title: 'Work', reason: 'name_taken' }],
+        changed: true,
+      })
+    })
+
+    it('applied by one capable desktop beats a refusal by another', async () => {
+      r.v2 = v2State({}, ['desk-a', 'desk-old'])
+      const hash = await v2Draft(upsert)
+      await r.acks('desk-old', [
+        v2Ack(upsert, { content_hash: hash, refused_reason: 'changed_on_desktop' }),
+      ])
+      expect((await r.run()).dropped).toEqual([]) // desk-a undecided
+      await r.acks('desk-a', [v2Ack(upsert, { content_hash: hash, applied_updated_at: 1500 })])
+      expect(await r.run()).toEqual({ dropped: [keyOf(upsert)], notices: [], changed: true })
+    })
+
+    it('keeps a draft re-saved after a refusal of its pushed revision', async () => {
+      const oldSealed = enc.encode(JSON.stringify(tagIntent))
+      const oldHash = await sha256Hex(oldSealed)
+      await r.db.drafts.put({
+        entryId: keyOf(tagIntent),
+        kind: 'tag',
+        sealed: enc.encode(JSON.stringify({ ...tagIntent, name: 'Work 2' })),
+        updatedAt: 2,
+        pushedHash: oldHash,
+      })
+      await r.acks('desk-a', [
+        v2Ack(tagIntent, { content_hash: oldHash, refused_reason: 'name_taken' }),
+      ])
+      expect(await r.run()).toEqual({ dropped: [], notices: [], changed: false })
+      expect(await r.db.drafts.get(keyOf(tagIntent))).toBeDefined()
+    })
+
+    it('a capable desktop with no acks file stops counting after the 7-day grace', async () => {
+      r.v2 = v2State({}, ['desk-a', 'desk-old'])
+      const hash = await v2Draft(tagIntent)
+      await r.acks('desk-a', [
+        v2Ack(tagIntent, { content_hash: hash, refused_reason: 'name_taken' }),
+      ])
+      expect((await r.run()).dropped).toEqual([]) // desk-old undecided
+      r.now.secs = T0 + UNDECIDED_GRACE_SECS - 1
+      expect((await r.run()).dropped).toEqual([])
+      r.now.secs = T0 + UNDECIDED_GRACE_SECS
+      expect(await r.run()).toEqual({
+        dropped: [keyOf(tagIntent)],
+        notices: [{ kind: 'refused', field: 'create_tag', title: 'Work', reason: 'name_taken' }],
+        changed: true,
+      })
+    })
+
+    it('an apply of an older revision keeps the newer one', async () => {
+      await v2Draft(upsert)
+      await r.acks('desk-a', [v2Ack(upsert, { content_hash: 'older', applied_updated_at: 1500 })])
+      expect((await r.run()).dropped).toEqual([])
+    })
+  })
+
+  describe('reflected in the synced state (21.2)', () => {
+    it.each([
+      ['a journal in `journals/`', journalIntent, { knownJournalIds: [ID] }],
+      ['a live tag in `tags.bin`', tagIntent, { knownTagIds: [ID] }],
+      ['a tag reflected then deleted on desktop', tagIntent, { knownTagIds: [ID] }],
+      ['a template with the same content', upsert, { templates: [template()] }],
+      ['a deleted template', deleteTpl, { deletedTemplateIds: [ID] }],
+    ] satisfies V2Case[])('drops %s, silently', async (_name, i, taxonomy) => {
+      r.v2 = v2State(taxonomy)
+      await v2Draft(i)
+      expect(await r.run()).toEqual({ dropped: [keyOf(i)], notices: [], changed: true })
+    })
+
+    it('keeps an upsert of a template deleted on desktop until the refusal ack', async () => {
+      r.v2 = v2State({ deletedTemplateIds: [ID] })
+      const hash = await v2Draft(upsert)
+      expect(await r.run()).toEqual({ dropped: [], notices: [], changed: false })
+      await r.acks('desk-a', [
+        v2Ack(upsert, { content_hash: hash, refused_reason: 'changed_on_desktop' }),
+      ])
+      expect(await r.run()).toEqual({
+        dropped: [keyOf(upsert)],
+        notices: [
+          {
+            kind: 'refused',
+            field: 'upsert_template',
+            title: 'Daily',
+            reason: 'changed_on_desktop',
+          },
+        ],
+        changed: true,
+      })
+    })
+
+    it('drops a trash whose entry is trashed (or tombstoned) in the manifests', async () => {
+      r.desktops.tombstones = new Set([ID])
+      await v2Draft(trash)
+      expect((await r.run()).dropped).toEqual([keyOf(trash)])
+    })
+
+    it.each([
+      ['a template whose content differs', upsert, { templates: [template({ name: 'Other' })] }],
+      ['a delete while the template is live', deleteTpl, { templates: [template()] }],
+      ['an unknown journal', journalIntent, { knownTagIds: [ID] }],
+    ] satisfies V2Case[])('keeps %s', async (_name, i, taxonomy) => {
+      r.v2 = v2State(taxonomy)
+      await v2Draft(i)
+      expect((await r.run()).dropped).toEqual([])
+    })
+
+    it('never drops an unpushed v2 draft', async () => {
+      r.v2 = v2State({ knownTagIds: [ID] })
+      await v2Draft(tagIntent, false)
+      await r.acks('desk-a', [v2Ack(tagIntent, { created: true })])
+      expect((await r.run()).dropped).toEqual([])
+      expect(await r.db.drafts.get(keyOf(tagIntent))).toBeDefined()
+    })
+
+    it('without the v2 state, keeps every v2 draft and says nothing', async () => {
+      r.v2 = undefined
+      await v2Draft(tagIntent)
+      await r.acks('desk-a', [v2Ack(tagIntent, { created: true })])
+      expect(await r.run()).toEqual({ dropped: [], notices: [], changed: false })
+    })
+
+    it('never loads a v2 draft key as an entry', async () => {
+      await v2Draft(tagIntent)
+      await r.run()
+      expect(r.vault.loadCalls.flat()).not.toContain(keyOf(tagIntent))
+    })
+  })
+
+  describe('waiting for a newer desktop (21.2)', () => {
+    it('fires once per draft only while no slot-holding desktop advertises v2; kept', async () => {
+      r.v2 = v2State({}, [])
+      await v2Draft(tagIntent)
+      expect(await r.run()).toEqual({
+        dropped: [],
+        notices: [{ kind: 'waiting_newer_desktop', title: 'Work' }],
+        changed: false,
+      })
+      expect((await r.run()).notices).toEqual([])
+      expect(await r.db.drafts.get(keyOf(tagIntent))).toBeDefined()
+    })
+
+    it('fires for an unpushed draft too', async () => {
+      r.v2 = v2State({}, [])
+      await v2Draft(trash, false)
+      expect((await r.run()).notices).toEqual([{ kind: 'waiting_newer_desktop' }])
+    })
+
+    it('does not fire while a capable desktop exists', async () => {
+      await v2Draft(tagIntent)
+      expect((await r.run()).notices).toEqual([])
+    })
+
+    it('a capable desktop that is not slot-holding does not count', async () => {
+      r.v2 = v2State({}, ['desk-gone'])
+      await v2Draft(tagIntent)
+      expect((await r.run()).notices).toEqual([{ kind: 'waiting_newer_desktop', title: 'Work' }])
     })
   })
 })

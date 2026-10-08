@@ -47,7 +47,9 @@ export const EMPTY_TAXONOMY: Taxonomy = {
   excludedJournalIds: [],
   knownJournalIds: [],
   tags: [],
+  knownTagIds: [],
   templates: [],
+  deletedTemplateIds: [],
 }
 
 /** In-memory `VaultApi`: `load` "downloads" a spec and records every call. */

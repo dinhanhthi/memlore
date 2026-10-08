@@ -402,7 +402,9 @@ describe('write commands', () => {
       { id: 't1', name: 'Work', color: null },
       { id: 't2', name: 'Ideas', color: null },
     ],
+    knownTagIds: ['t1', 't2'],
     templates: [],
+    deletedTemplateIds: [],
   }
 
   it('rejects every write command with read_only when write flag is disabled', async () => {

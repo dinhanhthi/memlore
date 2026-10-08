@@ -24,16 +24,33 @@
  * Fail safe: any read error (an unknown slot list, an acks file that does not open, a missing
  * device record) keeps every draft and shows nothing; a synced payload that cannot be read keeps
  * that draft.
+ *
+ * Outbox v2 drafts (journal, tag, template, trash; Phase 21) never reach the entry rules above.
+ * Without `v2` (the capable set and the taxonomy) they are all kept, silently. A PUSHED one is
+ * dropped when:
+ *  - reflected in the synced state: the journal is in `journals/` (any state), the tag in
+ *    `tags.bin` (live OR deleted: a tag the desktop created then deleted must still lift the
+ *    push hold-back of the entry drafts naming it), the upserted template is live with the same
+ *    content (a deleted one waits for the desktop's `changed_on_desktop` refusal), the deleted
+ *    template is deleted, the trashed entry is trashed or tombstoned in a manifest. Silent;
+ *  - acked by a v2-capable desktop (`resolveV2Ack`): applied silently, or finally refused with a
+ *    `refused` notice whose `field` is the v2 kind. Capable = slot-holding desktops advertising
+ *    `outbox_versions ∋ 2`; the others' acks are ignored (a v0.2.2 desktop acks a v2 file with
+ *    every field null). The 7-day undecided grace applies as for entry intents.
+ * While NO slot-holding desktop advertises v2, every v2 draft (pushed or not) is kept and raises
+ * one `waiting_newer_desktop` notice, once per draft.
  */
 
-import type { Core } from '../../core/core'
-import type { VaultApi } from '../commands/readSession'
+import type { Core, OutboxIntentV2 } from '../../core/core'
+import type { Taxonomy, VaultApi } from '../commands/readSession'
 import { sha256Hex } from '../drafts'
 import type { KeyRing } from '../keys'
 import {
   OUTBOX_BLOB_PREFIX,
   OUTBOX_META_PREFIX,
   OUTBOX_PUSHED_AT_PREFIX,
+  draftKind,
+  type DraftKind,
   type DraftRecord,
   type WebDb,
 } from '../storage/idb'
@@ -41,6 +58,8 @@ import type { EntryMetadata } from '../vault'
 import {
   ackIntentPath,
   decisionKey,
+  formatNotice,
+  resolveV2Ack,
   shouldRetainIntent,
   type FieldNotice,
   type OutboxAcksV1,
@@ -48,12 +67,14 @@ import {
   type OutboxFields,
   type WebNotice,
 } from './outbox'
+import { openV2Intent, v2IntentTarget } from './safeUpload'
 
 export const UNDECIDED_GRACE_SECS = 7 * 86400
 
 const RESOLVED = `${OUTBOX_META_PREFIX}resolved:`
 const REFUSED_AT = `${OUTBOX_META_PREFIX}refused-at:`
 const PUSHED_AT = OUTBOX_PUSHED_AT_PREFIX
+const WAITING = `${OUTBOX_META_PREFIX}waiting:`
 const ACKS_FILE = 'outbox-acks.bin'
 
 /** What the last pull saw of the other devices. */
@@ -66,9 +87,16 @@ export interface RetentionDesktops {
   tombstones: ReadonlySet<string>
 }
 
+/** What the v2 rules read (see the header); the taxonomy is the synced one, never an overlay. */
+export interface RetentionV2 {
+  /** Slot-holding desktops advertising `outbox_versions ∋ 2` (`Puller.v2Desktops`). */
+  desktops: ReadonlySet<string>
+  taxonomy: Pick<Taxonomy, 'knownJournalIds' | 'knownTagIds' | 'templates' | 'deletedTemplateIds'>
+}
+
 export interface RetentionDeps {
   db: Pick<WebDb, 'drafts' | 'files' | 'meta' | 'device'>
-  core: Pick<Core, 'openOutboxAcks' | 'openOutboxEntry'>
+  core: Pick<Core, 'openOutboxAcks' | 'openOutboxEntry' | 'openOutboxIntent'>
   ring: KeyRing
   /** Web clock, Unix seconds. */
   nowSecs: () => number
@@ -77,6 +105,8 @@ export interface RetentionDeps {
     VaultApi,
     'load' | 'getSynced' | 'getOutboxIntent' | 'getOutboxIntents' | 'setOutboxIntents'
   >
+  /** Absent: every v2 draft is kept, silently. */
+  v2?: RetentionV2
 }
 
 export interface RetentionResult {
@@ -98,7 +128,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Every manifest device's acks (absent file: none). Throws when a present file does not open. */
+/**
+ * Every manifest device's acks (absent file: none). Throws when a present file does not open. An
+ * entry that is not an object with a string `path` and a `decided` array is skipped: it decides
+ * nothing, so its draft is kept (the field types are checked where they are read).
+ */
 async function readAcks(deps: RetentionDeps): Promise<Map<string, OutboxAcksV1>> {
   const out = new Map<string, OutboxAcksV1>()
   for (const device of deps.desktops.manifests) {
@@ -106,8 +140,11 @@ async function readAcks(deps: RetentionDeps): Promise<Map<string, OutboxAcksV1>>
     if (rec === undefined) continue
     const parsed: unknown = JSON.parse(deps.core.openOutboxAcks(deps.ring, rec.ciphertext))
     if (!isRecord(parsed) || !Array.isArray(parsed.acks)) throw new Error('acks file is malformed')
+    const acks = (parsed.acks as unknown[]).filter(
+      (a) => isRecord(a) && typeof a.path === 'string' && Array.isArray(a.decided),
+    ) as OutboxAcksV1['acks']
     // Capability is about the folder it was read from, whatever id the file claims.
-    out.set(device, { ...(parsed as unknown as OutboxAcksV1), desktop_device_id: device })
+    out.set(device, { ...(parsed as unknown as OutboxAcksV1), acks, desktop_device_id: device })
   }
   return out
 }
@@ -232,13 +269,18 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
   const slots = desktops.slots
   const slotDesktops = desktops.manifests.filter((d) => slots.has(d))
 
-  const load = await deps.vault.load(drafts.map((d) => d.entryId))
+  const entryDrafts = drafts.filter((d) => draftKind(d) === 'entry')
+  const v2Drafts = drafts.filter((d) => draftKind(d) !== 'entry')
+  const load =
+    entryDrafts.length > 0
+      ? await deps.vault.load(entryDrafts.map((d) => d.entryId))
+      : { failed: [] }
   const failed = new Set(load.failed.map((f) => f.id))
 
-  const opened = new Map(drafts.map((d) => [d.entryId, openIntent(deps, d)]))
+  const opened = new Map(entryDrafts.map((d) => [d.entryId, openIntent(deps, d)]))
 
   const result: RetentionResult = { dropped: [], notices: [], changed: false }
-  for (const draft of drafts) {
+  for (const draft of entryDrafts) {
     const id = draft.entryId
     const intent = opened.get(id) ?? null
     if (intent === null || failed.has(id)) continue
@@ -300,5 +342,145 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
       if (updateOverlay(deps, intent, known, next)) result.changed = true
     }
   }
+  const v2Context = { webId: device.deviceId, acksByDevice, allAcks, slotDesktops }
+  if (v2Drafts.length > 0) await retainV2(deps, v2Drafts, v2Context, result)
   return result
+}
+
+// ---------------------------------------------------------------------------------------------
+// Outbox v2 drafts (Phase 21)
+// ---------------------------------------------------------------------------------------------
+
+const KIND_OF_PREFIX: Record<string, Exclude<DraftKind, 'entry'>> = {
+  j: 'journal',
+  t: 'tag',
+  p: 'template',
+  d: 'trash',
+}
+
+/** The draft's v2 intent, or null (kept) when it does not open or does not match its key. */
+function openV2(deps: RetentionDeps, draft: DraftRecord): OutboxIntentV2 | null {
+  try {
+    const intent = openV2Intent(deps.core, deps.ring, draft.sealed)
+    const { prefix, id } = v2IntentTarget(intent)
+    const named = draft.entryId === `${prefix}-${id}` && draftKind(draft) === KIND_OF_PREFIX[prefix]
+    return named ? intent : null
+  } catch {
+    return null
+  }
+}
+
+function decodeBase64(b64: string): number[] | null {
+  try {
+    return Array.from(atob(b64), (c) => c.charCodeAt(0))
+  } catch {
+    return null
+  }
+}
+
+function sameContent(a: readonly number[] | null, b: readonly number[] | null): boolean {
+  if (a === null || b === null) return a === b
+  return a.length === b.length && a.every((x, i) => x === b[i])
+}
+
+/** The synced state already shows this intent (see the header). */
+function isReflectedV2(
+  intent: OutboxIntentV2,
+  taxonomy: RetentionV2['taxonomy'],
+  tombstones: ReadonlySet<string>,
+): boolean {
+  switch (intent.kind) {
+    case 'create_journal':
+      return taxonomy.knownJournalIds.includes(intent.journal_id)
+    case 'create_tag':
+      return taxonomy.knownTagIds.includes(intent.tag_id)
+    case 'upsert_template': {
+      // Only equal content counts: a deleted target is the desktop's `changed_on_desktop` refusal.
+      const live = taxonomy.templates.find((t) => t.id === intent.template_id)
+      if (live === undefined) return false
+      const content = intent.content_b64 === null ? null : decodeBase64(intent.content_b64)
+      if (intent.content_b64 !== null && content === null) return false
+      return (
+        live.name === intent.name &&
+        (live.description ?? null) === intent.description &&
+        live.sort_order === intent.sort_order &&
+        sameContent(live.content, content)
+      )
+    }
+    case 'delete_template':
+      return taxonomy.deletedTemplateIds.includes(intent.template_id)
+    case 'trash_entry':
+      return tombstones.has(intent.entry_id)
+  }
+}
+
+/** The name a notice shows, when the intent carries one. */
+function titleOf(intent: OutboxIntentV2): string | undefined {
+  return 'name' in intent && intent.name !== '' ? intent.name : undefined
+}
+
+async function forgetV2(deps: RetentionDeps, key: string): Promise<void> {
+  await deps.db.meta.delete(`${PUSHED_AT}${key}`)
+  await deps.db.meta.delete(`${WAITING}${key}`)
+}
+
+interface V2Context {
+  webId: string
+  acksByDevice: ReadonlyMap<string, OutboxAcksV1>
+  allAcks: OutboxAcksV1[]
+  slotDesktops: readonly string[]
+}
+
+async function retainV2(
+  deps: RetentionDeps,
+  drafts: readonly DraftRecord[],
+  ctx: V2Context,
+  result: RetentionResult,
+): Promise<void> {
+  const v2 = deps.v2
+  if (v2 === undefined) return
+  const capableAll = ctx.slotDesktops.filter((d) => v2.desktops.has(d))
+  for (const draft of drafts) {
+    const intent = openV2(deps, draft)
+    if (intent === null) continue
+    const key = draft.entryId
+    const now = deps.nowSecs()
+    const hash = await sha256Hex(draft.sealed)
+    const since =
+      draft.pushedHash === hash ? await deps.db.drafts.recordPushedAt(key, hash, now) : null
+    if (draft.pushedHash === hash && since === null) continue // unmarked meanwhile: keep
+    if (since !== null) {
+      const capable = capableAll.filter(
+        (d) => ctx.acksByDevice.has(d) || now - since < UNDECIDED_GRACE_SECS,
+      )
+      const outcome = isReflectedV2(intent, v2.taxonomy, deps.desktops.tombstones)
+        ? ({ kind: 'applied' } as const)
+        : resolveV2Ack({
+            allAcks: ctx.allAcks,
+            intentPath: ackIntentPath(ctx.webId, key),
+            contentHash: hash,
+            capableDesktops: capable,
+          })
+      if (outcome.kind !== 'pending') {
+        if (await deps.db.drafts.dropPushed(key, draft.sealed, hash, [])) {
+          await forgetV2(deps, key)
+          result.dropped.push(key)
+          result.changed = true
+          if (outcome.kind === 'refused') {
+            const title = titleOf(intent)
+            result.notices.push(
+              formatNotice('refused', { field: intent.kind, title, reason: outcome.reason }),
+            )
+          }
+        }
+        continue
+      }
+    }
+    if (capableAll.length > 0) continue
+    // Persist first, so the notice is never repeated.
+    const waitingKey = `${WAITING}${key}`
+    if ((await deps.db.meta.get(waitingKey)) !== undefined) continue
+    await deps.db.meta.put({ key: waitingKey, value: true })
+    result.notices.push(formatNotice('waiting_newer_desktop', { title: titleOf(intent) }))
+  }
 }

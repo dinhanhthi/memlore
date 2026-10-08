@@ -76,8 +76,12 @@ export interface Taxonomy {
   knownJournalIds: string[]
   /** Live tags, by name. */
   tags: Tag[]
+  /** Every tag id in the pulled `tags.bin` files, live or deleted (Phase 21 retention). */
+  knownTagIds: string[]
   /** Live user templates (predefined templates do not sync), `sort_order` then name. */
   templates: Template[]
+  /** Template ids whose synced winner is deleted (Phase 21 retention). */
+  deletedTemplateIds: string[]
 }
 
 /** What one `pull()` observed. */
@@ -385,6 +389,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const started = epoch
     const release = await acquireOutboxLock()
     try {
+      // The taxonomy `ready()` read before this pass (hydrate and pull both run it first).
+      const synced = cache?.value
       const result = await runRetention({
         db,
         core,
@@ -392,6 +398,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
         nowSecs: () => nowSecs(),
         desktops: puller.desktops,
         vault,
+        ...(synced === undefined ? {} : { v2: { desktops: puller.v2Desktops, taxonomy: synced } }),
       })
       if (started !== epoch) return false
       notices.push(...result.notices)
@@ -575,11 +582,16 @@ function openDraft(
   }
 }
 
+/** A v2 intent file stem (`[jtpd]-<id>`): another browser's non-entry intent, never shown. */
+const V2_INTENT_STEM = /^[jtpd]-/
+
 /**
  * One foreign intent, or nothing when it cannot be opened or is not a v1 intent of `file.device`
  * for `file.entryId` (an unknown version is skipped, never an error). Logged by error name only.
+ * A v2 intent (`[jtpd]-` name) is skipped silently, before any decode.
  */
 function openForeignIntent(core: Core, ring: KeyRing, file: ForeignIntentFile): OutboxEntryV1[] {
+  if (V2_INTENT_STEM.test(file.entryId)) return []
   try {
     const parsed = JSON.parse(core.openOutboxEntry(ring, file.bytes)) as unknown
     if (!isForeignIntent(parsed, file)) throw new Error('not an outbox intent for this file')
@@ -819,10 +831,14 @@ export async function readTaxonomy(db: WebDb, core: Core, ring: KeyRing): Promis
       .filter((r) => !r.value.deleted)
       .map((r) => r.value.tag)
       .sort((a, b) => a.name.localeCompare(b.name)),
+    knownTagIds: [...tags.keys()],
     templates: [...templates.values()]
       .filter((r) => !r.value.deleted)
       .map((r) => r.value.template)
       .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    deletedTemplateIds: [...templates.entries()]
+      .filter(([, r]) => r.value.deleted)
+      .map(([id]) => id),
   }
 }
 

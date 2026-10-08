@@ -582,6 +582,7 @@ export function shouldRetainIntent(params: RetainParams): RetainResult {
  * The create-refused reason, or null. Needs an ack for the current revision from EVERY
  * importer-capable desktop (one desktop without a usable journal must not stop another from
  * creating it), all refused; any `created: true` for this path overrides.
+ * TODO(later): use `typeof` checks like `resolveV2Ack` (see docs/LATER.md, v1 `createRefusal`).
  */
 function createRefusal(
   allAcks: OutboxAcksV1[],
@@ -603,6 +604,63 @@ function createRefusal(
   }
   if (capableDesktops.length === 0 || !capableDesktops.every((d) => decided.has(d))) return null
   return reason
+}
+
+/** What the capable desktops' acks say about one v2 intent revision (Phase 21.1). */
+export type V2AckOutcome =
+  | { kind: 'applied' }
+  | { kind: 'refused'; reason: string }
+  | { kind: 'pending' }
+
+export interface ResolveV2AckParams {
+  allAcks: OutboxAcksV1[]
+  /** `<webDeviceId>/outbox/<prefix>-<id>.bin`: the draft key is the file stem (`ackIntentPath`). */
+  intentPath: string
+  /** SHA-256 hex of the pushed sealed bytes (the desktop's `content_hash`). */
+  contentHash: string
+  /**
+   * Slot-holding desktops advertising `outbox_versions ∋ 2` that count for this revision. Every
+   * other desktop's ack is ignored: a v0.2.2 desktop acks a v2 file it recorded
+   * `skipped_version` with every field null.
+   */
+  capableDesktops: readonly string[]
+}
+
+/**
+ * Resolves a v2 intent against the acks (desktop contract, `outbox_import.rs` `apply_intent_v2`):
+ * `created` (journal / tag create, sticky across revisions), `applied_updated_at` (template /
+ * trash apply, this revision only) or `refused_reason` (this revision only). An ack with none of
+ * the three is undecided. Applied by ANY capable desktop wins; a refusal is final only once
+ * EVERY capable desktop refused this revision. Reflection in the synced state is the caller's.
+ */
+export function resolveV2Ack(params: ResolveV2AckParams): V2AckOutcome {
+  const { allAcks, intentPath, contentHash, capableDesktops } = params
+  const capable = new Set(capableDesktops)
+  // Only a journal / tag create is sticky; `created` on any other kind decides nothing.
+  const stem = intentPath.slice(intentPath.lastIndexOf('/') + 1)
+  const creates = stem.startsWith('j-') || stem.startsWith('t-')
+  let reason: string | null = null
+  const refusedBy = new Set<string>()
+  for (const file of allAcks) {
+    if (!capable.has(file.desktop_device_id)) continue
+    // Fail safe: a field of the wrong type (or a non-object entry) decides nothing, so it keeps.
+    for (const a of file.acks as unknown[]) {
+      if (typeof a !== 'object' || a === null) continue
+      const ack = a as Partial<Record<keyof OutboxAckEntry, unknown>>
+      if (typeof ack.path !== 'string' || ack.path !== intentPath) continue
+      if (creates && ack.created === true) return { kind: 'applied' }
+      if (ack.content_hash !== contentHash) continue
+      if (typeof ack.applied_updated_at === 'number') return { kind: 'applied' }
+      if (typeof ack.refused_reason === 'string') {
+        reason ??= ack.refused_reason
+        refusedBy.add(file.desktop_device_id)
+      }
+    }
+  }
+  if (reason === null || capable.size === 0 || ![...capable].every((d) => refusedBy.has(d))) {
+    return { kind: 'pending' }
+  }
+  return { kind: 'refused', reason }
 }
 
 function mediaReflected(intent: OutboxEntryV1, synced: EntryMetadata): boolean {

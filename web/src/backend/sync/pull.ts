@@ -240,6 +240,8 @@ interface DeviceManifestRead {
 const ACKS_FILE = 'outbox-acks.bin'
 /** A cached intent of another web device: `<device>/outbox/<entryId>.bin`. */
 const FOREIGN_INTENT = /^([^/]+)\/outbox\/([^/]+)\.bin$/
+/** A v2 intent file stem (`[jtpd]-<id>`): another browser's journal / tag / template / trash. */
+const V2_INTENT_STEM = /^[jtpd]-/
 /** A cached manifest: `<device>/metadata.json` (capture 1 is the device id). */
 const CACHED_MANIFEST = /^([^/]+)\/metadata\.json$/
 
@@ -930,7 +932,8 @@ export class Puller {
   /**
    * Downloads the `outbox/<entryId>.bin` intents of each other web device (concurrency-limited)
    * and caches them; an oversize one keeps its cached copy. Every cached intent of a device or an
-   * entry that is no longer listed is dropped. Read-only: nothing is written to Drive.
+   * entry that is no longer listed is dropped (so is any cached `[jtpd]-<id>.bin` v2 intent, which
+   * is never downloaded). Read-only: nothing is written to Drive.
    */
   async #cacheForeignIntents(
     generation: number,
@@ -945,7 +948,9 @@ export class Puller {
       )
       for (const name of names) {
         const entryId = name.endsWith('.bin') ? name.slice(0, -'.bin'.length) : ''
-        if (entryId.startsWith('m-') || !isSafeEntryId(entryId)) continue
+        // Media and v2 intents are not entry intents: never downloaded (the web shows neither).
+        if (entryId.startsWith('m-') || V2_INTENT_STEM.test(entryId)) continue
+        if (!isSafeEntryId(entryId)) continue
         listed.push({ device, entryId, path: `${device}/outbox/${name}` })
       }
     }

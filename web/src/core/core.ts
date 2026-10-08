@@ -102,7 +102,11 @@ export function sealOutboxIntentV2(core: Core, ring: KeyRing, intent: OutboxInte
 }
 
 /** Open an outbox intent file of any supported frame version. */
-export function openOutboxIntent(core: Core, ring: KeyRing, bytes: Uint8Array): OpenedOutboxIntent {
+export function openOutboxIntent(
+  core: Pick<Core, 'openOutboxIntent'>,
+  ring: KeyRing,
+  bytes: Uint8Array,
+): OpenedOutboxIntent {
   const opened = core.openOutboxIntent(ring, bytes)
   try {
     if (opened.version === 1) return { version: 1, kind: 'entry', json: opened.json }

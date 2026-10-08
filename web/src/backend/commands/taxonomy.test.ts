@@ -233,6 +233,33 @@ describe('readTaxonomy (merge across devices)', () => {
     ])
   })
 
+  it('lists every tag id (live or deleted) and the deleted template ids', async () => {
+    const tpl = (id: string, updated_at: number, is_deleted: boolean): Record<string, unknown> => ({
+      id,
+      name: id,
+      description: null,
+      content_b64: null,
+      sort_order: 0,
+      created_at: 0,
+      updated_at,
+      is_deleted,
+    })
+    const { db, core } = build({
+      'devA/tags.bin': {
+        tags: [
+          { id: 't1', name: 'a', color: null, updated_at: 1, is_deleted: false },
+          { id: 't2', name: 'b', color: null, updated_at: 1, is_deleted: true },
+        ],
+      },
+      'devA/templates.bin': { templates: [tpl('p1', 1, false), tpl('p2', 2, true)] },
+      'devB/templates.bin': { templates: [tpl('p1', 3, true), tpl('p2', 1, false)] },
+    })
+    const taxonomy = await readTaxonomy(db, core, ring)
+    expect([...taxonomy.knownTagIds].sort()).toEqual(['t1', 't2'])
+    expect([...taxonomy.deletedTemplateIds].sort()).toEqual(['p1', 'p2'])
+    expect(taxonomy.templates).toEqual([])
+  })
+
   it('fails closed when a file cannot be opened', async () => {
     const { db } = build({ 'devA/journals/j1.bin': journalFile('devA', {}) })
     const core = {

@@ -1408,6 +1408,33 @@ describe('other web devices outbox (read-only)', () => {
     expect(env.drive.mutating()).toEqual([])
   })
 
+  it("never downloads another web device's v2 intents ([jtpd]-), and drops cached ones", async () => {
+    const env = await setup()
+    addSlot(env.drive, FOREIGN)
+    const V2 = ['j', 't', 'p', 'd'].map((p) => `${p}-bbbbbbbb-0000-4000-8000-000000000002.bin`)
+    addForeignOutbox(env.drive, FOREIGN, {
+      [`${ENTRY}.bin`]: 'SEALED',
+      ...Object.fromEntries(V2.map((name) => [name, 'V2'])),
+    })
+    // Cached by an older build.
+    await env.db.files.put({
+      path: `${FOREIGN}/outbox/${V2[1]}`,
+      ciphertext: bytes('V2'),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 0,
+      pinned: false,
+    })
+
+    await env.puller.refresh()
+
+    expect(env.puller.foreignIntents.map((f) => f.entryId)).toEqual([ENTRY])
+    const fetched = downloads(env.drive)
+    expect(fetched).toContain(`generations/g-0/${FOREIGN}/outbox/${ENTRY}.bin`)
+    for (const name of V2) expect(fetched.some((p) => p.endsWith(`/outbox/${name}`))).toBe(false)
+    expect(await env.db.files.get(`${FOREIGN}/outbox/${V2[1]}`)).toBeUndefined()
+  })
+
   it('ignores a device folder without a slot and drops intents that left the cloud', async () => {
     const env = await setup()
     const unslotted = 'ffffffff-4444-4555-8666-000000000000'

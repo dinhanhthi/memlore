@@ -90,7 +90,11 @@ export function v2IntentTarget(intent: OutboxIntentV2): { prefix: OutboxIntentPr
 }
 
 /** Opens sealed v2 intent bytes (frame 2 only; a v1 entry frame throws). */
-export function openV2Intent(core: Core, ring: KeyRing, bytes: Uint8Array): OutboxIntentV2 {
+export function openV2Intent(
+  core: Pick<Core, 'openOutboxIntent'>,
+  ring: KeyRing,
+  bytes: Uint8Array,
+): OutboxIntentV2 {
   const opened = openOutboxIntent(core, ring, bytes)
   if (opened.version !== 2) throw new SealVerifyError('not a v2 intent (frame 1)')
   return opened.intent
