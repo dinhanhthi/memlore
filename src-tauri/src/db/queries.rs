@@ -76,6 +76,10 @@ pub struct Entry {
     /// card show a chat-origin indicator without a per-card back-ref lookup.
     /// Local-only UX flag — not synced.
     pub from_chat: bool,
+    /// Unix seconds when the entry was moved to Trash; `None` when it is not
+    /// in Trash. Invariant: `Some` only together with `is_deleted = true`
+    /// (a purged or legacy tombstone has `is_deleted = true` and `None`).
+    pub trashed_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -467,7 +471,7 @@ pub fn set_journal_auto_tags(
 /// (filesystem deletes aren't transactional). The media rows are removed inside
 /// the same transaction as the tombstones — without this, a journal delete
 /// would orphan every entry's media (rows + disk + cloud), the exact leak the
-/// per-entry `soft_delete_entry_impl` cleanup prevents. Cloud blobs are swept
+/// per-entry `purge_entry_impl` cleanup prevents. Cloud blobs are swept
 /// by the sync engine's `reconcile_own_media_files` prune once the rows are gone.
 pub fn delete_journal(conn: &Connection, id: &str) -> Result<Vec<(String, Option<String>)>> {
     let now = now_unix();
@@ -528,10 +532,13 @@ fn cascade_journal_entries_delete(
     // don't get a pointless `local_version` bump and re-push — and after the
     // UPDATE every row in the journal reads `is_deleted = 1`, so the same
     // filter would match nothing and NO entry would ever be marked pending.
+    //
+    // Trashed rows (`is_deleted = 1` + `trashed_at`) are included too: the
+    // journal delete converts them to purge tombstones, which must re-push.
     tx.execute(
         "INSERT INTO sync_state (entry_id, local_version, sync_status)
          SELECT id, 1, 'pending' FROM entries
-         WHERE journal_id = ?1 AND is_deleted = 0
+         WHERE journal_id = ?1 AND (is_deleted = 0 OR trashed_at IS NOT NULL)
          ON CONFLICT(entry_id) DO UPDATE SET
              local_version = sync_state.local_version + 1,
              sync_status   = 'pending'",
@@ -586,9 +593,16 @@ fn cascade_journal_entries_delete(
     // `now_unix()` would be wrong for the same reason a bare `?1` is: it would
     // clobber a concurrent `move_entry_to_journal` that moved an entry OUT of
     // this journal into a live one.
+    //
+    // 3. Trashed entries in the journal are converted to purge tombstones
+    //    (`trashed_at = NULL`) with the same `MAX(updated_at + 1, ?1)` stamp:
+    //    their media rows were dropped above, so leaving them restorable
+    //    would bring back an entry whose attachments are gone, in a journal
+    //    that no longer exists.
     tx.execute(
-        "UPDATE entries SET is_deleted = 1, updated_at = MAX(updated_at + 1, ?1) \
-         WHERE journal_id = ?2 AND is_deleted = 0",
+        "UPDATE entries SET is_deleted = 1, trashed_at = NULL, \
+             updated_at = MAX(updated_at + 1, ?1) \
+         WHERE journal_id = ?2 AND (is_deleted = 0 OR trashed_at IS NOT NULL)",
         rusqlite::params![ts, id],
     )?;
     // `ts` (the CLAMPED peer stamp on the sync path) is correct here, not
@@ -608,15 +622,17 @@ fn cascade_journal_entries_delete(
 /// caller to unlink AFTER the surrounding transaction commits (filesystem
 /// deletes aren't transactional).
 ///
-/// Shared by [`crate::commands::entries::soft_delete_entry_impl`] (local
-/// delete) and the peer tombstone loop in `pull_entries`, which used to
+/// Shared by [`crate::commands::entries::purge_entry_impl`] (local
+/// purge) and the peer tombstone loop in `pull_entries`, which used to
 /// hand-copy the media half. One call at both sites so the two cascades cannot
 /// drift — this codebase has been bitten by that class three times already
 /// (the C3/I10 journal cascades and the C2 memory cascade).
 ///
-/// There is no restore/trash path for entries, so the media must go in the
-/// same transaction as the tombstone: otherwise the rows stay,
-/// `list_pending_uploads` (no `is_deleted` filter) keeps uploading them, and
+/// Runs at PURGE time (and for peer tombstones), never at trash time: a
+/// trashed entry keeps its media rows so a restore finds them, and
+/// `list_pending_uploads` (no `is_deleted` filter) keeps uploading them
+/// meanwhile. Once the entry is a permanent tombstone the media must go in
+/// the same transaction: otherwise the rows stay, keep uploading, and
 /// `reconcile_own_media_files` can never prune the cloud blobs — it only
 /// sweeps ids whose local row is gone.
 ///
@@ -1028,6 +1044,7 @@ pub fn insert_apple_imported_entry(
             cover_media_id: None,
             entry_date_user_edited: true,
             content_language: None,
+            trashed_at: None,
         },
     )
 }
@@ -1107,7 +1124,7 @@ const ENTRY_COLUMNS: &str = "id, journal_id, title, preview_text, content_text, 
     latitude, longitude, location_label, location_address, \
     weather_summary, weather_icon, emotion, \
     is_favorite, is_deleted, is_locked, is_invisible, vault_id, cover_media_id, content_language, \
-    entry_date_user_edited, media_count, from_chat";
+    entry_date_user_edited, media_count, from_chat, trashed_at";
 
 const ENTRY_COLUMNS_E_WITH_EFFECTIVE_LOCK: &str =
     "e.id, e.journal_id, e.title, e.preview_text, e.content_text, \
@@ -1118,7 +1135,8 @@ const ENTRY_COLUMNS_E_WITH_EFFECTIVE_LOCK: &str =
     CASE WHEN e.is_locked != 0 OR COALESCE(j.is_locked, 0) != 0 THEN 1 ELSE 0 END AS is_locked, \
     CASE WHEN e.is_invisible != 0 OR COALESCE(j.is_invisible, 0) != 0 THEN 1 ELSE 0 END AS is_invisible, \
     COALESCE(e.vault_id, j.vault_id) AS vault_id, \
-    e.cover_media_id, e.content_language, e.entry_date_user_edited, e.media_count, e.from_chat";
+    e.cover_media_id, e.content_language, e.entry_date_user_edited, e.media_count, e.from_chat, \
+    e.trashed_at";
 
 fn apply_locked_view_to_entries(entries: Vec<Entry>, locked_view: LockedView) -> Vec<Entry> {
     match locked_view {
@@ -2560,6 +2578,141 @@ pub fn soft_delete_entry(conn: &Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+// ─── Trash ───────────────────────────────────────────────────────────────────
+//
+// Local state: a trashed entry is `is_deleted = 1` + `trashed_at`, so every
+// existing `is_deleted = 0` filter (lists, search, stats, RAG) already hides
+// it. A purged entry (and every pre-Trash tombstone) is `is_deleted = 1` +
+// `trashed_at = NULL`. Invariant: `trashed_at IS NOT NULL ⇒ is_deleted = 1`,
+// and every write that sets `is_deleted = 0` also sets `trashed_at = NULL`.
+// These helpers only move the row; the caller marks it pending and runs the
+// memory / media cascades.
+
+/// Move a live entry to Trash at `now` (unix seconds). `trashed_at = now`;
+/// `updated_at` becomes `max(updated_at + 1, now)` so the trash beats the
+/// edit it follows under LWW even when that edit came from a peer whose
+/// clock is ahead (same rule as [`restore_entry`]). Errors with
+/// `QueryReturnedNoRows` when `id` is missing or not live (already trashed,
+/// purged or a legacy tombstone).
+pub fn trash_entry(conn: &Connection, id: &str, now: i64) -> Result<()> {
+    let affected = conn.execute(
+        "UPDATE entries SET is_deleted = 1, trashed_at = ?1, \
+             updated_at = MAX(updated_at + 1, ?1) \
+         WHERE id = ?2 AND is_deleted = 0",
+        rusqlite::params![now, id],
+    )?;
+    if affected == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
+}
+
+/// Bring a trashed entry back. `updated_at` becomes `max(updated_at + 1, now)`
+/// so the restore always beats the trash it undoes under LWW, even with a
+/// clock behind the trashing device. Errors with `QueryReturnedNoRows` when
+/// `id` is not in Trash (live, purged, legacy tombstone or missing).
+pub fn restore_entry(conn: &Connection, id: &str, now: i64) -> Result<()> {
+    let affected = conn.execute(
+        "UPDATE entries SET is_deleted = 0, trashed_at = NULL, \
+             updated_at = MAX(updated_at + 1, ?1) \
+         WHERE id = ?2 AND trashed_at IS NOT NULL",
+        rusqlite::params![now, id],
+    )?;
+    if affected == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
+}
+
+/// Turn a trashed entry into a permanent tombstone (`is_deleted = 1`,
+/// `trashed_at = NULL`). The stamp is the trashed row's `updated_at + 1`,
+/// NOT now: a restore or edit made on another device after the trash (but
+/// not yet pulled here) carries a newer `updated_at` and must still win LWW
+/// over this purge. Errors with `QueryReturnedNoRows` when `id` is not in
+/// Trash — including a live row an older build left with a stale
+/// `trashed_at` (downgrade), so the caller's media cascade never runs on it.
+pub fn purge_entry_mark(conn: &Connection, id: &str) -> Result<()> {
+    let affected = conn.execute(
+        "UPDATE entries SET is_deleted = 1, trashed_at = NULL, updated_at = updated_at + 1 \
+         WHERE id = ?1 AND is_deleted = 1 AND trashed_at IS NOT NULL",
+        [id],
+    )?;
+    if affected == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
+}
+
+/// Entries in Trash, most recently trashed first. Follows the
+/// `*_with_locked_view` convention: `Hidden` drops locked entries, `Covered`
+/// redacts them, `Revealed` shows them; invisible entries appear only for
+/// the active vault (`None` excludes every invisible entry).
+pub fn list_trashed_entries_with_locked_view(
+    conn: &Connection,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<Vec<Entry>> {
+    let lock_filter = match locked_view {
+        LockedView::Hidden => format!(" AND {}", locked_entry_exclusion_predicate()),
+        LockedView::Covered | LockedView::Revealed => String::new(),
+    };
+    let invisible_filter = invisible_entry_filter(active_vault_id);
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ENTRY_COLUMNS_E_WITH_EFFECTIVE_LOCK} FROM entries e \
+         JOIN journals j ON j.id = e.journal_id \
+         WHERE e.is_deleted = 1 AND e.trashed_at IS NOT NULL{lock_filter}{invisible_filter} \
+         ORDER BY e.trashed_at DESC, e.id"
+    ))?;
+    let rows = stmt.query_map([], row_to_entry)?;
+    rows.collect::<Result<Vec<_>>>()
+        .map(|entries| apply_locked_view_to_entries(entries, locked_view))
+}
+
+/// Ids of every entry trashed at or before `cutoff` (unix seconds) — the
+/// purge sweep's work list. Ignores lock and invisible state: retention
+/// applies to every trashed entry.
+pub fn list_trash_due(conn: &Connection, cutoff: i64) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT id FROM entries \
+         WHERE is_deleted = 1 AND trashed_at IS NOT NULL AND trashed_at <= ?1 \
+         ORDER BY trashed_at",
+    )?;
+    let rows = stmt.query_map([cutoff], |r| r.get(0))?;
+    rows.collect()
+}
+
+/// Why an entry write was refused by [`require_live_entry`].
+#[derive(Debug, thiserror::Error)]
+pub enum LiveEntryError {
+    #[error("entry not found")]
+    NotFound,
+    #[error("entry is deleted")]
+    Deleted,
+    #[error("entry is in Trash; restore it to edit")]
+    Trashed,
+    #[error(transparent)]
+    Db(#[from] rusqlite::Error),
+}
+
+/// Write guard for entry-mutating commands: returns the entry only when it
+/// exists and is live. A trashed entry is read-only until restored.
+/// `is_deleted` decides: a live row with a stale `trashed_at` (left by an
+/// older build after a downgrade) is live.
+pub fn require_live_entry(
+    conn: &Connection,
+    id: &str,
+) -> std::result::Result<Entry, LiveEntryError> {
+    let entry = get_entry(conn, id)?.ok_or(LiveEntryError::NotFound)?;
+    if entry.is_deleted {
+        return Err(if entry.trashed_at.is_some() {
+            LiveEntryError::Trashed
+        } else {
+            LiveEntryError::Deleted
+        });
+    }
+    Ok(entry)
+}
+
 pub fn set_entry_locked(conn: &Connection, id: &str, locked: bool) -> Result<()> {
     let now = now_unix();
     let affected = if locked {
@@ -2629,11 +2782,13 @@ pub fn set_entry_invisible(
 /// AND by the auto-detect hook in `commands::entries`.
 ///
 /// Bumps `updated_at` so listeners (sync, search reindex) see the
-/// change as a normal entry update.
+/// change as a normal entry update. A deleted (trashed or purged) row is
+/// left untouched and reported as `QueryReturnedNoRows`.
 pub fn set_entry_language(conn: &Connection, id: &str, language: Option<&str>) -> Result<Entry> {
     let now = now_unix();
     let affected = conn.execute(
-        "UPDATE entries SET content_language = ?1, updated_at = ?2 WHERE id = ?3",
+        "UPDATE entries SET content_language = ?1, updated_at = ?2 \
+         WHERE id = ?3 AND is_deleted = 0",
         rusqlite::params![language, now, id],
     )?;
     if affected == 0 {
@@ -3621,7 +3776,8 @@ pub fn get_entry_highlights(conn: &Connection, entry_id: &str) -> Result<Option<
 
 /// Persist a freshly-generated highlights cache. `model_id` is the
 /// `"{provider}:{chat_model}"` namespace string the caller produced
-/// via `provider_namespaced_chat_model_id` (introduced in R7).
+/// via `provider_namespaced_chat_model_id` (introduced in R7). A deleted
+/// (trashed or purged) row is left untouched (`QueryReturnedNoRows`).
 pub fn set_entry_highlights(
     conn: &Connection,
     entry_id: &str,
@@ -3634,7 +3790,7 @@ pub fn set_entry_highlights(
          SET ai_highlights = ?1,
              ai_highlights_generated_at = ?2,
              ai_highlights_model_id = ?3
-         WHERE id = ?4",
+         WHERE id = ?4 AND is_deleted = 0",
         rusqlite::params![markdown, generated_at, model_id, entry_id],
     )?;
     if affected == 0 {
@@ -4535,9 +4691,32 @@ pub struct SyncEntryRow<'a> {
     pub cover_media_id: Option<&'a str>,
     pub entry_date_user_edited: bool,
     pub content_language: Option<&'a str>,
+    /// WIRE trash stamp. On the wire a trashed entry is `is_deleted = false`
+    /// + `trashed_at` (so older peers keep showing it until purge); locally
+    /// it is `is_deleted = 1` + `trashed_at`. `upsert_entry_from_sync` does
+    /// that mapping — pass the wire values here, never the local ones.
+    pub trashed_at: Option<i64>,
+}
+
+/// Map the wire `(is_deleted, trashed_at)` pair to the local columns.
+///
+/// - `is_deleted = true` → purge/legacy tombstone: `(1, NULL)`.
+/// - `is_deleted = false`, `trashed_at = Some` → in Trash: `(1, trashed_at)`.
+/// - `is_deleted = false`, `trashed_at = None` → live: `(0, NULL)`.
+///
+/// Every live write therefore clears `trashed_at`, which keeps the invariant
+/// `trashed_at IS NOT NULL ⇒ is_deleted = 1` on every path through here
+/// (sync ingest, import resurrection, Apple import).
+fn local_trash_state(wire_is_deleted: bool, wire_trashed_at: Option<i64>) -> (bool, Option<i64>) {
+    if wire_is_deleted {
+        (true, None)
+    } else {
+        (wire_trashed_at.is_some(), wire_trashed_at)
+    }
 }
 
 pub fn upsert_entry_from_sync(conn: &Connection, row: SyncEntryRow<'_>) -> Result<()> {
+    let (is_deleted, trashed_at) = local_trash_state(row.is_deleted, row.trashed_at);
     conn.execute(
         "INSERT INTO entries (
             id, journal_id, title, preview_text, content_text,
@@ -4545,10 +4724,10 @@ pub fn upsert_entry_from_sync(conn: &Connection, row: SyncEntryRow<'_>) -> Resul
             latitude, longitude, location_label, location_address,
             weather_summary, weather_icon, emotion,
             is_favorite, is_deleted, is_locked, is_invisible, vault_id, yjs_doc,
-            cover_media_id, entry_date_user_edited, content_language
+            cover_media_id, entry_date_user_edited, content_language, trashed_at
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
-                 ?19, ?20, ?21, ?22, ?23, ?24)
+                 ?19, ?20, ?21, ?22, ?23, ?24, ?25)
          ON CONFLICT(id) DO UPDATE SET
             journal_id            = excluded.journal_id,
             title                 = excluded.title,
@@ -4571,7 +4750,8 @@ pub fn upsert_entry_from_sync(conn: &Connection, row: SyncEntryRow<'_>) -> Resul
             yjs_doc               = excluded.yjs_doc,
             cover_media_id        = excluded.cover_media_id,
             entry_date_user_edited = excluded.entry_date_user_edited,
-            content_language      = excluded.content_language",
+            content_language      = excluded.content_language,
+            trashed_at            = excluded.trashed_at",
         rusqlite::params![
             row.id,
             row.journal_id,
@@ -4589,7 +4769,7 @@ pub fn upsert_entry_from_sync(conn: &Connection, row: SyncEntryRow<'_>) -> Resul
             row.weather_icon,
             row.emotion,
             row.is_favorite as i64,
-            row.is_deleted as i64,
+            is_deleted as i64,
             row.is_locked as i64,
             row.is_invisible as i64,
             row.vault_id,
@@ -4597,6 +4777,7 @@ pub fn upsert_entry_from_sync(conn: &Connection, row: SyncEntryRow<'_>) -> Resul
             row.cover_media_id,
             row.entry_date_user_edited as i64,
             row.content_language,
+            trashed_at,
         ],
     )?;
     Ok(())
@@ -7314,6 +7495,7 @@ fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<Entry> {
         entry_date_user_edited: row.get::<_, i64>(22)? != 0,
         media_count: row.get(23)?,
         from_chat: row.get::<_, i64>(24)? != 0,
+        trashed_at: row.get(25)?,
     })
 }
 
@@ -8509,7 +8691,10 @@ pub fn count_media(conn: &Connection) -> Result<i64> {
 }
 
 /// Count of SOFT-DELETED `entries` rows — durable local evidence that the
-/// user deleted content on this device.
+/// user deleted content on this device. Trashed entries count too (they are
+/// `is_deleted = 1`); that is safe for the media-prune guard because a
+/// trashed entry keeps its media rows, so the prune never sees their blobs
+/// as orphans.
 ///
 /// This is the positive signal `reconcile_own_media_files` needs before it
 /// will prune with an empty local `media` table. "Media table is empty" alone
@@ -10349,6 +10534,7 @@ mod tests {
                 cover_media_id: None,
                 entry_date_user_edited: false,
                 content_language: None,
+                trashed_at: None,
             },
         )
         .unwrap();
@@ -10390,6 +10576,7 @@ mod tests {
                 cover_media_id: None,
                 entry_date_user_edited: false,
                 content_language: None,
+                trashed_at: None,
             },
         )
         .unwrap();
@@ -16302,6 +16489,444 @@ mod tests {
             row.thumbnail_path.as_deref(),
             Some("/cache/photo.thumb.jpg")
         );
+    }
+
+    // ── Trash (Phase 9) ───────────────────────────────────────────────────────
+
+    const TRASH_TS_2026: i64 = 1_768_042_800; // 2026-01-10 noon UTC
+
+    fn make_dated_entry(conn: &Connection, journal_id: &str, title: &str) -> String {
+        create_entry(
+            conn,
+            CreateEntryParams {
+                journal_id,
+                title: Some(title),
+                content_text: Some("trashable body"),
+                preview_text: None,
+                entry_date: TRASH_TS_2026,
+            },
+        )
+        .unwrap()
+        .id
+    }
+
+    fn set_updated_at(conn: &Connection, id: &str, ts: i64) {
+        conn.execute(
+            "UPDATE entries SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![ts, id],
+        )
+        .unwrap();
+    }
+
+    /// Rows that break the Trash invariant: live (`is_deleted = 0`) but still
+    /// carrying a `trashed_at` stamp.
+    fn invariant_violations(conn: &Connection) -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM entries WHERE is_deleted = 0 AND trashed_at IS NOT NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    fn wire_row<'a>(
+        id: &'a str,
+        journal_id: &'a str,
+        updated_at: i64,
+        is_deleted: bool,
+        trashed_at: Option<i64>,
+    ) -> SyncEntryRow<'a> {
+        SyncEntryRow {
+            id,
+            journal_id,
+            title: Some("synced"),
+            preview_text: None,
+            content_text: Some("synced body"),
+            entry_date: TRASH_TS_2026,
+            created_at: 1_000,
+            updated_at,
+            latitude: None,
+            longitude: None,
+            location_label: None,
+            location_address: None,
+            weather_summary: None,
+            weather_icon: None,
+            emotion: None,
+            is_favorite: false,
+            is_deleted,
+            is_locked: false,
+            is_invisible: false,
+            vault_id: None,
+            yjs_doc: None,
+            cover_media_id: None,
+            entry_date_user_edited: false,
+            content_language: None,
+            trashed_at,
+        }
+    }
+
+    #[test]
+    fn trash_entry_marks_row_trashed_and_hides_it_from_lists_search_and_stats() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Trashable");
+        set_updated_at(&conn, &eid, 1_000);
+
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert_eq!(e.trashed_at, Some(5_000));
+        assert_eq!(e.updated_at, 5_000);
+        assert!(list_all_entries(&conn).unwrap().is_empty());
+        assert!(search_entries(&conn, "trashable", None).unwrap().is_empty());
+        assert!(count_entries_by_date(&conn, 2026).unwrap().is_empty());
+        // Only a live row can be trashed.
+        assert!(trash_entry(&conn, &eid, 6_000).is_err());
+        assert!(trash_entry(&conn, "missing", 6_000).is_err());
+    }
+
+    #[test]
+    fn internal_language_and_highlights_writers_are_no_ops_on_a_trashed_row() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Trashed");
+        set_updated_at(&conn, &eid, 1_000);
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        assert!(set_entry_language(&conn, &eid, Some("vi")).is_err());
+        assert!(set_entry_highlights(&conn, &eid, "- md", 6_000, "p:m").is_err());
+
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert_eq!(e.updated_at, 5_000, "no write may bump a trashed row");
+        assert_eq!(e.content_language, None);
+        let highlights: Option<String> = conn
+            .query_row(
+                "SELECT ai_highlights FROM entries WHERE id = ?1",
+                [&eid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(highlights, None);
+    }
+
+    #[test]
+    fn trash_entry_moves_updated_at_forward_past_a_peer_clock_ahead() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Ahead");
+        // A peer edit stamped in this device's future.
+        set_updated_at(&conn, &eid, 9_000);
+
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert_eq!(e.trashed_at, Some(5_000), "trashed_at is the local now");
+        assert_eq!(
+            e.updated_at, 9_001,
+            "the trash must still beat the peer edit under LWW"
+        );
+    }
+
+    #[test]
+    fn restore_entry_brings_a_trashed_row_back_with_a_newer_stamp() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Back");
+        set_updated_at(&conn, &eid, 1_000);
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        // A clock behind the trash stamp still moves updated_at forward.
+        restore_entry(&conn, &eid, 4_000).unwrap();
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert!(!e.is_deleted);
+        assert_eq!(e.trashed_at, None);
+        assert_eq!(e.updated_at, 5_001);
+        assert_eq!(list_all_entries(&conn).unwrap().len(), 1);
+
+        trash_entry(&conn, &eid, 6_000).unwrap();
+        restore_entry(&conn, &eid, 9_000).unwrap();
+        assert_eq!(get_entry(&conn, &eid).unwrap().unwrap().updated_at, 9_000);
+
+        // Live, purged and legacy-tombstoned rows are not restorable.
+        assert!(restore_entry(&conn, &eid, 9_500).is_err());
+        trash_entry(&conn, &eid, 10_000).unwrap();
+        purge_entry_mark(&conn, &eid).unwrap();
+        assert!(restore_entry(&conn, &eid, 11_000).is_err());
+        let legacy = make_dated_entry(&conn, &jid, "Legacy");
+        soft_delete_entry(&conn, &legacy).unwrap();
+        assert!(restore_entry(&conn, &legacy, 11_000).is_err());
+    }
+
+    #[test]
+    fn purge_entry_mark_stamps_the_trashed_updated_at_plus_one() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Purge me");
+        set_updated_at(&conn, &eid, 1_000);
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        purge_entry_mark(&conn, &eid).unwrap();
+
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert!(e.is_deleted, "a purged row stays a tombstone");
+        assert_eq!(e.trashed_at, None);
+        assert_eq!(
+            e.updated_at, 5_001,
+            "trashed updated_at + 1, NOT now: a later restore elsewhere must still win"
+        );
+        assert!(
+            list_trashed_entries_with_locked_view(&conn, LockedView::Revealed, None)
+                .unwrap()
+                .is_empty()
+        );
+        // Only a trashed row can be purged.
+        assert!(purge_entry_mark(&conn, &eid).is_err());
+        let live = make_dated_entry(&conn, &jid, "Live");
+        assert!(purge_entry_mark(&conn, &live).is_err());
+    }
+
+    #[test]
+    fn list_trashed_entries_newest_first_with_locked_and_invisible_rules() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let older = make_dated_entry(&conn, &jid, "Older");
+        let newest = make_dated_entry(&conn, &jid, "Newest");
+        let locked = make_dated_entry(&conn, &jid, "Locked");
+        let invisible = make_dated_entry(&conn, &jid, "Invisible");
+        let live = make_dated_entry(&conn, &jid, "Live");
+        let legacy = make_dated_entry(&conn, &jid, "Legacy tombstone");
+        set_entry_locked(&conn, &locked, true).unwrap();
+        set_entry_invisible(&conn, &invisible, true, Some("vault-a")).unwrap();
+        soft_delete_entry(&conn, &legacy).unwrap();
+        trash_entry(&conn, &older, 100).unwrap();
+        trash_entry(&conn, &locked, 200).unwrap();
+        trash_entry(&conn, &newest, 300).unwrap();
+        trash_entry(&conn, &invisible, 400).unwrap();
+
+        let ids = |rows: Vec<Entry>| rows.into_iter().map(|e| e.id).collect::<Vec<_>>();
+        assert_eq!(
+            ids(list_trashed_entries_with_locked_view(&conn, LockedView::Revealed, None).unwrap()),
+            vec![newest.clone(), locked.clone(), older.clone()],
+            "newest trash first; invisible, live and legacy tombstones excluded"
+        );
+        assert_eq!(
+            ids(list_trashed_entries_with_locked_view(&conn, LockedView::Hidden, None).unwrap()),
+            vec![newest.clone(), older.clone()]
+        );
+        let covered =
+            list_trashed_entries_with_locked_view(&conn, LockedView::Covered, None).unwrap();
+        let covered_locked = covered.iter().find(|e| e.id == locked).unwrap();
+        assert!(
+            covered_locked.content_text.is_none(),
+            "covered view redacts"
+        );
+        assert_eq!(
+            ids(list_trashed_entries_with_locked_view(
+                &conn,
+                LockedView::Revealed,
+                Some("vault-a")
+            )
+            .unwrap()),
+            vec![invisible.clone(), newest, locked, older],
+            "the active vault's invisible entries are listed"
+        );
+        let _ = live;
+    }
+
+    #[test]
+    fn list_trash_due_returns_rows_trashed_at_or_before_cutoff() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let early = make_dated_entry(&conn, &jid, "Early");
+        let edge = make_dated_entry(&conn, &jid, "Edge");
+        let late = make_dated_entry(&conn, &jid, "Late");
+        let legacy = make_dated_entry(&conn, &jid, "Legacy");
+        soft_delete_entry(&conn, &legacy).unwrap();
+        set_entry_locked(&conn, &early, true).unwrap();
+        trash_entry(&conn, &early, 100).unwrap();
+        trash_entry(&conn, &edge, 200).unwrap();
+        trash_entry(&conn, &late, 300).unwrap();
+
+        let mut due = list_trash_due(&conn, 200).unwrap();
+        due.sort();
+        let mut expected = vec![early, edge];
+        expected.sort();
+        assert_eq!(
+            due, expected,
+            "locked rows are due too; legacy tombstones never"
+        );
+    }
+
+    #[test]
+    fn require_live_entry_refuses_missing_deleted_and_trashed_ids() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let live = make_dated_entry(&conn, &jid, "Live");
+        let deleted = make_dated_entry(&conn, &jid, "Deleted");
+        let trashed = make_dated_entry(&conn, &jid, "Trashed");
+        soft_delete_entry(&conn, &deleted).unwrap();
+        trash_entry(&conn, &trashed, 5_000).unwrap();
+
+        assert_eq!(require_live_entry(&conn, &live).unwrap().id, live);
+        assert!(matches!(
+            require_live_entry(&conn, "missing"),
+            Err(LiveEntryError::NotFound)
+        ));
+        assert!(matches!(
+            require_live_entry(&conn, &deleted),
+            Err(LiveEntryError::Deleted)
+        ));
+        assert!(matches!(
+            require_live_entry(&conn, &trashed),
+            Err(LiveEntryError::Trashed)
+        ));
+    }
+
+    /// The shape an older build leaves behind after a downgrade: its sync
+    /// upsert / import resurrection writes `is_deleted = 0` but never touches
+    /// the (unknown to it) `trashed_at` column.
+    fn make_downgrade_inconsistent_row(conn: &Connection, jid: &str) -> String {
+        let eid = make_dated_entry(conn, jid, "Resurrected by old build");
+        trash_entry(conn, &eid, 5_000).unwrap();
+        conn.execute("UPDATE entries SET is_deleted = 0 WHERE id = ?1", [&eid])
+            .unwrap();
+        assert_eq!(
+            invariant_violations(conn),
+            1,
+            "fixture breaks the invariant"
+        );
+        eid
+    }
+
+    #[test]
+    fn inconsistent_live_row_with_trashed_at_is_treated_as_live() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_downgrade_inconsistent_row(&conn, &jid);
+        let m = make_media(&conn, &eid);
+
+        assert!(
+            list_trashed_entries_with_locked_view(&conn, LockedView::Revealed, None)
+                .unwrap()
+                .is_empty(),
+            "a live row never shows in Trash"
+        );
+        assert!(list_trash_due(&conn, i64::MAX).unwrap().is_empty());
+        assert_eq!(
+            require_live_entry(&conn, &eid).unwrap().id,
+            eid,
+            "live wins: edits are allowed"
+        );
+        assert!(
+            purge_entry_mark(&conn, &eid).is_err(),
+            "purge refuses a live row, so its media cascade never runs"
+        );
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert!(!e.is_deleted);
+        assert!(get_media(&conn, &m.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn list_pending_uploads_still_lists_a_trashed_entrys_media() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Photo");
+        let m = make_media(&conn, &eid);
+        trash_entry(&conn, &eid, 5_000).unwrap();
+
+        let pending = list_pending_uploads(&conn).unwrap();
+        assert!(
+            pending.iter().any(|p| p.id == m.id),
+            "trash keeps media rows; a restore must find them uploaded"
+        );
+    }
+
+    #[test]
+    fn delete_journal_converts_its_trashed_entries_to_purged() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Trashed in journal");
+        trash_entry(&conn, &eid, 5_000).unwrap();
+        mark_entry_synced(&conn, &eid, 1).unwrap();
+
+        delete_journal(&conn, &jid).unwrap();
+
+        let e = get_entry(&conn, &eid).unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert_eq!(e.trashed_at, None, "trashed row becomes a purge tombstone");
+        assert!(
+            e.updated_at > 5_000,
+            "stamp moves forward so the tombstone wins"
+        );
+        assert!(
+            list_pending_entry_ids(&conn).unwrap().contains(&eid),
+            "the converted tombstone is re-pushed"
+        );
+        assert!(
+            list_trashed_entries_with_locked_view(&conn, LockedView::Revealed, None)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn upsert_entry_from_sync_maps_wire_trash_state_to_local_columns() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+
+        // live → trashed (wire: is_deleted=false + trashed_at)
+        upsert_entry_from_sync(&conn, wire_row("w1", &jid, 100, false, None)).unwrap();
+        upsert_entry_from_sync(&conn, wire_row("w1", &jid, 200, false, Some(200))).unwrap();
+        let e = get_entry(&conn, "w1").unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert_eq!(e.trashed_at, Some(200));
+
+        // trashed → live
+        upsert_entry_from_sync(&conn, wire_row("w1", &jid, 300, false, None)).unwrap();
+        let e = get_entry(&conn, "w1").unwrap().unwrap();
+        assert!(!e.is_deleted);
+        assert_eq!(e.trashed_at, None);
+
+        // trashed → purge tombstone (wire: is_deleted=true)
+        upsert_entry_from_sync(&conn, wire_row("w1", &jid, 400, false, Some(400))).unwrap();
+        upsert_entry_from_sync(&conn, wire_row("w1", &jid, 401, true, None)).unwrap();
+        let e = get_entry(&conn, "w1").unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert_eq!(e.trashed_at, None);
+    }
+
+    #[test]
+    fn trash_invariant_holds_across_every_path_that_sets_is_deleted() {
+        let conn = setup();
+        let jid = make_journal(&conn, "J");
+        let eid = make_dated_entry(&conn, &jid, "Invariant");
+
+        trash_entry(&conn, &eid, 5_000).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+        restore_entry(&conn, &eid, 6_000).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+
+        // Sync: live → trashed, trashed → live, and a malformed wire row that
+        // claims both is_deleted and trashed_at.
+        upsert_entry_from_sync(&conn, wire_row(&eid, &jid, 7_000, false, Some(7_000))).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+        upsert_entry_from_sync(&conn, wire_row(&eid, &jid, 8_000, false, None)).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+        upsert_entry_from_sync(&conn, wire_row(&eid, &jid, 9_000, true, Some(9_000))).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+
+        // Import resurrection writes `is_deleted=false, trashed_at=None`
+        // through the same upsert — over a trashed row it must clear the stamp.
+        set_updated_at(&conn, &eid, 9_500);
+        conn.execute(
+            "UPDATE entries SET is_deleted = 1, trashed_at = 9500 WHERE id = ?1",
+            [&eid],
+        )
+        .unwrap();
+        upsert_entry_from_sync(&conn, wire_row(&eid, &jid, 10_000, false, None)).unwrap();
+        assert_eq!(invariant_violations(&conn), 0);
+        assert_eq!(get_entry(&conn, &eid).unwrap().unwrap().trashed_at, None);
     }
 }
 

@@ -351,9 +351,10 @@ pub fn list_sources_for_memory(conn: &Connection, memory_id: &str) -> Result<Vec
 /// 4. Deletes the `memory_jobs` watermark row for `(source_type, source_id)`
 ///    — there is nothing left to re-scan for a deleted source.
 ///
-/// There is no entry/session-restore path in this app, so cascading on
-/// soft-delete is safe: a deleted source can never come back and reclaim its
-/// memory.
+/// Entries are cascaded when they move to Trash (not at purge). Restoring an
+/// entry from Trash does NOT bring its memories back — the user can rescan
+/// it. Chat sessions have no restore path. So a removed source never
+/// silently reclaims a memory item.
 ///
 /// **Sync interaction (I4 — do NOT redesign the sync merge for this).** Phase
 /// 6 sync (`docs/plans/2026-07-29-ai-user-memory/phase-6-sync.md`) union-merges

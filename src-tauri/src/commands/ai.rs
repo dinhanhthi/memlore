@@ -14012,6 +14012,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
             db::queries::Entry {
                 id: "e2".into(),
@@ -14039,6 +14040,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
         ];
         let out = build_multi_entry_summary_prompt(&entries, SummariseMode::Truncate);
@@ -14082,6 +14084,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
             db::queries::Entry {
                 id: "e2".into(),
@@ -14109,6 +14112,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
         ];
         let out = build_multi_entry_summary_prompt(&entries, SummariseMode::Truncate);
@@ -14152,6 +14156,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
             db::queries::Entry {
                 id: "e2".into(),
@@ -14179,6 +14184,7 @@ mod tests {
                 entry_date_user_edited: false,
                 media_count: 0,
                 from_chat: false,
+                trashed_at: None,
             },
         ];
         let out = build_multi_entry_summary_prompt(&entries, SummariseMode::Truncate);
@@ -15223,6 +15229,7 @@ mod tests {
             entry_date_user_edited: false,
             media_count: 0,
             from_chat: false,
+            trashed_at: None,
         }
     }
 

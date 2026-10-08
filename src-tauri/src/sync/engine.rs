@@ -4761,7 +4761,7 @@ impl SyncEngine {
                     // unchanged, so normal LWW convergence is unaffected.
                     let safe_ts = (*tombstone_ts).min(now_unix() + MAX_CLOCK_SKEW_SECS);
                     match tx.execute(
-                        "UPDATE entries SET is_deleted = 1, updated_at = ?1 \
+                        "UPDATE entries SET is_deleted = 1, trashed_at = NULL, updated_at = ?1 \
                          WHERE id = ?2 AND updated_at < ?1",
                         rusqlite::params![safe_ts, entry_id],
                     ) {
@@ -5585,6 +5585,9 @@ impl SyncEngine {
         };
 
         // LWW merge for non-Yjs fields when a local row exists.
+        // `Some` only when the local row is in Trash AND wins LWW: the
+        // write-back must keep it in Trash, not turn it into a purge.
+        let mut local_trashed_at: Option<i64> = None;
         let merged_meta = if let Some(ref local) = existing {
             // Snapshot the local entry's tag set so the LWW winner's
             // tag_ids field reflects whichever side is authoritative.
@@ -5622,7 +5625,12 @@ impl SyncEngine {
                 deleted_media: vec![],
                 trashed_at: None,
             };
-            merge_metadata_lww(&local_meta, &remote_meta)
+            let merged = merge_metadata_lww(&local_meta, &remote_meta);
+            // LWW returns the local side verbatim when it wins.
+            if merged == local_meta {
+                local_trashed_at = local.trashed_at;
+            }
+            merged
         } else {
             remote_meta.clone()
         };
@@ -5652,7 +5660,9 @@ impl SyncEngine {
                 weather_icon: merged_meta.weather_icon.as_deref(),
                 emotion: merged_meta.emotion.as_deref(),
                 is_favorite: merged_meta.is_favorite,
-                is_deleted: merged_meta.is_deleted,
+                // Wire form (see `SyncEntryRow::trashed_at`): a kept local
+                // trash is `is_deleted = false` + `trashed_at`.
+                is_deleted: merged_meta.is_deleted && local_trashed_at.is_none(),
                 is_locked,
                 is_invisible,
                 vault_id: vault_id.as_deref(),
@@ -5660,6 +5670,10 @@ impl SyncEngine {
                 cover_media_id: merged_meta.cover_media_id.as_deref(),
                 entry_date_user_edited: merged_meta.entry_date_user_edited,
                 content_language: merged_meta.content_language.as_deref(),
+                // Phase 10 carries a remote winner's `trashed_at` here once
+                // the wire mapping lands; until then only a winning local
+                // trash is preserved.
+                trashed_at: local_trashed_at,
             },
         )
         .map_err(sync_io)?;
@@ -6047,7 +6061,12 @@ fn build_local_manifest(
 /// redundantly re-pull it (and re-count it in `PullStats.pulled`).
 fn build_local_diff_view(conn: &Connection, device_id: &str) -> rusqlite::Result<DeviceMetadata> {
     let mut stmt = conn.prepare(
-        "SELECT e.id, e.updated_at, COALESCE(s.local_version, 0), e.is_deleted
+        // A trashed row counts as not deleted here (its wire form), so a
+        // newer peer tombstone still lands in `to_delete_locally` and takes
+        // it out of Trash. Diff input only; the published manifest is
+        // unchanged.
+        "SELECT e.id, e.updated_at, COALESCE(s.local_version, 0),
+                e.is_deleted = 1 AND e.trashed_at IS NULL
          FROM entries e
          LEFT JOIN sync_state s ON s.entry_id = e.id",
     )?;
@@ -13919,6 +13938,99 @@ mod tests {
         assert_eq!(sync_status, "pending");
     }
 
+    /// Ingest an older remote payload over a local deleted row (`trashed_at`
+    /// = `local_trashed_at`) and return the row's `(is_deleted, trashed_at)`.
+    fn ingest_older_remote_over_local_deleted_row(
+        local_trashed_at: Option<i64>,
+    ) -> (bool, Option<i64>) {
+        let key = test_key();
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-b");
+        let journal_id = default_journal(&conn);
+        let local_updated = now_unix();
+        let entry = db::create_entry(
+            &conn,
+            crate::db::CreateEntryParams {
+                journal_id: &journal_id,
+                title: Some("local"),
+                content_text: Some("body"),
+                preview_text: None,
+                entry_date: local_updated,
+            },
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE entries SET is_deleted = 1, trashed_at = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![local_trashed_at, local_updated, entry.id],
+        )
+        .unwrap();
+
+        let remote_meta = EntryMetadata {
+            entry_id: entry.id.clone(),
+            device_id: "dev-a".to_string(),
+            updated_at: local_updated.saturating_sub(60),
+            entry_date: local_updated,
+            created_at: local_updated,
+            journal_id: journal_id.clone(),
+            journal_name: Some("Synced".to_string()),
+            journal_color: None,
+            journal_updated_at: Some(local_updated),
+            title: Some("remote-older".to_string()),
+            preview_text: Some("body".to_string()),
+            content_text: Some("body".to_string()),
+            location_label: None,
+            location_address: None,
+            weather_summary: None,
+            weather_icon: None,
+            latitude: None,
+            longitude: None,
+            emotion: None,
+            is_favorite: false,
+            is_deleted: false,
+            is_locked: false,
+            is_invisible: false,
+            vault_id: None,
+            cover_media_id: None,
+            entry_date_user_edited: false,
+            content_language: None,
+            tag_ids: vec![],
+            media: vec![],
+            deleted_media: vec![],
+            trashed_at: None,
+        };
+        let ks = engine.make_key_state(&key);
+        let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
+        let metadata_ciphertext =
+            encrypt_data_with_state(&serde_json::to_vec(&remote_meta).unwrap(), &ks).unwrap();
+        let yjs_blob_ciphertext = encrypt_data_with_state(&make_yjs_blob("body"), &ks).unwrap();
+        let payload = SyncEntryPayload::new(fp, yjs_blob_ciphertext, metadata_ciphertext);
+
+        engine
+            .ingest_entry(&conn, &key_state_from_key(&key), &entry.id, &payload)
+            .unwrap();
+
+        let after = db::get_entry_raw(&conn, &entry.id).unwrap().unwrap();
+        (after.is_deleted, after.trashed_at)
+    }
+
+    #[test]
+    fn ingest_entry_keeps_a_newer_local_trash_in_trash() {
+        assert_eq!(
+            ingest_older_remote_over_local_deleted_row(Some(1_234)),
+            (true, Some(1_234)),
+            "a merge write-back must not turn a local trash into a purge"
+        );
+    }
+
+    #[test]
+    fn ingest_entry_keeps_a_newer_local_purge_tombstone_purged() {
+        assert_eq!(
+            ingest_older_remote_over_local_deleted_row(None),
+            (true, None)
+        );
+    }
+
     #[test]
     fn ingest_entry_media_tombstone_i64_max_does_not_delete_local_row() {
         let key = test_key();
@@ -19746,6 +19858,73 @@ mod tests {
             updated_at, t_tombstone,
             "entries.updated_at must be set to the tombstone's updated_at, not now_unix()"
         );
+    }
+
+    /// A peer tombstone newer than a locally trashed row purges it: the row
+    /// must leave Trash (`trashed_at = NULL`), not linger there as a
+    /// restorable entry the rest of the mesh already deleted.
+    #[tokio::test]
+    async fn peer_tombstone_takes_a_locally_trashed_entry_out_of_trash() {
+        let t_trashed: i64 = 1_000_000;
+        let t_tombstone: i64 = 2_000_000;
+
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+
+        let conn_r = fresh_db();
+        let journal_r = default_journal(&conn_r);
+        let entry_id = uuid::Uuid::new_v4().to_string();
+        conn_r
+            .execute(
+                "INSERT INTO entries (id, journal_id, title, preview_text, content_text,
+                    entry_date, created_at, updated_at, is_favorite, is_deleted, yjs_doc,
+                    trashed_at)
+                 VALUES (?1, ?2, 't', 'p', 'content', ?3, ?3, ?3, 0, 1, NULL, ?3)",
+                rusqlite::params![&entry_id, &journal_r, t_trashed],
+            )
+            .unwrap();
+
+        let manifest_peer = DeviceMetadata {
+            device_id: "dev-peer".to_string(),
+            recovery_generation: 0,
+            entries: vec![super::super::metadata::SyncedEntrySummary {
+                entry_id: entry_id.clone(),
+                updated_at: t_tombstone,
+                local_version: 1,
+                is_deleted: true,
+                trashed_at: None,
+            }],
+            journals: vec![],
+            chats_present: false,
+            memory_present: false,
+            generated_at: t_tombstone,
+            index_present: false,
+            outbox_versions: None,
+        };
+        let peer_dir = dir.path().join("dev-peer");
+        std::fs::create_dir_all(&peer_dir).unwrap();
+        std::fs::write(
+            peer_dir.join("metadata.json"),
+            serde_json::to_vec(&manifest_peer).unwrap(),
+        )
+        .unwrap();
+
+        let engine_r = make_engine(&dir, "dev-receiver");
+        engine_r
+            .pull_remote(&conn_r, &key, &key_state_from_key(&key))
+            .await
+            .unwrap();
+
+        let (is_deleted, trashed_at, updated_at): (i64, Option<i64>, i64) = conn_r
+            .query_row(
+                "SELECT is_deleted, trashed_at, updated_at FROM entries WHERE id = ?1",
+                [&entry_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(is_deleted, 1);
+        assert_eq!(trashed_at, None, "a peer-purged entry must leave Trash");
+        assert_eq!(updated_at, t_tombstone);
     }
 
     /// C2 fix: a peer-applied entry tombstone must cascade the AI User

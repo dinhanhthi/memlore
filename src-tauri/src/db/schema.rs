@@ -98,6 +98,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             -- chat-origin indicator without a per-card back-ref lookup.
             -- Local-only UX flag; not synced.
             from_chat        INTEGER NOT NULL DEFAULT 0,
+            -- Trash (v0.3.0): unix seconds when the user moved this entry to
+            -- Trash. Non-NULL only together with is_deleted = 1 (a trashed
+            -- row is hidden by every existing is_deleted = 0 filter); a purged
+            -- or legacy tombstone has is_deleted = 1 and trashed_at NULL.
+            -- Older DBs gain it in `add_trashed_at_column_if_missing`.
+            trashed_at       INTEGER,
             -- Accent-folded mirrors of `title` / `content_text` used *only* as
             -- the FTS5 index source. The `unicode61 remove_diacritics 2`
             -- tokenizer folds every Vietnamese tone/vowel diacritic at tokenize
@@ -1681,6 +1687,11 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     // `auto_tag_id` drop pattern above.
     let _ = conn.execute_batch("ALTER TABLE journals DROP COLUMN icon;");
 
+    // ── Trash (2026-10-07) ────────────────────────────────────────────────
+    // Additive: nullable `entries.trashed_at` + a partial index for the Trash
+    // list and the 30-day purge. Runs after `entries` is guaranteed to exist.
+    add_trashed_at_column_if_missing(conn)?;
+
     // ── Web companion outbox imports (2026-10-02) ─────────────────────────
     // Additive local-only table for recording imported web outbox intents,
     // their decide-once outcomes, and crash markers. Never synced.
@@ -1851,6 +1862,36 @@ fn add_from_chat_column_if_missing(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Add `entries.trashed_at` (unix seconds, NULL = not in Trash) to a database
+/// from v0.2.x or earlier, plus the partial index the Trash list and the
+/// purge sweep read. Detect-and-add via `pragma_table_info`, so it is a no-op
+/// on a fresh DB (column defined inline in `CREATE TABLE`) and on every later
+/// launch. Existing rows keep `trashed_at = NULL`: a legacy `is_deleted = 1`
+/// row is a permanent tombstone, never an item in Trash.
+///
+/// Also heals, on every launch, a live row carrying a stale `trashed_at`:
+/// after a downgrade, an older build's sync upsert or import resurrection
+/// writes `is_deleted = 0` without knowing the column. Live wins (it was the
+/// old build's last write, and the wire already says live), so only the
+/// local-only column is cleared — no pending mark, no `updated_at` bump.
+fn add_trashed_at_column_if_missing(conn: &Connection) -> Result<()> {
+    let has_trashed_at: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('entries') WHERE name='trashed_at'",
+        [],
+        |r| r.get(0),
+    )?;
+    if has_trashed_at == 0 {
+        conn.execute_batch("ALTER TABLE entries ADD COLUMN trashed_at INTEGER;")?;
+    }
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_entries_trashed_at \
+         ON entries(trashed_at) WHERE trashed_at IS NOT NULL;
+         UPDATE entries SET trashed_at = NULL \
+         WHERE is_deleted = 0 AND trashed_at IS NOT NULL;",
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1979,6 +2020,154 @@ mod tests {
         // Re-running the helper must not error (idempotent guard probes
         // pragma_table_info before ALTERing).
         add_from_chat_column_if_missing(&conn).unwrap();
+    }
+
+    #[test]
+    fn migrate_adds_trashed_at_to_v0_2_db_and_keeps_every_row() {
+        // The v0.2.x shape is today's schema minus `trashed_at` and its
+        // index (no other column changed in this release). Build it exactly:
+        // run the current migration, then strip the Trash additions.
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute_batch(
+            "DROP INDEX idx_entries_trashed_at;
+             ALTER TABLE entries DROP COLUMN trashed_at;",
+        )
+        .unwrap();
+        let has_col: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('entries') WHERE name='trashed_at'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(has_col, 0, "fixture is the pre-Trash shape");
+        // Live rows, a legacy tombstone (`is_deleted = 1`, the pre-Trash
+        // meaning of "gone for good") and media on both.
+        conn.execute_batch(
+            "INSERT INTO journals (id, name, created_at, updated_at) VALUES ('j1', 'J', 1, 1);
+             INSERT INTO entries (id, journal_id, title, content_text, entry_date, created_at, updated_at, is_deleted)
+                VALUES ('live1', 'j1', 'Live one', 'body one', 10, 10, 100, 0),
+                       ('live2', 'j1', 'Live two', 'body two', 20, 20, 200, 0),
+                       ('gone1', 'j1', 'Gone', 'old body', 30, 30, 300, 1);
+             INSERT INTO media (id, entry_id, file_name, file_type, storage_provider, storage_path, created_at)
+                VALUES ('m1', 'live1', 'a.jpg', 'image/jpeg', 'local', '/p/a.jpg', 10),
+                       ('m2', 'gone1', 'b.jpg', 'image/jpeg', 'local', '/p/b.jpg', 30);",
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+
+        let rows: Vec<(String, String, i64, i64, Option<i64>)> = conn
+            .prepare(
+                "SELECT id, title, updated_at, is_deleted, trashed_at FROM entries ORDER BY id",
+            )
+            .unwrap()
+            .query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                ("gone1".into(), "Gone".into(), 300, 1, None),
+                ("live1".into(), "Live one".into(), 100, 0, None),
+                ("live2".into(), "Live two".into(), 200, 0, None),
+            ],
+            "every row survives untouched with trashed_at NULL"
+        );
+        let media: Vec<String> = conn
+            .prepare("SELECT id FROM media ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(media, vec!["m1".to_string(), "m2".to_string()]);
+        // A legacy tombstone is a purged entry, never a trashed one.
+        assert!(crate::db::queries::list_trashed_entries_with_locked_view(
+            &conn,
+            crate::db::queries::LockedView::Revealed,
+            None
+        )
+        .unwrap()
+        .is_empty());
+        assert!(crate::db::queries::list_trash_due(&conn, i64::MAX)
+            .unwrap()
+            .is_empty());
+        let has_index: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_entries_trashed_at'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(has_index, 1, "partial trash index created");
+
+        // Second run is a no-op: no error, same column count, rows intact.
+        let cols_before: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('entries')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        migrate(&conn).unwrap();
+        let cols_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('entries')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cols_before, cols_after);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM entries", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn migrate_heals_a_live_row_left_with_trashed_at_by_a_downgrade() {
+        // An older build's sync upsert / import resurrection sets
+        // `is_deleted = 0` but leaves the unknown `trashed_at` column alone.
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO journals (id, name, created_at, updated_at) VALUES ('j1', 'J', 1, 1);
+             INSERT INTO entries (id, journal_id, title, entry_date, created_at, updated_at, is_deleted, trashed_at)
+                VALUES ('bad',   'j1', 'Resurrected', 10, 10, 100, 0, 500),
+                       ('live',  'j1', 'Live',        20, 20, 200, 0, NULL),
+                       ('trash', 'j1', 'Trashed',     30, 30, 300, 1, 600),
+                       ('gone',  'j1', 'Purged',      40, 40, 400, 1, NULL);",
+        )
+        .unwrap();
+        let read = |conn: &Connection| -> Vec<(String, i64, i64, Option<i64>)> {
+            conn.prepare("SELECT id, updated_at, is_deleted, trashed_at FROM entries ORDER BY id")
+                .unwrap()
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap()
+        };
+        let expected = vec![
+            ("bad".to_string(), 100, 0, None),
+            ("gone".to_string(), 400, 1, None),
+            ("live".to_string(), 200, 0, None),
+            ("trash".to_string(), 300, 1, Some(600)),
+        ];
+
+        migrate(&conn).unwrap();
+        assert_eq!(
+            read(&conn),
+            expected,
+            "live wins, updated_at untouched; trashed and purged rows unchanged"
+        );
+
+        migrate(&conn).unwrap();
+        assert_eq!(read(&conn), expected, "idempotent");
     }
 
     #[test]

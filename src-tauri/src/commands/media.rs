@@ -189,6 +189,8 @@ pub(crate) fn save_media_to_media_dir(
     extension: &str,
     insertion_mode: &str,
 ) -> Result<PickImageResult, String> {
+    // Refuse before compressing or writing anything: a trashed entry is read-only.
+    crate::db::require_live_entry(conn, entry_id).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(media_dir).map_err(|e| e.to_string())?;
 
     let ext_input = extension.to_lowercase();
@@ -1140,6 +1142,8 @@ fn save_attached_file_to_media_dir(
             "extension '{ext}' is a media type; use the image/video/audio picker instead"
         ));
     }
+
+    crate::db::require_live_entry(conn, entry_id).map_err(|e| e.to_string())?;
 
     let media_uuid = uuid::Uuid::new_v4().to_string();
     let dest_name = if ext.is_empty() {
@@ -2383,6 +2387,7 @@ pub(crate) fn delete_media_inner(conn: &Connection, media_id: &str) -> Result<()
     let storage_path = media.storage_path.clone();
     let thumbnail_path = media.thumbnail_path.clone();
     let entry_id = media.entry_id.clone();
+    crate::db::require_live_entry(conn, &entry_id).map_err(|e| e.to_string())?;
     let deleted_at = crate::utils::time::now_unix();
 
     // POINT OF NO RETURN (T38): persist the tombstone before dropping the
@@ -2466,7 +2471,20 @@ pub fn update_media_insertion_mode(
     // Security: require journal to be unlocked before mutating media.
     // Consistent with delete_media, resolve_media, get_media_status, read_media_bytes.
     require_media_unlocked(&conn, &key_state)?;
-    crate::db::update_media_insertion_mode_db(&conn, &media_id, &mode).map_err(|e| e.to_string())
+    update_media_insertion_mode_impl(&conn, &media_id, &mode)
+}
+
+/// Inner (testable) implementation for `update_media_insertion_mode`.
+pub(crate) fn update_media_insertion_mode_impl(
+    conn: &Connection,
+    media_id: &str,
+    mode: &str,
+) -> Result<(), String> {
+    let media = crate::db::get_media(conn, media_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Media not found: {media_id}"))?;
+    crate::db::require_live_entry(conn, &media.entry_id).map_err(|e| e.to_string())?;
+    crate::db::update_media_insertion_mode_db(conn, media_id, mode).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -4599,14 +4617,15 @@ mod tests {
 
     #[test]
     fn save_attached_file_removes_orphan_when_db_insert_fails() {
-        // Use a non-existent entry_id so the media FK constraint fires.
-        // The helper must clean up the on-disk file it just wrote so the
-        // media dir doesn't accumulate untracked bytes.
-        let conn = setup_db();
+        // Drop the media table so the insert fails AFTER the live-entry
+        // guard and the file write. The helper must clean up the on-disk
+        // file it just wrote so the media dir doesn't accumulate untracked
+        // bytes.
+        let (conn, eid) = setup_with_entry();
+        conn.execute_batch("DROP TABLE media;").unwrap();
         let dir = TempDir::new().unwrap();
-        let result =
-            save_attached_file_to_media_dir(&conn, dir.path(), "no-such-entry", "report.pdf", b"x");
-        assert!(result.is_err(), "expected FK-constraint failure");
+        let result = save_attached_file_to_media_dir(&conn, dir.path(), &eid, "report.pdf", b"x");
+        assert!(result.is_err(), "expected DB-insert failure");
         // Nothing should be left under the media dir.
         let leftover: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
         assert!(
@@ -5147,5 +5166,110 @@ mod tests {
             "orphaned media file must be removed on DB-insert failure, but found: {:?}",
             leftover.iter().map(|e| e.path()).collect::<Vec<_>>()
         );
+    }
+
+    // ── Phase 9: Trash guard ─────────────────────────────────────────────
+
+    fn trashed_msg() -> String {
+        crate::db::LiveEntryError::Trashed.to_string()
+    }
+
+    fn insert_media_row(conn: &Connection, eid: &str) -> crate::db::Media {
+        crate::db::create_media(
+            conn,
+            crate::db::CreateMediaParams {
+                entry_id: eid,
+                file_name: "img.png",
+                file_type: "image/png",
+                storage_path: "/nonexistent/img.png",
+                file_size: None,
+                sort_order: 0,
+                insertion_mode: "inline",
+                width: None,
+                height: None,
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn save_media_refuses_trashed_entry_and_writes_nothing() {
+        let (conn, eid) = setup_with_entry();
+        crate::db::trash_entry(&conn, &eid, 1_700_000_000).unwrap();
+        let dir = TempDir::new().unwrap();
+
+        let err = save_media_to_media_dir(&conn, dir.path(), &eid, b"bytes", "png", "inline")
+            .unwrap_err();
+
+        assert_eq!(err, trashed_msg());
+        assert!(crate::db::get_media_for_entry(&conn, &eid)
+            .unwrap()
+            .is_empty());
+        assert!(std::fs::read_dir(dir.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn save_attached_file_refuses_trashed_entry_and_writes_nothing() {
+        let (conn, eid) = setup_with_entry();
+        crate::db::trash_entry(&conn, &eid, 1_700_000_000).unwrap();
+        let dir = TempDir::new().unwrap();
+
+        let err = save_attached_file_to_media_dir(&conn, dir.path(), &eid, "report.pdf", b"x")
+            .unwrap_err();
+
+        assert_eq!(err, trashed_msg());
+        assert!(crate::db::get_media_for_entry(&conn, &eid)
+            .unwrap()
+            .is_empty());
+        assert!(std::fs::read_dir(dir.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn delete_media_refuses_trashed_entry_and_keeps_the_row() {
+        let (conn, eid) = setup_with_entry();
+        let media = insert_media_row(&conn, &eid);
+        crate::db::trash_entry(&conn, &eid, 1_700_000_000).unwrap();
+
+        let err = delete_media_inner(&conn, &media.id).unwrap_err();
+
+        assert_eq!(err, trashed_msg());
+        assert!(crate::db::get_media(&conn, &media.id).unwrap().is_some());
+        assert!(crate::db::list_media_tombstones_for_entry(&conn, &eid)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn update_media_insertion_mode_impl_updates_live_entry_media() {
+        let (conn, eid) = setup_with_entry();
+        let media = insert_media_row(&conn, &eid);
+
+        update_media_insertion_mode_impl(&conn, &media.id, "attached").unwrap();
+
+        let updated = crate::db::get_media(&conn, &media.id).unwrap().unwrap();
+        assert_eq!(updated.insertion_mode, "attached");
+    }
+
+    #[test]
+    fn update_media_insertion_mode_impl_refuses_trashed_entry() {
+        let (conn, eid) = setup_with_entry();
+        let media = insert_media_row(&conn, &eid);
+        crate::db::trash_entry(&conn, &eid, 1_700_000_000).unwrap();
+
+        let err = update_media_insertion_mode_impl(&conn, &media.id, "attached").unwrap_err();
+
+        assert_eq!(err, trashed_msg());
+        let unchanged = crate::db::get_media(&conn, &media.id).unwrap().unwrap();
+        assert_eq!(unchanged.insertion_mode, "inline");
+    }
+
+    #[test]
+    fn update_media_insertion_mode_impl_errors_for_missing_media() {
+        let conn = setup_db();
+        let err = update_media_insertion_mode_impl(&conn, "no-such-media", "attached").unwrap_err();
+        assert!(err.contains("Media not found"), "got: {err}");
     }
 }

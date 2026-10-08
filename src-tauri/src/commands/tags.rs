@@ -111,6 +111,7 @@ pub(crate) fn add_tag_to_entry_impl(
     tag_id: &str,
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
     db::add_tag_to_entry(&tx, entry_id, tag_id).map_err(|e| e.to_string())?;
     db::touch_entry_updated_at(&tx, entry_id).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, entry_id).map_err(|e| e.to_string())?;
@@ -125,6 +126,7 @@ pub(crate) fn remove_tag_from_entry_impl(
     tag_id: &str,
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
     db::remove_tag_from_entry(&tx, entry_id, tag_id).map_err(|e| e.to_string())?;
     db::touch_entry_updated_at(&tx, entry_id).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, entry_id).map_err(|e| e.to_string())?;
@@ -788,5 +790,53 @@ mod tests {
             updated_at > 1,
             "updated_at must be bumped after add_tag_to_entry (got {updated_at})"
         );
+    }
+
+    // ── Phase 9: Trash guard ─────────────────────────────────────────────
+
+    fn tag_ids_for(conn: &Connection, entry_id: &str) -> Vec<String> {
+        db::get_tags_for_entry(conn, entry_id)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.id)
+            .collect()
+    }
+
+    #[test]
+    fn add_and_remove_tag_work_on_a_live_entry() {
+        let state = make_state();
+        let jid = make_journal(&state, "J");
+        let eid = make_entry(&state, &jid, "Live");
+        let conn = state.lock().unwrap();
+        let tag = db::create_tag(&conn, "t", None).unwrap();
+
+        super::add_tag_to_entry_impl(&conn, &eid, &tag.id).unwrap();
+        assert_eq!(tag_ids_for(&conn, &eid), vec![tag.id.clone()]);
+
+        super::remove_tag_from_entry_impl(&conn, &eid, &tag.id).unwrap();
+        assert!(tag_ids_for(&conn, &eid).is_empty());
+    }
+
+    #[test]
+    fn add_and_remove_tag_refuse_a_trashed_entry() {
+        let state = make_state();
+        let jid = make_journal(&state, "J");
+        let eid = make_entry(&state, &jid, "Trashed");
+        let conn = state.lock().unwrap();
+        let kept = db::create_tag(&conn, "kept", None).unwrap();
+        let other = db::create_tag(&conn, "other", None).unwrap();
+        super::add_tag_to_entry_impl(&conn, &eid, &kept.id).unwrap();
+        db::trash_entry(&conn, &eid, 1_700_000_000).unwrap();
+        let trashed = db::LiveEntryError::Trashed.to_string();
+
+        assert_eq!(
+            super::add_tag_to_entry_impl(&conn, &eid, &other.id).unwrap_err(),
+            trashed
+        );
+        assert_eq!(
+            super::remove_tag_from_entry_impl(&conn, &eid, &kept.id).unwrap_err(),
+            trashed
+        );
+        assert_eq!(tag_ids_for(&conn, &eid), vec![kept.id]);
     }
 }

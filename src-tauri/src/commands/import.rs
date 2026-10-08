@@ -403,6 +403,8 @@ fn build_dedup_map(conn: &rusqlite::Connection) -> Result<DedupMap, String> {
     // Include soft-deleted entries so a re-imported previously-deleted entry
     // resurrects the existing row (via LWW upsert) rather than creating a
     // ghost twin and leaving the soft-deleted original forever.
+    // Trashed entries are `is_deleted = 1` too, so they resurrect the same
+    // way; `write_entry_row` clears their `trashed_at`.
     let rows = db::list_all_entries_including_deleted(conn).map_err(|e| e.to_string())?;
     let mut map = DedupMap::new();
     for e in rows {
@@ -1111,6 +1113,10 @@ fn write_entry_row(
             cover_media_id: None,
             entry_date_user_edited: false,
             content_language: None,
+            // Live on the wire → `upsert_entry_from_sync` writes
+            // `is_deleted = 0, trashed_at = NULL`, so resurrecting a trashed
+            // row through the dedup path also takes it out of Trash.
+            trashed_at: None,
         },
     )
     .map_err(|e| format!("upsert entry: {e}"))
@@ -4834,60 +4840,70 @@ mod tests {
 
     #[test]
     fn merge_resurrects_soft_deleted_row_rather_than_creating_ghost() {
-        let src = make_state();
-        let sks = make_key_state();
-        seed_entry(&src, &sks, "resurrect", "body", 1_700_000_000);
-        {
-            let conn = src.lock().unwrap();
-            conn.execute("UPDATE entries SET updated_at = 9_000_000_000", [])
-                .unwrap();
-        }
+        // A legacy tombstone and a trashed entry (`is_deleted = 1` +
+        // `trashed_at`) both resurrect; the trashed one must leave Trash.
+        for trashed in [false, true] {
+            let src = make_state();
+            let sks = make_key_state();
+            seed_entry(&src, &sks, "resurrect", "body", 1_700_000_000);
+            {
+                let conn = src.lock().unwrap();
+                conn.execute("UPDATE entries SET updated_at = 9_000_000_000", [])
+                    .unwrap();
+            }
 
-        let tmp = tempfile::tempdir().unwrap();
-        let zip_path = tmp.path().join("resurrect.memlore.zip");
-        export_data_inner(
-            None,
-            &src,
-            &sks,
-            zip_path.to_string_lossy().to_string(),
-            ExportFormat::MemloreJson,
-            ExportScope::All,
-        )
-        .unwrap();
+            let tmp = tempfile::tempdir().unwrap();
+            let zip_path = tmp.path().join("resurrect.memlore.zip");
+            export_data_inner(
+                None,
+                &src,
+                &sks,
+                zip_path.to_string_lossy().to_string(),
+                ExportFormat::MemloreJson,
+                ExportScope::All,
+            )
+            .unwrap();
 
-        // Dst: seed the same (date, body), then soft-delete it.
-        let dst = make_state();
-        let dks = make_key_state();
-        seed_entry(&dst, &dks, "kept-locally", "body", 1_700_000_000);
-        let deleted_id = {
+            // Dst: seed the same (date, body), then soft-delete or trash it.
+            let dst = make_state();
+            let dks = make_key_state();
+            seed_entry(&dst, &dks, "kept-locally", "body", 1_700_000_000);
+            let deleted_id = {
+                let conn = dst.lock().unwrap();
+                let id = db::list_all_entries(&conn).unwrap()[0].id.clone();
+                if trashed {
+                    db::trash_entry(&conn, &id, 1_800_000_000).unwrap();
+                } else {
+                    db::soft_delete_entry(&conn, &id).unwrap();
+                }
+                id
+            };
+            // Now `list_all_entries` should return nothing.
+            {
+                let conn = dst.lock().unwrap();
+                assert_eq!(db::list_all_entries(&conn).unwrap().len(), 0);
+            }
+
+            let summary = import_data_inner(
+                None,
+                &dst,
+                &dks,
+                zip_path.to_string_lossy().to_string(),
+                ImportFormat::MemloreZip,
+                ImportMode::MergeNewer,
+                None,
+            )
+            .unwrap();
+            assert_eq!(summary.imported, 1, "trashed={trashed}");
+
+            // The deleted row was resurrected — same id, is_deleted=0, and
+            // never live with a leftover trash stamp.
             let conn = dst.lock().unwrap();
-            let id = db::list_all_entries(&conn).unwrap()[0].id.clone();
-            db::soft_delete_entry(&conn, &id).unwrap();
-            id
-        };
-        // Now `list_all_entries` should return nothing.
-        {
-            let conn = dst.lock().unwrap();
-            assert_eq!(db::list_all_entries(&conn).unwrap().len(), 0);
+            let rows = db::list_all_entries(&conn).unwrap();
+            assert_eq!(rows.len(), 1, "only the resurrected row exists");
+            assert_eq!(rows[0].id, deleted_id, "same row id, not a ghost twin");
+            assert_eq!(rows[0].trashed_at, None, "trashed={trashed}");
         }
-
-        let summary = import_data_inner(
-            None,
-            &dst,
-            &dks,
-            zip_path.to_string_lossy().to_string(),
-            ImportFormat::MemloreZip,
-            ImportMode::MergeNewer,
-            None,
-        )
-        .unwrap();
-        assert_eq!(summary.imported, 1);
-
-        // The soft-deleted row was resurrected — same id, is_deleted=0.
-        let conn = dst.lock().unwrap();
-        let rows = db::list_all_entries(&conn).unwrap();
-        assert_eq!(rows.len(), 1, "only the resurrected row exists");
-        assert_eq!(rows[0].id, deleted_id, "same row id, not a ghost twin");
     }
 
     #[test]

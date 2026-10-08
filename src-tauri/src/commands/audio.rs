@@ -24,7 +24,7 @@
 //! | `save_audio_memo` | async | Reads WAV bytes, calls `save_media_to_media_dir`, inserts DB row |
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{Manager, State};
 
@@ -548,23 +548,33 @@ pub async fn save_audio_memo(
     // Tauri requires the async command future to be Send.
     let result = {
         let conn = state.lock()?;
-        let media =
-            save_media_to_media_dir(&conn, &media_dir, &entry_id, &bytes, "wav", "attached")?;
-        // Persist the recording duration so the UI can display "1:23 voice memo" labels.
-        if duration_seconds > 0.0 {
-            if let Err(e) =
-                crate::db::update_media_duration(&conn, &media.media_id, duration_seconds)
-            {
-                log::warn!("update_media_duration for {}: {e}", media.media_id);
-            }
-        }
-        media
+        save_audio_memo_impl(&conn, &media_dir, &entry_id, &bytes, duration_seconds)?
     };
 
     // Best-effort cleanup of the temp file — non-fatal if it fails.
     let _ = tokio::fs::remove_file(&path).await;
 
     Ok(result)
+}
+
+/// Synchronous (testable) DB + file half of `save_audio_memo`: stores the
+/// WAV as an attached media row on `entry_id` and records its duration.
+/// `save_media_to_media_dir` refuses an entry that is not live (Trash).
+pub(crate) fn save_audio_memo_impl(
+    conn: &rusqlite::Connection,
+    media_dir: &Path,
+    entry_id: &str,
+    bytes: &[u8],
+    duration_seconds: f64,
+) -> Result<PickImageResult, String> {
+    let media = save_media_to_media_dir(conn, media_dir, entry_id, bytes, "wav", "attached")?;
+    // Persist the recording duration so the UI can display "1:23 voice memo" labels.
+    if duration_seconds > 0.0 {
+        if let Err(e) = crate::db::update_media_duration(conn, &media.media_id, duration_seconds) {
+            log::warn!("update_media_duration for {}: {e}", media.media_id);
+        }
+    }
+    Ok(media)
 }
 
 /// Sample the most recent audio levels so the frontend can draw a live
@@ -862,5 +872,70 @@ mod tests {
         let _ = std::fs::remove_file(&link);
         assert!(result.is_err(), "symlink inside temp dir must be rejected");
         assert!(result.unwrap_err().contains("symlink"));
+    }
+
+    // ── Phase 9: Trash guard ─────────────────────────────────────────────
+
+    fn tiny_wav() -> Vec<u8> {
+        let mut wav_bytes: Vec<u8> = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut wav_bytes);
+            let spec = hound::WavSpec {
+                channels: 1,
+                sample_rate: 22050,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::new(cursor, spec).expect("hound writer");
+            writer.write_sample(0i16).unwrap();
+            writer.finalize().unwrap();
+        }
+        wav_bytes
+    }
+
+    fn make_entry(conn: &rusqlite::Connection) -> String {
+        let journal_id = db::create_journal(conn, "Audio", None).unwrap().id;
+        db::create_entry(
+            conn,
+            db::CreateEntryParams {
+                journal_id: &journal_id,
+                title: None,
+                content_text: None,
+                preview_text: None,
+                entry_date: 1_000_000,
+            },
+        )
+        .unwrap()
+        .id
+    }
+
+    #[test]
+    fn save_audio_memo_impl_saves_memo_with_duration_on_live_entry() {
+        let conn = setup_db();
+        let dir = TempDir::new().unwrap();
+        let entry_id = make_entry(&conn);
+
+        let result = save_audio_memo_impl(&conn, dir.path(), &entry_id, &tiny_wav(), 83.0)
+            .expect("live entry accepts an audio memo");
+
+        let media = db::get_media(&conn, &result.media_id).unwrap().unwrap();
+        assert_eq!(media.entry_id, entry_id);
+        assert_eq!(media.duration_seconds, Some(83.0));
+    }
+
+    #[test]
+    fn save_audio_memo_impl_refuses_trashed_entry_and_writes_nothing() {
+        let conn = setup_db();
+        let dir = TempDir::new().unwrap();
+        let entry_id = make_entry(&conn);
+        db::trash_entry(&conn, &entry_id, 1_700_000_000).unwrap();
+
+        let err = save_audio_memo_impl(&conn, dir.path(), &entry_id, &tiny_wav(), 5.0).unwrap_err();
+
+        assert_eq!(err, db::LiveEntryError::Trashed.to_string());
+        assert!(db::get_media_for_entry(&conn, &entry_id)
+            .unwrap()
+            .is_empty());
+        assert!(std::fs::read_dir(dir.path()).unwrap().next().is_none());
     }
 }

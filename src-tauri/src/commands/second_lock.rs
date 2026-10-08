@@ -85,6 +85,7 @@ pub(crate) fn set_entry_locked_impl(
 ) -> Result<(), String> {
     require_second_lock_enabled(conn)?;
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
     db::set_entry_locked(&tx, entry_id, locked).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())
 }
@@ -327,5 +328,20 @@ mod tests {
                 .unwrap()
                 .is_locked
         );
+    }
+
+    // ── Phase 9: Trash guard ─────────────────────────────────────────────
+
+    #[test]
+    fn set_entry_locked_refuses_trashed_entry_and_leaves_it_unchanged() {
+        let conn = setup();
+        let entry_id = make_entry(&conn);
+        set_second_lock_password_impl(&conn, "secret").unwrap();
+        db::trash_entry(&conn, &entry_id, 1_700_000_000).unwrap();
+
+        let err = set_entry_locked_impl(&conn, &entry_id, true).unwrap_err();
+
+        assert_eq!(err, db::LiveEntryError::Trashed.to_string());
+        assert!(!db::get_entry(&conn, &entry_id).unwrap().unwrap().is_locked);
     }
 }

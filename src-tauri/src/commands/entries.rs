@@ -279,6 +279,7 @@ pub(crate) fn update_entry_impl(
     preview_text: Option<&str>,
 ) -> Result<Entry, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let stored =
         db::update_entry(&tx, id, title, content_text, preview_text).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
@@ -303,6 +304,7 @@ pub(crate) fn update_entry_location_impl(
     location_address: Option<&str>,
 ) -> Result<Entry, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let stored = db::update_entry_location(
         &tx,
         id,
@@ -324,6 +326,7 @@ pub(crate) fn update_entry_weather_impl(
     weather_icon: Option<&str>,
 ) -> Result<Entry, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let stored = db::update_entry_weather(&tx, id, weather_summary, weather_icon)
         .map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
@@ -339,6 +342,7 @@ pub(crate) fn save_entry_content_impl(
     preview_text: &str,
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     db::save_entry_content(&tx, id, yjs_doc, content_text, preview_text)
         .map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
@@ -346,35 +350,200 @@ pub(crate) fn save_entry_content_impl(
     Ok(())
 }
 
+/// Move an entry to Trash (the `soft_delete_entry` command). One transaction:
+/// trash stamp + pending mark + AI User Memory cleanup.
+///
+/// Memories go now, not at purge (user decision): `memory_item_sources` has
+/// no FK to `entries` (intentional, see schema.rs), and a trashed entry must
+/// stop feeding retrieval. A restore does not bring them back.
+///
+/// Media rows, files and the embedding index are deliberately KEPT so a
+/// restore finds them; they go at purge time ([`purge_entry_impl`]).
 pub(crate) fn soft_delete_entry_impl(conn: &Connection, id: &str) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    db::soft_delete_entry(&tx, id).map_err(|e| e.to_string())?;
-    db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
-    // Delete this entry's media rows in the same transaction as the tombstone.
-    // There is no restore/trash path for entries, so a deleted entry's media
-    // would otherwise stay on disk, keep uploading (`list_pending_uploads` has
-    // no is_deleted filter), and linger in the cloud forever. The cloud blobs
-    // are swept by the sync engine's `reconcile_own_media_files` prune once
-    // these rows are gone. The `media_count`/`cover_media_id` triggers fire on
-    // each row delete. On-disk files are unlinked AFTER commit (below) so a
-    // rollback can never leave a live row pointing at a deleted file.
-    let media = db::cascade_entry_content_delete(&tx, id).map_err(|e| e.to_string())?;
-    // AI User Memory bugfix: `memory_item_sources` has no FK to `entries`
-    // (intentional, see schema.rs), so a deleted entry's distilled memory
-    // would otherwise stay retrievable forever. Runs in the SAME transaction
-    // so the cleanup is atomic with the entry's own tombstone write.
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().timestamp();
+    db::queries::trash_entry(&tx, id, now).map_err(|e| e.to_string())?;
+    db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     db::memory::cleanup_memory_for_deleted_source(&tx, "journal_entry", id, now)
         .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
-    // Best-effort disk cleanup, only after the DB change is durable.
-    for (storage_path, thumbnail_path) in &media {
+    Ok(())
+}
+
+/// Bring an entry back from Trash and mark it pending. Errors when `id` is
+/// not in Trash (live, purged, legacy tombstone or missing) or is not in the
+/// Trash list this `locked_view` / `active_vault_id` shows (a locked entry
+/// under `Hidden`, another vault's invisible entry). Unlike purge (see
+/// [`purge_view`]), restore is allowed under `Covered`: it is
+/// non-destructive, so acting on a redacted placeholder loses nothing.
+pub(crate) fn restore_entry_impl(
+    conn: &Connection,
+    id: &str,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<(), String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    require_in_visible_trash(&tx, id, locked_view, active_vault_id)?;
+    let now = chrono::Utc::now().timestamp();
+    db::queries::restore_entry(&tx, id, now).map_err(not_in_trash)?;
+    db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// The view purges may act under: a locked entry is purged only when its
+/// content is `Revealed`. `Covered` lists it as a redacted placeholder, but
+/// the user cannot see what they would destroy, so it purges like `Hidden`.
+fn purge_view(locked_view: LockedView) -> LockedView {
+    match locked_view {
+        LockedView::Covered => LockedView::Hidden,
+        other => other,
+    }
+}
+
+/// Refuse `id` unless it is in the Trash list for this view. Missing and
+/// out-of-view ids get the same error, so a caller cannot probe which
+/// locked or invisible ids exist.
+fn require_in_visible_trash(
+    conn: &Connection,
+    id: &str,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<(), String> {
+    let visible =
+        db::queries::list_trashed_entries_with_locked_view(conn, locked_view, active_vault_id)
+            .map_err(|e| e.to_string())?
+            .iter()
+            .any(|e| e.id == id);
+    if visible {
+        Ok(())
+    } else {
+        Err(not_in_trash(rusqlite::Error::QueryReturnedNoRows))
+    }
+}
+
+fn not_in_trash(e: rusqlite::Error) -> String {
+    match e {
+        rusqlite::Error::QueryReturnedNoRows => "entry is not in Trash".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Purge one trashed entry inside the caller's transaction: permanent
+/// tombstone + pending mark + media rows / embedding index cascade + the
+/// (idempotent) memory cleanup. Returns the media file paths to unlink once
+/// the caller has committed.
+fn purge_entry_in_tx(
+    tx: &Connection,
+    id: &str,
+    now: i64,
+) -> Result<Vec<(String, Option<String>)>, String> {
+    // Mark first: it refuses anything not in Trash, so a live entry's media
+    // is never touched.
+    db::queries::purge_entry_mark(tx, id).map_err(not_in_trash)?;
+    db::mark_entry_pending(tx, id).map_err(|e| e.to_string())?;
+    // The media rows go in the same transaction as the tombstone: otherwise
+    // they keep uploading (`list_pending_uploads` has no is_deleted filter)
+    // and linger in the cloud forever. The cloud blobs are swept by the sync
+    // engine's `reconcile_own_media_files` prune once these rows are gone.
+    // The `media_count`/`cover_media_id` triggers fire on each row delete.
+    let media = db::cascade_entry_content_delete(tx, id).map_err(|e| e.to_string())?;
+    // Already ran at trash time; repeated here because a peer's memory.bin
+    // can union-merge a source row back in the meantime.
+    db::memory::cleanup_memory_for_deleted_source(tx, "journal_entry", id, now)
+        .map_err(|e| e.to_string())?;
+    Ok(media)
+}
+
+/// Best-effort disk cleanup, only after the DB change is durable, so a
+/// rollback can never leave a live row pointing at a deleted file.
+fn remove_purged_media_files(media: &[(String, Option<String>)]) {
+    for (storage_path, thumbnail_path) in media {
         crate::commands::media::remove_media_files_best_effort(
             storage_path,
             thumbnail_path.as_deref(),
         );
     }
-    Ok(())
+}
+
+/// Permanently delete one trashed entry (the `delete_entry_forever`
+/// command). Returns the media file paths it unlinked. Refuses an entry not
+/// in this view's Trash, and a locked entry unless `Revealed` (see
+/// [`purge_view`]).
+pub(crate) fn purge_entry_impl(
+    conn: &Connection,
+    id: &str,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<Vec<(String, Option<String>)>, String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    require_in_visible_trash(&tx, id, purge_view(locked_view), active_vault_id)?;
+    let now = chrono::Utc::now().timestamp();
+    let media = purge_entry_in_tx(&tx, id, now)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    remove_purged_media_files(&media);
+    Ok(media)
+}
+
+pub(crate) fn list_trashed_entries_impl(
+    conn: &Connection,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<Vec<Entry>, String> {
+    let rows =
+        db::queries::list_trashed_entries_with_locked_view(conn, locked_view, active_vault_id)
+            .map_err(|e| e.to_string())?;
+    rows.into_iter().map(entry_row_from_db).collect()
+}
+
+/// Purge every entry the Trash screen shows readably for this view — the ids
+/// [`list_trashed_entries_impl`] returns for the same `active_vault_id`,
+/// with `Covered` treated as `Hidden` (see [`purge_view`]). So only
+/// `Revealed` purges locked trashed entries, and another vault's invisible entries are never touched; those still go via
+/// the 30-day retention sweep. One transaction; returns how many were purged
+/// (0 on an empty Trash, so a repeat call is a no-op).
+pub(crate) fn empty_trash_impl(
+    conn: &Connection,
+    locked_view: LockedView,
+    active_vault_id: Option<&str>,
+) -> Result<usize, String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let ids: Vec<String> = db::queries::list_trashed_entries_with_locked_view(
+        &tx,
+        purge_view(locked_view),
+        active_vault_id,
+    )
+    .map_err(|e| e.to_string())?
+    .into_iter()
+    .map(|e| e.id)
+    .collect();
+    let now = chrono::Utc::now().timestamp();
+    let mut media = Vec::new();
+    for id in &ids {
+        media.extend(purge_entry_in_tx(&tx, id, now)?);
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    remove_purged_media_files(&media);
+    Ok(ids.len())
+}
+
+pub(crate) fn update_entry_language_impl(
+    conn: &Connection,
+    id: &str,
+    language: Option<&str>,
+) -> Result<Entry, String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
+    let stored = db::queries::set_entry_language(&tx, id, language).map_err(|e| e.to_string())?;
+    db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(stored)
+}
+
+pub(crate) fn mark_entry_date_user_edited_impl(conn: &Connection, id: &str) -> Result<(), String> {
+    db::queries::require_live_entry(conn, id).map_err(|e| e.to_string())?;
+    db::mark_entry_date_user_edited(conn, id).map_err(|e| e.to_string())
 }
 
 pub(crate) fn update_entry_emotion_impl(
@@ -383,6 +552,7 @@ pub(crate) fn update_entry_emotion_impl(
     emotion: Option<&str>,
 ) -> Result<Entry, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let stored = db::update_entry_emotion(&tx, id, emotion).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
@@ -391,6 +561,7 @@ pub(crate) fn update_entry_emotion_impl(
 
 pub(crate) fn toggle_favorite_impl(conn: &Connection, id: &str) -> Result<bool, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     let new_value = db::toggle_favorite(&tx, id).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
@@ -403,6 +574,7 @@ pub(crate) fn update_entry_date_impl(
     entry_date: i64,
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     db::update_entry_date(&tx, id, entry_date).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
@@ -415,6 +587,7 @@ pub(crate) fn move_entry_to_journal_impl(
     journal_id: &str,
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
     db::move_entry_to_journal(&tx, id, journal_id).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
@@ -833,7 +1006,8 @@ pub fn update_entry(
     Ok(entry)
 }
 
-/// Soft-delete an entry. Requires the app to be unlocked — `key_state` is the
+/// Move an entry to Trash (name kept for IPC compatibility). Its media stay
+/// until it is purged. Requires the app to be unlocked — `key_state` is the
 /// access-control gate (Phase 3: no per-field decryption, but the gate remains
 /// so a locked device cannot mutate entries via IPC).
 #[tauri::command]
@@ -845,11 +1019,79 @@ pub fn soft_delete_entry(
     key_state.with_key(|_key| {
         let conn = state.lock()?;
         soft_delete_entry_impl(&conn, &id)
+    })
+}
+
+/// Entries in Trash, most recently trashed first, under the same
+/// `locked_view` / `active_vault_id` rules as the other list commands — so a
+/// locked trashed entry is listed (and restorable) while the lock is open.
+#[tauri::command]
+pub fn list_trashed_entries(
+    state: State<'_, AppState>,
+    key_state: State<'_, EncryptionKeyState>,
+    locked_view: LockedView,
+    active_vault_id: Option<String>,
+) -> Result<Vec<Entry>, String> {
+    key_state.with_key(|_key| {
+        let conn = state.lock()?;
+        list_trashed_entries_impl(&conn, locked_view, active_vault_id.as_deref())
+    })
+}
+
+/// Restore an entry from Trash. Only an entry the Trash list shows for this
+/// `locked_view` / `active_vault_id` can be restored.
+#[tauri::command]
+pub fn restore_entry(
+    state: State<'_, AppState>,
+    key_state: State<'_, EncryptionKeyState>,
+    id: String,
+    locked_view: LockedView,
+    active_vault_id: Option<String>,
+) -> Result<(), String> {
+    key_state.with_key(|_key| {
+        let conn = state.lock()?;
+        restore_entry_impl(&conn, &id, locked_view, active_vault_id.as_deref())
+    })
+}
+
+/// Permanently delete one entry that is in Trash and visible for this view;
+/// a locked entry requires `Revealed` (see [`purge_entry_impl`]).
+#[tauri::command]
+pub fn delete_entry_forever(
+    state: State<'_, AppState>,
+    key_state: State<'_, EncryptionKeyState>,
+    id: String,
+    locked_view: LockedView,
+    active_vault_id: Option<String>,
+) -> Result<(), String> {
+    key_state.with_key(|_key| {
+        let conn = state.lock()?;
+        purge_entry_impl(&conn, &id, locked_view, active_vault_id.as_deref())
     })?;
     // Re-arm the throttled own-cloud media prune so the next automatic sync
-    // sweeps the deleted entry's now-orphaned cloud media blobs.
+    // sweeps the purged entry's now-orphaned cloud media blobs.
     crate::sync::engine::reset_session_own_cloud_reconciled();
     Ok(())
+}
+
+/// Permanently delete every entry the Trash screen shows readably for this
+/// view (`Covered` purges like `Hidden`; see [`empty_trash_impl`]). Returns
+/// how many entries were purged.
+#[tauri::command]
+pub fn empty_trash(
+    state: State<'_, AppState>,
+    key_state: State<'_, EncryptionKeyState>,
+    locked_view: LockedView,
+    active_vault_id: Option<String>,
+) -> Result<usize, String> {
+    let purged = key_state.with_key(|_key| {
+        let conn = state.lock()?;
+        empty_trash_impl(&conn, locked_view, active_vault_id.as_deref())
+    })?;
+    if purged > 0 {
+        crate::sync::engine::reset_session_own_cloud_reconciled();
+    }
+    Ok(purged)
 }
 
 /// Set the emotion tag on an entry to one of `'good' | 'neutral' | 'bad'`,
@@ -894,12 +1136,7 @@ pub fn update_entry_language(
     }
     key_state.with_key(|_key| {
         let conn = state.lock()?;
-        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        let stored = db::queries::set_entry_language(&tx, &id, language.as_deref())
-            .map_err(|e| e.to_string())?;
-        db::mark_entry_pending(&tx, &id).map_err(|e| e.to_string())?;
-        tx.commit().map_err(|e| e.to_string())?;
-        Ok(stored)
+        update_entry_language_impl(&conn, &id, language.as_deref())
     })
 }
 
@@ -1128,7 +1365,7 @@ pub fn mark_entry_date_user_edited(
 ) -> Result<(), String> {
     key_state.with_key(|_key| {
         let conn = state.lock()?;
-        db::mark_entry_date_user_edited(&conn, &id).map_err(|e| e.to_string())
+        mark_entry_date_user_edited_impl(&conn, &id)
     })
 }
 
@@ -1325,6 +1562,7 @@ pub(crate) fn snapshot_entry_version_impl(
     preview_text: &str,
 ) -> Result<String, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    db::queries::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
     let device_id = db::get_or_create_device_id(&tx).map_err(|e| e.to_string())?;
     let version_id = db::insert_entry_version(&tx, entry_id, yjs_doc, preview_text, &device_id)
         .map_err(|e| e.to_string())?;
@@ -1458,28 +1696,23 @@ mod tests {
         db::list_journals(&conn, None).unwrap()[0].id.clone()
     }
 
-    /// Soft-deleting an entry must remove its media rows (inline AND attached),
-    /// unlink the backing files from disk, and let the DB triggers clear the
-    /// denormalized `media_count` / `cover_media_id` — so a deleted entry leaves
-    /// no orphaned media to keep uploading or linger on disk. The cloud blobs
-    /// are then swept by `reconcile_own_media_files` once the rows are gone.
-    #[test]
-    fn soft_delete_entry_removes_its_media_rows_and_files() {
+    /// Attach an inline and an attached media row (each with a thumbnail) to
+    /// `entry_id`, backed by real files in `dir`, and make the first one the
+    /// cover. Returns every file path created.
+    fn attach_two_media_with_files(
+        conn: &Connection,
+        entry_id: &str,
+        dir: &std::path::Path,
+    ) -> Vec<std::path::PathBuf> {
         use std::io::Write;
-        let tmp = tempfile::TempDir::new().unwrap();
-        let state = make_state();
-        let jid = journal_id(&state);
-        let conn = state.lock().unwrap();
-        let entry = create_entry_impl(&conn, &jid, Some("t"), Some("body"), None, 0).unwrap();
-
         let mut files: Vec<std::path::PathBuf> = Vec::new();
         let mut first_media_id: Option<String> = None;
         for (i, (name, mode)) in [("inline.jpg", "inline"), ("attached.pdf", "attached")]
             .into_iter()
             .enumerate()
         {
-            let storage = tmp.path().join(name);
-            let thumb = tmp.path().join(format!("{name}.thumb"));
+            let storage = dir.join(name);
+            let thumb = dir.join(format!("{name}.thumb"));
             std::fs::File::create(&storage)
                 .unwrap()
                 .write_all(b"x")
@@ -1489,9 +1722,9 @@ mod tests {
                 .write_all(b"t")
                 .unwrap();
             let media = db::create_media(
-                &conn,
+                conn,
                 crate::db::CreateMediaParams {
-                    entry_id: &entry.id,
+                    entry_id,
                     file_name: name,
                     file_type: "image/jpeg",
                     storage_path: storage.to_str().unwrap(),
@@ -1506,7 +1739,7 @@ mod tests {
                 },
             )
             .unwrap();
-            db::update_media_thumbnail_path(&conn, &media.id, Some(thumb.to_str().unwrap()))
+            db::update_media_thumbnail_path(conn, &media.id, Some(thumb.to_str().unwrap()))
                 .unwrap();
             if first_media_id.is_none() {
                 first_media_id = Some(media.id.clone());
@@ -1517,23 +1750,59 @@ mod tests {
         // Set a cover so we can assert the delete trigger clears it.
         conn.execute(
             "UPDATE entries SET cover_media_id = ?1 WHERE id = ?2",
-            rusqlite::params![first_media_id.as_deref().unwrap(), entry.id],
+            rusqlite::params![first_media_id.as_deref().unwrap(), entry_id],
         )
         .unwrap();
-        assert_eq!(db::get_media_for_entry(&conn, &entry.id).unwrap().len(), 2);
+        files
+    }
+
+    /// Moving an entry to Trash keeps its media rows AND files, so a restore
+    /// finds them. Purging it then removes the rows (inline AND attached),
+    /// returns the file list, unlinks the files, and lets the DB triggers
+    /// clear the denormalized `media_count` / `cover_media_id` — so a purged
+    /// entry leaves no orphaned media to keep uploading or linger on disk.
+    #[test]
+    fn trash_keeps_media_rows_and_files_and_purge_removes_them() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let entry = create_entry_impl(&conn, &jid, Some("t"), Some("body"), None, 0).unwrap();
+        let files = attach_two_media_with_files(&conn, &entry.id, tmp.path());
 
         soft_delete_entry_impl(&conn, &entry.id).unwrap();
 
+        assert_eq!(
+            db::get_media_for_entry(&conn, &entry.id).unwrap().len(),
+            2,
+            "trash must keep the entry's media rows"
+        );
+        for f in &files {
+            assert!(f.exists(), "trash must not unlink {}", f.display());
+        }
+        let trashed = db::get_entry(&conn, &entry.id).unwrap().unwrap();
+        assert!(trashed.trashed_at.is_some());
+        assert_eq!(trashed.media_count, 2);
+
+        let paths = purge_entry_impl(&conn, &entry.id, LockedView::Revealed, None).unwrap();
+
+        assert_eq!(
+            paths.len(),
+            2,
+            "one (storage, thumbnail) pair per media row"
+        );
         assert!(
             db::get_media_for_entry(&conn, &entry.id)
                 .unwrap()
                 .is_empty(),
-            "soft-delete must remove all of the entry's media rows"
+            "purge must remove all of the entry's media rows"
         );
         for f in &files {
             assert!(!f.exists(), "media file must be unlinked: {}", f.display());
         }
         let stored = db::get_entry(&conn, &entry.id).unwrap().unwrap();
+        assert!(stored.is_deleted, "a purged entry stays a tombstone");
+        assert_eq!(stored.trashed_at, None, "a purged entry leaves Trash");
         assert_eq!(stored.media_count, 0, "media_count trigger must reach 0");
         assert!(
             stored.cover_media_id.is_none(),
@@ -1541,14 +1810,12 @@ mod tests {
         );
     }
 
-    /// Deleting a whole journal must strip every entry's media (rows + files),
-    /// not just tombstone the entries — otherwise journal-delete re-introduces
-    /// the exact media leak the per-entry cleanup prevents.
-    /// `cascade_entry_content_delete` must drop the entry's embedding index,
-    /// not just its media. Shared with the `pull_entries` peer-tombstone loop,
-    /// so this pins both entry-side paths.
+    /// Trash keeps the embedding index (a restore needs no re-embed; every
+    /// RAG query already filters `is_deleted = 1`). Purge runs
+    /// `cascade_entry_content_delete`, which drops it — shared with the
+    /// `pull_entries` peer-tombstone loop, so this pins both entry-side paths.
     #[test]
-    fn soft_delete_entry_drops_the_embedding_index() {
+    fn trash_keeps_the_embedding_index_and_purge_drops_it() {
         let state = make_state();
         let jid = journal_id(&state);
         let conn = state.lock().unwrap();
@@ -1559,29 +1826,40 @@ mod tests {
                 .unwrap();
             db::embeddings::mark_entry_embedding_dirty(&conn, eid, "m", "h", 0, 0).unwrap();
         }
-
-        soft_delete_entry_impl(&conn, &entry.id).unwrap();
-
-        for (table, expected) in [("entry_embedding_chunks", 0), ("entry_embedding_jobs", 0)] {
-            let n: i64 = conn
-                .query_row(
-                    &format!("SELECT COUNT(*) FROM {table} WHERE entry_id = ?1"),
-                    [&entry.id],
-                    |r| r.get(0),
-                )
-                .unwrap();
-            assert_eq!(n, expected, "{table} must be cleared for the deleted entry");
-        }
-        let kept: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM entry_embedding_chunks WHERE entry_id = ?1",
-                [&other.id],
+        let count = |table: &str, eid: &str| -> i64 {
+            conn.query_row(
+                &format!("SELECT COUNT(*) FROM {table} WHERE entry_id = ?1"),
+                [eid],
                 |r| r.get(0),
             )
-            .unwrap();
-        assert_eq!(kept, 1, "another entry's index must survive");
+            .unwrap()
+        };
+
+        soft_delete_entry_impl(&conn, &entry.id).unwrap();
+        assert_eq!(
+            count("entry_embedding_chunks", &entry.id),
+            1,
+            "trash keeps the index"
+        );
+
+        purge_entry_impl(&conn, &entry.id, LockedView::Revealed, None).unwrap();
+        for table in ["entry_embedding_chunks", "entry_embedding_jobs"] {
+            assert_eq!(
+                count(table, &entry.id),
+                0,
+                "{table} must be cleared for the purged entry"
+            );
+        }
+        assert_eq!(
+            count("entry_embedding_chunks", &other.id),
+            1,
+            "another entry's index must survive"
+        );
     }
 
+    /// Deleting a whole journal must strip every entry's media (rows + files),
+    /// not just tombstone the entries — otherwise journal-delete re-introduces
+    /// the exact media leak the per-entry cleanup prevents.
     #[test]
     fn delete_journal_removes_entry_media_rows_and_files() {
         use std::io::Write;
@@ -2975,6 +3253,465 @@ mod tests {
 
         let conn = state.lock().unwrap();
         soft_delete_entry_impl(&conn, &id).expect("delete with no memories must not error");
+    }
+
+    // ── Phase 9: Trash commands ──────────────────────────────────────────────
+
+    fn trash_msg() -> String {
+        db::queries::LiveEntryError::Trashed.to_string()
+    }
+
+    fn new_entry(conn: &Connection, jid: &str, title: &str) -> String {
+        create_entry_impl(conn, jid, Some(title), Some("body"), None, 1_700_000_000)
+            .unwrap()
+            .id
+    }
+
+    fn local_version(conn: &Connection, id: &str) -> i64 {
+        conn.query_row(
+            "SELECT local_version FROM sync_state WHERE entry_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn soft_delete_impl_moves_the_entry_to_trash() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let id = new_entry(&conn, &jid, "t");
+
+        soft_delete_entry_impl(&conn, &id).unwrap();
+
+        let e = db::get_entry(&conn, &id).unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert!(e.trashed_at.is_some());
+        let listed = list_trashed_entries_impl(&conn, LockedView::Revealed, None).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, id);
+    }
+
+    #[test]
+    fn soft_delete_impl_refuses_trashed_and_missing_entries() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let id = new_entry(&conn, &jid, "t");
+        soft_delete_entry_impl(&conn, &id).unwrap();
+        let version = local_version(&conn, &id);
+
+        assert_eq!(soft_delete_entry_impl(&conn, &id).unwrap_err(), trash_msg());
+        assert_eq!(
+            local_version(&conn, &id),
+            version,
+            "a refused trash must not re-mark pending"
+        );
+        assert!(soft_delete_entry_impl(&conn, "missing").is_err());
+    }
+
+    #[test]
+    fn restore_entry_impl_brings_a_trashed_entry_back_with_its_media() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let id = new_entry(&conn, &jid, "Back");
+        let files = attach_two_media_with_files(&conn, &id, tmp.path());
+        soft_delete_entry_impl(&conn, &id).unwrap();
+        let version = local_version(&conn, &id);
+
+        restore_entry_impl(&conn, &id, LockedView::Revealed, None).unwrap();
+
+        let e = db::get_entry(&conn, &id).unwrap().unwrap();
+        assert!(!e.is_deleted);
+        assert_eq!(e.trashed_at, None);
+        assert_eq!(db::get_media_for_entry(&conn, &id).unwrap().len(), 2);
+        assert!(files.iter().all(|f| f.exists()));
+        assert_eq!(local_version(&conn, &id), version + 1, "restore re-pushes");
+        assert!(list_trashed_entries_impl(&conn, LockedView::Revealed, None)
+            .unwrap()
+            .is_empty());
+        // Edits work again once restored.
+        update_entry_impl(&conn, &id, Some("edited"), None, None).unwrap();
+    }
+
+    #[test]
+    fn restore_entry_impl_errors_for_live_missing_and_purged_ids() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let live = new_entry(&conn, &jid, "Live");
+        let purged = new_entry(&conn, &jid, "Purged");
+        soft_delete_entry_impl(&conn, &purged).unwrap();
+        purge_entry_impl(&conn, &purged, LockedView::Revealed, None).unwrap();
+        let version = local_version(&conn, &purged);
+
+        assert!(restore_entry_impl(&conn, &live, LockedView::Revealed, None).is_err());
+        assert!(restore_entry_impl(&conn, "missing", LockedView::Revealed, None).is_err());
+        assert!(restore_entry_impl(&conn, &purged, LockedView::Revealed, None).is_err());
+        assert_eq!(local_version(&conn, &purged), version);
+        assert!(db::get_entry(&conn, &purged).unwrap().unwrap().is_deleted);
+    }
+
+    #[test]
+    fn purge_entry_impl_marks_pending_and_is_idempotent_on_memories() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let id = new_entry(&conn, &jid, "t");
+        db::memory::insert_memory_item(&conn, "m1", "fact", "journal_entry", 100).unwrap();
+        db::memory::add_memory_source(&conn, "m1", "journal_entry", &id).unwrap();
+        soft_delete_entry_impl(&conn, &id).unwrap();
+        assert!(
+            db::memory::list_memory_items(&conn).unwrap().is_empty(),
+            "memories go at trash time"
+        );
+        let version = local_version(&conn, &id);
+
+        let paths = purge_entry_impl(&conn, &id, LockedView::Revealed, None).unwrap();
+
+        assert!(paths.is_empty(), "no media, nothing to unlink");
+        assert_eq!(local_version(&conn, &id), version + 1);
+        let e = db::get_entry(&conn, &id).unwrap().unwrap();
+        assert!(e.is_deleted);
+        assert_eq!(e.trashed_at, None);
+    }
+
+    #[test]
+    fn purge_entry_impl_refuses_live_missing_and_already_purged_ids() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let live = new_entry(&conn, &jid, "Live");
+        let files = attach_two_media_with_files(&conn, &live, tmp.path());
+
+        assert!(purge_entry_impl(&conn, &live, LockedView::Revealed, None).is_err());
+        assert_eq!(
+            db::get_media_for_entry(&conn, &live).unwrap().len(),
+            2,
+            "a refused purge must not touch a live entry's media"
+        );
+        assert!(files.iter().all(|f| f.exists()));
+        assert!(purge_entry_impl(&conn, "missing", LockedView::Revealed, None).is_err());
+
+        soft_delete_entry_impl(&conn, &live).unwrap();
+        purge_entry_impl(&conn, &live, LockedView::Revealed, None).unwrap();
+        assert!(purge_entry_impl(&conn, &live, LockedView::Revealed, None).is_err());
+    }
+
+    #[test]
+    fn list_trashed_entries_impl_follows_the_locked_view() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let plain = new_entry(&conn, &jid, "Plain");
+        let locked = new_entry(&conn, &jid, "Locked");
+        let _live = new_entry(&conn, &jid, "Live");
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        soft_delete_entry_impl(&conn, &plain).unwrap();
+        soft_delete_entry_impl(&conn, &locked).unwrap();
+
+        let ids = |view| {
+            let mut v: Vec<String> = list_trashed_entries_impl(&conn, view, None)
+                .unwrap()
+                .into_iter()
+                .map(|e| e.id)
+                .collect();
+            v.sort();
+            v
+        };
+        let mut both = vec![plain.clone(), locked.clone()];
+        both.sort();
+        assert_eq!(ids(LockedView::Revealed), both);
+        assert_eq!(ids(LockedView::Hidden), vec![plain]);
+    }
+
+    #[test]
+    fn empty_trash_impl_purges_every_visible_trashed_entry_and_is_idempotent() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let a = new_entry(&conn, &jid, "A");
+        let b = new_entry(&conn, &jid, "B");
+        let live = new_entry(&conn, &jid, "Live");
+        let files = attach_two_media_with_files(&conn, &a, tmp.path());
+        soft_delete_entry_impl(&conn, &a).unwrap();
+        soft_delete_entry_impl(&conn, &b).unwrap();
+
+        let purged = empty_trash_impl(&conn, LockedView::Revealed, None).unwrap();
+
+        assert_eq!(purged, 2);
+        assert!(list_trashed_entries_impl(&conn, LockedView::Revealed, None)
+            .unwrap()
+            .is_empty());
+        assert!(db::get_media_for_entry(&conn, &a).unwrap().is_empty());
+        assert!(files.iter().all(|f| !f.exists()), "files unlinked");
+        let live_row = db::get_entry(&conn, &live).unwrap().unwrap();
+        assert!(!live_row.is_deleted, "a live entry is never purged");
+
+        assert_eq!(
+            empty_trash_impl(&conn, LockedView::Revealed, None).unwrap(),
+            0,
+            "a second empty is a no-op"
+        );
+    }
+
+    #[test]
+    fn empty_trash_impl_leaves_locked_entries_the_view_hides() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let plain = new_entry(&conn, &jid, "Plain");
+        let locked = new_entry(&conn, &jid, "Locked");
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        soft_delete_entry_impl(&conn, &plain).unwrap();
+        soft_delete_entry_impl(&conn, &locked).unwrap();
+
+        assert_eq!(
+            empty_trash_impl(&conn, LockedView::Hidden, None).unwrap(),
+            1
+        );
+
+        let remaining = list_trashed_entries_impl(&conn, LockedView::Revealed, None).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, locked);
+    }
+
+    #[test]
+    fn empty_trash_impl_under_covered_leaves_locked_entries_alone() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let plain = new_entry(&conn, &jid, "Plain");
+        let locked = new_entry(&conn, &jid, "Locked");
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        soft_delete_entry_impl(&conn, &plain).unwrap();
+        soft_delete_entry_impl(&conn, &locked).unwrap();
+        assert_eq!(
+            list_trashed_entries_impl(&conn, LockedView::Covered, None)
+                .unwrap()
+                .len(),
+            2,
+            "Covered still lists the locked entry (redacted)"
+        );
+
+        assert_eq!(
+            empty_trash_impl(&conn, LockedView::Covered, None).unwrap(),
+            1,
+            "Covered purges only what the user can actually read"
+        );
+
+        let remaining = list_trashed_entries_impl(&conn, LockedView::Revealed, None).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, locked);
+    }
+
+    #[test]
+    fn restore_entry_impl_requires_the_entry_to_be_visible_in_the_view() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let locked = new_entry(&conn, &jid, "Locked");
+        let invisible = new_entry(&conn, &jid, "Invisible");
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        db::set_entry_invisible(&conn, &invisible, true, Some("vault-a")).unwrap();
+        soft_delete_entry_impl(&conn, &locked).unwrap();
+        soft_delete_entry_impl(&conn, &invisible).unwrap();
+        let version = local_version(&conn, &locked);
+
+        let not_found = not_in_trash(rusqlite::Error::QueryReturnedNoRows);
+        assert_eq!(
+            restore_entry_impl(&conn, &locked, LockedView::Hidden, None).unwrap_err(),
+            not_found
+        );
+        assert_eq!(
+            restore_entry_impl(&conn, &invisible, LockedView::Revealed, None).unwrap_err(),
+            not_found
+        );
+        assert_eq!(
+            restore_entry_impl(&conn, &invisible, LockedView::Revealed, Some("vault-b"))
+                .unwrap_err(),
+            not_found
+        );
+        assert_eq!(
+            local_version(&conn, &locked),
+            version,
+            "refused: no pending"
+        );
+        assert!(db::get_entry(&conn, &locked).unwrap().unwrap().is_deleted);
+
+        // Covered lists (and so restores) a locked entry; the vault match
+        // makes the invisible one reachable.
+        restore_entry_impl(&conn, &locked, LockedView::Covered, None).unwrap();
+        restore_entry_impl(&conn, &invisible, LockedView::Hidden, Some("vault-a")).unwrap();
+        assert!(!db::get_entry(&conn, &locked).unwrap().unwrap().is_deleted);
+    }
+
+    #[test]
+    fn purge_entry_impl_requires_revealed_for_locked_and_the_active_vault() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let locked = new_entry(&conn, &jid, "Locked");
+        let invisible = new_entry(&conn, &jid, "Invisible");
+        let files = attach_two_media_with_files(&conn, &locked, tmp.path());
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        db::set_entry_invisible(&conn, &invisible, true, Some("vault-a")).unwrap();
+        soft_delete_entry_impl(&conn, &locked).unwrap();
+        soft_delete_entry_impl(&conn, &invisible).unwrap();
+
+        let not_found = not_in_trash(rusqlite::Error::QueryReturnedNoRows);
+        for view in [LockedView::Hidden, LockedView::Covered] {
+            assert_eq!(
+                purge_entry_impl(&conn, &locked, view, None).unwrap_err(),
+                not_found
+            );
+        }
+        assert_eq!(
+            purge_entry_impl(&conn, &invisible, LockedView::Revealed, None).unwrap_err(),
+            not_found
+        );
+        assert_eq!(db::get_media_for_entry(&conn, &locked).unwrap().len(), 2);
+        assert!(files.iter().all(|f| f.exists()));
+        assert!(db::get_entry(&conn, &locked)
+            .unwrap()
+            .unwrap()
+            .trashed_at
+            .is_some());
+
+        purge_entry_impl(&conn, &locked, LockedView::Revealed, None).unwrap();
+        purge_entry_impl(&conn, &invisible, LockedView::Hidden, Some("vault-a")).unwrap();
+        assert_eq!(
+            db::get_entry(&conn, &locked).unwrap().unwrap().trashed_at,
+            None
+        );
+        assert_eq!(
+            db::get_entry(&conn, &invisible)
+                .unwrap()
+                .unwrap()
+                .trashed_at,
+            None
+        );
+    }
+
+    #[test]
+    fn detect_language_after_save_leaves_a_trashed_entry_untouched() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let entry = create_entry_impl(&conn, &jid, Some("t"), Some(EN_PARAGRAPH), None, 0).unwrap();
+        conn.execute(
+            "UPDATE entries SET content_language = NULL WHERE id = ?1",
+            [&entry.id],
+        )
+        .unwrap();
+        soft_delete_entry_impl(&conn, &entry.id).unwrap();
+        let before = db::get_entry(&conn, &entry.id).unwrap().unwrap();
+        assert!(
+            crate::utils::language_detect::detect_language(
+                before.content_text.as_deref().unwrap_or("")
+            )
+            .is_some(),
+            "fixture text must be detectable or this test proves nothing"
+        );
+        let version = local_version(&conn, &entry.id);
+
+        maybe_detect_language_after_save(&conn, &entry.id);
+
+        let after = db::get_entry(&conn, &entry.id).unwrap().unwrap();
+        assert_eq!(after.content_language, None);
+        assert_eq!(after.updated_at, before.updated_at);
+        assert_eq!(local_version(&conn, &entry.id), version);
+    }
+
+    #[test]
+    fn entry_writes_on_a_trashed_entry_are_refused_with_the_trash_message() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let other_journal = db::create_journal(&conn, "Other", None).unwrap().id;
+        let id = new_entry(&conn, &jid, "Original");
+        soft_delete_entry_impl(&conn, &id).unwrap();
+        let version = local_version(&conn, &id);
+        let msg = trash_msg();
+
+        let results: Vec<(&str, Result<(), String>)> = vec![
+            (
+                "update_entry",
+                update_entry_impl(&conn, &id, Some("x"), None, None).map(|_| ()),
+            ),
+            (
+                "save_entry_content",
+                save_entry_content_impl(&conn, &id, b"yjs", "x", "x"),
+            ),
+            (
+                "update_entry_emotion",
+                update_entry_emotion_impl(&conn, &id, Some("good")).map(|_| ()),
+            ),
+            (
+                "update_entry_language",
+                update_entry_language_impl(&conn, &id, Some("en")).map(|_| ()),
+            ),
+            (
+                "update_entry_location",
+                update_entry_location_impl(&conn, &id, Some(1.0), Some(2.0), None, None)
+                    .map(|_| ()),
+            ),
+            (
+                "update_entry_weather",
+                update_entry_weather_impl(&conn, &id, Some("sun"), None).map(|_| ()),
+            ),
+            (
+                "toggle_favorite",
+                toggle_favorite_impl(&conn, &id).map(|_| ()),
+            ),
+            ("update_entry_date", update_entry_date_impl(&conn, &id, 42)),
+            (
+                "move_entry_to_journal",
+                move_entry_to_journal_impl(&conn, &id, &other_journal),
+            ),
+            (
+                "mark_entry_date_user_edited",
+                mark_entry_date_user_edited_impl(&conn, &id),
+            ),
+            (
+                "snapshot_entry_version",
+                snapshot_entry_version_impl(&conn, &id, b"v", "p").map(|_| ()),
+            ),
+        ];
+        for (name, result) in results {
+            assert_eq!(
+                result.unwrap_err(),
+                msg,
+                "{name} must refuse a trashed entry"
+            );
+        }
+
+        let e = db::get_entry(&conn, &id).unwrap().unwrap();
+        assert_eq!(e.title.as_deref(), Some("Original"));
+        assert_eq!(e.journal_id, jid);
+        assert!(!e.is_favorite);
+        assert_eq!(
+            local_version(&conn, &id),
+            version,
+            "nothing re-marked pending"
+        );
+        assert!(db::list_entry_versions(&conn, &id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn entry_writes_on_a_missing_entry_report_not_found() {
+        let state = make_state();
+        let conn = state.lock().unwrap();
+        assert_eq!(
+            toggle_favorite_impl(&conn, "missing").unwrap_err(),
+            db::queries::LiveEntryError::NotFound.to_string()
+        );
     }
 
     #[test]

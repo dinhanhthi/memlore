@@ -94,10 +94,12 @@ pub(crate) fn set_entry_invisible_impl(
         let vault_id = active_vault_id.ok_or_else(|| UNABLE_TO_UPDATE.to_string())?;
         require_existing_vault(conn, vault_id)?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        db::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
         db::set_entry_invisible(&tx, entry_id, true, Some(vault_id)).map_err(|e| e.to_string())?;
         tx.commit().map_err(|e| e.to_string())
     } else {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        db::require_live_entry(&tx, entry_id).map_err(|e| e.to_string())?;
         db::set_entry_invisible(&tx, entry_id, false, None).map_err(|e| e.to_string())?;
         tx.commit().map_err(|e| e.to_string())
     }
@@ -409,6 +411,42 @@ mod tests {
             entry.vault_id.as_deref(),
             Some(vault_b.as_str()),
             "cascade must rebind child invisible entries to journal vault"
+        );
+    }
+
+    // ── Phase 9: Trash guard ─────────────────────────────────────────────
+
+    #[test]
+    fn set_entry_invisible_refuses_trashed_entry_and_leaves_it_unchanged() {
+        let conn = setup();
+        let entry_id = make_entry(&conn);
+        let vault = open_or_create_invisible_vault_impl(&conn, "secret").unwrap();
+        db::trash_entry(&conn, &entry_id, 1_700_000_000).unwrap();
+
+        let err = set_entry_invisible_impl(&conn, &entry_id, true, Some(&vault)).unwrap_err();
+
+        assert_eq!(err, db::LiveEntryError::Trashed.to_string());
+        let entry = db::get_entry(&conn, &entry_id).unwrap().unwrap();
+        assert!(!entry.is_invisible);
+        assert!(entry.vault_id.is_none());
+    }
+
+    #[test]
+    fn clearing_invisible_on_trashed_entry_is_refused() {
+        let conn = setup();
+        let entry_id = make_entry(&conn);
+        let vault = open_or_create_invisible_vault_impl(&conn, "secret").unwrap();
+        set_entry_invisible_impl(&conn, &entry_id, true, Some(&vault)).unwrap();
+        db::trash_entry(&conn, &entry_id, 1_700_000_000).unwrap();
+
+        let err = set_entry_invisible_impl(&conn, &entry_id, false, None).unwrap_err();
+
+        assert_eq!(err, db::LiveEntryError::Trashed.to_string());
+        assert!(
+            db::get_entry(&conn, &entry_id)
+                .unwrap()
+                .unwrap()
+                .is_invisible
         );
     }
 }
