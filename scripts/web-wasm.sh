@@ -2,7 +2,7 @@
 # Build memlore-wasm (release) and generate the web bindings into web/src/core/pkg.
 # Usage: scripts/web-wasm.sh [--check-only | --test-sealers]
 #   --check-only    only verify the wasm-bindgen-cli version, then exit
-#   --test-sealers  build with feature test-sealers (exports sealEntry/sealMedia)
+#   --test-sealers  build with feature test-sealers (exports sealEntry/sealMedia/sealVersion)
 #                   into web/src/core/pkg-test (gitignored; tests only, never ship)
 #   LOCK_FILE=...  override the Cargo.lock to read (testing)
 # The wasm-bindgen-cli version must equal the wasm-bindgen version in Cargo.lock.
@@ -55,7 +55,7 @@ wasm-bindgen --target web --out-dir "$out_dir" \
   "$target_dir/wasm32-unknown-unknown/release/memlore_wasm.wasm"
 
 # The production package must never export the test-only sealers.
-if [ -z "$mode" ] && grep -Eq 'sealEntry|sealMedia' "$out_dir"/memlore_wasm.d.ts; then
-  echo "production pkg exports test-only sealers (sealEntry/sealMedia)" >&2
+if [ -z "$mode" ] && grep -Eq 'sealEntry|sealMedia|sealVersion' "$out_dir"/memlore_wasm.d.ts; then
+  echo "production pkg exports test-only sealers (sealEntry/sealMedia/sealVersion)" >&2
   exit 1
 fi

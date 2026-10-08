@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as Y from 'yjs'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { loadCore, type Core } from './core'
+import {
+  loadCore,
+  openOutboxIntent,
+  openVersion,
+  sealOutboxIntentV2,
+  type Core,
+  type OutboxIntentV2,
+} from './core'
 
 const ABANDON_ART = `${'abandon '.repeat(23)}art`
 
@@ -52,7 +59,19 @@ interface Fixture {
   recovery_phrase: string
   device_id: string
   generation: number
-  expected: { entries: ExpectedEntry[]; media: ExpectedMedia[]; tags: string[] }
+  expected: {
+    entries: ExpectedEntry[]
+    media: ExpectedMedia[]
+    tags: string[]
+    versions: ExpectedVersion[]
+  }
+}
+
+interface ExpectedVersion {
+  version_id: string
+  entry_index: number
+  preview_text: string
+  content_text: string
 }
 
 interface EntryMeta {
@@ -171,6 +190,24 @@ describe('desktop vault fixture opens in WASM (hard gate)', () => {
     for (const name of fixture.expected.tags) expect(tags).toContain(name)
   })
 
+  it('opens the desktop-sealed version snapshot', () => {
+    expect(fixture.expected.versions).toHaveLength(1)
+    for (const v of fixture.expected.versions) {
+      const opened = openVersion(core, ring, file(`${base}/versions/${v.version_id}.bin`))
+      expect(opened.metadata.version_id).toBe(v.version_id)
+      expect(opened.metadata.entry_id).toBe(fixture.expected.entries[v.entry_index].entry_id)
+      expect(opened.metadata.device_id).toBe(fixture.device_id)
+      expect(opened.metadata.preview_text).toBe(v.preview_text)
+      expect(opened.metadata.created_at).toBeGreaterThan(0)
+      expect(yjsText(opened.yjs)).toBe(v.content_text)
+    }
+  })
+
+  it('refuses an entry file as a version', () => {
+    const id = fixture.expected.entries[0].entry_id
+    expect(() => openVersion(core, ring, file(entryPath(id)))).toThrow()
+  })
+
   it('verifyMasterFingerprint accepts the right fingerprint and rejects a wrong one', () => {
     expect(() => core.verifyMasterFingerprint(ring, keyringMeta.master_fingerprint)).not.toThrow()
     expect(() => core.verifyMasterFingerprint(ring, '0'.repeat(64))).toThrow()
@@ -242,5 +279,110 @@ describe('desktop vault fixture opens in WASM (hard gate)', () => {
       core.openMedia(r, file(`${base}/media/${fixture.expected.media[0].media_id}`)),
     ).toThrow()
     expect(() => core.openDeviceBin(r, file(`${base}/tags.bin`))).toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Outbox v2 intents (journal / tag / template / trash) and the v1 entry path.
+// ---------------------------------------------------------------------------
+
+describe('outbox intents through WASM', () => {
+  const WEB = 'web-device-0001'
+  const intents: OutboxIntentV2[] = [
+    {
+      kind: 'create_journal',
+      web_device_id: WEB,
+      web_updated_at_secs: 10,
+      journal_id: 'journal-0001',
+      name: 'Work',
+      color: '#aabbcc',
+      auto_tag_ids: ['tag-00000001'],
+    },
+    {
+      kind: 'create_tag',
+      web_device_id: WEB,
+      web_updated_at_secs: 11,
+      tag_id: 'tag-00000001',
+      name: 'Fun',
+      color: null,
+    },
+    {
+      kind: 'upsert_template',
+      web_device_id: WEB,
+      web_updated_at_secs: 12,
+      template_id: 'template-0001',
+      name: 'Daily',
+      description: 'desc',
+      content_b64: 'aGk=',
+      sort_order: 3,
+      base_updated_at: null,
+    },
+    {
+      kind: 'delete_template',
+      web_device_id: WEB,
+      web_updated_at_secs: 13,
+      template_id: 'template-0001',
+      base_updated_at: 7,
+    },
+    {
+      kind: 'trash_entry',
+      web_device_id: WEB,
+      web_updated_at_secs: 14,
+      entry_id: 'entry-000001',
+      base_updated_at: 8,
+    },
+  ]
+  const entryV1 = {
+    schema_version: 1,
+    entry_id: 'entry-000001',
+    web_device_id: WEB,
+    created_on_web: true,
+    web_updated_at_secs: 5,
+    base_state_vector: [],
+    yjs_full_state: [1, 2],
+    content_text: 'hi',
+    preview_text: 'hi',
+    fields: {},
+    media: [],
+  }
+
+  let core: Core
+  let ring: Ring
+
+  beforeAll(async () => {
+    core = await loadCore()
+    ring = core.KeyRing.fromRecovery(
+      ZERO_PHRASE,
+      recoveryJson.wrapped_master,
+      keyringMeta.master_fingerprint,
+    )
+    ring.loadContentList(text('.meta/keyring/_content.json'))
+  })
+
+  it('seals and opens every v2 kind unchanged', () => {
+    expect(new Set(intents.map((i) => i.kind)).size).toBe(5)
+    for (const intent of intents) {
+      const opened = openOutboxIntent(core, ring, sealOutboxIntentV2(core, ring, intent))
+      expect(opened).toEqual({ version: 2, intent })
+    }
+  })
+
+  it('rejects an invalid v2 intent before sealing', () => {
+    const bad = { ...intents[1], color: 'red' } as OutboxIntentV2
+    expect(() => sealOutboxIntentV2(core, ring, bad)).toThrow()
+  })
+
+  it('decodes a v1 entry frame exactly as openOutboxEntry does', () => {
+    const sealed = core.sealOutboxEntry(ring, JSON.stringify(entryV1))
+    const opened = openOutboxIntent(core, ring, sealed)
+    expect(opened.version).toBe(1)
+    if (opened.version !== 1) return
+    expect(opened.kind).toBe('entry')
+    expect(JSON.parse(opened.json)).toEqual(JSON.parse(core.openOutboxEntry(ring, sealed)))
+  })
+
+  it('openOutboxEntry still refuses a v2 frame', () => {
+    const sealed = sealOutboxIntentV2(core, ring, intents[4])
+    expect(() => core.openOutboxEntry(ring, sealed)).toThrow(/unsupported schema version: 2/)
   })
 })

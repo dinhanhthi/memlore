@@ -13,59 +13,14 @@
 //! immediately identifiable by inspection; the two payload shapes are
 //! otherwise structurally identical.
 
-use bincode::Options;
-use serde::{Deserialize, Serialize};
-
-use super::entry_sync::MAX_PAYLOAD_BYTES;
 use super::provider::SyncError;
 
-/// Current on-disk payload version for version-snapshot blobs.
-pub const VERSION_PAYLOAD_SCHEMA_VERSION: u16 = 1;
-
-/// Magic header for version-snapshot blobs. Distinct from entries' `XJS1`
-/// so a misplaced file is identifiable at a glance.
-const VERSION_PAYLOAD_MAGIC: [u8; 4] = *b"XJV1";
-
-/// One version snapshot's encrypted payload as written to disk.
-///
-/// `yjs_blob_ciphertext` is AES-256-GCM(sync_key) of the immutable Yjs
-/// snapshot bytes (`entry_versions.yjs_doc`). `metadata_ciphertext` is
-/// AES-256-GCM(sync_key) of the JSON-encoded [`VersionMetadata`].
-///
-/// Field order mirrors `SyncEntryPayload`: `schema_version` first so a
-/// version mismatch is visible before any ciphertext bytes are read.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SyncVersionPayload {
-    pub schema_version: u16,
-    pub key_fingerprint: [u8; 32],
-    pub yjs_blob_ciphertext: Vec<u8>,
-    pub metadata_ciphertext: Vec<u8>,
-}
-
-impl SyncVersionPayload {
-    pub fn new(
-        key_fingerprint: [u8; 32],
-        yjs_blob_ciphertext: Vec<u8>,
-        metadata_ciphertext: Vec<u8>,
-    ) -> Self {
-        Self {
-            schema_version: VERSION_PAYLOAD_SCHEMA_VERSION,
-            key_fingerprint,
-            yjs_blob_ciphertext,
-            metadata_ciphertext,
-        }
-    }
-}
-
-/// Plaintext metadata bundle encrypted into `SyncVersionPayload.metadata_ciphertext`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VersionMetadata {
-    pub version_id: String,
-    pub entry_id: String,
-    pub created_at: i64,
-    pub device_id: String,
-    pub preview_text: String,
-}
+/// Frame types, the `XJV1` codec and the opener live in `memlore_core::version`
+/// (shared with the web); this module keeps thin wrappers that map its
+/// `CodecError` to `SyncError`, plus the desktop key-state helpers.
+pub use memlore_core::version::{
+    SyncVersionPayload, VersionMetadata, VERSION_PAYLOAD_SCHEMA_VERSION,
+};
 
 /// Cloud path for a version blob: flat under the authoring device's own
 /// folder, mirroring `{device_id}/media/{media_id}` and
@@ -74,46 +29,12 @@ pub fn version_cloud_path(device_id: &str, version_id: &str) -> String {
     format!("{device_id}/versions/{version_id}.bin")
 }
 
-fn bincode_opts() -> impl bincode::Options {
-    bincode::DefaultOptions::new()
-        .with_fixint_encoding()
-        .with_limit(MAX_PAYLOAD_BYTES)
-}
-
 pub fn serialize_version_payload(payload: &SyncVersionPayload) -> Result<Vec<u8>, SyncError> {
-    let body = bincode_opts()
-        .serialize(payload)
-        .map_err(|e| SyncError::Serialization(e.to_string()))?;
-    let mut out = Vec::with_capacity(VERSION_PAYLOAD_MAGIC.len() + body.len());
-    out.extend_from_slice(&VERSION_PAYLOAD_MAGIC);
-    out.extend_from_slice(&body);
-    Ok(out)
+    Ok(memlore_core::version::serialize_version_payload(payload)?)
 }
 
 pub fn deserialize_version_payload(bytes: &[u8]) -> Result<SyncVersionPayload, SyncError> {
-    if bytes.len() < VERSION_PAYLOAD_MAGIC.len() {
-        return Err(SyncError::Serialization(
-            "version payload too short to contain magic header".to_string(),
-        ));
-    }
-    if bytes[..VERSION_PAYLOAD_MAGIC.len()] != VERSION_PAYLOAD_MAGIC {
-        return Err(SyncError::Serialization(format!(
-            "invalid version payload magic header (expected {:?}, got {:?})",
-            VERSION_PAYLOAD_MAGIC,
-            &bytes[..VERSION_PAYLOAD_MAGIC.len()]
-        )));
-    }
-    let body = &bytes[VERSION_PAYLOAD_MAGIC.len()..];
-    let payload: SyncVersionPayload = bincode_opts()
-        .deserialize(body)
-        .map_err(|e| SyncError::Serialization(e.to_string()))?;
-    if payload.schema_version != VERSION_PAYLOAD_SCHEMA_VERSION {
-        return Err(SyncError::Serialization(format!(
-            "unsupported version payload schema version {} (expected {})",
-            payload.schema_version, VERSION_PAYLOAD_SCHEMA_VERSION
-        )));
-    }
-    Ok(payload)
+    Ok(memlore_core::version::deserialize_version_payload(bytes)?)
 }
 
 /// Encrypt one field (Yjs snapshot bytes or metadata JSON) for a version
@@ -166,6 +87,22 @@ mod tests {
         assert_eq!(back.schema_version, VERSION_PAYLOAD_SCHEMA_VERSION);
     }
 
+    /// XJV1 frame bytes pinned before the codec moved to `memlore_core::version`.
+    /// bincode fixint is deterministic, so any drift in magic, field order or
+    /// integer width shows up here.
+    const GOLDEN_FRAME_HEX: &str = "584a56310100cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd0300000000000000010203040000000000000009080706";
+
+    #[test]
+    fn golden_frame_bytes_unchanged() {
+        let p = SyncVersionPayload::new(TEST_FP, vec![1, 2, 3], vec![9, 8, 7, 6]);
+        let bytes = serialize_version_payload(&p).unwrap();
+        assert_eq!(hex::encode(&bytes), GOLDEN_FRAME_HEX);
+        assert_eq!(
+            deserialize_version_payload(&hex::decode(GOLDEN_FRAME_HEX).unwrap()).unwrap(),
+            p
+        );
+    }
+
     #[test]
     fn payload_starts_with_distinct_magic() {
         let p = SyncVersionPayload::new(TEST_FP, vec![1], vec![2]);
@@ -175,7 +112,9 @@ mod tests {
 
     #[test]
     fn payload_missing_magic_is_rejected() {
-        let body = bincode_opts()
+        use bincode::Options;
+        let body = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
             .serialize(&SyncVersionPayload::new(TEST_FP, vec![1], vec![2]))
             .unwrap();
         let err = deserialize_version_payload(&body).unwrap_err();

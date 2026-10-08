@@ -10,7 +10,7 @@
 //! - Time is always a parameter; nothing here reads a clock or generates ids.
 //! - Error strings carry no key material, no journal text and no fragments of the
 //!   rejected input (JSON errors report only a class, line and column). One
-//!   exception: outbox intent validation may name a rejected id or emotion token.
+//!   exception: outbox intent validation may name a rejected id, emotion token or color.
 //! - Untrusted input is size-capped before any decrypt or parse
 //!   ([`MAX_ENTRY_BYTES`], [`MAX_MEDIA_BYTES`], [`MAX_BIN_BYTES`],
 //!   [`MAX_JSON_BYTES`]); over-limit input returns an error and no data.
@@ -22,7 +22,7 @@
 //! - Passwords and recovery phrases passed in as `&str` stay in the JS heap; Rust
 //!   cannot zeroize them.
 //!
-//! Test sealers: `sealEntry` and `sealMedia` can forge validly encrypted files
+//! Test sealers: `sealEntry`, `sealMedia` and `sealVersion` can forge validly encrypted files
 //! under the user's content key, so they are exported only with the cargo
 //! feature `test-sealers` (off by default, off in production builds). JS tests
 //! that need them must build a separate package with
@@ -39,11 +39,12 @@ use memlore_core::metadata::{
     compute_diff, compute_journal_diff, merge_metadata_lww, DeviceMetadata, EntryMetadata,
     SyncedJournalSummary,
 };
-use memlore_core::outbox::{self, OutboxEntryV1};
+use memlore_core::outbox::{self, OutboxEntryV1, OutboxIntent, OutboxIntentV2};
 use memlore_core::recovery::{validate_recovery_mnemonic, RECOVERY_WORD_COUNT};
 use memlore_core::sync_control::{
     authorize_recovery_push, RecoveryOwnerPermit, SyncControlV1, SYNC_CONTROL_VERSION,
 };
+use memlore_core::version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use zeroize::Zeroizing;
@@ -345,6 +346,32 @@ pub fn open_device_bin(ring: &KeyRing, bytes: &[u8]) -> Result<Vec<u8>, JsError>
     open_bare_inner(&ring.state, bytes, true).map_err(js_err)
 }
 
+/// Plaintext of one opened version snapshot file.
+#[wasm_bindgen(getter_with_clone)]
+pub struct OpenedVersion {
+    /// `serde_json` of `VersionMetadata`.
+    #[wasm_bindgen(js_name = metadataJson)]
+    pub metadata_json: String,
+    /// Immutable Yjs full-state snapshot bytes.
+    pub yjs: Vec<u8>,
+}
+
+fn open_version_inner(state: &KeyRingState, bytes: &[u8]) -> Result<OpenedVersion, String> {
+    check_len("version file", bytes.len(), MAX_ENTRY_BYTES)?;
+    let opened = version::open_version(state.list()?, bytes).map_err(envelope_err)?;
+    Ok(OpenedVersion {
+        metadata_json: to_json("version metadata", &opened.metadata)?,
+        yjs: opened.yjs,
+    })
+}
+
+/// Open `<device>/versions/<versionId>.bin`. The caller still checks
+/// `version_id` against the file name, as desktop `ingest_version` does.
+#[wasm_bindgen(js_name = openVersion)]
+pub fn open_version(ring: &KeyRing, bytes: &[u8]) -> Result<OpenedVersion, JsError> {
+    open_version_inner(&ring.state, bytes).map_err(js_err)
+}
+
 // ---------------------------------------------------------------------------
 // Sealers
 // ---------------------------------------------------------------------------
@@ -391,6 +418,24 @@ pub fn seal_media(ring: &KeyRing, plaintext: &[u8]) -> Result<Vec<u8>, JsError> 
     seal_media_inner(&ring.state, plaintext, false).map_err(js_err)
 }
 
+#[cfg(any(test, feature = "test-sealers"))]
+fn seal_version_inner(
+    state: &KeyRingState,
+    metadata_json: &str,
+    yjs: &[u8],
+) -> Result<Vec<u8>, String> {
+    let metadata: version::VersionMetadata = parse_json("version metadata", metadata_json)?;
+    version::seal_version(state.list()?, &metadata, yjs).map_err(envelope_err)
+}
+
+/// TEST FIXTURES ONLY (feature `test-sealers`). The web never writes version
+/// snapshots; this exists so tests can build version files.
+#[cfg(feature = "test-sealers")]
+#[wasm_bindgen(js_name = sealVersion)]
+pub fn seal_version(ring: &KeyRing, metadata_json: &str, yjs: &[u8]) -> Result<Vec<u8>, JsError> {
+    seal_version_inner(&ring.state, metadata_json, yjs).map_err(js_err)
+}
+
 /// Seal media bytes for an outbox upload (thin wrapper over core `seal_media`).
 #[wasm_bindgen(js_name = sealOutboxMedia)]
 pub fn seal_outbox_media(ring: &KeyRing, plaintext: &[u8]) -> Result<Vec<u8>, JsError> {
@@ -426,6 +471,65 @@ fn open_outbox_entry_inner(state: &KeyRingState, bytes: &[u8]) -> Result<String,
 #[wasm_bindgen(js_name = openOutboxEntry)]
 pub fn open_outbox_entry(ring: &KeyRing, bytes: &[u8]) -> Result<String, JsError> {
     open_outbox_entry_inner(&ring.state, bytes).map_err(js_err)
+}
+
+fn seal_outbox_intent_v2_inner(state: &KeyRingState, intent_json: &str) -> Result<Vec<u8>, String> {
+    let intent: OutboxIntentV2 = parse_json("outbox intent", intent_json)?;
+    let list = state.list()?;
+    outbox::seal_outbox_intent_v2(list, &intent).map_err(|e| e.to_string())
+}
+
+/// Validate and seal a v2 outbox intent JSON (`OutboxIntentV2`, tagged by
+/// `kind`) into encrypted wire bytes (frame version 2).
+#[wasm_bindgen(js_name = sealOutboxIntentV2)]
+pub fn seal_outbox_intent_v2(ring: &KeyRing, intent_json: &str) -> Result<Vec<u8>, JsError> {
+    seal_outbox_intent_v2_inner(&ring.state, intent_json).map_err(js_err)
+}
+
+/// One opened outbox intent of any supported frame version.
+#[wasm_bindgen(getter_with_clone)]
+pub struct OpenedOutboxIntent {
+    /// Frame version: 1 = entry intent, 2 = `OutboxIntentV2`.
+    pub version: u16,
+    /// `"entry"` for v1, else the v2 `kind` tag.
+    pub kind: String,
+    /// JSON of `OutboxEntryV1` (v1) or `OutboxIntentV2` (v2).
+    pub json: String,
+}
+
+fn open_outbox_intent_inner(
+    state: &KeyRingState,
+    bytes: &[u8],
+) -> Result<OpenedOutboxIntent, String> {
+    check_len("outbox intent file", bytes.len(), MAX_ENTRY_BYTES)?;
+    let list = state.list()?;
+    match outbox::open_outbox_intent(list, bytes).map_err(|e| e.to_string())? {
+        OutboxIntent::V1(entry) => Ok(OpenedOutboxIntent {
+            version: 1,
+            kind: "entry".to_string(),
+            json: to_json("outbox entry", &entry)?,
+        }),
+        OutboxIntent::V2(intent) => {
+            let value = serde_json::to_value(&intent)
+                .map_err(|_| "cannot serialize outbox intent".to_string())?;
+            // Read the serde tag back so `kind` can never drift from the JSON.
+            let kind = value["kind"]
+                .as_str()
+                .ok_or_else(|| "outbox intent has no kind".to_string())?
+                .to_string();
+            Ok(OpenedOutboxIntent {
+                version: 2,
+                kind,
+                json: to_json("outbox intent", &value)?,
+            })
+        }
+    }
+}
+
+/// Open an outbox intent file of any supported frame version (v1 entry or v2).
+#[wasm_bindgen(js_name = openOutboxIntent)]
+pub fn open_outbox_intent(ring: &KeyRing, bytes: &[u8]) -> Result<OpenedOutboxIntent, JsError> {
+    open_outbox_intent_inner(&ring.state, bytes).map_err(js_err)
 }
 
 fn open_outbox_acks_inner(state: &KeyRingState, bytes: &[u8]) -> Result<String, String> {
@@ -878,6 +982,101 @@ mod tests {
         let err = parse_manifest_inner("{SECRET-VALUE").unwrap_err();
         assert!(err.starts_with("invalid manifest: syntax error at line 1"));
         assert!(!err.contains("SECRET"));
+    }
+
+    const VERSION_META: &str = r#"{"version_id":"11111111-1111-1111-1111-111111111111","entry_id":"22222222-2222-2222-2222-222222222222","created_at":1700000000,"device_id":"device-a","preview_text":"hi"}"#;
+
+    #[test]
+    fn version_seal_open_round_trip_through_wrappers() {
+        let s = list_state();
+        let sealed = seal_version_inner(&s, VERSION_META, b"snap").unwrap();
+        let opened = open_version_inner(&s, &sealed).unwrap();
+        let a: serde_json::Value = serde_json::from_str(&opened.metadata_json).unwrap();
+        let b: serde_json::Value = serde_json::from_str(VERSION_META).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(opened.yjs, b"snap");
+        // An entry frame is not a version frame.
+        let entry = seal_entry_inner(&s, META, b"y").unwrap();
+        assert!(open_version_inner(&s, &entry).is_err());
+        assert!(seal_version_inner(&s, "{}", b"y").is_err());
+    }
+
+    #[test]
+    fn open_version_rejects_unsafe_ids_without_echoing_them() {
+        let s = list_state();
+        let mut meta: version::VersionMetadata = serde_json::from_str(VERSION_META).unwrap();
+        meta.device_id = "SECRET/../x".to_string();
+        let sealed = version::seal_version(s.list().unwrap(), &meta, b"y").unwrap();
+        let err = open_version_inner(&s, &sealed).err().unwrap();
+        assert!(err.contains("device_id"), "{err}");
+        assert!(!err.contains("SECRET"), "{err}");
+    }
+
+    const WEB: &str = "web-device-0001";
+
+    fn v2_intents() -> Vec<serde_json::Value> {
+        vec![
+            serde_json::json!({"kind":"create_journal","web_device_id":WEB,"web_updated_at_secs":10,"journal_id":"journal-0001","name":"Work","color":"#aabbcc","auto_tag_ids":["tag-00000001"]}),
+            serde_json::json!({"kind":"create_tag","web_device_id":WEB,"web_updated_at_secs":11,"tag_id":"tag-00000001","name":"Fun","color":null}),
+            serde_json::json!({"kind":"upsert_template","web_device_id":WEB,"web_updated_at_secs":12,"template_id":"template-0001","name":"Daily","description":null,"content_b64":"aGk=","sort_order":3,"base_updated_at":null}),
+            serde_json::json!({"kind":"delete_template","web_device_id":WEB,"web_updated_at_secs":13,"template_id":"template-0001","base_updated_at":7}),
+            serde_json::json!({"kind":"trash_entry","web_device_id":WEB,"web_updated_at_secs":14,"entry_id":"entry-000001","base_updated_at":8}),
+        ]
+    }
+
+    #[test]
+    fn every_v2_intent_kind_seals_and_opens() {
+        let s = list_state();
+        for intent in v2_intents() {
+            let sealed = seal_outbox_intent_v2_inner(&s, &intent.to_string()).unwrap();
+            let opened = open_outbox_intent_inner(&s, &sealed).unwrap();
+            assert_eq!(opened.version, 2);
+            assert_eq!(opened.kind, intent["kind"].as_str().unwrap());
+            let back: serde_json::Value = serde_json::from_str(&opened.json).unwrap();
+            assert_eq!(back, intent);
+            // The v1-only opener still refuses a v2 frame.
+            let err = open_outbox_entry_inner(&s, &sealed).unwrap_err();
+            assert_eq!(err, "unsupported schema version: 2");
+        }
+    }
+
+    #[test]
+    fn invalid_v2_intents_are_rejected_before_sealing() {
+        let s = list_state();
+        let mut bad_color = v2_intents()[1].clone();
+        bad_color["color"] = "red".into();
+        assert!(seal_outbox_intent_v2_inner(&s, &bad_color.to_string()).is_err());
+        let mut bad_id = v2_intents()[4].clone();
+        bad_id["entry_id"] = "x".into();
+        assert!(seal_outbox_intent_v2_inner(&s, &bad_id.to_string()).is_err());
+        let mut unknown = v2_intents()[4].clone();
+        unknown["kind"] = "rename_tag".into();
+        assert!(seal_outbox_intent_v2_inner(&s, &unknown.to_string()).is_err());
+    }
+
+    #[test]
+    fn v1_entry_frame_opens_through_open_outbox_intent() {
+        let s = list_state();
+        let entry = serde_json::json!({"schema_version":1,"entry_id":"entry-000001","web_device_id":WEB,"created_on_web":true,"web_updated_at_secs":5,"base_state_vector":[],"yjs_full_state":[1,2],"content_text":"hi","preview_text":"hi","fields":{},"media":[]});
+        let sealed = seal_outbox_entry_inner(&s, &entry.to_string()).unwrap();
+        let opened = open_outbox_intent_inner(&s, &sealed).unwrap();
+        assert_eq!(opened.version, 1);
+        assert_eq!(opened.kind, "entry");
+        assert_eq!(opened.json, open_outbox_entry_inner(&s, &sealed).unwrap());
+    }
+
+    #[test]
+    fn oversized_version_and_intent_files_are_rejected() {
+        let s = list_state();
+        let big = vec![0u8; MAX_ENTRY_BYTES + 1];
+        assert!(open_version_inner(&s, &big)
+            .err()
+            .unwrap()
+            .contains("too large"));
+        assert!(open_outbox_intent_inner(&s, &big)
+            .err()
+            .unwrap()
+            .contains("too large"));
     }
 
     #[test]

@@ -31,3 +31,85 @@ export function loadCore(): Promise<Core> {
   })
   return loading
 }
+
+type KeyRing = pkg.KeyRing
+
+/** Decrypted metadata of a version snapshot (Rust `VersionMetadata`). */
+export interface VersionMetadata {
+  version_id: string
+  entry_id: string
+  created_at: number
+  device_id: string
+  preview_text: string
+}
+
+/** One opened `<device>/versions/<versionId>.bin`. */
+export interface OpenedVersion {
+  metadata: VersionMetadata
+  /** Immutable Yjs full-state snapshot bytes. */
+  yjs: Uint8Array
+}
+
+interface IntentBase {
+  web_device_id: string
+  web_updated_at_secs: number
+}
+
+/**
+ * v2 outbox intent, matching the Rust `OutboxIntentV2` JSON exactly (tag `kind`, snake_case,
+ * closed schema: unknown fields are rejected). Rust `Option` fields are always present as `null`.
+ */
+export type OutboxIntentV2 =
+  | (IntentBase & {
+      kind: 'create_journal'
+      journal_id: string
+      name: string
+      color: string | null
+      auto_tag_ids: string[]
+    })
+  | (IntentBase & { kind: 'create_tag'; tag_id: string; name: string; color: string | null })
+  | (IntentBase & {
+      kind: 'upsert_template'
+      template_id: string
+      name: string
+      description: string | null
+      content_b64: string | null
+      sort_order: number
+      /** `null` = create. */
+      base_updated_at: number | null
+    })
+  | (IntentBase & { kind: 'delete_template'; template_id: string; base_updated_at: number })
+  | (IntentBase & { kind: 'trash_entry'; entry_id: string; base_updated_at: number })
+
+/** An opened outbox intent: v1 keeps the raw `OutboxEntryV1` JSON (as `openOutboxEntry`). */
+export type OpenedOutboxIntent =
+  | { version: 1; kind: 'entry'; json: string }
+  | { version: 2; intent: OutboxIntentV2 }
+
+/** Open a version snapshot file. The caller still checks `version_id` against the file name. */
+export function openVersion(core: Core, ring: KeyRing, bytes: Uint8Array): OpenedVersion {
+  const opened = core.openVersion(ring, bytes)
+  try {
+    return { metadata: JSON.parse(opened.metadataJson) as VersionMetadata, yjs: opened.yjs }
+  } finally {
+    opened.free()
+  }
+}
+
+/** Validate and seal a v2 intent into encrypted outbox bytes. */
+export function sealOutboxIntentV2(core: Core, ring: KeyRing, intent: OutboxIntentV2): Uint8Array {
+  return core.sealOutboxIntentV2(ring, JSON.stringify(intent))
+}
+
+/** Open an outbox intent file of any supported frame version. */
+export function openOutboxIntent(core: Core, ring: KeyRing, bytes: Uint8Array): OpenedOutboxIntent {
+  const opened = core.openOutboxIntent(ring, bytes)
+  try {
+    if (opened.version === 1) return { version: 1, kind: 'entry', json: opened.json }
+    if (opened.version === 2)
+      return { version: 2, intent: JSON.parse(opened.json) as OutboxIntentV2 }
+    throw new Error(`unsupported outbox intent version ${opened.version}`)
+  } finally {
+    opened.free()
+  }
+}

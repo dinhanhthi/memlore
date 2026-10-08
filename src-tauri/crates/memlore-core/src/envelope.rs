@@ -443,7 +443,7 @@ use crate::keyring_types::ContentListV2;
 use crate::recovery::{derive_recovery_key, validate_recovery_mnemonic};
 
 /// `0x01` envelope byte (`encryption.rs` `VERSION_AES_GCM_V1`, private there).
-const ENVELOPE_V1: u8 = 0x01;
+pub(crate) const ENVELOPE_V1: u8 = 0x01;
 /// Bytes of the little endian epoch tag in a `0x02` envelope.
 const EPOCH_SIZE: usize = 4;
 /// Magic of the entry frame (`entry_sync.rs` `PAYLOAD_MAGIC`, private there). A
@@ -460,11 +460,12 @@ pub enum EnvelopeError {
     /// The buffer is shorter than the minimum for its format.
     #[error("buffer too short")]
     ShortBuffer,
-    /// An entry frame does not start with `XJS1`.
-    #[error("invalid entry frame magic")]
+    /// A frame does not start with its channel magic (`XJS1` entries,
+    /// `XJV1` versions).
+    #[error("invalid frame magic")]
     BadMagic,
-    /// An entry frame carries a schema version this build cannot read.
-    #[error("unsupported entry frame schema version {0}")]
+    /// An entry or version frame carries a schema version this build cannot read.
+    #[error("unsupported frame schema version {0}")]
     UnsupportedSchemaVersion(u16),
     /// Envelope byte other than the ones valid for the channel.
     #[error("unknown envelope version: {0:#04x}")]
@@ -476,7 +477,7 @@ pub enum EnvelopeError {
     /// damaged data).
     #[error("wrong key or corrupted data")]
     WrongKey,
-    /// The entry frame fingerprint matches no epoch of the content-key list.
+    /// The entry or version frame fingerprint matches no epoch of the content-key list.
     #[error("key fingerprint matches no content key in the list")]
     FingerprintMismatch,
     /// A `_content.json` entry unwrapped, but its stored fingerprint differs.
@@ -510,14 +511,14 @@ pub struct OpenedEntry {
 
 /// `K2[e]`: the AES key of every cloud channel for the content key `content`.
 /// Two HKDF steps (see "The one key chain").
-fn envelope_key(content: &[u8; KEY_SIZE]) -> Zeroizing<[u8; KEY_SIZE]> {
+pub(crate) fn envelope_key(content: &[u8; KEY_SIZE]) -> Zeroizing<[u8; KEY_SIZE]> {
     let k1 = derive_sync_key(content);
     derive_sync_key(&k1)
 }
 
 /// `K2` and epoch of the latest content key (`key_state.rs`
 /// `with_latest_sync_key` applied to the engine's pre-derived snapshot).
-fn latest_envelope_key(
+pub(crate) fn latest_envelope_key(
     list: &ContentKeyList,
 ) -> Result<(u32, Zeroizing<[u8; KEY_SIZE]>), EnvelopeError> {
     let content = list
@@ -527,7 +528,7 @@ fn latest_envelope_key(
     Ok((list.latest, envelope_key(content)))
 }
 
-fn seal_v1(key: &[u8; KEY_SIZE], plaintext: &[u8]) -> Result<Vec<u8>, EnvelopeError> {
+pub(crate) fn seal_v1(key: &[u8; KEY_SIZE], plaintext: &[u8]) -> Result<Vec<u8>, EnvelopeError> {
     let inner = encrypt_data(key, plaintext).map_err(EnvelopeError::Crypto)?;
     let mut out = Vec::with_capacity(1 + inner.len());
     out.push(ENVELOPE_V1);
@@ -537,7 +538,7 @@ fn seal_v1(key: &[u8; KEY_SIZE], plaintext: &[u8]) -> Result<Vec<u8>, EnvelopeEr
 
 /// Strip the `0x01` byte of an entry inner blob and decrypt it with `key`
 /// (`engine.rs` `ingest_entry`, closure of `with_sync_key_for_fingerprint`).
-fn open_v1_with(key: &[u8; KEY_SIZE], blob: &[u8]) -> Result<Vec<u8>, EnvelopeError> {
+pub(crate) fn open_v1_with(key: &[u8; KEY_SIZE], blob: &[u8]) -> Result<Vec<u8>, EnvelopeError> {
     let inner = blob.get(1..).ok_or(EnvelopeError::Empty)?;
     if inner.len() < NONCE_SIZE + TAG_SIZE {
         return Err(EnvelopeError::ShortBuffer);
@@ -787,7 +788,7 @@ pub fn unlock_local(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::encryption::{
         decrypt_data_with_state, encrypt_data_with_state, encrypt_data_with_state_epoch,
@@ -799,7 +800,7 @@ mod tests {
         Zeroizing::new([b; 32])
     }
 
-    fn list_of(epochs: &[(u32, u8)], latest: u32) -> ContentKeyList {
+    pub(crate) fn list_of(epochs: &[(u32, u8)], latest: u32) -> ContentKeyList {
         ContentKeyList {
             keys: epochs.iter().map(|(e, b)| (*e, key(*b))).collect(),
             latest,
@@ -810,7 +811,7 @@ mod tests {
 
     /// Desktop engine view of `list`: pre-derived snapshot, like
     /// `snapshot_for_engine` / `make_key_state`.
-    fn engine_state(list: &ContentKeyList) -> EncryptionKeyState {
+    pub(crate) fn engine_state(list: &ContentKeyList) -> EncryptionKeyState {
         let ks = EncryptionKeyState::new();
         let keys = list.keys.iter().map(|(e, k)| (*e, key(k[0]))).collect();
         ks.set_content_state(keys, list.latest, key(0), key(9))
@@ -1150,7 +1151,7 @@ mod tests {
 
     // ---- golden: sealed by WASM, opened natively ----
 
-    fn b64_decode(text: &str) -> Vec<u8> {
+    pub(crate) fn b64_decode(text: &str) -> Vec<u8> {
         let mut out = Vec::new();
         let (mut acc, mut bits) = (0u32, 0u32);
         for c in text.bytes().filter(|c| *c != b'=') {
@@ -1175,7 +1176,7 @@ mod tests {
 
     /// Content keys of the frozen desktop vault, loaded exactly like
     /// `golden_desktop_fixture_decodes` does.
-    fn desktop_vault_list() -> ContentKeyList {
+    pub(crate) fn desktop_vault_list() -> ContentKeyList {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/");
         let vault: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(format!("{dir}desktop-vault.v1.json")).unwrap(),

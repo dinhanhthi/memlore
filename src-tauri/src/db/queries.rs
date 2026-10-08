@@ -14062,6 +14062,20 @@ mod tests {
         );
     }
 
+    /// The web outbox validates v2 template intents against core copies of
+    /// these caps; they must never drift from what the desktop stores.
+    #[test]
+    fn template_caps_match_core_outbox_copies() {
+        assert_eq!(
+            memlore_core::outbox::MAX_TEMPLATE_CONTENT_BYTES,
+            MAX_TEMPLATE_CONTENT_BYTES
+        );
+        assert_eq!(
+            memlore_core::outbox::MAX_TEMPLATE_DESCRIPTION_BYTES,
+            MAX_TEMPLATE_DESCRIPTION_BYTES
+        );
+    }
+
     #[test]
     fn update_template_rejects_oversized_content() {
         let conn = setup();

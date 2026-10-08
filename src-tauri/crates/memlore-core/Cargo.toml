@@ -19,6 +19,7 @@ hkdf = "0.12"
 zeroize = { version = "1", features = ["derive"] }
 hmac = "0.12"
 hex = "0.4"
+base64 = "0.22"
 bip39 = { version = "2", default-features = false, features = ["std", "zeroize"] }
 serde_json = "1.0"
 

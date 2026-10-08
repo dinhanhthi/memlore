@@ -3794,6 +3794,7 @@ version = "0.2.1"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "base64 0.22.1",
  "bincode",
  "bip39",
  "getrandom 0.2.17",
