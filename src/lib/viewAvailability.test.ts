@@ -113,7 +113,9 @@ describe('isViewAvailable', () => {
 describe('needsMonthIndex', () => {
   it('names the views a desktop month index unlocks on web', () => {
     for (const view of ALL_VIEWS) {
-      expect(needsMonthIndex(view)).toBe(view === 'media' || view === 'onthisday' || view === 'map')
+      expect(needsMonthIndex(view)).toBe(
+        view === 'media' || view === 'onthisday' || view === 'map' || view === 'stats',
+      )
     }
   })
 })

@@ -229,7 +229,7 @@ describe('command palette on web', () => {
   })
 
   describe('views served from the desktop month index', () => {
-    const INDEXED_IDS = ['page.media', 'page.onthisday', 'page.map']
+    const INDEXED_IDS = ['page.media', 'page.onthisday', 'page.map', 'page.stats']
     // A pill offers only the options other than the current value.
     const MEDIA_VIEW_MODE_IDS = [
       'settings_value.media_view_mode.full',

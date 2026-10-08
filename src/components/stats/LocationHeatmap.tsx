@@ -10,6 +10,8 @@ import { useMapSourceUsable } from '../../hooks/useMapSourceUsable'
 import { useStats } from '../../hooks/useStats'
 import { useTheme } from '../../hooks/useTheme'
 import { MapSourceGate } from '../map/MapSourceGate'
+import { MapTilesConsent } from '../map/MapTilesConsent'
+import { isWeb } from '../../lib/platform'
 import { LOCATION_DENSITY_KEY } from './statsPeriod'
 import { createMapBasemapLayer, DEFAULT_CENTER, DEFAULT_ZOOM } from '../map/LeafletMap'
 
@@ -104,6 +106,14 @@ export function LocationHeatmap() {
   }
 
   if (!usable) {
+    // The web serves no offline basemap or MapKit: tiles are opt-in with the user's MapTiler key.
+    if (isWeb) {
+      return (
+        <div className="flex min-h-80 items-center justify-center">
+          <MapTilesConsent />
+        </div>
+      )
+    }
     return <MapSourceGate variant="inline" className="h-80" />
   }
 

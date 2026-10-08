@@ -1026,7 +1026,8 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   const attemptPendingRestore = useCallback(() => {
     const pending = getPendingRestore()
     if (!pending) return
-    if (pending.entryId !== entryIdRef.current) {
+    // Restore needs the desktop version store; the web reads history only.
+    if (!versions || pending.entryId !== entryIdRef.current) {
       setPendingRestore(null)
       return
     }

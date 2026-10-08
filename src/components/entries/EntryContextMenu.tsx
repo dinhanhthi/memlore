@@ -619,7 +619,7 @@ export function EntryContextMenu({
                 hasSubmenu
               />
             )}
-            {caps.versions && (
+            {caps.versionsRead && (
               <MenuItem
                 icon={<History className="size-3.5" />}
                 label={t('entry_context.version_history', { defaultValue: 'Version history' })}

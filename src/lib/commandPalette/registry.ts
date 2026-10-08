@@ -205,7 +205,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.stats',
     icon: BarChart3,
     keywords: ['analytics', 'insights', 'charts'],
-    available: () => capabilities.stats,
+    available: () => currentCapabilities().stats,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'stats', selectedEntryId: null }),
   },

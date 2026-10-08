@@ -18,6 +18,7 @@ import {
 import { RestoredScroll } from '../common/RestoredScroll'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { cn } from '../../lib/cn'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useTabStore } from '../../stores/tabStore'
 import { type StatsTab, useUiStore } from '../../stores/uiStore'
 import { ChartCard } from './ChartCard'
@@ -54,12 +55,19 @@ const LocationHeatmap = lazy(() =>
 
 // ─── Tab IDs ─────────────────────────────────────────────────────────────────
 
-const STATS_TABS: { id: StatsTab; labelKey: string; defaultLabel: string; icon: LucideIcon }[] = [
+/** `ai`: the tab needs the AI backend (hidden on the web, which has none). */
+const STATS_TABS: {
+  id: StatsTab
+  labelKey: string
+  defaultLabel: string
+  icon: LucideIcon
+  ai?: true
+}[] = [
   { id: 'charts', labelKey: 'tabs.charts', defaultLabel: 'Charts', icon: LineChart },
   { id: 'insights', labelKey: 'tabs.insights', defaultLabel: 'Insights', icon: Lightbulb },
-  { id: 'reviews', labelKey: 'tabs.reviews', defaultLabel: 'Reviews', icon: Sparkles },
-  { id: 'usage', labelKey: 'tabs.usage', defaultLabel: 'AI usage', icon: BarChart3 },
-  { id: 'audit', labelKey: 'tabs.audit', defaultLabel: 'AI audit log', icon: History },
+  { id: 'reviews', labelKey: 'tabs.reviews', defaultLabel: 'Reviews', icon: Sparkles, ai: true },
+  { id: 'usage', labelKey: 'tabs.usage', defaultLabel: 'AI usage', icon: BarChart3, ai: true },
+  { id: 'audit', labelKey: 'tabs.audit', defaultLabel: 'AI audit log', icon: History, ai: true },
 ]
 
 function statsTabId(id: StatsTab) {
@@ -87,11 +95,15 @@ export function StatisticsView() {
   const { t } = useTranslation('stats')
   const isClay = useUiStore((s) => s.designSystem) === 'clay'
   const [period, setPeriod] = useState<Period>('30d')
+  const caps = useCapabilities()
+  const tabs = STATS_TABS.filter((tab) => caps.ai || tab.ai !== true)
   // Per-app-tab so each stats view keeps its own sub-tab independently.
-  const activeTab = useTabStore((s) => {
+  const storedTab = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
     return tab?.statsTab ?? 'charts'
   })
+  // A persisted AI tab falls back to Charts where the AI tabs are hidden (web).
+  const activeTab = tabs.some((tab) => tab.id === storedTab) ? storedTab : 'charts'
   const setActiveTab = (tab: StatsTab) => useTabStore.getState().updateActiveTab({ statsTab: tab })
 
   // Track which tabs have been visited this mount. Panel content only mounts
@@ -127,9 +139,12 @@ export function StatisticsView() {
             })}
           </p>
         </div>
-        <div className="shrink-0">
-          <ExportButton />
-        </div>
+        {/* Export saves a file through the desktop shell. */}
+        {caps.importExport && (
+          <div className="shrink-0">
+            <ExportButton />
+          </div>
+        )}
       </div>
 
       {/* ── Section picker — Clay segmented control (ids feed the panels'
@@ -141,7 +156,7 @@ export function StatisticsView() {
           ariaLabel={t('tab_sections.statistics')}
           idPrefix="stats-tab"
           commitOnArrow
-          options={STATS_TABS.map((tab) => {
+          options={tabs.map((tab) => {
             const label = t(tab.labelKey, { defaultValue: tab.defaultLabel })
             const Icon = tab.icon
             return {
@@ -176,7 +191,7 @@ export function StatisticsView() {
        * (privacy note, retention, clear, filters) stay pinned. Other
        * tabs scroll the whole panel as usual. */}
       <div className="min-h-0 flex-1">
-        {STATS_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id
           const shouldRender = isActive || visitedTabs.has(tab.id)
           const ownsScroll = tab.id !== 'audit'

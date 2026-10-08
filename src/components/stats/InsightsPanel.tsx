@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEmotionTrend } from '../../hooks/useEmotionTrend'
 import { PeriodSelector, type Period } from './PeriodSelector'
 import { EmotionTrendChart } from './EmotionTrendChart'
@@ -28,6 +29,7 @@ function periodToRange(period: Period): { start: number; end: number } {
 export function InsightsPanel() {
   const { t } = useTranslation('stats')
   const [period, setPeriod] = useState<Period>('30d')
+  const caps = useCapabilities()
 
   const { rows, isLoading: trendLoading } = useEmotionTrend(period)
   const range = useMemo(() => periodToRange(period), [period])
@@ -67,7 +69,8 @@ export function InsightsPanel() {
         )}
       </section>
 
-      <ThemeInsightsSection start={range.start} end={range.end} />
+      {/* AI themes need the AI backend, which the web does not have. */}
+      {caps.ai && <ThemeInsightsSection start={range.start} end={range.end} />}
     </div>
   )
 }

@@ -298,7 +298,9 @@
     "confirm_title": "Khôi phục phiên bản này?",
     "confirm_description": "Mục nhật ký sẽ được cập nhật theo phiên bản này. Nội dung hiện tại vẫn được giữ trong lịch sử và không bị mất.",
     "select_prompt": "Chọn một phiên bản để xem trước",
-    "restore_failed": "Khôi phục phiên bản thất bại"
+    "restore_failed": "Khôi phục phiên bản thất bại",
+    "close": "Đóng",
+    "read_only_note": "Chỉ xem trên trình duyệt. Hãy khôi phục phiên bản trong ứng dụng máy tính."
   },
   "second_lock_prompt": {
     "password_placeholder": "Mật khẩu khóa phụ",

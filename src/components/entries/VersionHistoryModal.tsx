@@ -7,6 +7,7 @@ import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useEntryVersions } from '../../hooks/useEntryVersions'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useUiStore } from '../../stores/uiStore'
 import { formatRelativeDate, formatTime } from '../../lib/dates'
 import { snapshotToPmJson } from '../../lib/yjs'
@@ -44,6 +45,9 @@ export function VersionHistoryModal({ entryId, entryTitle, onClose }: VersionHis
   const justifyEnabled = useEditorJustifyEnabled()
   const typography = useEditorTypography()
   const { versions, isLoading, getVersionContent, restore } = useEntryVersions(entryId)
+  // Restore writes through the desktop version store; the web reads history only.
+  const caps = useCapabilities()
+  const canRestore = caps.versions && caps.writes
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [mathExtensions, setMathExtensions] = useState<Extension[]>([])
@@ -160,29 +164,42 @@ export function VersionHistoryModal({ entryId, entryTitle, onClose }: VersionHis
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          {t('versionHistory.cancel', { defaultValue: 'Cancel' })}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setConfirmOpen(true)}
-          disabled={selectedId === null}
-        >
-          {t('versionHistory.restore', { defaultValue: 'Restore' })}
-        </Button>
+        {canRestore ? (
+          <>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t('versionHistory.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setConfirmOpen(true)}
+              disabled={selectedId === null}
+            >
+              {t('versionHistory.restore', { defaultValue: 'Restore' })}
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-fg-muted mr-auto text-xs">{t('versionHistory.read_only_note')}</p>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              {t('versionHistory.close')}
+            </Button>
+          </>
+        )}
       </Modal.Footer>
-      <ConfirmDialog
-        open={confirmOpen}
-        title={t('versionHistory.confirm_title', { defaultValue: 'Restore this version?' })}
-        description={t('versionHistory.confirm_description', {
-          defaultValue:
-            'The entry will be updated to match this version. The current content is kept in history and is not lost.',
-        })}
-        confirmLabel={t('versionHistory.restore', { defaultValue: 'Restore' })}
-        onConfirm={handleConfirmRestore}
-        onClose={() => setConfirmOpen(false)}
-      />
+      {canRestore && (
+        <ConfirmDialog
+          open={confirmOpen}
+          title={t('versionHistory.confirm_title', { defaultValue: 'Restore this version?' })}
+          description={t('versionHistory.confirm_description', {
+            defaultValue:
+              'The entry will be updated to match this version. The current content is kept in history and is not lost.',
+          })}
+          confirmLabel={t('versionHistory.restore', { defaultValue: 'Restore' })}
+          onConfirm={handleConfirmRestore}
+          onClose={() => setConfirmOpen(false)}
+        />
+      )}
     </Modal>
   )
 }

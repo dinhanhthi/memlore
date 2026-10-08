@@ -2,11 +2,13 @@ import { authHandlers } from './commands/auth'
 import { cacheHandlers, installCacheStatsEmitter } from './commands/cache'
 import { deviceBinHandlers } from './commands/deviceBins'
 import { entryHandlers } from './commands/entries'
+import { indexStatsHandlers } from './commands/indexStats'
 import { indexViewHandlers } from './commands/indexViews'
 import { mediaHandlers } from './commands/media'
 import { searchHandlers } from './commands/search'
 import { installSyncAutostart, syncHandlers } from './commands/sync'
 import { taxonomyHandlers } from './commands/taxonomy'
+import { versionHandlers } from './commands/versions'
 import {
   deleteWebSetting,
   getWebSetting,
@@ -61,6 +63,8 @@ registerHandlers(searchHandlers)
 registerHandlers(syncHandlers)
 registerHandlers(deviceBinHandlers)
 registerHandlers(indexViewHandlers)
+registerHandlers(indexStatsHandlers)
+registerHandlers(versionHandlers)
 installSyncAutostart()
 installEvictorAutostart()
 installDraftsAutostart()

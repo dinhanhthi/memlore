@@ -49,7 +49,7 @@ import type { Handler } from '../router'
 import type { MonthIndexMedia, MonthIndexReader, MonthIndexRow } from '../sync/monthIndex'
 import { toEntry } from './entries'
 import { WEB_MEDIA_PATH_PREFIX, hasLiveMedia, isSafeMediaId } from './media'
-import { readEnv, type VaultApi } from './readSession'
+import { readEnv, type Taxonomy, type VaultApi } from './readSession'
 
 const ON_THIS_DAY_LIMIT = 200
 /** Desktop `MAP_PIN_SOFT_CAP` (commands/entries.rs). */
@@ -62,14 +62,21 @@ const GALLERY_KINDS: readonly string[] = ['image/', 'video/', 'audio/']
 const asNumber = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
 
-/** Locked: `VaultLockedError`. Otherwise the vault and the reader (null when the session has none). */
-async function openIndex(): Promise<{ vault: VaultApi; reader: MonthIndexReader | null }> {
+/**
+ * Locked: `VaultLockedError`. Otherwise the vault, the reader (null when the session has none) and
+ * the taxonomy `ready()` resolved.
+ */
+export async function openIndex(): Promise<{
+  vault: VaultApi
+  reader: MonthIndexReader | null
+  taxonomy: Taxonomy
+}> {
   const env = readEnv()
   if (!env.isUnlocked()) throw new VaultLockedError()
   const session = await env.session()
   // The reader's journal exclusion is applied by `ready()`.
-  await session.ready()
-  return { vault: session.vault, reader: session.monthIndex ?? null }
+  const taxonomy = await session.ready()
+  return { vault: session.vault, reader: session.monthIndex ?? null, taxonomy }
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0')
@@ -162,7 +169,7 @@ const listOnThisDay: Handler = async ({ month, day }) => {
 }
 
 /** Title and preview the gallery shows for an entry, and which of its media it lists. */
-interface GallerySource {
+export interface GallerySource {
   title: string
   preview: string
   includes: (mediaId: string) => boolean
@@ -172,7 +179,7 @@ interface GallerySource {
  * Same rule as `media.ts`: an unloaded entry is the index row, a loaded one is its vault copy
  * (only media that copy still carries live), and one the vault refuses lists nothing.
  */
-function gallerySource(vault: VaultApi, row: MonthIndexRow): GallerySource | null {
+export function gallerySource(vault: VaultApi, row: MonthIndexRow): GallerySource | null {
   const status = vault.status(row.entry_id)
   if (status === 'not-loaded') {
     return { title: row.title ?? '', preview: row.preview_text ?? '', includes: () => true }

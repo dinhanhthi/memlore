@@ -298,7 +298,9 @@
     "confirm_title": "Restore this version?",
     "confirm_description": "The entry will be updated to match this version. The current content is kept in history and is not lost.",
     "select_prompt": "Select a version to preview",
-    "restore_failed": "Failed to restore version"
+    "restore_failed": "Failed to restore version",
+    "close": "Close",
+    "read_only_note": "Read-only in the browser. Restore a version in the desktop app."
   },
   "second_lock_prompt": {
     "password_placeholder": "Second-lock password",
