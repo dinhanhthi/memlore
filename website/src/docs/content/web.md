@@ -43,7 +43,7 @@ Your desktop vault is always the primary authority. To guarantee that a browser 
 
 - **Web never writes sync protocol files directly.** Instead, the web companion creates sealed write intents in a private `outbox/` folder.
 - **Desktop imports and verifies all edits.** When your desktop app syncs, it reads the outbox, merges text changes using CRDTs (so concurrent typing is preserved), and saves the result to your local encrypted database.
-- **No entry deletion.** To protect against accidental deletions or compromised shared computers, entries cannot be deleted on the web. Deletions must be made on desktop.
+- **Deletes go to the desktop Trash.** Deleting on the web moves the entry to the Trash on your desktop, where you can restore it for 30 days. The browser only hides the entry until your desktop applies the move; nothing is erased. Anyone with your unlocked web session can queue a delete, so lock or sign out on a shared computer.
 - **Instant revocation.** You can cut off web access at any time from your desktop app: open Settings → Security → Security actions → Connected devices and remove the web companion. At its next sync the web tab drops its cached entries and locks; its unsent edits stay sealed in the browser until you re-connect or clear the site data.
 
 ---

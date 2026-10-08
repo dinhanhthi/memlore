@@ -40,6 +40,21 @@ describe('useTemplates', () => {
     expect(result.current.error).toBeNull()
   })
 
+  it('refetches on entries-changed without flashing the loading state', async () => {
+    vi.mocked(tauri.listTemplates).mockResolvedValue([makeTemplate()])
+    const { result } = renderHook(() => useTemplates())
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    vi.mocked(tauri.listTemplates).mockResolvedValue([])
+    act(() => {
+      window.dispatchEvent(new CustomEvent('memlore:entries-changed'))
+    })
+
+    expect(result.current.isLoading).toBe(false)
+    await waitFor(() => expect(result.current.templates).toEqual([]))
+    expect(tauri.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
   it('returns templates on successful fetch', async () => {
     const templates = [makeTemplate(), makeTemplate({ id: 'tmpl-2', name: 'Second' })]
     vi.mocked(tauri.listTemplates).mockResolvedValue(templates)

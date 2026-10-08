@@ -62,8 +62,8 @@ export function TagPickerPopover({ entryId, onClose }: TagPickerPopoverProps) {
   )
 
   const trimmedQuery = query.trim()
-  // create_tag is unsupported on web — picking existing tags stays.
-  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyEdits
+  // On web, create_tag needs a desktop that imports outbox v2 (taxonomyCreate).
+  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyCreate
 
   async function handleAddExisting(tag: Tag) {
     const targetEntry = entryIdRef.current

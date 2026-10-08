@@ -38,7 +38,7 @@
  *    `outbox_versions ∋ 2`; the others' acks are ignored (a v0.2.2 desktop acks a v2 file with
  *    every field null). The 7-day undecided grace applies as for entry intents.
  * While NO slot-holding desktop advertises v2, every v2 draft (pushed or not) is kept and raises
- * one `waiting_newer_desktop` notice, once per draft.
+ * one `waiting_newer_desktop` notice (`field` = the v2 kind), once per draft.
  */
 
 import type { Core, OutboxIntentV2 } from '../../core/core'
@@ -481,6 +481,8 @@ async function retainV2(
     const waitingKey = `${WAITING}${key}`
     if ((await deps.db.meta.get(waitingKey)) !== undefined) continue
     await deps.db.meta.put({ key: waitingKey, value: true })
-    result.notices.push(formatNotice('waiting_newer_desktop', { title: titleOf(intent) }))
+    result.notices.push(
+      formatNotice('waiting_newer_desktop', { field: intent.kind, title: titleOf(intent) }),
+    )
   }
 }

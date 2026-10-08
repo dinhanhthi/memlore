@@ -157,14 +157,14 @@ export function JournalForm({ journal, onSave, onCancel, externalError }: Journa
     () => filterTagSuggestions(pickerTags, { query: tagQuery, excludeIds: selectedAutoTagIds }),
     [pickerTags, selectedAutoTagIds, tagQuery],
   )
-  // create_tag is unsupported on web — picking existing tags stays.
-  const canCreateTag = canCreateTagName(pickerTags, tagQuery) && caps.taxonomyEdits
+  // On web, create_tag needs a desktop that imports outbox v2 (taxonomyCreate).
+  const canCreateTag = canCreateTagName(pickerTags, tagQuery) && caps.taxonomyCreate
 
-  // Defensive: create_journal is unsupported on web, so never render the
-  // modal in create mode there. Callers are the palette's action.new_journal
-  // (taxonomyEdits-gated) and JournalsSettings' "New journal" button (gated
-  // in phase 4/T20); this guard covers any path the gates miss.
-  if (journal === null && !caps.taxonomyEdits) return null
+  // Defensive: never render the modal in create mode without taxonomyCreate
+  // (web without a v2 desktop). Callers are the palette's action.new_journal
+  // and JournalsSettings' "New journal" button, both taxonomyCreate-gated;
+  // this guard covers any path the gates miss.
+  if (journal === null && !caps.taxonomyCreate) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

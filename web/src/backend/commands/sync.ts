@@ -5,7 +5,7 @@
  *
  * Desktop contract followed here (src-tauri/src/commands/sync.rs, src/lib/tauri.ts):
  *   Event  "sync:status-changed" `{state, enabled, configured, provider, lastSync, entriesPending,
- *          error, notices?}`, `state` is `'idle' | 'syncing' | 'synced' | 'error'` (there is no
+ *          entriesHeld?, error, notices?}` (`entriesHeld` is web only), `state` is `'idle' | 'syncing' | 'synced' | 'error'` (there is no
  *          "offline" or "incompatible" phase: both are `error` with a message). A clean run ends
  *          in `synced`.
  *          `lastSync` is Unix SECONDS. `provider` is `'gdrive'` (CloudProviderKind), never
@@ -107,6 +107,11 @@ export interface SyncStatus {
   provider: string | null
   lastSync: number | null
   entriesPending: number
+  /**
+   * How many of `entriesPending` the last push kept queued on purpose (`PushResult.held`: no
+   * desktop imports outbox v2 yet, or the draft waits for an earlier one). Absent when none.
+   */
+  entriesHeld?: number
   /**
    * Intent-retention notices, structured for the UI to translate. Set only on the one `synced`
    * status event that carries them; `get_sync_status` never has them.
@@ -247,6 +252,10 @@ let pushRetryTimer: unknown = null
 let pushError: string | null = null
 /** `entriesPending` of the last status event. */
 let reportedPending = 0
+/** `PushResult.held` of the last push reported (0 after a lock or restart). */
+let heldDrafts = 0
+/** `entriesHeld` of the last status event (0 when absent). */
+let reportedHeld = 0
 /** The last push result reported: `pushAll` resolves every joiner of a run to the same object. */
 let lastReported: PushResult | null = null
 
@@ -279,6 +288,8 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   pushNextAt = 0
   pushError = null
   reportedPending = 0
+  heldDrafts = 0
+  reportedHeld = 0
   lastReported = null
   emittedCapabilities = NO_CAPABILITIES
 }
@@ -296,13 +307,17 @@ function emitCapabilities(next: WebCapabilities): void {
 
 const snapshot = (): SyncStatus => {
   const e = env()
-  return {
+  const pending = e.isUnlocked() ? e.pendingCount() : 0
+  const status: SyncStatus = {
     enabled: true,
     configured: true,
     provider: 'gdrive',
     lastSync: lastSyncSec,
-    entriesPending: e.isUnlocked() ? e.pendingCount() : 0,
+    entriesPending: pending,
   }
+  const held = Math.min(heldDrafts, pending)
+  if (held > 0) status.entriesHeld = held
+  return status
 }
 
 function setPhase(next: SyncPhase, error: string | null): void {
@@ -317,6 +332,7 @@ function setPhase(next: SyncPhase, error: string | null): void {
     pendingNotices = []
   }
   reportedPending = payload.entriesPending
+  reportedHeld = payload.entriesHeld ?? 0
   env().emit(STATUS_EVENT, payload)
 }
 
@@ -509,6 +525,7 @@ function reportPush(result: PushResult, startedEpoch: number): void {
     return
   }
   if (startedEpoch !== epoch || !e.isUnlocked() || name === ERROR_NAMES.vaultLocked) return
+  heldDrafts = result.held ?? 0
   if (name === ERROR_NAMES.missingVaultState || name === ERROR_NAMES.formatUnsupported) {
     // Retrying cannot help until the user re-onboards (or updates the app, for a latched format
     // guard); reads and pulls keep working.
@@ -539,7 +556,12 @@ function reportPush(result: PushResult, startedEpoch: number): void {
       return
     }
   }
-  if (e.pendingCount() !== reportedPending) setPhase(phase, lastError)
+  if (
+    e.pendingCount() !== reportedPending ||
+    Math.min(heldDrafts, e.pendingCount()) !== reportedHeld
+  ) {
+    setPhase(phase, lastError)
+  }
 }
 
 function schedulePushRetry(delay: number): void {
@@ -582,6 +604,7 @@ export function startSyncSchedule(): void {
   pushFailures = 0
   pushNextAt = 0
   pushError = null
+  heldDrafts = 0
   if (phase === 'error') setPhase('idle', null)
 
   const onFocus = (): void => request('focus')

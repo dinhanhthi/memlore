@@ -15,7 +15,11 @@ const KNOWN_FIELDS = new Set([
   'tag_remove',
 ])
 
-/** Refusal codes the desktop sends today plus the ones desktop v0.3.0 adds. */
+/**
+ * Refusal codes the desktop sends (`src-tauri/src/sync/outbox_import.rs`), v1 and v2. `absent`
+ * also covers a locked, invisible or purged target, by design. Any other code is shown through
+ * `reason.unknown`.
+ */
 const KNOWN_REASONS = new Set([
   'journal',
   'tag_not_found',
@@ -25,6 +29,21 @@ const KNOWN_REASONS = new Set([
   'entry_trashed',
   'name_taken',
   'changed_on_desktop',
+  'invalid',
+  'absent',
+  'empty_base',
+  'invalid_emotion',
+  'journal_locked_or_invisible',
+  'target_not_writable',
+])
+
+/** Outbox v2 intent kinds (the notice `field`): `true` when the intent carries a name. */
+const V2_KINDS: ReadonlyMap<string, boolean> = new Map([
+  ['create_journal', true],
+  ['create_tag', true],
+  ['upsert_template', true],
+  ['delete_template', false],
+  ['trash_entry', false],
 ])
 
 function fieldLabel(field: string, t: Translate): string {
@@ -44,6 +63,17 @@ function reasonLabel(reason: string | undefined, t: Translate): string {
 
 /** Render one structured web sync notice as a translated sentence. */
 export function formatWebNotice(notice: WebNotice, t: Translate): string {
+  const v2Named = V2_KINDS.get(notice.field ?? '')
+  if (v2Named !== undefined && notice.kind !== 'replaced') {
+    const key =
+      notice.kind === 'refused'
+        ? `${PREFIX}.refused_v2.${notice.field}`
+        : `${PREFIX}.waiting_v2.${notice.field}`
+    const values: Record<string, unknown> = {}
+    if (v2Named) values.title = notice.title || t(`${PREFIX}.untitled`)
+    if (notice.kind === 'refused') values.reason = reasonLabel(notice.reason, t)
+    return Object.keys(values).length > 0 ? t(key, values) : t(key)
+  }
   if (notice.kind === 'waiting_newer_desktop') {
     // Not always about an entry (journal, tag, template intents), so no
     // "Untitled" fallback here.

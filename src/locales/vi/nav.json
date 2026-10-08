@@ -118,6 +118,11 @@
     "hours_ago": "{{count}} giờ trước",
     "days_ago": "{{count}} ngày trước",
     "pending": "{{count}} đang chờ",
+    "held_label": "{{count}} chờ bản desktop",
+    "held_update_one": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ Memlore desktop 0.3.0 trở lên.",
+    "held_update_other": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ Memlore desktop 0.3.0 trở lên.",
+    "held_order_one": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ một thay đổi trước đó được đồng bộ về bản desktop.",
+    "held_order_other": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ một thay đổi trước đó được đồng bộ về bản desktop.",
     "sync_now": "Đồng bộ ngay",
     "repair": "Sửa khoá",
     "force_re_pair_inconclusive": "Không xác minh được keyring trên cloud. Sửa khoá để tiếp tục đồng bộ.",
@@ -165,8 +170,22 @@
       "replaced": "Chỉnh sửa của bạn ({{field}}) cho “{{title}}” đã bị thay thế bởi một thay đổi từ bản desktop.",
       "refused": "Bản desktop không thể áp dụng chỉnh sửa của bạn ({{field}}) cho “{{title}}”: {{reason}}.",
       "refused_create": "Bản desktop không thể thêm mục mới “{{title}}”: {{reason}}.",
-      "waiting_newer_desktop": "Một thay đổi bạn thực hiện ở đây đang chờ một bản desktop chạy phiên bản Memlore mới hơn.",
-      "waiting_newer_desktop_titled": "Thay đổi của bạn cho “{{title}}” đang chờ một bản desktop chạy phiên bản Memlore mới hơn.",
+      "waiting_newer_desktop": "Một thay đổi bạn thực hiện ở đây đang chờ Memlore desktop 0.3.0 trở lên.",
+      "waiting_newer_desktop_titled": "Thay đổi của bạn cho “{{title}}” đang chờ Memlore desktop 0.3.0 trở lên.",
+      "refused_v2": {
+        "create_journal": "Bản desktop không thể tạo nhật ký “{{title}}”: {{reason}}.",
+        "create_tag": "Bản desktop không thể tạo thẻ “{{title}}”: {{reason}}.",
+        "upsert_template": "Bản desktop không thể lưu mẫu “{{title}}”: {{reason}}.",
+        "delete_template": "Bản desktop không thể xóa một mẫu: {{reason}}.",
+        "trash_entry": "Bản desktop không thể chuyển một mục vào Thùng rác: {{reason}}."
+      },
+      "waiting_v2": {
+        "create_journal": "Nhật ký mới “{{title}}” đang chờ Memlore desktop 0.3.0 trở lên.",
+        "create_tag": "Thẻ mới “{{title}}” đang chờ Memlore desktop 0.3.0 trở lên.",
+        "upsert_template": "Thay đổi của bạn cho mẫu “{{title}}” đang chờ Memlore desktop 0.3.0 trở lên.",
+        "delete_template": "Một mẫu bạn đã xóa ở đây đang chờ Memlore desktop 0.3.0 trở lên.",
+        "trash_entry": "Một mục bạn đã xóa ở đây đang chờ Memlore desktop 0.3.0 trở lên."
+      },
       "untitled": "Không tiêu đề",
       "field": {
         "title": "tiêu đề",
@@ -187,6 +206,12 @@
         "entry_trashed": "mục đã được chuyển vào Thùng rác trên bản desktop",
         "name_taken": "tên này đã được sử dụng",
         "changed_on_desktop": "mục đã được thay đổi trên bản desktop trong lúc đó",
+        "invalid": "bản desktop không thể chấp nhận thay đổi này",
+        "absent": "mục này không có trên bản desktop",
+        "empty_base": "bản desktop đã có nội dung cho mục này mà chỉnh sửa này sẽ ghi đè",
+        "invalid_emotion": "cảm xúc không hợp lệ",
+        "journal_locked_or_invisible": "nhật ký không có trên bản desktop",
+        "target_not_writable": "không thể chỉnh sửa mục này trên bản desktop",
         "unknown": "lý do không xác định ({{code}})"
       }
     }

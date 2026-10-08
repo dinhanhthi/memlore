@@ -8,7 +8,10 @@
  *    from every draft after a reload, so a pushed-but-unimported edit is never rebuilt from synced
  *    state. Pushed drafts are dropped by the 16.1 retention rule (`sync/retention.ts`).
  *  - "Dirty" = some draft whose `pushedHash` is missing or is not the hash of its `sealed`.
- *  - Provides `beforeunload` warning when there are unpushed drafts.
+ *  - Provides `beforeunload` warning when there are unpushed drafts. Held drafts (push.ts: waiting
+ *    for a desktop that imports outbox v2, or for an earlier draft) count too, on purpose: they are
+ *    safe in IndexedDB but exist nowhere else yet, so clearing site data or closing a private
+ *    window still loses them. The sync status explains them as waiting, not failed.
  *  - Notifies `onDraftSaved` listeners after every stored draft (the debounced push trigger in
  *    `commands/sync.ts`), so the write commands need no push call of their own.
  *  - Dispatches uploads via `safeUpload`.

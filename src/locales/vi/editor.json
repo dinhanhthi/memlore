@@ -242,6 +242,7 @@
     "locked_entry": "Mục đã khóa",
     "delete_title": "Chuyển vào Thùng rác",
     "delete_description": "Khôi phục trong Cài đặt → Dữ liệu → Đã xóa gần đây trong vòng 30 ngày.",
+    "delete_description_web": "Chuyển vào Thùng rác trong ứng dụng desktop. Khôi phục ở đó trong vòng 30 ngày.",
     "delete_cancel": "Hủy",
     "delete_confirm": "Chuyển vào Thùng rác"
   },

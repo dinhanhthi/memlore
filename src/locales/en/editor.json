@@ -242,6 +242,7 @@
     "locked_entry": "Locked entry",
     "delete_title": "Move to Trash",
     "delete_description": "Restore it from Settings → Data → Recently deleted within 30 days.",
+    "delete_description_web": "Moves to the Trash on your desktop app. Restore it there within 30 days.",
     "delete_cancel": "Cancel",
     "delete_confirm": "Move to Trash"
   },

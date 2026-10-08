@@ -263,7 +263,7 @@ export function JournalsSettings() {
             )}
           </SettingsSurfaceCard>
 
-          {caps.taxonomyEdits && (
+          {caps.taxonomyCreate && (
             <div className="mt-3">
               <Button
                 variant="ghost"

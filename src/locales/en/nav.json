@@ -118,6 +118,11 @@
     "hours_ago": "{{count}}h ago",
     "days_ago": "{{count}}d ago",
     "pending": "{{count}} pending",
+    "held_label": "{{count}} waiting for desktop",
+    "held_update_one": "Saved in this browser. {{count}} change is waiting for Memlore desktop 0.3.0 or later.",
+    "held_update_other": "Saved in this browser. {{count}} changes are waiting for Memlore desktop 0.3.0 or later.",
+    "held_order_one": "Saved in this browser. {{count}} change is waiting for an earlier change to reach your desktop first.",
+    "held_order_other": "Saved in this browser. {{count}} changes are waiting for an earlier change to reach your desktop first.",
     "sync_now": "Sync now",
     "repair": "Repair",
     "force_re_pair_inconclusive": "The cloud keyring could not be verified. Repair to continue syncing.",
@@ -165,8 +170,22 @@
       "replaced": "Your edit ({{field}}) to “{{title}}” was replaced by a change from your desktop.",
       "refused": "Your desktop couldn't apply your edit ({{field}}) to “{{title}}”: {{reason}}.",
       "refused_create": "Your desktop couldn't add the new entry “{{title}}”: {{reason}}.",
-      "waiting_newer_desktop": "A change you made here is waiting for a desktop running a newer version of Memlore.",
-      "waiting_newer_desktop_titled": "Your change to “{{title}}” is waiting for a desktop running a newer version of Memlore.",
+      "waiting_newer_desktop": "A change you made here is waiting for Memlore desktop 0.3.0 or later.",
+      "waiting_newer_desktop_titled": "Your change to “{{title}}” is waiting for Memlore desktop 0.3.0 or later.",
+      "refused_v2": {
+        "create_journal": "Your desktop couldn't create the journal “{{title}}”: {{reason}}.",
+        "create_tag": "Your desktop couldn't create the tag “{{title}}”: {{reason}}.",
+        "upsert_template": "Your desktop couldn't save the template “{{title}}”: {{reason}}.",
+        "delete_template": "Your desktop couldn't delete a template: {{reason}}.",
+        "trash_entry": "Your desktop couldn't move an entry to the Trash: {{reason}}."
+      },
+      "waiting_v2": {
+        "create_journal": "The new journal “{{title}}” is waiting for Memlore desktop 0.3.0 or later.",
+        "create_tag": "The new tag “{{title}}” is waiting for Memlore desktop 0.3.0 or later.",
+        "upsert_template": "Your change to the template “{{title}}” is waiting for Memlore desktop 0.3.0 or later.",
+        "delete_template": "A template you deleted here is waiting for Memlore desktop 0.3.0 or later.",
+        "trash_entry": "An entry you deleted here is waiting for Memlore desktop 0.3.0 or later."
+      },
       "untitled": "Untitled",
       "field": {
         "title": "title",
@@ -187,6 +206,12 @@
         "entry_trashed": "the entry was moved to Trash on your desktop",
         "name_taken": "that name is already in use",
         "changed_on_desktop": "it was changed on your desktop in the meantime",
+        "invalid": "your desktop couldn't accept it",
+        "absent": "it isn't available on your desktop",
+        "empty_base": "your desktop already has content for it that this edit would overwrite",
+        "invalid_emotion": "the emotion isn't valid",
+        "journal_locked_or_invisible": "the journal isn't available on your desktop",
+        "target_not_writable": "the entry can't be edited on your desktop",
         "unknown": "unknown reason ({{code}})"
       }
     }

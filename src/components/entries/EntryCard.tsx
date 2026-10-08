@@ -5,6 +5,7 @@ import { Star, Trash2, Video, Image as ImageIcon, LockKeyhole } from 'lucide-rea
 import type { Entry } from '../../types/entry'
 import type { Journal, Tag } from '../../types/journal'
 import { cn } from '../../lib/cn'
+import { isWeb } from '../../lib/platform'
 import { EMOTION_BY_KEY } from '../common/emotions'
 import { ensureVideoThumbnail, getEntry, getMediaStatus, listMediaForEntry } from '../../lib/tauri'
 import { emitEntryPatched } from '../../hooks/useEntries'
@@ -630,7 +631,11 @@ function EntryCardImpl({
 
       {confirmOpen && (
         <Modal onClose={() => setConfirmOpen(false)} maxWidth={360}>
-          <Modal.Header description={t('entry_card.delete_description')}>
+          <Modal.Header
+            description={t(
+              isWeb ? 'entry_card.delete_description_web' : 'entry_card.delete_description',
+            )}
+          >
             {t('entry_card.delete_title')}
           </Modal.Header>
           <Modal.Footer>

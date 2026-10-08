@@ -196,7 +196,7 @@ export function TemplatesSettings() {
                                 <p className="text-fg-muted mt-0.5 text-xs">{tpl.description}</p>
                               )}
                             </div>
-                            {caps.taxonomyEdits && (
+                            {caps.taxonomyCreate && (
                               <div className="flex shrink-0 gap-1">
                                 <Button
                                   variant="ghost"
@@ -226,7 +226,7 @@ export function TemplatesSettings() {
                       </SettingsSurfaceCard>
                     )}
 
-                    {caps.taxonomyEdits && (
+                    {caps.taxonomyCreate && (
                       <div className="mt-3">
                         <Button
                           variant="ghost"

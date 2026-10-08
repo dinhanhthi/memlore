@@ -31,6 +31,7 @@ vi.mock('../platform', async (importOriginal) => {
       gallery: false,
       lookback: false,
       taxonomyEdits: false,
+      taxonomyCreate: false,
       deleteEntries: false,
       trash: false,
       audioRecording: false,
@@ -226,6 +227,27 @@ describe('command palette on web', () => {
     for (const id of WEB_VISIBLE_IDS) {
       expect(available, `expected ${id} to stay available on web`).toContain(id)
     }
+  })
+
+  describe('creates sent through outbox v2', () => {
+    afterEach(() => {
+      useCapabilitiesStore.getState().setWebCapabilities({ outboxV2: false, monthIndex: false })
+    })
+
+    it('offers New journal once a synced desktop imports outbox v2', () => {
+      useCapabilitiesStore.getState().setWebCapabilities({ outboxV2: true })
+      expect(availableIds()).toContain('action.new_journal')
+    })
+
+    it('hides New journal while web writes are off', () => {
+      useCapabilitiesStore.getState().setWebCapabilities({ outboxV2: true })
+      useCapabilitiesStore.getState().setWrites(false)
+      try {
+        expect(availableIds()).not.toContain('action.new_journal')
+      } finally {
+        useCapabilitiesStore.getState().setWrites(true)
+      }
+    })
   })
 
   describe('views served from the desktop month index', () => {

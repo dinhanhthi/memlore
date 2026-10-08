@@ -864,7 +864,7 @@ const ACTION_COMMANDS: Command[] = [
     labelKey: 'action.new_journal',
     icon: BookPlus,
     keywords: ['create', 'notebook', 'add'],
-    available: () => capabilities.taxonomyEdits,
+    available: () => currentCapabilities().taxonomyCreate,
     run: () => useUiStore.getState().setNewJournalModalOpen(true),
   },
   {

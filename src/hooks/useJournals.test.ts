@@ -51,6 +51,20 @@ describe('useJournals', () => {
     expect(result.current.journals).toHaveLength(1)
   })
 
+  it('refetches on entries-changed (a dropped web create or trash refusal)', async () => {
+    vi.mocked(tauri.listJournals).mockResolvedValue([makeJournal()])
+    const { result } = renderHook(() => useJournals())
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    vi.mocked(tauri.listJournals).mockResolvedValue([])
+    act(() => {
+      window.dispatchEvent(new CustomEvent('memlore:entries-changed'))
+    })
+
+    await waitFor(() => expect(result.current.journals).toHaveLength(0))
+    expect(tauri.listJournals).toHaveBeenCalledTimes(2)
+  })
+
   it('does not auto-select first journal — null (All Journals) is valid default', async () => {
     vi.mocked(tauri.listJournals).mockResolvedValue([makeJournal({ id: 'j1' })])
 

@@ -769,7 +769,7 @@ describe('outbox v2 retention (Phase 21)', () => {
       await v2Draft(tagIntent)
       expect(await r.run()).toEqual({
         dropped: [],
-        notices: [{ kind: 'waiting_newer_desktop', title: 'Work' }],
+        notices: [{ kind: 'waiting_newer_desktop', field: 'create_tag', title: 'Work' }],
         changed: false,
       })
       expect((await r.run()).notices).toEqual([])
@@ -779,7 +779,9 @@ describe('outbox v2 retention (Phase 21)', () => {
     it('fires for an unpushed draft too', async () => {
       r.v2 = v2State({}, [])
       await v2Draft(trash, false)
-      expect((await r.run()).notices).toEqual([{ kind: 'waiting_newer_desktop' }])
+      expect((await r.run()).notices).toEqual([
+        { kind: 'waiting_newer_desktop', field: 'trash_entry' },
+      ])
     })
 
     it('does not fire while a capable desktop exists', async () => {
@@ -790,7 +792,9 @@ describe('outbox v2 retention (Phase 21)', () => {
     it('a capable desktop that is not slot-holding does not count', async () => {
       r.v2 = v2State({}, ['desk-gone'])
       await v2Draft(tagIntent)
-      expect((await r.run()).notices).toEqual([{ kind: 'waiting_newer_desktop', title: 'Work' }])
+      expect((await r.run()).notices).toEqual([
+        { kind: 'waiting_newer_desktop', field: 'create_tag', title: 'Work' },
+      ])
     })
   })
 })

@@ -251,7 +251,7 @@ export function TagsView() {
             <div className="flex h-full flex-col items-center justify-center gap-3 px-5 text-center">
               <p className="font-display text-fg text-xl font-bold">{t('tags_view.empty_title')}</p>
               <p className="text-fg-muted text-sm">{t('tags_view.empty_hint')}</p>
-              {caps.taxonomyEdits && (
+              {caps.taxonomyCreate && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -298,7 +298,7 @@ export function TagsView() {
                       <span className="text-fg-muted ml-1 font-normal">{totalEntries}</span>
                     </th>
                     <th scope="col" className="py-2 pr-3">
-                      {caps.taxonomyEdits && (
+                      {caps.taxonomyCreate && (
                         <div className="flex justify-end">
                           <button
                             type="button"

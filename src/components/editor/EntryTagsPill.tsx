@@ -135,8 +135,8 @@ export function EntryTagsPill({ entryId }: EntryTagsPillProps) {
   )
 
   const trimmedQuery = query.trim()
-  // create_tag is unsupported on web — picking existing tags stays.
-  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyEdits
+  // On web, create_tag needs a desktop that imports outbox v2 (taxonomyCreate).
+  const canCreate = canCreateTagName(allTags, query) && caps.taxonomyCreate
 
   async function handleAddExisting(tag: Tag) {
     if (!entryId) return
@@ -164,8 +164,8 @@ export function EntryTagsPill({ entryId }: EntryTagsPillProps) {
       removeSuggestion(name)
       return
     }
-    // Adding an existing tag is supported on web; creating a new one is not.
-    if (!caps.taxonomyEdits) return
+    // Adding an existing tag always works; creating one needs taxonomyCreate.
+    if (!caps.taxonomyCreate) return
     const targetEntry = entryId
     let created: Tag
     try {

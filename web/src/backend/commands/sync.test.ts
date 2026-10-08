@@ -1091,6 +1091,39 @@ describe('push status', () => {
     expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0, error: null })
   })
 
+  it('reports the drafts a push held as entriesHeld, clamped to the pending count', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 2
+    h.pushResult = { pushed: 0, skipped: 0, pending: 2, held: 2 }
+    startSyncSchedule()
+    await h.settle()
+    // Only the held count changed: the status is still emitted.
+    expect(h.states()).toEqual(['syncing', 'synced', 'synced'])
+    expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 2, entriesHeld: 2 })
+    h.pending = 1
+    await expect(syncHandlers.get_sync_status({})).resolves.toMatchObject({
+      entriesPending: 1,
+      entriesHeld: 1,
+    })
+    lock('manual')
+    await expect(syncHandlers.get_sync_status({})).resolves.not.toHaveProperty('entriesHeld')
+  })
+
+  it('drops entriesHeld once a push holds nothing', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = { pushed: 0, skipped: 0, pending: 1, held: 1 }
+    startSyncSchedule()
+    await h.settle()
+    h.pushResult = PUSHED_ALL
+    h.online()
+    await h.settle()
+    expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0 })
+    expect(h.last()).not.toHaveProperty('entriesHeld')
+  })
+
   it('emits nothing after a push that leaves entriesPending unchanged', async () => {
     const h = harness()
     h.flag = true

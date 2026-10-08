@@ -462,6 +462,12 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
               provider: payload.provider,
               lastSync: payload.lastSync,
               entriesPending: payload.entriesPending,
+              // Web only; anything but a positive number means none.
+              ...(typeof payload.entriesHeld === 'number' &&
+              Number.isFinite(payload.entriesHeld) &&
+              payload.entriesHeld > 0
+                ? { entriesHeld: payload.entriesHeld }
+                : {}),
             },
             isSyncing: nowSyncing,
             lastError: payload.error ?? (payload.state === 'synced' ? null : get().lastError),

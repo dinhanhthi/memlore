@@ -1603,6 +1603,11 @@ export interface SyncStatus {
   provider: string | null
   lastSync: number | null
   entriesPending: number
+  /**
+   * Web only: how many of `entriesPending` are deliberately queued (waiting for
+   * Memlore desktop 0.3.0 or for an earlier change). The desktop never sends it.
+   */
+  entriesHeld?: number
 }
 
 /** Current completeness and live progress of a vault catch-up pull. */
@@ -1692,6 +1697,8 @@ export interface SyncStatusEvent {
   provider: string | null
   lastSync: number | null
   entriesPending: number
+  /** Web only: see {@link SyncStatus.entriesHeld}. */
+  entriesHeld?: number
   error: string | null
   /**
    * Web only: intent-retention notices, set on the one `synced` event that
@@ -1705,7 +1712,8 @@ export interface SyncStatusEvent {
  * `web/src/backend/sync/outbox.ts` (src/ must not import from web/). `field`
  * is a raw key (`title`, `entry_date`, …, `tag_add:<id>`, `tag_remove:<id>`),
  * `reason` a raw desktop refusal code. A `refused` notice without `field` is
- * a new entry the desktop could not add.
+ * a new entry the desktop could not add. On an outbox v2 notice (`refused`,
+ * `waiting_newer_desktop`) `field` is the intent kind (`create_tag`, …).
  */
 export interface WebNotice {
   kind: 'replaced' | 'refused' | 'waiting_newer_desktop'

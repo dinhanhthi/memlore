@@ -324,6 +324,24 @@ describe('syncStore', () => {
     expect(useSyncStore.getState().status?.entriesPending).toBe(7)
   })
 
+  it('keeps a numeric entriesHeld (web) and drops it when absent or malformed', async () => {
+    await useSyncStore.getState().init()
+    const base: SyncStatusEvent = {
+      state: 'synced',
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: null,
+      entriesPending: 3,
+      error: null,
+    }
+    fireStatus({ ...base, entriesHeld: 2 })
+    expect(useSyncStore.getState().status?.entriesHeld).toBe(2)
+    fireStatus({ ...base, entriesHeld: '2' } as unknown as SyncStatusEvent)
+    expect(useSyncStore.getState().status).not.toHaveProperty('entriesHeld')
+    fireStatus(base)
+    expect(useSyncStore.getState().status).not.toHaveProperty('entriesHeld')
+  })
+
   it('synced event clears lastError', async () => {
     await useSyncStore.getState().init()
     fireStatus({

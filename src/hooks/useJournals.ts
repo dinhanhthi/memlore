@@ -11,6 +11,7 @@ import {
 import type { Journal } from '../types/journal'
 
 const JOURNALS_CHANGED_EVENT = 'memlore:journals-changed'
+const ENTRIES_CHANGED_EVENT = 'memlore:entries-changed'
 
 /** Broadcast that the journal list has changed (create, update, delete,
  * or sync pulled new/tombstoned journals from a peer). Subscribers (e.g.
@@ -25,21 +26,24 @@ export function useJournals() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchJournals = useCallback(() => {
-    setIsLoading(true)
-    setError(null)
+  const fetchJournals = useCallback(
+    (showLoading = true) => {
+      if (showLoading) setIsLoading(true)
+      setError(null)
 
-    listJournals(activeVaultId)
-      .then((fetched: Journal[]) => {
-        setJournals(fetched)
-        setIsLoading(false)
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        setError(message)
-        setIsLoading(false)
-      })
-  }, [setJournals, activeVaultId])
+      listJournals(activeVaultId)
+        .then((fetched: Journal[]) => {
+          setJournals(fetched)
+          setIsLoading(false)
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
+          setError(message)
+          setIsLoading(false)
+        })
+    },
+    [setJournals, activeVaultId],
+  )
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch on mount; would need TanStack Query to fix properly
@@ -52,9 +56,16 @@ export function useJournals() {
     const handler = () => {
       fetchJournals()
     }
+    // Entries-changed too, quietly: on web a dropped create refusal removes a
+    // pending journal from the overlay without a journals-changed event.
+    const quietHandler = () => {
+      fetchJournals(false)
+    }
     window.addEventListener(JOURNALS_CHANGED_EVENT, handler)
+    window.addEventListener(ENTRIES_CHANGED_EVENT, quietHandler)
     return () => {
       window.removeEventListener(JOURNALS_CHANGED_EVENT, handler)
+      window.removeEventListener(ENTRIES_CHANGED_EVENT, quietHandler)
     }
   }, [fetchJournals])
 

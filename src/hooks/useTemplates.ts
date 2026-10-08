@@ -13,25 +13,35 @@ export function useTemplates() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTemplates = useCallback(() => {
-    setIsLoading(true)
-    setError(null)
+  const fetchTemplates = useCallback(
+    (showLoading = true) => {
+      if (showLoading) setIsLoading(true)
+      setError(null)
 
-    listTemplates()
-      .then((fetched: Template[]) => {
-        setTemplates(fetched)
-        setIsLoading(false)
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        setError(message)
-        setIsLoading(false)
-      })
-  }, [setTemplates])
+      listTemplates()
+        .then((fetched: Template[]) => {
+          setTemplates(fetched)
+          setIsLoading(false)
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
+          setError(message)
+          setIsLoading(false)
+        })
+    },
+    [setTemplates],
+  )
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch on mount; would need TanStack Query to fix properly
     fetchTemplates()
+    // Quietly (no loading flash) on entries-changed: on web a dropped template
+    // refusal removes a pending template from the overlay.
+    const handler = () => {
+      fetchTemplates(false)
+    }
+    window.addEventListener('memlore:entries-changed', handler)
+    return () => window.removeEventListener('memlore:entries-changed', handler)
   }, [fetchTemplates])
 
   const createTemplate = async (

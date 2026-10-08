@@ -46,7 +46,17 @@ describe('formatWebNotice', () => {
   })
 
   it('translates the reason codes later desktops add', () => {
-    for (const code of ['entry_trashed', 'name_taken', 'changed_on_desktop']) {
+    for (const code of [
+      'entry_trashed',
+      'name_taken',
+      'changed_on_desktop',
+      'invalid',
+      'absent',
+      'empty_base',
+      'invalid_emotion',
+      'journal_locked_or_invisible',
+      'target_not_writable',
+    ]) {
       expect(formatWebNotice({ kind: 'refused', field: 'title', reason: code }, t)).toContain(
         `"reason":"sync.web_notice.reason.${code}"`,
       )
@@ -81,5 +91,63 @@ describe('formatWebNotice', () => {
     expect(formatWebNotice({ kind: 'waiting_newer_desktop' }, t)).toBe(
       'sync.web_notice.waiting_newer_desktop',
     )
+  })
+
+  describe('outbox v2 kinds', () => {
+    it('formats a refused create with its own sentence and the name', () => {
+      for (const kind of ['create_journal', 'create_tag', 'upsert_template']) {
+        expect(
+          formatWebNotice({ kind: 'refused', field: kind, title: 'Work', reason: 'name_taken' }, t),
+        ).toBe(
+          `sync.web_notice.refused_v2.${kind}{"title":"Work","reason":"sync.web_notice.reason.name_taken"}`,
+        )
+      }
+    })
+
+    it('formats a refused template delete and trash without a title', () => {
+      expect(
+        formatWebNotice(
+          { kind: 'refused', field: 'delete_template', reason: 'changed_on_desktop' },
+          t,
+        ),
+      ).toBe(
+        'sync.web_notice.refused_v2.delete_template{"reason":"sync.web_notice.reason.changed_on_desktop"}',
+      )
+      expect(formatWebNotice({ kind: 'refused', field: 'trash_entry', reason: 'absent' }, t)).toBe(
+        'sync.web_notice.refused_v2.trash_entry{"reason":"sync.web_notice.reason.absent"}',
+      )
+    })
+
+    it('falls back to Untitled for a named kind without a name', () => {
+      expect(
+        formatWebNotice({ kind: 'refused', field: 'create_tag', reason: 'invalid' }, t),
+      ).toContain('"title":"sync.web_notice.untitled"')
+    })
+
+    it('keeps an unknown refusal code behind the unknown reason fallback', () => {
+      expect(
+        formatWebNotice({ kind: 'refused', field: 'trash_entry', reason: 'some.new_code' }, t),
+      ).toBe(
+        'sync.web_notice.refused_v2.trash_entry{"reason":"sync.web_notice.reason.unknown{\\"code\\":\\"some.new_code\\"}"}',
+      )
+    })
+
+    it('formats a waiting notice per kind', () => {
+      expect(
+        formatWebNotice(
+          { kind: 'waiting_newer_desktop', field: 'create_journal', title: 'Trips' },
+          t,
+        ),
+      ).toBe('sync.web_notice.waiting_v2.create_journal{"title":"Trips"}')
+      expect(formatWebNotice({ kind: 'waiting_newer_desktop', field: 'trash_entry' }, t)).toBe(
+        'sync.web_notice.waiting_v2.trash_entry',
+      )
+    })
+
+    it('formats a waiting notice with an unknown field generically', () => {
+      expect(formatWebNotice({ kind: 'waiting_newer_desktop', field: 'mood_v3' }, t)).toBe(
+        'sync.web_notice.waiting_newer_desktop',
+      )
+    })
   })
 })

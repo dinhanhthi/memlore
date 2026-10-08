@@ -81,7 +81,8 @@ export interface OutboxAcksV1 {
  * A sync notice for the UI to translate (JSON-serializable: it crosses the invoke shim). No English
  * text: `field` is the raw field key (`title`, `journal_id`, `tag_add:<id>`, ...), `reason` the raw
  * desktop refusal code (unknown codes pass through). A `refused` notice without `field` is an
- * entry the desktop could not create.
+ * entry the desktop could not create. On an outbox v2 notice (`refused`, `waiting_newer_desktop`)
+ * `field` is the intent kind (`create_tag`, `trash_entry`, ...).
  */
 export interface WebNotice {
   kind: 'replaced' | 'refused' | 'waiting_newer_desktop'

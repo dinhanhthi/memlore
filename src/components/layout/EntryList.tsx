@@ -315,7 +315,7 @@ export function EntryList({
 
   const paginatorLabel = tagFilter?.name ?? (starred ? 'favorites' : 'entries')
 
-  // Entry deletion is desktop-only (docs/LATER.md); without onDelete the card hides its trash button.
+  // Web deletes need a desktop that imports outbox v2; without onDelete the card hides its trash button.
   const { deleteEntries } = useCapabilities()
   const handleDeleteEntry = useCallback(
     async (id: string) => {

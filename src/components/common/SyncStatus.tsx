@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { useSync } from '../../hooks/useSync'
 import { useSyncStore } from '../../stores/syncStore'
+import { useCapabilitiesStore } from '../../stores/capabilitiesStore'
 import { useUpdateActiveTab } from '../../hooks/useActiveTab'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
 import {
@@ -109,6 +110,9 @@ export function SyncStatus({
   // Web-only intent-retention notices; always empty on desktop.
   const notices = useSyncStore((s) => s.notices)
   const dismissNotices = useSyncStore((s) => s.dismissNotices)
+  // Web only: picks the held-drafts explanation (no desktop imports v2 yet vs
+  // waiting for an earlier change). Unused on desktop (no `entriesHeld`).
+  const outboxV2 = useCapabilitiesStore((s) => s.outboxV2)
   const updateActiveTab = useUpdateActiveTab()
 
   // Prefer the i18n key over the raw backend string. Frontend-originated
@@ -185,6 +189,15 @@ export function SyncStatus({
 
   const displayPhase = isSyncing ? 'syncing' : phase
   const hasPending = status.entriesPending > 0
+  // Web only: drafts kept queued on purpose. They are saved in this browser,
+  // not failed, so they get their own explanation instead of the plain
+  // pending count.
+  const heldCount = Math.min(status.entriesHeld ?? 0, status.entriesPending)
+  const unheldCount = status.entriesPending - heldCount
+  const heldNote =
+    heldCount > 0
+      ? t(outboxV2 ? 'sync.held_order' : 'sync.held_update', { count: heldCount })
+      : null
   const hasError = displayPhase === 'error' || !!resolvedError
   // Notices outrank the resting pending/synced label, never an error,
   // a running sync or recovery.
@@ -216,7 +229,9 @@ export function SyncStatus({
         : showNotices
           ? t('sync.web_notice.count', { count: notices.length })
           : hasPending
-            ? t('sync.pending', { count: status.entriesPending })
+            ? unheldCount > 0
+              ? t('sync.pending', { count: unheldCount })
+              : t('sync.held_label', { count: heldCount })
             : formatSyncedLabel(status.lastSync, t)
 
   const summaryTooltip =
@@ -227,6 +242,14 @@ export function SyncStatus({
           merged: lastSummary.merged,
         })
       : null
+  // The resting state explains held drafts; other states keep their own text.
+  const showHeldNote =
+    heldNote !== null &&
+    !recoveryBlocksSync &&
+    displayPhase !== 'syncing' &&
+    !hasError &&
+    !showNotices
+  const pillTooltip = showHeldNote ? heldNote : summaryTooltip
 
   // Don't show the error (red) tone while a sync is actively in flight — a
   // lingering `lastError` from a prior attempt must not paint a healthy
@@ -332,8 +355,8 @@ export function SyncStatus({
         <span className="flex shrink-0">
           <SyncStatusIcon spin={showSpin} icon={SyncIcon} tone={statusTone} />
         </span>
-        {summaryTooltip ? (
-          <Tooltip content={summaryTooltip} placement="top">
+        {pillTooltip ? (
+          <Tooltip content={pillTooltip} placement="top">
             <ShimmerText
               active={showSpin}
               className={cn('text-sm font-medium', !showSpin && statusTone)}
@@ -393,6 +416,7 @@ export function SyncStatus({
               {label}
             </ShimmerText>
           )}
+          {showHeldNote && <span className="text-fg-muted mt-0.5 text-sm">{heldNote}</span>}
           {hasError && !isSyncing && !recoveryBlocksSync && (
             <span className="text-fg-muted mt-0.5 text-sm">
               {forceRePairMessage ?? resolvedError}
