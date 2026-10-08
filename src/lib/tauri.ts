@@ -122,6 +122,31 @@ export const updateEntry = (
   previewText?: string,
 ): Promise<Entry> => invoke('update_entry', { id, title, contentText, previewText })
 export const softDeleteEntry = (id: string): Promise<void> => invoke('soft_delete_entry', { id })
+
+/** Trashed entries visible under `lockedView` / `activeVaultId`, newest
+ * first. Locked entries come back redacted under `covered`. */
+export const listTrashedEntries = (
+  lockedView: LockedView = 'revealed',
+  activeVaultId: string | null = null,
+): Promise<Entry[]> => invoke('list_trashed_entries', { lockedView, activeVaultId })
+/** Bring an entry back from Trash. Allowed under `covered`. */
+export const restoreEntry = (
+  id: string,
+  lockedView: LockedView = 'revealed',
+  activeVaultId: string | null = null,
+): Promise<void> => invoke('restore_entry', { id, lockedView, activeVaultId })
+/** Permanently delete one trashed entry. A locked entry needs `revealed`. */
+export const deleteEntryForever = (
+  id: string,
+  lockedView: LockedView = 'revealed',
+  activeVaultId: string | null = null,
+): Promise<void> => invoke('delete_entry_forever', { id, lockedView, activeVaultId })
+/** Permanently delete every trashed entry readable in this view (locked
+ * entries are skipped unless `revealed`). Returns how many were purged. */
+export const emptyTrash = (
+  lockedView: LockedView = 'revealed',
+  activeVaultId: string | null = null,
+): Promise<number> => invoke('empty_trash', { lockedView, activeVaultId })
 export const toggleFavorite = (id: string): Promise<boolean> => invoke('toggle_favorite', { id })
 export const updateEntryEmotion = (id: string, emotion: EmotionKey | null): Promise<Entry> =>
   invoke('update_entry_emotion', { id, emotion })

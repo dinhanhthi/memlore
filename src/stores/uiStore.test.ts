@@ -244,8 +244,13 @@ describe('uiStore', () => {
     })
 
     it('coerceDataTab keeps demo only in DEV builds', () => {
-      expect(validDataTabs(true)).toEqual(['import', 'export', 'downloads', 'demo'])
-      expect(validDataTabs(false)).toEqual(['import', 'export', 'downloads'])
+      expect(validDataTabs(true)).toEqual(['import', 'export', 'downloads', 'trash', 'demo'])
+      expect(validDataTabs(false)).toEqual(['import', 'export', 'downloads', 'trash'])
+      expect(coerceDataTab('trash', false)).toBe('trash')
+      expect(coerceDataTab('trash', true)).toBe('trash')
+      // Persisted state is untrusted: a non-string must coerce, not throw.
+      expect(coerceDataTab(42, false)).toBe('import')
+      expect(coerceDataTab(undefined, false)).toBe('import')
       expect(coerceDataTab('demo', true)).toBe('demo')
       expect(coerceDataTab('demo', false)).toBe('import')
       expect(coerceDataTab('export', false)).toBe('export')

@@ -450,7 +450,8 @@
     "tabs": {
       "import": "Import",
       "export": "Export",
-      "downloads": "Downloads"
+      "downloads": "Downloads",
+      "trash": "Recently deleted"
     },
     "downloads": {
       "title": "Downloads",
@@ -476,6 +477,28 @@
         "basemap": "Locations, map previews, and the heatmap",
         "fonts": "the custom editor font, which will fall back to the default"
       }
+    },
+    "trash": {
+      "hint": "Deleted entries stay here for 30 days, then they are permanently deleted. Restore one to bring it back.",
+      "older_versions_note": "Devices on older Memlore versions still show these entries until they are permanently deleted.",
+      "empty": "Nothing here. Entries you delete appear here for 30 days.",
+      "untitled": "Untitled",
+      "locked_entry": "Locked entry",
+      "deleted_ago_one": "deleted {{count}} day ago",
+      "deleted_ago_other": "deleted {{count}} days ago",
+      "days_left_one": "{{count}} day left",
+      "days_left_other": "{{count}} days left",
+      "preview": "Preview",
+      "restore": "Restore",
+      "delete_forever": "Delete forever",
+      "delete_forever_title": "Delete this entry forever?",
+      "delete_forever_body": "The entry and its media are permanently deleted from this device and your synced devices. This can't be undone.",
+      "empty_trash": "Empty trash",
+      "empty_trash_title": "Empty trash?",
+      "empty_trash_body_one": "{{count}} entry and its media will be permanently deleted. This can't be undone.",
+      "empty_trash_body_other": "{{count}} entries and their media will be permanently deleted. This can't be undone.",
+      "empty_trash_locked_note": "Locked entries are skipped here. Unlock them to delete them now; otherwise they are deleted after 30 days like the rest.",
+      "error": "Something went wrong: {{message}}"
     }
   },
   "about_section": {

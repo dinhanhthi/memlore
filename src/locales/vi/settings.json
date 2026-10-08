@@ -450,7 +450,8 @@
     "tabs": {
       "import": "Nhập dữ liệu",
       "export": "Xuất dữ liệu",
-      "downloads": "Tải xuống"
+      "downloads": "Tải xuống",
+      "trash": "Đã xóa gần đây"
     },
     "downloads": {
       "title": "Tải xuống",
@@ -476,6 +477,25 @@
         "basemap": "Vị trí, bản xem trước bản đồ, và heatmap",
         "fonts": "font tùy chỉnh của trình soạn thảo (sẽ trở về font mặc định)"
       }
+    },
+    "trash": {
+      "hint": "Các mục đã xóa được giữ ở đây trong 30 ngày, sau đó sẽ bị xóa vĩnh viễn. Khôi phục một mục để lấy lại nó.",
+      "older_versions_note": "Các thiết bị dùng phiên bản Memlore cũ hơn vẫn hiển thị những mục này cho đến khi chúng bị xóa vĩnh viễn.",
+      "empty": "Không có gì ở đây. Các mục bạn xóa sẽ xuất hiện ở đây trong 30 ngày.",
+      "untitled": "Không có tiêu đề",
+      "locked_entry": "Mục đã khóa",
+      "deleted_ago_other": "đã xóa {{count}} ngày trước",
+      "days_left_other": "còn {{count}} ngày",
+      "preview": "Xem trước",
+      "restore": "Khôi phục",
+      "delete_forever": "Xóa vĩnh viễn",
+      "delete_forever_title": "Xóa vĩnh viễn mục này?",
+      "delete_forever_body": "Mục này cùng tệp đa phương tiện của nó sẽ bị xóa vĩnh viễn khỏi thiết bị này và các thiết bị đã đồng bộ. Không thể hoàn tác.",
+      "empty_trash": "Dọn sạch thùng rác",
+      "empty_trash_title": "Dọn sạch thùng rác?",
+      "empty_trash_body_other": "{{count}} mục cùng tệp đa phương tiện của chúng sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+      "empty_trash_locked_note": "Các mục đã khóa được bỏ qua ở đây. Mở khóa để xóa chúng ngay; nếu không, chúng cũng bị xóa vĩnh viễn sau 30 ngày như các mục khác.",
+      "error": "Đã xảy ra lỗi: {{message}}"
     }
   },
   "about_section": {

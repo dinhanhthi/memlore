@@ -29,8 +29,12 @@ export interface EntryPreviewModalProps {
   entryId: string
   onClose: () => void
   /** Open this entry in the full editor (All Entries). Provided by the host,
-   *  which owns tab navigation; the modal only decides when to ask. */
-  onEdit: (entryId: string) => void
+   *  which owns tab navigation; the modal only decides when to ask. Omit to
+   *  hide the Edit button (e.g. a trashed entry cannot be edited). */
+  onEdit?: (entryId: string) => void
+  /** Render a trashed (`is_deleted`) entry instead of reporting it
+   *  unavailable. Locked entries stay unavailable regardless. */
+  allowDeleted?: boolean
 }
 
 /**
@@ -48,7 +52,12 @@ export interface EntryPreviewModalProps {
  * in a thread they were mid-way through. The Edit button is the opt-in
  * escape hatch for when they do want the editor.
  */
-export function EntryPreviewModal({ entryId, onClose, onEdit }: EntryPreviewModalProps) {
+export function EntryPreviewModal({
+  entryId,
+  onClose,
+  onEdit,
+  allowDeleted = false,
+}: EntryPreviewModalProps) {
   const { t, i18n } = useTranslation(['ai', 'editor'])
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
   const justifyEnabled = useEditorJustifyEnabled()
@@ -87,8 +96,9 @@ export function EntryPreviewModal({ entryId, onClose, onEdit }: EntryPreviewModa
         ])
         if (cancelled) return
         // Same exclusion rule the rest of this feature applies: a locked or
-        // deleted entry is never rendered, no matter how it was reached.
-        if (!entry || entry.is_locked || entry.is_deleted) {
+        // deleted entry is never rendered, no matter how it was reached —
+        // except a trashed one when the host (Trash settings) opts in.
+        if (!entry || entry.is_locked || (entry.is_deleted && !allowDeleted)) {
           setState({ kind: 'unavailable' })
           return
         }
@@ -109,7 +119,7 @@ export function EntryPreviewModal({ entryId, onClose, onEdit }: EntryPreviewModa
     return () => {
       cancelled = true
     }
-  }, [entryId, activeVaultId, previewEditor])
+  }, [entryId, activeVaultId, previewEditor, allowDeleted])
 
   const untitled = t('editor:untitled_entry', { defaultValue: 'Untitled' })
   const heading =
@@ -131,7 +141,7 @@ export function EntryPreviewModal({ entryId, onClose, onEdit }: EntryPreviewModa
           </div>
           {/* Only once the entry is known readable — offering Edit on an
               unavailable entry would navigate to a blank editor. */}
-          {state.kind === 'loaded' && (
+          {state.kind === 'loaded' && onEdit && (
             <Button
               variant="secondary"
               size="sm"

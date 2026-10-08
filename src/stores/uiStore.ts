@@ -116,7 +116,7 @@ export type LocationTab = 'geocoding' | 'saved'
  *  which rehydrate migrates rather than discards. */
 export type AITab = 'general' | 'providers' | 'chat' | 'features' | 'memories' | 'persona'
 export type TemplatesTab = 'custom' | 'builtin'
-export type DataTab = 'import' | 'export' | 'downloads' | 'demo'
+export type DataTab = 'import' | 'export' | 'downloads' | 'trash' | 'demo'
 export type EditorTab = 'font' | 'general' | 'layout'
 export type SyncTab = 'gdrive' | 'devices' | 'schedule'
 export type AppearanceTab = 'theme' | 'display' | 'layout'
@@ -132,14 +132,16 @@ export type StatsTab = 'charts' | 'insights' | 'reviews' | 'usage' | 'audit'
 /** Valid Settings → Data tabs. `demo` is DEV-only. */
 export function validDataTabs(isDev: boolean = import.meta.env.DEV): readonly DataTab[] {
   return isDev
-    ? (['import', 'export', 'downloads', 'demo'] as const)
-    : (['import', 'export', 'downloads'] as const)
+    ? (['import', 'export', 'downloads', 'trash', 'demo'] as const)
+    : (['import', 'export', 'downloads', 'trash'] as const)
 }
 
 /** Coerce a persisted/unknown tab id to a valid DataTab for the current build. */
-export function coerceDataTab(tab: string, isDev: boolean = import.meta.env.DEV): DataTab {
+export function coerceDataTab(tab: unknown, isDev: boolean = import.meta.env.DEV): DataTab {
   const valid = validDataTabs(isDev)
-  return (valid as readonly string[]).includes(tab) ? (tab as DataTab) : 'import'
+  return typeof tab === 'string' && (valid as readonly string[]).includes(tab)
+    ? (tab as DataTab)
+    : 'import'
 }
 
 interface UiState {

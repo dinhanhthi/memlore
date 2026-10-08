@@ -44,6 +44,11 @@ export interface Entry {
    * show a chat-origin indicator without a per-card back-ref lookup.
    * Local-only UX flag — not synced. */
   from_chat: boolean
+  /** Unix seconds when the entry was moved to Trash; null when it is not in
+   * Trash. Only set together with `is_deleted` (a purged or legacy tombstone
+   * has `is_deleted` and a null `trashed_at`). Optional so older fixtures and
+   * payloads without the field still type-check. */
+  trashed_at?: number | null
 }
 
 export interface SearchResult {

@@ -9,6 +9,7 @@ import { useSyncStore } from '../../stores/syncStore'
 import { DownloadsSettings } from './data/DownloadsSettings'
 import { ExportModal } from './data/ExportModal'
 import { ImportModal } from './data/ImportModal'
+import { TrashSettings } from './data/TrashSettings'
 import { SettingsTabList } from './SettingsTabList'
 import { useTabSlideDirection } from './useTabSlideDirection'
 import { useTabStore } from '../../stores/tabStore'
@@ -31,6 +32,7 @@ const BASE_DATA_TABS: { id: DataTab; labelKey: string; defaultLabel: string }[] 
   { id: 'import', labelKey: 'data_section.tabs.import', defaultLabel: 'Import' },
   { id: 'export', labelKey: 'data_section.tabs.export', defaultLabel: 'Export' },
   { id: 'downloads', labelKey: 'data_section.tabs.downloads', defaultLabel: 'Downloads' },
+  { id: 'trash', labelKey: 'data_section.tabs.trash', defaultLabel: 'Recently deleted' },
 ]
 
 // Demo tab label is hardcoded (DEV-only path) — not in shared locale JSON so
@@ -51,7 +53,8 @@ function dataPanelId(id: DataTab) {
 /// 1. Import — restore from backup or another app
 /// 2. Export — save journal entries to a file
 /// 3. Downloads — opt-in on-device models, offline map, custom fonts
-/// 4. Demo Data (DEV only) — seed demo journals/entries
+/// 4. Recently deleted — Trash: preview, restore, delete forever, empty
+/// 5. Demo Data (DEV only) — seed demo journals/entries
 export function DataSettings() {
   const { t } = useTranslation('settings')
   const rawProvider = useSyncStore((s) => s.status?.provider ?? null)
@@ -141,6 +144,12 @@ export function DataSettings() {
               {tab.id === 'downloads' && (
                 <div className="max-w-180">
                   <DownloadsSettings />
+                </div>
+              )}
+
+              {tab.id === 'trash' && (
+                <div className="max-w-180">
+                  <TrashSettings />
                 </div>
               )}
 
