@@ -4,7 +4,8 @@
  * `pushAll()` is the web companion's only write path after onboarding. Every upload goes through
  * `safeUpload` (write flag, clock, fence, format guard, allowlist, seal-then-verify, under the Web
  * Lock); the one other write is `safeEnsureOutboxFolder` (`<webId>` and `<webId>/outbox` only),
- * once per session, behind the same checks. Nothing is ever deleted, on Drive or in IndexedDB.
+ * once per session, behind the same checks. Push deletes nothing, on Drive or in IndexedDB; only
+ * `retention.ts` drops pushed drafts from IndexedDB, and nothing ever deletes on Drive.
  *
  * Session (one per unlock, dropped by the lock hook):
  *  - `ExpectedVaultState` comes from the device record (`recoveryGeneration`, `masterFingerprint`)
