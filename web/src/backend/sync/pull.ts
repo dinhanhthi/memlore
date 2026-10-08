@@ -281,9 +281,38 @@ function entryRows(manifest: unknown): { rows: ManifestEntryRow[]; dropped: numb
       dropped += 1
       continue
     }
-    rows.push({ entry_id: row.entry_id, updated_at: row.updated_at, is_deleted: row.is_deleted })
+    // `trashed_at` is optional (desktop v0.3.0+): a garbage value drops the field, not the row.
+    const trashedAt =
+      typeof row.trashed_at === 'number' && Number.isFinite(row.trashed_at)
+        ? { trashed_at: row.trashed_at }
+        : {}
+    rows.push({
+      entry_id: row.entry_id,
+      updated_at: row.updated_at,
+      is_deleted: row.is_deleted,
+      ...trashedAt,
+    })
   }
   return { rows, dropped }
+}
+
+/**
+ * Every entry id with a tombstone row in ANY manifest, plus every entry whose LWW WINNER is in the
+ * desktop Trash. The asymmetry is deliberate: a trashed row that lost to a newer live row (a
+ * restore or an edit elsewhere) does not count.
+ */
+function tombstonesOf(
+  manifests: ReadonlyMap<string, Manifest>,
+  index: ReadonlyMap<string, IndexEntry>,
+): Set<string> {
+  const tombstones = new Set<string>()
+  for (const manifest of manifests.values()) {
+    for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
+  }
+  for (const winner of index.values()) {
+    if (winner.trashedAt !== undefined) tombstones.add(winner.entryId)
+  }
+  return tombstones
 }
 
 const entryPath = (winner: IndexEntry): string =>
@@ -336,7 +365,7 @@ export class Puller {
   /**
    * What intent retention needs from the last refresh: the devices with a manifest, the listed
    * device slot ids (null before a refresh) and every entry id with a tombstone row in ANY
-   * manifest (not only LWW winners).
+   * manifest (not only LWW winners), plus every entry whose LWW winner is trashed.
    */
   get desktops(): RetentionDesktops {
     return this.#desktops
@@ -406,10 +435,7 @@ export class Puller {
       this.#index = buildEntryIndex(
         [...manifests].map(([device, manifest]) => ({ device, entries: manifest.entries })),
       )
-      const tombstones = new Set<string>()
-      for (const manifest of manifests.values()) {
-        for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
-      }
+      const tombstones = tombstonesOf(manifests, this.#index)
       this.#desktops = { manifests: [...manifests.keys()], slots: null, tombstones }
       return true
     } catch (error) {
@@ -477,10 +503,7 @@ export class Puller {
     )
     this.#degraded = degraded
     this.#foreignIntents = foreignIntents
-    const tombstones = new Set<string>()
-    for (const manifest of manifests.values()) {
-      for (const row of manifest.entries) if (row.is_deleted) tombstones.add(row.entry_id)
-    }
+    const tombstones = tombstonesOf(manifests, this.#index)
     this.#desktops = { manifests: [...manifests.keys()], slots: this.#listedSlots, tombstones }
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
   }
@@ -843,8 +866,10 @@ export class Puller {
     }
     const found = await Promise.all(
       listed.map(async ({ device, entryId, path }): Promise<ForeignIntentFile | null> => {
-        // TODO(later): assert unlocked inside the limited call, see docs/LATER.md.
-        const read = await this.#limit(() => this.#readOptional(generation, path))
+        const read = await this.#limit(() => {
+          this.#assertUnlocked()
+          return this.#readOptional(generation, path)
+        })
         if (read === null) return null
         if (read === 'oversize') {
           warnings.push(`${path}: file is too large and was ignored`)
@@ -908,7 +933,10 @@ export class Puller {
         await this.#db.files.touch(path, this.#now())
         return cached.ciphertext
       }
-      const bytes = await this.#limit(() => this.#readOptional(generation, path))
+      const bytes = await this.#limit(() => {
+        this.#assertUnlocked()
+        return this.#readOptional(generation, path)
+      })
       if (bytes === 'oversize') return null // not retryable: the id is treated as missing
       if (bytes !== null && isCurrent()) {
         // Best effort: a full store must not fail the read.

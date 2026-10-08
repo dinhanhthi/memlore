@@ -590,7 +590,8 @@ function indexDiffers(
       next === undefined ||
       next.authorDevice !== row.authorDevice ||
       next.updatedAt !== row.updatedAt ||
-      next.isDeleted !== row.isDeleted
+      next.isDeleted !== row.isDeleted ||
+      next.trashedAt !== row.trashedAt
     ) {
       return true
     }

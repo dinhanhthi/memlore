@@ -110,6 +110,7 @@ function setup(guardMetadata?: (id: string, metadataJson: string) => void): Fake
       authorDevice: full.device_id,
       updatedAt: full.updated_at,
       isDeleted: full.is_deleted,
+      ...(typeof full.trashed_at === 'number' ? { trashedAt: full.trashed_at } : {}),
     })
   }
   return {
@@ -309,6 +310,43 @@ describe('exclusions', () => {
     expect(result.excluded).toEqual(['a'])
     expect(f.fetched).toEqual(['a'])
     expect(f.vault.size).toBe(0)
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('treats a trashed index winner as deleted, even when a live copy at the same time is held', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', title: SECRET, updated_at: 500 })
+    f.put({ entry_id: 'b', updated_at: 400 })
+    await f.vault.load(['a', 'b'])
+    // An old peer re-lists the entry live at the same updated_at; the trashed row wins the tie.
+    f.index.set('a', {
+      entryId: 'a',
+      authorDevice: 'dev-z',
+      updatedAt: 500,
+      isDeleted: false,
+      trashedAt: 450,
+    })
+    const result = await f.vault.load(['a'])
+    expect(result.excluded).toEqual(['a'])
+    expect(f.vault.status('a')).toBe('deleted')
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).toEqual(['b'])
+    expect(f.vault.search('title')).toHaveLength(1)
+    expect(f.vault.listIndex().map((e) => e.entryId)).toEqual(['b'])
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('hides an opened copy whose metadata is trashed; ignores a non-numeric trashed_at', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', title: SECRET, trashed_at: 450 })
+    f.put({ entry_id: 'b', title: 'fine', trashed_at: '450' as never })
+    // The manifest row did not say so (e.g. an older cached manifest): the payload decides.
+    f.index.set('a', { entryId: 'a', authorDevice: 'dev-a', updatedAt: 100, isDeleted: false })
+    const result = await f.vault.load(['a', 'b'])
+    expect(result.excluded).toEqual(['a'])
+    expect(result.loaded).toEqual(['b'])
+    expect(f.vault.status('a')).toBe('deleted')
+    expect(f.vault.search('fine').map((e) => e.metadata.entry_id)).toEqual(['b'])
+    expect(f.vault.getEntry('b').metadata).not.toHaveProperty('trashed_at')
     expect(f.vault.__debugDump()).not.toContain(SECRET)
   })
 

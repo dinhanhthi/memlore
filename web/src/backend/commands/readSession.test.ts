@@ -286,6 +286,20 @@ describe('read session priming', () => {
     expect((await same.session.pull()).changed).toBe(false)
   })
 
+  it('pull() reports a change when only the trash state of a row moved', async () => {
+    const r = await rig()
+    r.refresh.mockImplementationOnce(async () => {
+      r.puller.index = new Map([
+        [
+          'e1',
+          { entryId: 'e1', authorDevice: 'devA', updatedAt: 1, isDeleted: false, trashedAt: 1 },
+        ],
+      ])
+      return { stale: [] as string[] }
+    })
+    expect((await r.session.pull()).changed).toBe(true)
+  })
+
   it('prime runs once per unlock and again after a lock', async () => {
     const r = await rig()
     await r.session.ready()

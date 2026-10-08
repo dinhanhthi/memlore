@@ -37,14 +37,43 @@ describe('buildEntryIndex', () => {
     const y = { entryId: 'e', authorDevice: 'b', updatedAt: 5, isDeleted: true }
     expect(lwwWinner(x, y)).toBe(lwwWinner(y, x))
   })
+
+  it('on an exact tie prefers the trashed row over the device-id tiebreak, symmetrically', () => {
+    const trashed = { device: 'dev-a', entries: [{ ...row('e1', 10), trashed_at: 9 }] }
+    const oldPeerLive = { device: 'dev-z', entries: [row('e1', 10)] }
+    expect(buildEntryIndex([trashed, oldPeerLive]).get('e1')).toMatchObject({
+      authorDevice: 'dev-a',
+      trashedAt: 9,
+    })
+    expect(buildEntryIndex([oldPeerLive, trashed]).get('e1')?.authorDevice).toBe('dev-a')
+    const newerLive = { device: 'dev-b', entries: [row('e1', 11)] }
+    expect(buildEntryIndex([trashed, newerLive]).get('e1')?.trashedAt).toBeUndefined()
+  })
+
+  it('leaves legacy rows without trashed_at untouched', () => {
+    const index = buildEntryIndex([{ device: 'd', entries: [row('e1', 10)] }])
+    expect(index.get('e1')).toEqual({
+      entryId: 'e1',
+      authorDevice: 'd',
+      updatedAt: 10,
+      isDeleted: false,
+    })
+  })
 })
 
 describe('newestLive', () => {
-  it('excludes tombstones, orders by updated_at desc then id asc, and limits', () => {
+  it('excludes tombstones and trashed rows, orders by updated_at desc then id asc, and limits', () => {
     const index = buildEntryIndex([
       {
         device: 'd',
-        entries: [row('b', 5), row('a', 5), row('c', 9), row('dead', 100, true), row('old', 1)],
+        entries: [
+          row('b', 5),
+          row('a', 5),
+          row('c', 9),
+          row('dead', 100, true),
+          { ...row('trashed', 100), trashed_at: 50 },
+          row('old', 1),
+        ],
       },
     ])
     expect(newestLive(index, 3).map((e) => e.entryId)).toEqual(['c', 'a', 'b'])

@@ -4585,6 +4585,8 @@ where
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         },
         Err(error) => {
             drop(staging_conn);
@@ -9404,11 +9406,14 @@ mod tests {
                 updated_at: 1,
                 local_version: 1,
                 is_deleted,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         }
     }
 
@@ -9430,6 +9435,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         }
     }
 

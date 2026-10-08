@@ -23,6 +23,7 @@ import { isFormatGuardLatched, resetFormatGuardLatch } from './formatGuard'
 import { FormatUnsupportedError, onboardComplete } from './onboard'
 import { safeUpload } from './safeUpload'
 import {
+  FETCH_CONCURRENCY,
   PullTransientError,
   ReonboardRequiredError,
   Puller,
@@ -172,7 +173,13 @@ function patchManifest(
   patchFile(drive, ['generations', 'g-0', device, 'metadata.json'], change)
 }
 
-type Row = { entry_id: string; updated_at: number; is_deleted: boolean; local_version: number }
+type Row = {
+  entry_id: string
+  updated_at: number
+  is_deleted: boolean
+  local_version: number
+  trashed_at?: unknown
+}
 
 /** A second desktop folder with a manifest, small files and a copy of one fixture entry file. */
 function addSecondDevice(drive: FakeDrive, rows: Row[], entryFileFrom?: string): string {
@@ -330,6 +337,43 @@ describe('warmStart', () => {
       updatedAt: NEWEST + 100,
     })
     expect(entryDownloads(env.drive).some((p) => p.includes(victim))).toBe(false)
+  })
+
+  it('hides a trashed winner from warmStart and lists it as a tombstone for retention', async () => {
+    const env = await setup()
+    const victim = fixture.expected.entries[0].entry_id
+    patchManifest(env.drive, env.desktop, (m) => {
+      for (const e of m.entries as Row[]) {
+        if (e.entry_id === victim) {
+          e.trashed_at = 1_900_000_000
+          e.updated_at = NEWEST + 100
+        }
+      }
+    })
+    const ids = await env.puller.warmStart()
+    expect(ids).not.toContain(victim)
+    expect(ids).toHaveLength(5)
+    expect(env.puller.index?.get(victim)).toMatchObject({
+      isDeleted: false,
+      trashedAt: 1_900_000_000,
+    })
+    expect(env.puller.desktops.tombstones.has(victim)).toBe(true)
+    expect(env.puller.desktops.tombstones.size).toBe(1)
+    expect(entryDownloads(env.drive).some((p) => p.includes(victim))).toBe(false)
+  })
+
+  it('does not count a trashed row as a tombstone once a newer live row wins', async () => {
+    const env = await setup()
+    const victim = fixture.expected.entries[0].entry_id
+    patchManifest(env.drive, env.desktop, (m) => {
+      for (const e of m.entries as Row[]) if (e.entry_id === victim) e.trashed_at = 1
+    })
+    addSecondDevice(env.drive, [
+      { entry_id: victim, updated_at: NEWEST + 100, is_deleted: false, local_version: 9 },
+    ])
+    await env.puller.refresh()
+    expect(env.puller.index?.get(victim)?.trashedAt).toBeUndefined()
+    expect(env.puller.desktops.tombstones.has(victim)).toBe(false)
   })
 })
 
@@ -569,9 +613,52 @@ describe('refresh', () => {
     expect(env.puller.index).toBeNull()
   })
 
+  // Holds every download matching `held` until the limiter is full (the rest queue behind it),
+  // locks, then releases: a read still queued in the limiter must not reach Drive.
+  async function expectNoQueuedDownloadAfterLock(
+    env: Env,
+    unlocked: { current: boolean },
+    held: RegExp,
+    run: () => Promise<unknown>,
+  ): Promise<void> {
+    const release = new Gate()
+    const reached = new Gate()
+    const downloadsSeen: string[] = []
+    let heldCount = 0
+    env.net.hold = (path) => {
+      downloadsSeen.push(path)
+      if (!held.test(path)) return undefined
+      heldCount += 1
+      reached.open()
+      return release
+    }
+    const pending = run()
+    await reached.promise
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(heldCount, 'the limiter is full and more reads are queued').toBe(FETCH_CONCURRENCY)
+    unlocked.current = false
+    const downloadsAtLock = downloadsSeen.length
+    release.open()
+    await expect(pending).rejects.toBeInstanceOf(VaultLockedError)
+    expect(downloadsSeen.length).toBe(downloadsAtLock)
+    env.net.hold = undefined
+    unlocked.current = true
+  }
+
   it('a lock mid-refresh issues no further downloads', async () => {
     const unlocked = { current: true }
     const env = await setup({}, { isUnlocked: () => unlocked.current })
+    // Another web device with more outbox intents than the limiter admits at once.
+    const peer = 'eeeeeeee-3333-4444-8555-ffffffffffff'
+    env.drive.addFile(
+      `${peer}.json`,
+      env.drive.chain('Memlore', '.meta', 'keyring', 'devices'),
+      '{}',
+    )
+    const outbox = env.drive.chain('Memlore', 'generations', 'g-0', peer, 'outbox')
+    for (let i = 0; i < FETCH_CONCURRENCY + 3; i += 1) {
+      env.drive.addFile(`aaaaaaaa-0000-4000-8000-00000000000${i}.bin`, outbox, `SEALED-${i}`)
+    }
     const smallFile = /\/(outbox-acks|tags|templates)\.bin$|\/journals\/[^/]+\.bin$/
     const release = new Gate()
     const reached = new Gate()
@@ -594,6 +681,21 @@ describe('refresh', () => {
     release.open()
     await expect(refresh).rejects.toBeInstanceOf(VaultLockedError)
     expect(downloadsSeen.length).toBe(downloadsAtLock)
+    env.net.hold = undefined
+    unlocked.current = true
+
+    // Outbox intents of the web peer still queued in the limiter.
+    await expectNoQueuedDownloadAfterLock(env, unlocked, /\/outbox\/[^/]+\.bin$/, () =>
+      env.puller.refresh(),
+    )
+
+    // Entry downloads still queued in the limiter.
+    await env.puller.refresh()
+    const ids = fixture.expected.entries.map((e) => e.entry_id)
+    expect(ids.length).toBeGreaterThan(FETCH_CONCURRENCY)
+    await expectNoQueuedDownloadAfterLock(env, unlocked, /\/entries\/[^/]+\.bin$/, () =>
+      env.puller.fetchEntries(ids),
+    )
   })
 })
 
@@ -1359,6 +1461,29 @@ describe('primeFromCache', () => {
     expect(reloaded.desktops.manifests).toEqual([env.desktop])
     expect(reloaded.index?.has('second-entry')).toBe(false)
     expect(reloaded.index?.size).toBe(7)
+  })
+
+  it('drops a non-numeric trashed_at of a cached row but keeps the row; primes trashed rows', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    const path = `${env.desktop}/metadata.json`
+    const cached = await env.db.files.get(path)
+    if (!cached) throw new Error('manifest was not cached')
+    const [garbage, trashed] = fixture.expected.entries.map((e) => e.entry_id)
+    const manifest = JSON.parse(text(cached.ciphertext)) as { entries: Row[] }
+    for (const e of manifest.entries) {
+      if (e.entry_id === garbage) e.trashed_at = 'soon'
+      if (e.entry_id === trashed) e.trashed_at = 1_900_000_000
+    }
+    await env.db.files.put({ ...cached, ciphertext: bytes(JSON.stringify(manifest)) })
+    const reloaded = reload(env)
+    expect(await prime(reloaded)).toBe(true)
+    expect(reloaded.index?.size).toBe(7)
+    expect(reloaded.index?.get(garbage)).not.toHaveProperty('trashedAt')
+    expect(reloaded.index?.get(trashed)?.trashedAt).toBe(1_900_000_000)
+    expect(reloaded.desktops.tombstones.has(trashed)).toBe(true)
+    expect(reloaded.desktops.tombstones.has(garbage)).toBe(false)
+    expect(await reloaded.warmStart()).not.toContain(trashed)
   })
 
   it('a revocation after priming drops the cache, locks and clears the index', async () => {

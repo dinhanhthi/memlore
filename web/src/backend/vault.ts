@@ -38,7 +38,7 @@
 import * as Y from 'yjs'
 import type { Core } from '../core/core'
 import { getKeyRing, onLock, type KeyRing } from './keys'
-import type { IndexEntry } from './sync/entryIndex'
+import { isLive, type IndexEntry } from './sync/entryIndex'
 import type { OutboxEntryV1 } from './sync/outbox'
 import { foldText, matchesQuery, parseQuery, type MatchOptions } from './textFold'
 
@@ -92,6 +92,8 @@ export interface EntryMetadata {
   is_invisible: boolean
   vault_id: string | null
   tag_ids: string[]
+  /** Set when the entry is in the desktop Trash (v0.3.0+): hidden like a deleted entry. */
+  trashed_at?: number
   /** Everything else (location, weather, media, ...), passed through untouched. */
   [key: string]: unknown
 }
@@ -209,8 +211,11 @@ function parseMetadata(json: string, expectedId: string): EntryMetadata {
     throw new Error('entry metadata is malformed')
   }
   if (raw.entry_id !== expectedId) throw new Error('entry id does not match its file')
+  // `...raw` would pass a non-numeric `trashed_at` through: drop it, never trust it.
+  const { trashed_at: trashedAt, ...rest } = raw
   return {
-    ...raw,
+    ...rest,
+    ...(typeof trashedAt === 'number' ? { trashed_at: trashedAt } : {}),
     entry_id: raw.entry_id,
     device_id: raw.device_id,
     updated_at: raw.updated_at,
@@ -707,7 +712,8 @@ export class Vault {
     for (const id of new Set(ids)) {
       const winner = index.get(id)
       if (winner === undefined) result.missing.push(id)
-      else if (winner.isDeleted) this.#markDeleted(winner, result)
+      // Before `#isFresh`: a live copy held at the same `updated_at` loses to a trashed winner.
+      else if (!isLive(winner)) this.#markDeleted(winner, result)
       else if (this.#isFresh(winner)) this.#report(id, result)
       else toFetch.push(id)
     }
@@ -833,7 +839,7 @@ export class Vault {
   }
 
   #exclusionReason(metadata: EntryMetadata): ExcludedReason | null {
-    if (metadata.is_deleted) return 'deleted'
+    if (metadata.is_deleted || typeof metadata.trashed_at === 'number') return 'deleted'
     if (metadata.is_locked) return 'locked'
     if (metadata.is_invisible) return 'invisible'
     if (this.#journalExcluded(metadata.journal_id)) return 'journal'
@@ -893,14 +899,14 @@ export class Vault {
 
   /**
    * The index (all known entries, loaded or not), `updated_at` descending (the fetch order of the
-   * lazy pages), without tombstones and without ids already known to be excluded. A stub older
+   * lazy pages), without tombstones or trashed entries and without ids already known to be excluded. A stub older
    * than the index winner is listed again: its entry changed and may be visible now.
    */
   listIndex(): IndexEntry[] {
     const index = this.#puller?.index
     if (index === null || index === undefined) return []
     return [...index.values()]
-      .filter((e) => !e.isDeleted && !this.#isStubbed(e))
+      .filter((e) => isLive(e) && !this.#isStubbed(e))
       .sort((a, b) => b.updatedAt - a.updatedAt || (a.entryId < b.entryId ? -1 : 1))
   }
 

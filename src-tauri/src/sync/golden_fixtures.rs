@@ -183,6 +183,7 @@ fn peer_meta(
         tag_ids: vec![],
         media,
         deleted_media: vec![],
+        trashed_at: None,
     }
 }
 
@@ -203,11 +204,14 @@ fn write_peer_manifest(dir: &TempDir, meta: &EntryMetadata) {
             updated_at: meta.updated_at,
             local_version: 1,
             is_deleted: false,
+            trashed_at: None,
         }],
         journals: vec![],
         chats_present: false,
         memory_present: false,
         generated_at: meta.updated_at,
+        index_present: false,
+        outbox_versions: None,
     };
     write_peer(
         dir,

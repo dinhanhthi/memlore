@@ -236,6 +236,8 @@ const DEVICE_MANIFEST_FIELDS = [
   'memory_present',
   'generated_at',
   'schema_version',
+  'index_present',
+  'outbox_versions',
 ] as const
 
 const SYNCED_ENTRY_SUMMARY_FIELDS = [
@@ -243,6 +245,7 @@ const SYNCED_ENTRY_SUMMARY_FIELDS = [
   'updated_at',
   'local_version',
   'is_deleted',
+  'trashed_at',
 ] as const
 
 const SYNCED_JOURNAL_SUMMARY_FIELDS = [
@@ -316,6 +319,7 @@ const ENTRY_METADATA_FIELDS = [
   'tag_ids',
   'media',
   'deleted_media',
+  'trashed_at',
 ] as const
 
 const SYNC_MEDIA_ITEM_FIELDS = [

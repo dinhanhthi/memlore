@@ -341,6 +341,45 @@ describe('formatGuard', () => {
       expect(isFormatGuardLatched()).toBe(true)
     })
 
+    it('passes the additive index_present and outbox_versions keys', () => {
+      const withNewKeys = { ...validManifest, index_present: true, outbox_versions: [1, 2] }
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', withNewKeys)).not.toThrow()
+      expect(isFormatGuardLatched()).toBe(false)
+    })
+
+    it('passes trashed_at on an entries summary row', () => {
+      const trashedRow = {
+        ...validManifest,
+        entries: [{ ...validManifest.entries[0], trashed_at: 2000 }],
+      }
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', trashedRow)).not.toThrow()
+      expect(isFormatGuardLatched()).toBe(false)
+    })
+
+    it('still latches on an unknown key beside the new manifest keys', () => {
+      const extra = {
+        ...validManifest,
+        index_present: true,
+        outbox_versions: [1],
+        future_manifest_field: 1,
+      }
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', extra)).toThrow(
+        FormatUnsupportedError,
+      )
+      expect(isFormatGuardLatched()).toBe(true)
+    })
+
+    it('still latches on an unknown key beside trashed_at in an entries row', () => {
+      const extra = {
+        ...validManifest,
+        entries: [{ ...validManifest.entries[0], trashed_at: 2000, future_row_field: 1 }],
+      }
+      expect(() => checkDeviceManifest(fakeCore, 'dev1/metadata.json', extra)).toThrow(
+        FormatUnsupportedError,
+      )
+      expect(isFormatGuardLatched()).toBe(true)
+    })
+
     it('rejects unknown field in journals summary', () => {
       const extraJournal = {
         ...validManifest,
@@ -423,6 +462,20 @@ describe('formatGuard', () => {
 
     it('rejects unknown top-level field in entry metadata', () => {
       const extra = { ...validMeta, summary_v2: 'ai generated' }
+      expect(() => checkEntryMetadata(fakeCore, 'entries/e1.bin', extra)).toThrow(
+        FormatUnsupportedError,
+      )
+      expect(isFormatGuardLatched()).toBe(true)
+    })
+
+    it('passes trashed_at in entry metadata', () => {
+      const trashed = { ...validMeta, trashed_at: 2000 }
+      expect(() => checkEntryMetadata(fakeCore, 'entries/e1.bin', trashed)).not.toThrow()
+      expect(isFormatGuardLatched()).toBe(false)
+    })
+
+    it('still latches on an unknown key beside trashed_at in entry metadata', () => {
+      const extra = { ...validMeta, trashed_at: 2000, future_entry_field: 1 }
       expect(() => checkEntryMetadata(fakeCore, 'entries/e1.bin', extra)).toThrow(
         FormatUnsupportedError,
       )

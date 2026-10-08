@@ -16,6 +16,13 @@ pub struct SyncedEntrySummary {
     pub updated_at: i64,
     pub local_version: i64,
     pub is_deleted: bool,
+    /// Unix-seconds time (same clock as `updated_at`) the entry was moved to Trash; `None` for a live entry.
+    /// A trashed entry stays `is_deleted = false` on the wire until purge.
+    /// Skipped when `None` so existing entries' metadata bytes and hashes do
+    /// not change (no mass re-push). Unlike `vault_id`, do not "fix" this by
+    /// dropping `skip_serializing_if`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trashed_at: Option<i64>,
 }
 
 /// Same shape for journals — journals are simple metadata-only records, no
@@ -53,6 +60,14 @@ pub struct DeviceMetadata {
     /// writes memory cannot poison the flag for devices that do.
     #[serde(default)]
     pub memory_present: bool,
+    /// `true` when this device published a month index (set by desktop
+    /// v0.3.0+). Skipped when `false` so older manifests stay byte-identical.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub index_present: bool,
+    /// Outbox intent schema versions this device can import (set by desktop
+    /// v0.3.0+). `None` for older devices; skipped when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outbox_versions: Option<Vec<u16>>,
     pub generated_at: i64,
 }
 
@@ -437,6 +452,13 @@ pub struct EntryMetadata {
     /// by `reconcile_own_media_files` on the uploader.
     #[serde(default)]
     pub deleted_media: Vec<SyncDeletedMediaItem>,
+    /// Unix-seconds time (same clock as `updated_at`) the entry was moved to Trash; `None` for a live entry.
+    /// A trashed entry stays `is_deleted = false` on the wire until purge.
+    /// Skipped when `None` so existing entries' metadata bytes and hashes do
+    /// not change (no mass re-push). Unlike `vault_id`, do not "fix" this by
+    /// dropping `skip_serializing_if`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trashed_at: Option<i64>,
 }
 
 /// Last-write-wins merge: newer `updated_at` wins; on tie, the lexicographic
@@ -494,11 +516,14 @@ mod tests {
                 updated_at: 50,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: true,
             memory_present: true,
             generated_at: 1_700_000_000,
+            index_present: false,
+            outbox_versions: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let back: DeviceMetadata = serde_json::from_str(&json).unwrap();
@@ -534,6 +559,7 @@ mod tests {
         assert!(parsed.deleted_media.is_empty());
         assert!(!parsed.is_locked);
         assert!(parsed.vault_id.is_none());
+        assert!(parsed.trashed_at.is_none());
         let back: EntryMetadata =
             serde_json::from_str(&serde_json::to_string(&parsed).unwrap()).unwrap();
         assert_eq!(back, parsed);
@@ -546,6 +572,7 @@ mod tests {
             updated_at,
             local_version: 1,
             is_deleted,
+            trashed_at: None,
         };
         let meta = |entries| DeviceMetadata {
             device_id: "d".to_string(),
@@ -555,12 +582,155 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         };
         let local = meta(vec![s("old", 10, false)]);
         let remote = meta(vec![s("a", 5, false), s("b", 9, false), s("old", 20, true)]);
         let d = compute_diff(&local, &remote);
         assert_eq!(d.to_pull, vec!["b".to_string(), "a".to_string()]);
         assert_eq!(d.to_delete_locally, vec![("old".to_string(), 20)]);
+    }
+
+    fn summary(id: &str, updated_at: i64, trashed_at: Option<i64>) -> SyncedEntrySummary {
+        SyncedEntrySummary {
+            entry_id: id.to_string(),
+            updated_at,
+            local_version: 1,
+            is_deleted: false,
+            trashed_at,
+        }
+    }
+
+    fn manifest(entries: Vec<SyncedEntrySummary>) -> DeviceMetadata {
+        DeviceMetadata {
+            device_id: "d".to_string(),
+            recovery_generation: 0,
+            entries,
+            journals: vec![],
+            chats_present: false,
+            memory_present: false,
+            index_present: false,
+            outbox_versions: None,
+            generated_at: 0,
+        }
+    }
+
+    fn entry_meta(device_id: &str, updated_at: i64, trashed_at: Option<i64>) -> EntryMetadata {
+        let mut meta: EntryMetadata = serde_json::from_value(serde_json::json!({
+            "entry_id": "e1",
+            "device_id": device_id,
+            "updated_at": updated_at,
+            "entry_date": 1,
+            "created_at": 1,
+            "journal_id": "j",
+            "journal_name": null,
+            "title": null,
+            "preview_text": null,
+            "content_text": null,
+            "location_label": null,
+            "location_address": null,
+            "weather_summary": null,
+            "weather_icon": null,
+            "latitude": null,
+            "longitude": null,
+            "emotion": null,
+            "is_favorite": false,
+            "is_deleted": false,
+        }))
+        .unwrap();
+        meta.trashed_at = trashed_at;
+        meta
+    }
+
+    #[test]
+    fn legacy_json_without_new_keys_defaults_them() {
+        let row: SyncedEntrySummary = serde_json::from_str(
+            r#"{"entry_id":"e","updated_at":1,"local_version":1,"is_deleted":false}"#,
+        )
+        .unwrap();
+        assert_eq!(row.trashed_at, None);
+
+        let m: DeviceMetadata = serde_json::from_str(
+            r#"{"device_id":"legacy","entries":[],"journals":[],"generated_at":1}"#,
+        )
+        .unwrap();
+        assert!(!m.index_present);
+        assert_eq!(m.outbox_versions, None);
+    }
+
+    #[test]
+    fn default_new_fields_serialize_byte_identical_to_legacy() {
+        let row = summary("e", 5, None);
+        assert_eq!(
+            serde_json::to_string(&row).unwrap(),
+            r#"{"entry_id":"e","updated_at":5,"local_version":1,"is_deleted":false}"#
+        );
+
+        let m = manifest(vec![row]);
+        assert_eq!(
+            serde_json::to_string(&m).unwrap(),
+            r#"{"device_id":"d","recovery_generation":0,"entries":[{"entry_id":"e","updated_at":5,"local_version":1,"is_deleted":false}],"journals":[],"chats_present":false,"memory_present":false,"generated_at":0}"#
+        );
+
+        let json = serde_json::to_value(entry_meta("d", 1, None)).unwrap();
+        assert!(json.get("trashed_at").is_none());
+    }
+
+    #[test]
+    fn set_new_fields_round_trip() {
+        let row = summary("e", 5, Some(4));
+        let back: SyncedEntrySummary =
+            serde_json::from_str(&serde_json::to_string(&row).unwrap()).unwrap();
+        assert_eq!(back, row);
+
+        let mut m = manifest(vec![row]);
+        m.index_present = true;
+        m.outbox_versions = Some(vec![1, 2]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains(r#""index_present":true"#));
+        assert!(json.contains(r#""outbox_versions":[1,2]"#));
+        let back: DeviceMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, m);
+
+        let meta = entry_meta("d", 1, Some(7));
+        let back: EntryMetadata =
+            serde_json::from_str(&serde_json::to_string(&meta).unwrap()).unwrap();
+        assert_eq!(back.trashed_at, Some(7));
+    }
+
+    #[test]
+    fn merge_metadata_lww_carries_winner_trashed_at() {
+        let live = entry_meta("dev-a", 10, None);
+        let trashed = entry_meta("dev-b", 20, Some(20));
+        assert_eq!(merge_metadata_lww(&live, &trashed).trashed_at, Some(20));
+        assert_eq!(merge_metadata_lww(&trashed, &live).trashed_at, Some(20));
+
+        // A newer restore (trashed_at cleared) wins over the older trash.
+        let restored = entry_meta("dev-a", 30, None);
+        assert_eq!(merge_metadata_lww(&trashed, &restored).trashed_at, None);
+
+        // Tie: device_id tiebreak decides, and the winner's value is carried.
+        let tie_trashed = entry_meta("dev-z", 10, Some(10));
+        assert_eq!(merge_metadata_lww(&live, &tie_trashed).trashed_at, Some(10));
+    }
+
+    #[test]
+    fn diff_treats_trashed_live_row_as_live() {
+        let local = manifest(vec![summary("known", 10, None)]);
+        let remote = manifest(vec![
+            summary("known", 20, Some(20)),
+            summary("new", 5, Some(5)),
+            summary("stale", 1, Some(1)),
+        ]);
+        let local = DeviceMetadata {
+            entries: [local.entries, vec![summary("stale", 3, None)]].concat(),
+            ..local
+        };
+        let d = compute_diff(&local, &remote);
+        assert_eq!(d.to_pull, vec!["known".to_string(), "new".to_string()]);
+        assert!(d.to_delete_locally.is_empty());
+        assert_eq!(d.unchanged, 1);
     }
 
     #[test]

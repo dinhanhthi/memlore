@@ -320,6 +320,7 @@ mod tests {
             updated_at,
             local_version: 1,
             is_deleted,
+            trashed_at: None,
         }
     }
 
@@ -332,6 +333,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_700_000_000,
+            index_present: false,
+            outbox_versions: None,
         }
     }
 
@@ -367,6 +370,7 @@ mod tests {
             tag_ids: vec![],
             media: vec![],
             deleted_media: vec![],
+            trashed_at: None,
         }
     }
 
@@ -387,6 +391,8 @@ mod tests {
             chats_present: true,
             memory_present: true,
             generated_at: 1_700_000_000,
+            index_present: false,
+            outbox_versions: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let back: DeviceMetadata = serde_json::from_str(&json).unwrap();
@@ -404,6 +410,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let back: DeviceMetadata = serde_json::from_str(&json).unwrap();
@@ -650,6 +658,7 @@ mod tests {
                 id: "media-gone".to_string(),
                 deleted_at: 1_700_000_100,
             }],
+            trashed_at: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let back: EntryMetadata = serde_json::from_str(&json).unwrap();

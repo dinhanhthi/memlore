@@ -3260,6 +3260,7 @@ impl SyncEngine {
             tag_ids,
             media,
             deleted_media,
+            trashed_at: None,
         };
         let meta_plain =
             serde_json::to_vec(&meta).map_err(|e| SyncError::Serialization(e.to_string()))?;
@@ -5619,6 +5620,7 @@ impl SyncEngine {
                 tag_ids: local_tag_ids,
                 media: vec![],
                 deleted_media: vec![],
+                trashed_at: None,
             };
             merge_metadata_lww(&local_meta, &remote_meta)
         } else {
@@ -6009,6 +6011,7 @@ fn build_local_manifest(
                 updated_at: row.get::<_, i64>(1)?,
                 local_version: row.get::<_, i64>(2)?,
                 is_deleted: row.get::<_, i64>(3)? != 0,
+                trashed_at: None,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -6030,6 +6033,8 @@ fn build_local_manifest(
         chats_present,
         memory_present,
         generated_at: now_unix(),
+        index_present: false,
+        outbox_versions: None,
     })
 }
 
@@ -6053,6 +6058,7 @@ fn build_local_diff_view(conn: &Connection, device_id: &str) -> rusqlite::Result
                 updated_at: row.get::<_, i64>(1)?,
                 local_version: row.get::<_, i64>(2)?,
                 is_deleted: row.get::<_, i64>(3)? != 0,
+                trashed_at: None,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -6064,6 +6070,8 @@ fn build_local_diff_view(conn: &Connection, device_id: &str) -> rusqlite::Result
         chats_present: false,
         memory_present: false,
         generated_at: now_unix(),
+        index_present: false,
+        outbox_versions: None,
     })
 }
 
@@ -6837,6 +6845,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         };
         let remote = DeviceMetadata {
             device_id: "remote".to_string(),
@@ -6847,30 +6857,36 @@ mod tests {
                     updated_at: 200,
                     local_version: 1,
                     is_deleted: true,
+                    trashed_at: None,
                 },
                 SyncedEntrySummary {
                     entry_id: "older-live".to_string(),
                     updated_at: 100,
                     local_version: 1,
                     is_deleted: false,
+                    trashed_at: None,
                 },
                 SyncedEntrySummary {
                     entry_id: "a-tombstone".to_string(),
                     updated_at: 200,
                     local_version: 1,
                     is_deleted: true,
+                    trashed_at: None,
                 },
                 SyncedEntrySummary {
                     entry_id: "newest-live".to_string(),
                     updated_at: 300,
                     local_version: 1,
                     is_deleted: false,
+                    trashed_at: None,
                 },
             ],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
         };
 
         let diff = recovery_entry_diff(&local, &remote, true);
@@ -6922,6 +6938,7 @@ mod tests {
             tag_ids: vec![],
             media: vec![],
             deleted_media: vec![],
+            trashed_at: None,
         };
         let ks = engine.make_key_state(&key);
         let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
@@ -8157,11 +8174,14 @@ mod tests {
                 updated_at: 100,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at,
+            index_present: false,
+            outbox_versions: None,
         }
     }
 
@@ -10232,6 +10252,7 @@ mod tests {
                     updated_at: 1_000 - position as i64,
                     local_version: 1,
                     is_deleted: false,
+                    trashed_at: None,
                 },
             )
             .collect();
@@ -10243,6 +10264,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::write(
             dir.path().join("dev-b/metadata.json"),
@@ -10465,6 +10488,7 @@ mod tests {
                 updated_at: 1_000,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             })
             .collect();
         let manifest = DeviceMetadata {
@@ -10475,6 +10499,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::write(
             dir.path().join("dev-b/metadata.json"),
@@ -11090,6 +11116,8 @@ mod tests {
             chats_present: true,
             memory_present: false,
             generated_at: 2_000,
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::create_dir_all(dir.path().join("dev-b")).unwrap();
         std::fs::write(
@@ -11237,6 +11265,7 @@ mod tests {
                 updated_at: 1_000,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             })
             .collect();
         let manifest = DeviceMetadata {
@@ -11247,6 +11276,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::write(
             dir.path().join("dev-b/metadata.json"),
@@ -12341,11 +12372,14 @@ mod tests {
                 updated_at: 1_000,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::write(
             peer_dir.join("metadata.json"),
@@ -13848,6 +13882,7 @@ mod tests {
                 id: media.id.clone(),
                 deleted_at: media.created_at,
             }],
+            trashed_at: None,
         };
         let ks = engine.make_key_state(&key);
         let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
@@ -13956,6 +13991,7 @@ mod tests {
                 id: media.id.clone(),
                 deleted_at: i64::MAX,
             }],
+            trashed_at: None,
         };
         let ks = engine.make_key_state(&key);
         let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
@@ -14355,6 +14391,7 @@ mod tests {
             tag_ids: vec![],
             media: vec![],
             deleted_media: vec![],
+            trashed_at: None,
         };
         let ks = engine.make_key_state(&key);
         let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
@@ -16885,6 +16922,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 3000,
+            index_present: false,
+            outbox_versions: None,
         };
         let payload_a = super::super::metadata::JournalPayload {
             journal_id: journal_id.to_string(),
@@ -16933,6 +16972,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 2000,
+            index_present: false,
+            outbox_versions: None,
         };
 
         // dev-receiver runs the pull. Manifests are passed in
@@ -17009,6 +17050,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: now_unix(),
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::create_dir_all(dir.path().join("dev-peer")).unwrap();
         std::fs::write(
@@ -17117,6 +17160,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: now_unix(),
+            index_present: false,
+            outbox_versions: None,
         };
         std::fs::write(
             dir.path().join("dev-peer/metadata.json"),
@@ -17922,6 +17967,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 2000,
+            index_present: false,
+            outbox_versions: None,
         };
 
         let conn = fresh_db();
@@ -19569,11 +19616,14 @@ mod tests {
                 updated_at: t2,
                 local_version: 1,
                 is_deleted: true,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: t2,
+            index_present: false,
+            outbox_versions: None,
         };
         let manifest_b_dir = dir.path().join("dev-b");
         std::fs::create_dir_all(&manifest_b_dir).unwrap();
@@ -19655,11 +19705,14 @@ mod tests {
                 updated_at: t_tombstone,
                 local_version: 1,
                 is_deleted: true,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: t_tombstone,
+            index_present: false,
+            outbox_versions: None,
         };
         let peer_dir = dir.path().join("dev-peer");
         std::fs::create_dir_all(&peer_dir).unwrap();
@@ -19734,11 +19787,14 @@ mod tests {
                 updated_at: t_tombstone,
                 local_version: 1,
                 is_deleted: true,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: t_tombstone,
+            index_present: false,
+            outbox_versions: None,
         };
         let peer_dir = dir.path().join("dev-peer");
         std::fs::create_dir_all(&peer_dir).unwrap();
@@ -19817,11 +19873,14 @@ mod tests {
                 updated_at: t_tombstone,
                 local_version: 1,
                 is_deleted: true,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: t_tombstone,
+            index_present: false,
+            outbox_versions: None,
         };
         let peer_dir = dir.path().join("dev-peer");
         std::fs::create_dir_all(&peer_dir).unwrap();
@@ -19964,11 +20023,14 @@ mod tests {
                 updated_at: i64::MAX,
                 local_version: 1,
                 is_deleted: true,
+                trashed_at: None,
             }],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: i64::MAX,
+            index_present: false,
+            outbox_versions: None,
         };
         let peer_dir = dir.path().join("dev-attacker");
         std::fs::create_dir_all(&peer_dir).unwrap();
@@ -20026,6 +20088,7 @@ mod tests {
                 updated_at: 1_000,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             })
             .collect();
         let manifest = DeviceMetadata {
@@ -20036,6 +20099,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         provider
             .write_file(
@@ -20061,6 +20126,7 @@ mod tests {
                 updated_at: 1_000,
                 local_version: 1,
                 is_deleted: false,
+                trashed_at: None,
             })
             .collect();
         let journals: Vec<super::super::metadata::SyncedJournalSummary> = journals
@@ -20082,6 +20148,8 @@ mod tests {
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         provider
             .write_file(
@@ -20184,18 +20252,22 @@ mod tests {
                     updated_at: 1_000,
                     local_version: 1,
                     is_deleted: false,
+                    trashed_at: None,
                 },
                 super::super::metadata::SyncedEntrySummary {
                     entry_id: "tombstoned".to_string(),
                     updated_at: 1_000,
                     local_version: 1,
                     is_deleted: true,
+                    trashed_at: None,
                 },
             ],
             journals: vec![],
             chats_present: false,
             memory_present: false,
             generated_at: 1_000,
+            index_present: false,
+            outbox_versions: None,
         };
         provider
             .write_file(
