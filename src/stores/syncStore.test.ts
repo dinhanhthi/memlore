@@ -1097,4 +1097,18 @@ describe('syncStore', () => {
     await useSyncStore.getState().syncNow()
     expect(useSyncStore.getState().retryAt).toBeNull()
   })
+
+  // ── format-guard latch (web) ────────────────────────────────────────────
+
+  it('memlore:format-guard-latched event refetches the sync status', async () => {
+    await useSyncStore.getState().init()
+    expect(tauri.getSyncStatus).toHaveBeenCalledTimes(1)
+    const latched: SyncStatus = { ...defaultStatus, entriesPending: 3 }
+    vi.mocked(tauri.getSyncStatus).mockResolvedValueOnce(latched)
+    ;(listenersByName['memlore:format-guard-latched'] ?? []).forEach((h) =>
+      h({ payload: { path: 'control.json', reason: 'unknown field' } }),
+    )
+    await vi.waitFor(() => expect(useSyncStore.getState().status).toEqual(latched))
+    expect(tauri.getSyncStatus).toHaveBeenCalledTimes(2)
+  })
 })

@@ -560,6 +560,19 @@ const createEntry = outboxWrite(async (args, lock) => {
   return toEntry(created)
 })
 
+/**
+ * The entry a write builds on. Locked, invisible, deleted and excluded-journal entries refuse the
+ * write with `EntryNotAvailableError`, the same answer reads give (`loadVisible`).
+ */
+function writeViewOrUnavailable(vault: VaultApi, id: string): VaultEntry {
+  try {
+    return vault.getWriteView(id)
+  } catch (error) {
+    if (error instanceof EntryUnavailableError) throw new EntryNotAvailableError()
+    throw error
+  }
+}
+
 async function ensureLoaded(vault: VaultApi, id: string): Promise<void> {
   if (vault.status(id) === 'not-loaded') {
     await vault.load([id])
@@ -578,8 +591,7 @@ const saveEntryContent = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -632,8 +644,7 @@ const updateEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -706,8 +717,7 @@ const updateEntryDate = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -790,7 +800,7 @@ const markEntryDateUserEdited = outboxWrite(async (args, lock) => {
   }
 
   // Throws ForeignEntryReadOnlyError for an entry known only from another browser's outbox.
-  const writeView = vault.getWriteView(id)
+  const writeView = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -857,8 +867,7 @@ const updateEntryEmotion = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -927,8 +936,7 @@ const toggleFavorite = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -999,8 +1007,7 @@ const moveEntryToJournal = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(id) ?? null
-  const syncedEntry = vault.getWriteView(id)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, id)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -1069,8 +1076,7 @@ const addTagToEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getWriteView(entryId)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, entryId)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -1144,8 +1150,7 @@ const removeTagFromEntry = outboxWrite(async (args, lock) => {
   await lock()
 
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  const syncedEntry = vault.getWriteView(entryId)
-  if (!syncedEntry && !priorIntent) throw new EntryNotAvailableError()
+  const syncedEntry = writeViewOrUnavailable(vault, entryId)
 
   const device = await db.device.get()
   if (!device) throw new Error('Device record missing')
@@ -1222,9 +1227,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler =>
     const ring = getKeyRing()
 
     await ensureLoaded(vault, entryId)
-    if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
-      throw new EntryNotAvailableError()
-    }
+    writeViewOrUnavailable(vault, entryId)
 
     const accept = kind === 'image' ? 'image/*' : 'video/*'
     const file = await promptForFile(accept)
@@ -1266,7 +1269,7 @@ const pickMedia = (kind: 'image' | 'video'): Handler =>
     // a retention pass may have dropped it meanwhile.
     await lock()
     const priorIntent = vault.getOutboxIntent(entryId) ?? null
-    if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
+    writeViewOrUnavailable(vault, entryId)
     await db.blobs.put({
       path: `outbox/m-${mediaId}`,
       bytes: sealedMedia,
@@ -1346,9 +1349,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   const ring = getKeyRing()
 
   await ensureLoaded(vault, entryId)
-  if (!vault.getWriteView(entryId) && !vault.getOutboxIntent(entryId)) {
-    throw new EntryNotAvailableError()
-  }
+  writeViewOrUnavailable(vault, entryId)
 
   const maxBytes = DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES
   if (mediaPlain.length > maxBytes) {
@@ -1371,7 +1372,7 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   // a retention pass may have dropped it meanwhile.
   await lock()
   const priorIntent = vault.getOutboxIntent(entryId) ?? null
-  if (!vault.getWriteView(entryId) && !priorIntent) throw new EntryNotAvailableError()
+  writeViewOrUnavailable(vault, entryId)
   await db.blobs.put({
     path: `outbox/m-${mediaId}`,
     bytes: sealedMedia,

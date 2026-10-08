@@ -43,6 +43,14 @@ import { useAiSettingsStore } from './aiSettingsStore'
 const WATCHDOG_MS = 130_000
 
 /**
+ * Emitted by the web backend when its format guard latches the session
+ * read-only. Duplicated from `FORMAT_GUARD_LATCHED_EVENT` in
+ * `web/src/backend/sync/formatGuard.ts` (src/ must not import from web/) —
+ * keep the two strings identical. Never fires on desktop.
+ */
+const FORMAT_GUARD_LATCHED_EVENT = 'memlore:format-guard-latched'
+
+/**
  * Global sync state — single source of truth shared by every sync UI surface
  * (footer indicator, Settings → Sync panel, scheduler row). A previous
  * iteration kept all of this inside `useSync`, but each component mount got
@@ -106,6 +114,7 @@ interface SyncStoreState {
   unlistenProgress: UnlistenFn | null
   unlistenRecovery: UnlistenFn | null
   unlistenRetry: UnlistenFn | null
+  unlistenFormatGuard: UnlistenFn | null
   /** Guards `syncNow` against rapid re-entry — same role as the old hook ref. */
   inflightSync: boolean
   /** Watchdog timer handle. Cleared when sync ends or on each new event. */
@@ -214,6 +223,7 @@ const initialSnapshot = {
   unlistenProgress: null,
   unlistenRecovery: null,
   unlistenRetry: null,
+  unlistenFormatGuard: null,
   inflightSync: false,
   watchdogTimer: null,
 }
@@ -499,6 +509,17 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
         console.warn('syncStore: listen SYNC_RETRY_SCHEDULED_EVENT failed', err)
       }
 
+      // Web format-guard latch — refetch status now so the read-only note
+      // shows without waiting for the next pull/push.
+      try {
+        const unlistenFormatGuard = await listen(FORMAT_GUARD_LATCHED_EVENT, () => {
+          void get().refresh()
+        })
+        set({ unlistenFormatGuard })
+      } catch (err) {
+        console.warn('syncStore: listen FORMAT_GUARD_LATCHED_EVENT failed', err)
+      }
+
       // Initial snapshot fetches. Failures are warned, not thrown — the
       // listener will fill state in once the next event arrives.
       const [deviceRes, statusRes, settingsRes, recoveryRes] = await Promise.allSettled([
@@ -717,8 +738,14 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
  * tests should reach for it.
  */
 export function __resetSyncStoreForTests() {
-  const { unlisten, unlistenProgress, unlistenRecovery, unlistenRetry, watchdogTimer } =
-    useSyncStore.getState()
+  const {
+    unlisten,
+    unlistenProgress,
+    unlistenRecovery,
+    unlistenRetry,
+    unlistenFormatGuard,
+    watchdogTimer,
+  } = useSyncStore.getState()
   if (watchdogTimer !== null) clearTimeout(watchdogTimer)
   // Module-level, so it survives the state reset unless cancelled explicitly —
   // a leftover timer would fan out change events into the next test.
@@ -747,6 +774,13 @@ export function __resetSyncStoreForTests() {
   if (unlistenRetry) {
     try {
       unlistenRetry()
+    } catch {
+      /* ignore */
+    }
+  }
+  if (unlistenFormatGuard) {
+    try {
+      unlistenFormatGuard()
     } catch {
       /* ignore */
     }

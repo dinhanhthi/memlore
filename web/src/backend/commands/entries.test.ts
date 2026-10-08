@@ -3,6 +3,7 @@ import * as Y from 'yjs'
 import type { Entry } from '../../../../src/types/entry'
 import type { PagedResult } from '../../../../src/types/pagination'
 import {
+  EntryNotAvailableError,
   MAX_LOAD_ROUNDS,
   MSG_UNAVAILABLE,
   entryHandlers,
@@ -15,6 +16,7 @@ import { installFakeSession, type FakeSpec } from './readTestKit'
 import { setWriteFlagForTest } from '../config'
 import { resetClock, updateClockOffset } from '../clock'
 import { lock, setKeyRing, type KeyRing } from '../keys'
+import { EntryUnavailableError } from '../vault'
 
 afterEach(() => {
   configureReadEnv({})
@@ -690,6 +692,57 @@ describe('write commands', () => {
       MSG_UNAVAILABLE,
     )
     await expect(call('mark_entry_date_user_edited', { id: 'l' })).rejects.toThrow(MSG_UNAVAILABLE)
+  })
+
+  it('refuses writes on locked, invisible and excluded-journal entries with EntryNotAvailableError', async () => {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    const { vault } = installFakeSession(
+      [
+        ...many(1, () => ({ journal: 'j2' })),
+        { id: 'l', updatedAt: 2, locked: true },
+        { id: 'i', updatedAt: 1, invisible: true },
+      ],
+      { taxonomy: TAXONOMY },
+    )
+    // The fake vault has no journal exclusion: e01 stands in for an entry of an excluded journal.
+    const realWriteView = vault.getWriteView
+    Object.defineProperty(vault, 'getWriteView', {
+      value: (entryId: string) => {
+        if (entryId === id(1)) throw new EntryUnavailableError(entryId, 'journal')
+        return realWriteView(entryId)
+      },
+    })
+    setCustomMediaPicker(async () => {
+      throw new Error('the picker must not open for an unavailable entry')
+    })
+
+    for (const target of ['l', 'i', id(1)]) {
+      const writeCalls: Array<[string, Record<string, unknown>]> = [
+        ['save_entry_content', { id: target, yjsDoc: [], contentText: '', previewText: '' }],
+        ['update_entry', { id: target, title: 'Updated' }],
+        ['update_entry_date', { id: target, entryDate: 12345 }],
+        ['update_entry_emotion', { id: target, emotion: 'good' }],
+        ['toggle_favorite', { id: target }],
+        ['move_entry_to_journal', { id: target, journalId: 'j1' }],
+        ['add_tag_to_entry', { entryId: target, tagId: 't1' }],
+        ['remove_tag_from_entry', { entryId: target, tagId: 't1' }],
+        ['pick_image', { entryId: target }],
+        ['pick_video', { entryId: target }],
+        ['save_pasted_image', { entryId: target, bytes: [1, 2, 3], mime: 'image/png' }],
+      ]
+      for (const [name, args] of writeCalls) {
+        const error = await Promise.resolve()
+          .then(() => call(name, args))
+          .then(
+            () => null,
+            (e: unknown) => e,
+          )
+        expect(error, `${name} ${target}`).toBeInstanceOf(EntryNotAvailableError)
+        expect((error as Error).message).toBe(MSG_UNAVAILABLE)
+      }
+    }
+    expect(vault.getOutboxIntents()).toEqual([])
   })
 
   it('add_tag_to_entry and remove_tag_from_entry modify existing tags only', async () => {

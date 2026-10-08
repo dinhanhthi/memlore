@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import * as tauri from '../lib/tauri'
 import { lockApp } from '../lib/lock'
+import { isWeb } from '../lib/platform'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { EncryptionMode } from '../lib/tauri'
 
@@ -118,6 +120,27 @@ export function useAuth() {
       cancelled = true
     }
   }, [setEncryptionMode, setLocked, setBiometricEnabled])
+
+  // Web only: the backend auto-locks itself (idle / hidden tab) and emits
+  // `app:locked`. Mirror it into the store so the UI shows the lock screen
+  // instead of failing every command with VaultLockedError. Desktop locks
+  // only through the UI, so it needs no listener.
+  useEffect(() => {
+    if (!isWeb) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listen('app:locked', () => setLocked(true)).then(
+      (fn) => {
+        if (cancelled) fn()
+        else unlisten = fn
+      },
+      (error: unknown) => console.warn('Failed to listen for app:locked:', error),
+    )
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [setLocked])
 
   // Unlock with password. Also derives/unwraps the encryption key into backend state.
   // `initializeEncryption` validates the password via AES-GCM tag check when

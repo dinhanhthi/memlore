@@ -1,8 +1,26 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { listen } from '@tauri-apps/api/event'
 import { useAuth } from './useAuth'
 import { useSettingsStore } from '../stores/settingsStore'
 import * as tauri from '../lib/tauri'
+
+// `isWeb` is a module-level const; a getter lets each test pick the platform.
+const platform = vi.hoisted(() => ({ isWeb: false }))
+vi.mock('../lib/platform', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/platform')>()
+  return {
+    ...actual,
+    get isWeb() {
+      return platform.isWeb
+    },
+  }
+})
+
+type EventHandler = (event: { payload: unknown }) => void
+const eventHandlers: Record<string, EventHandler> = {}
+const unlistenSpy = vi.fn()
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
 
 vi.mock('../lib/tauri', () => ({
   isPasswordSet: vi.fn(),
@@ -28,6 +46,12 @@ vi.mock('../lib/tauri', () => ({
 describe('useAuth (password-only model)', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    platform.isWeb = false
+    for (const name of Object.keys(eventHandlers)) delete eventHandlers[name]
+    vi.mocked(listen).mockImplementation(async (name, handler) => {
+      eventHandlers[name] = handler as EventHandler
+      return unlistenSpy
+    })
     vi.mocked(tauri.initializeEncryption).mockResolvedValue()
     vi.mocked(tauri.lockEncryption).mockResolvedValue()
     vi.mocked(tauri.isEncryptionInitialized).mockResolvedValue(false)
@@ -485,5 +509,43 @@ describe('useAuth (password-only model)', () => {
 
     const phrase = await result.current.getPendingRotationRecovery()
     expect(phrase).toBeNull()
+  })
+
+  // ─── Web backend auto-lock (app:locked event) ────────────────────────────
+
+  it('web: an app:locked event from the backend flips the UI to locked', async () => {
+    platform.isWeb = true
+    vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
+    vi.mocked(tauri.isEncryptionInitialized).mockResolvedValue(true)
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(eventHandlers['app:locked']).toBeDefined())
+    await waitFor(() => expect(result.current.encryptionMode).toBe('password'))
+    expect(result.current.isLocked).toBe(false)
+
+    act(() => eventHandlers['app:locked']({ payload: undefined }))
+
+    expect(result.current.isLocked).toBe(true)
+  })
+
+  it('web: unsubscribes from app:locked on unmount', async () => {
+    platform.isWeb = true
+    vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
+
+    const { unmount } = renderHook(() => useAuth())
+    await waitFor(() => expect(eventHandlers['app:locked']).toBeDefined())
+
+    unmount()
+
+    expect(unlistenSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('desktop: does not subscribe to app:locked', async () => {
+    vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.encryptionMode).toBe('password'))
+
+    expect(listen).not.toHaveBeenCalledWith('app:locked', expect.anything())
   })
 })
