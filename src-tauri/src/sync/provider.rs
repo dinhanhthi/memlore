@@ -32,6 +32,9 @@ pub enum FileKind {
     EmbeddingChunks,
     /// Web outbox intent and media files (`{device_id}/outbox/*`).
     Outbox,
+    /// Month index files (`{device_id}/index/<YYYY-MM>.bin`) plus the
+    /// catalog `{device_id}/index/months.bin` (see `memlore_core::month_index`).
+    Index,
     /// Files directly under `{device_id}/` (no subfolder) — e.g.
     /// `settings.bin`, `tags.bin`, `metadata.json`. Used by own-cloud
     /// reconcile to detect missing whole-table surface blobs.
@@ -52,6 +55,7 @@ impl FileKind {
             FileKind::Versions => Some("versions"),
             FileKind::EmbeddingChunks => Some("embeddings"),
             FileKind::Outbox => Some("outbox"),
+            FileKind::Index => Some("index"),
             FileKind::DeviceRoot => None,
         }
     }

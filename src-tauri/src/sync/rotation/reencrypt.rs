@@ -826,6 +826,43 @@ mod tests {
         assert!(decrypt_data_with_state(&stored, &old_ks).is_err());
     }
 
+    /// Month index files and their catalog are re-sealed under the new key.
+    #[tokio::test]
+    async fn reencrypt_rewrites_index_month_and_catalog_with_new_key() {
+        let (app_state, provider) = make_state_and_provider();
+        let old_master = [14u8; 32];
+        let new_master = [15u8; 32];
+        let files = [
+            ("dev/index/2026-01.bin", &b"{\"month\":\"2026-01\"}"[..]),
+            ("dev/index/months.bin", &b"{\"months\":[]}"[..]),
+        ];
+        let rotation_id = {
+            let conn = app_state.lock().unwrap();
+            db::insert_rotation_job(&conn, "old-fp", "new-fp", 1, 2, None).unwrap()
+        };
+        for (path, plain) in files {
+            provider
+                .write_file(path, &encrypt_with_master(&old_master, plain))
+                .await
+                .unwrap();
+            let conn = app_state.lock().unwrap();
+            db::insert_rotation_item(&conn, rotation_id, "blob", path).unwrap();
+        }
+
+        let ctx = make_ctx(old_master, new_master);
+        reencrypt_items(&provider, &app_state, rotation_id, &ctx, None)
+            .await
+            .unwrap();
+
+        let new_ks = ks_for_master(&new_master);
+        let old_ks = ks_for_master(&old_master);
+        for (path, plain) in files {
+            let stored = provider.read_file(path).await.unwrap();
+            assert_eq!(decrypt_data_with_state(&stored, &new_ks).unwrap(), plain);
+            assert!(decrypt_data_with_state(&stored, &old_ks).is_err());
+        }
+    }
+
     /// A `blob` item whose file does not exist (a singleton like streak.bin the
     /// device never wrote, but enumerated from the fixed known set) must be
     /// skipped, NOT fail the whole rotation.

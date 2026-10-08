@@ -220,6 +220,25 @@ where
         }
         total_items += version_paths.len();
 
+        // Month index files (`{device}/index/<YYYY-MM>.bin` + `months.bin`):
+        // bare envelopes under the sync key, like journals.
+        // TODO(later): `FileKind::EmbeddingChunks` is still not enumerated —
+        // see docs/LATER.md "Key rotation does not re-encrypt embedding chunk batches".
+        let index_paths = month_index_files(
+            SyncProvider::list_files(provider, device_id, FileKind::Index)
+                .await
+                .map_err(|e| format!("enumerate: list index for {device_id}: {e}"))?,
+        );
+
+        {
+            let conn = state.lock()?;
+            for path in &index_paths {
+                db::insert_rotation_item(&conn, rotation_id, "blob", path)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        total_items += index_paths.len();
+
         // Per-device singleton blobs at the device-folder root (not in a
         // subfolder, so `list_files`/`FileKind` can't enumerate them). They are
         // bare versioned envelopes under the same master-derived key. Insert the
@@ -304,6 +323,13 @@ where
             .await
             .map_err(|e| format!("enumerate_stragglers: list versions for {device_id}: {e}"))?;
 
+        let index_paths = month_index_files(
+            provider
+                .list_files(device_id, FileKind::Index)
+                .await
+                .map_err(|e| format!("enumerate_stragglers: list index for {device_id}: {e}"))?,
+        );
+
         let conn = state.lock()?;
         for path in &entry_paths {
             // Returns () — the UNIQUE constraint silently ignores duplicates.
@@ -335,7 +361,7 @@ where
                 new_items += 1;
             }
         }
-        for path in &journal_paths {
+        for path in journal_paths.iter().chain(&index_paths) {
             let before = conn
                 .query_row(
                     "SELECT COUNT(*) FROM rotation_job_items WHERE rotation_id=?1 AND envelope_id=?2",
@@ -389,6 +415,19 @@ where
 
     log::info!("rotation: enumerate_stragglers found {new_items} new envelopes");
     Ok(new_items)
+}
+
+/// Keep only month files and the catalog from an `index/` listing; a stray
+/// file there is not ours to re-seal.
+fn month_index_files(paths: Vec<String>) -> Vec<String> {
+    paths
+        .into_iter()
+        .filter(|p| {
+            p.rsplit('/')
+                .next()
+                .is_some_and(memlore_core::month_index::is_month_index_file_name)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -650,6 +689,60 @@ mod tests {
             vec![
                 "dev-a/versions/v1.bin".to_string(),
                 "dev-a/versions/v2.bin".to_string(),
+            ]
+        );
+    }
+
+    /// Month index files (`{device}/index/<YYYY-MM>.bin` + `months.bin`) are
+    /// bare envelopes under the sync key: enumerated as `blob` so
+    /// `reencrypt_bare_envelope` re-seals them, in both passes.
+    #[tokio::test]
+    async fn enumerate_includes_index_files_as_blobs() {
+        let conn = setup_db();
+        let state = make_app_state(conn);
+        let provider = CombinedProvider::new();
+        write_meta_to_combined(&provider, &test_fp(), 1).await;
+        // Strays in `index/` are not month files and are never re-sealed.
+        for path in [
+            "dev-a/index/2026-01.bin",
+            "dev-a/index/months.bin",
+            "dev-a/index/junk.bin",
+            "dev-a/index/2026-1.bin",
+        ] {
+            provider.sync.write_file(path, b"ct").await.unwrap();
+        }
+
+        let master_old = Zeroizing::new([0u8; 32]);
+        let (rotation_id, ctx) =
+            enumerate_envelopes(&provider, &state, master_old, "password123!", None, false)
+                .await
+                .unwrap();
+        // A month written mid-rotation is picked up by the straggler pass.
+        for path in ["dev-a/index/2026-02.bin", "dev-a/index/stray.txt"] {
+            provider.sync.write_file(path, b"ct").await.unwrap();
+        }
+        enumerate_stragglers(&provider, &state, rotation_id, &ctx)
+            .await
+            .unwrap();
+
+        let conn = state.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT envelope_id, envelope_kind FROM rotation_job_items \
+                 WHERE rotation_id=?1 AND envelope_id LIKE 'dev-a/index/%' ORDER BY envelope_id",
+            )
+            .unwrap();
+        let items: Vec<(String, String)> = stmt
+            .query_map([rotation_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            items,
+            vec![
+                ("dev-a/index/2026-01.bin".to_string(), "blob".to_string()),
+                ("dev-a/index/2026-02.bin".to_string(), "blob".to_string()),
+                ("dev-a/index/months.bin".to_string(), "blob".to_string()),
             ]
         );
     }

@@ -7606,6 +7606,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gdrive_lists_index_subfolder() {
+        use wiremock::{Request, Respond, ResponseTemplate as RT};
+
+        struct IndexResponder;
+        impl Respond for IndexResponder {
+            fn respond(&self, request: &Request) -> RT {
+                let url = request.url.to_string();
+                if !url.contains("q=") {
+                    return RT::new(404);
+                }
+                let q = urlencoding::decode(&url)
+                    .unwrap_or_default()
+                    .replace('+', " ");
+                if q.contains("name = 'index'") {
+                    return RT::new(200).set_body_json(serde_json::json!({
+                        "files": [{"id": "index-folder-id", "name": "index"}]
+                    }));
+                }
+                if q.contains("'index-folder-id' in parents") {
+                    return RT::new(200).set_body_json(serde_json::json!({
+                        "files": [
+                            {"id": "m1", "name": "2026-01.bin"},
+                            {"id": "cat", "name": "months.bin"}
+                        ]
+                    }));
+                }
+                if q.contains("name = 'dev-a'") {
+                    return RT::new(200).set_body_json(serde_json::json!({
+                        "files": [{"id": "dev-folder-id", "name": "dev-a"}]
+                    }));
+                }
+                RT::new(200).set_body_json(serde_json::json!({ "files": [] }))
+            }
+        }
+
+        let mock = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(IndexResponder)
+            .mount(&mock)
+            .await;
+        let provider = GDriveProvider::new(make_session("tok"), &mock.uri(), &mock.uri()).unwrap();
+        *provider.root_folder_id.write().await = Some("root-id".to_string());
+
+        let files = provider.list_files("dev-a", FileKind::Index).await.unwrap();
+        assert_eq!(
+            files,
+            vec![
+                "dev-a/index/2026-01.bin".to_string(),
+                "dev-a/index/months.bin".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn gdrive_lists_and_reads_outbox_intent_and_media_file() {
         use wiremock::{Request, Respond, ResponseTemplate as RT};
 

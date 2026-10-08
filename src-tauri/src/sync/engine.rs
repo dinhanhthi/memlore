@@ -788,8 +788,11 @@ impl SyncEngine {
         // Own-cloud self-heal (5× list_files: Entries/Media/Journals/
         // Versions/DeviceRoot): always on Manual; once per process session
         // on Automatic. Flag is set only after success so a transient
-        // listing failure retries on the next Automatic tick.
-        if self.should_reconcile_own_cloud(trigger) {
+        // listing failure retries on the next Automatic tick. Read once
+        // here: the month index push below lists `index/` on the same
+        // cycles, after reconcile may have already armed the flag.
+        let reconcile_own_cloud = self.should_reconcile_own_cloud(trigger);
+        if reconcile_own_cloud {
             let media_paths = self.reconcile_own_cloud_content(access).await?;
             // Prune own-folder media blobs whose local row is gone (inline node
             // removed, entry/journal soft-deleted, explicit remove). Throttled
@@ -1052,13 +1055,34 @@ impl SyncEngine {
             stats.errors.push(format!("ai_reviews: {e}"));
         }
 
+        // Month index for the web (`index/`). Runs after media/version pushes
+        // because rows only reference already-uploaded media and versions.
+        // Lists `index/` only on reconcile cycles; others trust stored hashes.
+        // A failure never fails the cycle, but it clears `index_present` so
+        // readers ignore a possibly stale index until a cycle completes.
+        let ks = self.make_key_state(key);
+        if let Err(e) = super::index_sync::push_month_index(
+            self.provider.as_ref(),
+            access,
+            &self.device_id,
+            &ks,
+            reconcile_own_cloud,
+        )
+        .await
+        {
+            log::warn!("sync: month index push failed: {e}");
+            stats.errors.push(format!("index: {e}"));
+        }
+        let index_present = access.with_conn(super::index_sync::index_present)?;
+
         // Hash-gate metadata.json (surface `"metadata"`): skip the write when
         // entry/journal lists, presence flags, and recovery_generation are
         // unchanged. `generated_at` is wall-clock and must not bust the gate.
-        let manifest = access.with_conn(|conn| {
+        let mut manifest = access.with_conn(|conn| {
             build_local_manifest(conn, &self.device_id, chats_present, memory_present)
                 .map_err(sync_io)
         })?;
+        manifest.index_present = index_present;
         let hash_bytes =
             metadata_hash_bytes(&manifest).map_err(|e| SyncError::Serialization(e.to_string()))?;
         let upload_bytes =
@@ -7091,6 +7115,27 @@ mod tests {
         assert!(dir.path().join("dev-a/metadata.json").exists());
     }
 
+    /// The push cycle writes the month index and publishes `index_present`
+    /// only once the catalog is on the provider.
+    #[tokio::test]
+    async fn push_writes_month_index_and_sets_index_present() {
+        let key = test_key();
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        make_entry_with_content(&conn, &key, "entry-0");
+
+        engine
+            .push_local(&conn, &key, &key_state_from_key(&key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+        assert!(dir.path().join("dev-a/index/months.bin").exists());
+        let manifest: DeviceMetadata =
+            serde_json::from_slice(&std::fs::read(dir.path().join("dev-a/metadata.json")).unwrap())
+                .unwrap();
+        assert!(manifest.index_present);
+    }
+
     #[tokio::test]
     async fn entry_payload_uses_raw_entry_lock_flags_not_journal_effective_lock() {
         let key = test_key();
@@ -7369,6 +7414,7 @@ mod tests {
         journals: std::sync::atomic::AtomicUsize,
         versions: std::sync::atomic::AtomicUsize,
         device_root: std::sync::atomic::AtomicUsize,
+        index: std::sync::atomic::AtomicUsize,
     }
 
     impl CountingListFilesProvider {
@@ -7380,6 +7426,7 @@ mod tests {
                 journals: std::sync::atomic::AtomicUsize::new(0),
                 versions: std::sync::atomic::AtomicUsize::new(0),
                 device_root: std::sync::atomic::AtomicUsize::new(0),
+                index: std::sync::atomic::AtomicUsize::new(0),
             }
         }
 
@@ -7390,6 +7437,7 @@ mod tests {
             self.versions.store(0, std::sync::atomic::Ordering::SeqCst);
             self.device_root
                 .store(0, std::sync::atomic::Ordering::SeqCst);
+            self.index.store(0, std::sync::atomic::Ordering::SeqCst);
         }
 
         fn count(&self, kind: FileKind) -> usize {
@@ -7399,6 +7447,7 @@ mod tests {
                 FileKind::Journals => &self.journals,
                 FileKind::Versions => &self.versions,
                 FileKind::DeviceRoot => &self.device_root,
+                FileKind::Index => &self.index,
                 _ => return 0,
             };
             atom.load(std::sync::atomic::Ordering::SeqCst)
@@ -7430,6 +7479,7 @@ mod tests {
                 FileKind::Journals => Some(&self.journals),
                 FileKind::Versions => Some(&self.versions),
                 FileKind::DeviceRoot => Some(&self.device_root),
+                FileKind::Index => Some(&self.index),
                 _ => None,
             };
             if let Some(a) = atom {
@@ -7488,6 +7538,11 @@ mod tests {
             2, // reconcile + version prune
             "first cycle: reconcile Versions + prune Versions"
         );
+        assert_eq!(
+            counting.count(FileKind::Index),
+            1,
+            "the month index lists index/ on the reconcile cycle"
+        );
         assert!(
             flag.load(std::sync::atomic::Ordering::SeqCst),
             "successful reconcile must set the session flag"
@@ -7512,6 +7567,11 @@ mod tests {
             counting.count(FileKind::Versions),
             1,
             "only version-folder prune should list Versions after reconcile is gated off"
+        );
+        assert_eq!(
+            counting.count(FileKind::Index),
+            0,
+            "the month index trusts stored hashes when reconcile is gated off"
         );
     }
 

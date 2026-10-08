@@ -4348,6 +4348,21 @@ pub fn clear_all_surface_push_hashes(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Every `(surface, content_hash)` whose surface starts with `prefix` (e.g.
+/// the month index keys `index:<YYYY-MM>`). Exact prefix match, no `LIKE`
+/// wildcards.
+pub fn list_surface_push_hashes_with_prefix(
+    conn: &Connection,
+    prefix: &str,
+) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT surface, content_hash FROM sync_push_state \
+         WHERE substr(surface, 1, length(?1)) = ?1 ORDER BY surface",
+    )?;
+    let rows = stmt.query_map([prefix], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    rows.collect()
+}
+
 // ─── Sync pull revision store (conditional manifest fetch) ──────────────────
 //
 // Per-peer manifest revisions let steady-state sync skip downloading a body
@@ -5155,6 +5170,210 @@ pub fn list_pending_version_uploads(conn: &Connection) -> Result<Vec<VersionRow>
         })
     })?;
     rows.collect()
+}
+
+/// Rows for the month index (`{device}/index/<YYYY-MM>.bin`, read by the web).
+///
+/// Live entries only (`is_deleted = 0` drops Trash and tombstones), and never
+/// a locked or invisible entry, nor one in a locked or invisible journal.
+/// Media and versions are limited to what is already in the cloud: media with
+/// `upload_status = 'uploaded'` (same filter as the entry manifest push) and
+/// versions with `upload_status = 'uploaded'`. A version's `device_id` is the
+/// folder its file lives in: the `cloud_path` folder when this device uploaded
+/// it, else the authoring device (peer versions are pulled from that folder).
+pub fn list_month_index_rows(
+    conn: &Connection,
+) -> Result<Vec<memlore_core::month_index::MonthIndexRow>> {
+    use memlore_core::metadata::SyncMediaItem;
+    use memlore_core::month_index::{MonthIndexRow, MonthIndexVersionRef};
+
+    let mut stmt = conn.prepare(&format!(
+        "SELECT e.id, e.updated_at, e.entry_date, e.journal_id, e.emotion, e.is_favorite, \
+                e.title, e.preview_text, e.content_text, e.latitude, e.longitude, e.location_label \
+         FROM entries e JOIN journals j ON j.id = e.journal_id \
+         WHERE e.is_deleted = 0 AND {} AND {} \
+         ORDER BY e.entry_date ASC, e.id ASC",
+        locked_entry_exclusion_predicate(),
+        invisible_entry_exclusion_predicate()
+    ))?;
+    let mut rows = stmt
+        .query_map([], |row| {
+            let content_text: Option<String> = row.get(8)?;
+            Ok(MonthIndexRow {
+                entry_id: row.get(0)?,
+                updated_at: row.get(1)?,
+                entry_date: row.get(2)?,
+                journal_id: row.get(3)?,
+                emotion: row.get(4)?,
+                is_favorite: row.get(5)?,
+                title: row.get(6)?,
+                preview_text: row.get(7)?,
+                word_count: content_text
+                    .as_deref()
+                    .map_or(0, |t| t.split_whitespace().count() as i64),
+                latitude: row.get(9)?,
+                longitude: row.get(10)?,
+                location_label: row.get(11)?,
+                tag_ids: Vec::new(),
+                media: Vec::new(),
+                versions: Vec::new(),
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    // Children in three grouped queries (not three per entry), each in the
+    // per-entry order the index has always used so month hashes are stable.
+    let visible = month_index_visible_entry_ids_sql();
+    let mut tags: HashMap<String, Vec<String>> = HashMap::new();
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT entry_id, tag_id FROM entry_tags WHERE entry_id IN ({visible}) \
+         ORDER BY entry_id ASC, tag_id ASC"
+    ))?;
+    for r in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))? {
+        let (entry_id, tag_id) = r?;
+        tags.entry(entry_id).or_default().push(tag_id);
+    }
+
+    let mut media: HashMap<String, Vec<SyncMediaItem>> = HashMap::new();
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT {MEDIA_COLUMNS} FROM media \
+         WHERE upload_status = 'uploaded' AND entry_id IN ({visible}) \
+         ORDER BY entry_id ASC, sort_order ASC, created_at ASC"
+    ))?;
+    for m in stmt.query_map([], row_to_media)? {
+        let m = m?;
+        media.entry(m.entry_id).or_default().push(SyncMediaItem {
+            id: m.id,
+            file_name: m.file_name,
+            file_type: m.file_type,
+            file_size: m.file_size,
+            sort_order: m.sort_order,
+            created_at: m.created_at,
+            insertion_mode: m.insertion_mode,
+            width: m.width,
+            height: m.height,
+            duration_seconds: m.duration_seconds,
+            exif_date: m.exif_date,
+            exif_latitude: m.exif_latitude,
+            exif_longitude: m.exif_longitude,
+        });
+    }
+
+    let mut versions: HashMap<String, Vec<MonthIndexVersionRef>> = HashMap::new();
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT entry_id, id, device_id, created_at, cloud_path FROM entry_versions \
+         WHERE upload_status = 'uploaded' AND entry_id IN ({visible}) \
+         ORDER BY entry_id ASC, created_at DESC, id ASC"
+    ))?;
+    for v in stmt.query_map([], |r| {
+        let author: String = r.get(2)?;
+        let cloud_path: Option<String> = r.get(4)?;
+        let device_id = cloud_path
+            .as_deref()
+            .and_then(|p| p.split('/').next())
+            .filter(|d| !d.is_empty())
+            .map_or(author, str::to_string);
+        Ok((
+            r.get::<_, String>(0)?,
+            MonthIndexVersionRef {
+                version_id: r.get(1)?,
+                device_id,
+                created_at: r.get(3)?,
+            },
+        ))
+    })? {
+        let (entry_id, version) = v?;
+        versions.entry(entry_id).or_default().push(version);
+    }
+
+    for row in &mut rows {
+        row.tag_ids = tags.remove(&row.entry_id).unwrap_or_default();
+        row.media = media.remove(&row.entry_id).unwrap_or_default();
+        row.versions = versions.remove(&row.entry_id).unwrap_or_default();
+    }
+    Ok(rows)
+}
+
+/// Subquery of the entry ids the month index may carry: live, and neither the
+/// entry nor its journal locked or invisible.
+fn month_index_visible_entry_ids_sql() -> String {
+    format!(
+        "SELECT e.id FROM entries e JOIN journals j ON j.id = e.journal_id \
+         WHERE e.is_deleted = 0 AND {} AND {}",
+        locked_entry_exclusion_predicate(),
+        invisible_entry_exclusion_predicate()
+    )
+}
+
+/// Cheap fingerprint of every input to [`list_month_index_rows`], so an
+/// unchanged vault skips the rebuild. Hashes narrow projections of the same
+/// visible entries, their tag links, uploaded media and uploaded versions.
+/// Content is covered by `updated_at` (every content writer bumps it) plus
+/// `length(content_text)`, so a same-second LWW tie that swaps content
+/// without moving `updated_at` still refreshes `word_count`; the text itself
+/// is never hashed. Tag links and media metadata are hashed directly because
+/// their writers do not bump the entry. A lock or invisible flag drops the
+/// entry from the visible set, so it moves the fingerprint too.
+pub fn month_index_fingerprint(conn: &Connection) -> Result<String> {
+    use rusqlite::types::ValueRef;
+    use sha2::{Digest, Sha256};
+
+    let visible = month_index_visible_entry_ids_sql();
+    let queries = [
+        format!(
+            "SELECT e.id, e.updated_at, length(e.content_text), e.entry_date, e.journal_id, \
+                    e.emotion, e.is_favorite, e.title, e.preview_text, e.latitude, \
+                    e.longitude, e.location_label \
+             FROM entries e WHERE e.id IN ({visible}) ORDER BY e.id"
+        ),
+        format!(
+            "SELECT entry_id, tag_id FROM entry_tags WHERE entry_id IN ({visible}) \
+             ORDER BY entry_id, tag_id"
+        ),
+        format!(
+            "SELECT id, entry_id, file_name, file_type, file_size, sort_order, created_at, \
+                    insertion_mode, width, height, duration_seconds, exif_date, \
+                    exif_latitude, exif_longitude \
+             FROM media WHERE upload_status = 'uploaded' AND entry_id IN ({visible}) \
+             ORDER BY id"
+        ),
+        format!(
+            "SELECT id, entry_id, device_id, created_at, cloud_path FROM entry_versions \
+             WHERE upload_status = 'uploaded' AND entry_id IN ({visible}) ORDER BY id"
+        ),
+    ];
+    let mut hasher = Sha256::new();
+    // A payload schema bump must rewrite every month file.
+    hasher.update(memlore_core::month_index::MONTH_INDEX_SCHEMA_VERSION.to_le_bytes());
+    for (q, sql) in queries.iter().enumerate() {
+        hasher.update([b'Q', q as u8]);
+        let mut stmt = conn.prepare_cached(sql)?;
+        let cols = stmt.column_count();
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            hasher.update(b"R");
+            for i in 0..cols {
+                // Type tag + length prefix keeps adjacent values unambiguous.
+                match row.get_ref(i)? {
+                    ValueRef::Null => hasher.update(b"n"),
+                    ValueRef::Integer(v) => {
+                        hasher.update(b"i");
+                        hasher.update(v.to_le_bytes());
+                    }
+                    ValueRef::Real(v) => {
+                        hasher.update(b"r");
+                        hasher.update(v.to_bits().to_le_bytes());
+                    }
+                    ValueRef::Text(b) | ValueRef::Blob(b) => {
+                        hasher.update(b"t");
+                        hasher.update((b.len() as u64).to_le_bytes());
+                        hasher.update(b);
+                    }
+                }
+            }
+        }
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 /// Mark a version as uploaded, recording its own-folder cloud path.
@@ -11127,6 +11346,176 @@ mod tests {
             invisible_entry_exclusion_predicate(),
             "e.is_invisible = 0 AND COALESCE(j.is_invisible, 0) = 0"
         );
+    }
+
+    #[test]
+    fn month_index_rows_exclude_locked_invisible_trashed_and_tombstoned_entries() {
+        let conn = setup();
+        let (public, locked, in_locked_journal) = seed_locked_view_entries(&conn);
+        let (public2, invisible, in_invisible_journal) = seed_invisible_view_entries(&conn);
+        let public_journal = make_journal(&conn, "Other");
+        let trashed = make_entry(&conn, &public_journal, "Trashed", "t");
+        trash_entry(&conn, &trashed, 1_700_000_500).unwrap();
+        let tombstone = make_entry(&conn, &public_journal, "Gone", "g");
+        soft_delete_entry(&conn, &tombstone).unwrap();
+
+        let mut ids: Vec<String> = list_month_index_rows(&conn)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.entry_id)
+            .collect();
+        ids.sort();
+        let mut expected = vec![public, public2];
+        expected.sort();
+        assert_eq!(ids, expected);
+        for absent in [
+            locked,
+            in_locked_journal,
+            invisible,
+            in_invisible_journal,
+            trashed,
+            tombstone,
+        ] {
+            assert!(!ids.contains(&absent));
+        }
+    }
+
+    /// The fingerprint must move on every change that alters a month row,
+    /// including writers that do not bump `entries.updated_at` (tag links,
+    /// media metadata, version upload), and on a journal lock. It must stay
+    /// put for changes the index never carries.
+    #[test]
+    fn month_index_fingerprint_tracks_every_row_input() {
+        let conn = setup();
+        let journal_id = make_journal(&conn, "J");
+        let entry_id = make_entry(&conn, &journal_id, "T", "body");
+        let media = create_media(
+            &conn,
+            CreateMediaParams {
+                entry_id: &entry_id,
+                file_name: "a.jpg",
+                file_type: "image/jpeg",
+                storage_path: "a.jpg",
+                file_size: Some(10),
+                sort_order: 0,
+                insertion_mode: "inline",
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+                width: None,
+                height: None,
+            },
+        )
+        .unwrap();
+        let mut last = month_index_fingerprint(&conn).unwrap();
+        let mut assert_moved = |what: &str, moved: bool| {
+            let now = month_index_fingerprint(&conn).unwrap();
+            assert_eq!(now != last, moved, "{what}");
+            last = now;
+        };
+
+        // Pending media is not in the index.
+        bump_media_accessed(&conn, &media.id, 42).unwrap();
+        assert_moved("last_accessed_at", false);
+        mark_media_uploaded(&conn, &media.id, "dev-a/media/x", 1).unwrap();
+        assert_moved("media uploaded", true);
+        update_media_insertion_mode_db(&conn, &media.id, "attached").unwrap();
+        assert_moved("media insertion_mode", true);
+
+        let tag = create_tag(&conn, "tag-a", None).unwrap();
+        assert_moved("unlinked tag", false);
+        add_tag_to_entry(&conn, &entry_id, &tag.id).unwrap();
+        assert_moved("tag linked", true);
+
+        let version = insert_entry_version(&conn, &entry_id, b"y", "p", "dev-a").unwrap();
+        assert_moved("pending version", false);
+        mark_version_uploaded(&conn, &version, "dev-a/versions/x.bin").unwrap();
+        assert_moved("version uploaded", true);
+
+        // A same-second LWW tie can change content without bumping
+        // `updated_at`; the content length still moves the fingerprint.
+        conn.execute(
+            "UPDATE entries SET content_text = 'other words' WHERE id = ?1",
+            [&entry_id],
+        )
+        .unwrap();
+        assert_moved("content length", true);
+        conn.execute(
+            "UPDATE entries SET updated_at = updated_at + 1 WHERE id = ?1",
+            [&entry_id],
+        )
+        .unwrap();
+        assert_moved("updated_at", true);
+
+        set_journal_locked(&conn, &journal_id, true).unwrap();
+        assert_moved("journal locked", true);
+    }
+
+    #[test]
+    fn month_index_row_carries_tags_uploaded_media_and_uploaded_versions() {
+        let conn = setup();
+        let journal_id = make_journal(&conn, "J");
+        let entry_id = create_entry(
+            &conn,
+            CreateEntryParams {
+                journal_id: &journal_id,
+                title: Some("Title"),
+                content_text: Some("  one two\nthree  "),
+                preview_text: Some("one two"),
+                entry_date: 1_700_000_000,
+            },
+        )
+        .unwrap()
+        .id;
+        let tag = create_tag(&conn, "tag-a", None).unwrap();
+        add_tag_to_entry(&conn, &entry_id, &tag.id).unwrap();
+        let media_params = |name: &'static str, sort_order: i64| CreateMediaParams {
+            entry_id: &entry_id,
+            file_name: name,
+            file_type: "image/jpeg",
+            storage_path: name,
+            file_size: Some(10),
+            sort_order,
+            insertion_mode: "inline",
+            exif_date: None,
+            exif_latitude: None,
+            exif_longitude: None,
+            width: Some(2),
+            height: Some(3),
+        };
+        let uploaded_media = create_media(&conn, media_params("up.jpg", 0)).unwrap();
+        mark_media_uploaded(&conn, &uploaded_media.id, "dev-a/media/x", 1).unwrap();
+        let _pending_media = create_media(&conn, media_params("pending.jpg", 1)).unwrap();
+        let own_version = insert_entry_version(&conn, &entry_id, b"y", "p", "dev-a").unwrap();
+        mark_version_uploaded(&conn, &own_version, "dev-a/versions/x.bin").unwrap();
+        let _pending_version = insert_entry_version(&conn, &entry_id, b"y", "p", "dev-a").unwrap();
+        insert_remote_version(&conn, "peer-version", &entry_id, b"y", "p", 5, "dev-b").unwrap();
+
+        let rows = list_month_index_rows(&conn).unwrap();
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.entry_id, entry_id);
+        assert_eq!(row.journal_id, journal_id);
+        assert_eq!(row.title.as_deref(), Some("Title"));
+        assert_eq!(row.preview_text.as_deref(), Some("one two"));
+        assert_eq!(row.word_count, 3);
+        assert_eq!(row.tag_ids, vec![tag.id]);
+        let media_ids: Vec<&str> = row.media.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(media_ids, vec![uploaded_media.id.as_str()]);
+        assert_eq!(row.media[0].file_name, "up.jpg");
+        assert_eq!(row.media[0].width, Some(2));
+        let mut versions: Vec<(String, String)> = row
+            .versions
+            .iter()
+            .map(|v| (v.version_id.clone(), v.device_id.clone()))
+            .collect();
+        versions.sort();
+        let mut expected = vec![
+            (own_version, "dev-a".to_string()),
+            ("peer-version".to_string(), "dev-b".to_string()),
+        ];
+        expected.sort();
+        assert_eq!(versions, expected);
     }
 
     #[test]

@@ -104,6 +104,26 @@ pub fn month_key(entry_date_secs: i64) -> String {
     format!("{year:04}-{month:02}")
 }
 
+/// True for the names `index/` may hold: a `<YYYY-MM>.bin` month file or the
+/// `months.bin` catalog. Anything else in that folder is a stray to ignore.
+pub fn is_month_index_file_name(name: &str) -> bool {
+    match name.strip_suffix(".bin") {
+        Some("months") => true,
+        Some(stem) => is_month_key(stem),
+        None => false,
+    }
+}
+
+/// True for a `"YYYY-MM"` month key as produced by [`month_key`] (shape only).
+pub fn is_month_key(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 7
+        && b[4] == b'-'
+        && b.iter()
+            .enumerate()
+            .all(|(i, c)| i == 4 || c.is_ascii_digit())
+}
+
 /// Year and month (1-12) of a day count since 1970-01-01 (proleptic Gregorian).
 fn civil_year_month(days: i64) -> (i64, u32) {
     let z = days + 719_468;
@@ -222,6 +242,28 @@ mod tests {
             r#"{"schema_version":1,"device_id":"d"}"#
         )
         .is_err());
+    }
+
+    #[test]
+    fn month_index_file_name_accepts_months_and_catalog_only() {
+        for ok in ["2026-01.bin", "1969-12.bin", "months.bin"] {
+            assert!(is_month_index_file_name(ok), "{ok}");
+        }
+        for bad in [
+            "junk.bin",
+            "2026-1.bin",
+            "2026-01",
+            "months",
+            "2026_01.bin",
+            "2026-01.bin.tmp",
+            "x2026-01.bin",
+            "",
+        ] {
+            assert!(!is_month_index_file_name(bad), "{bad}");
+        }
+        assert!(is_month_key("2026-01"));
+        assert!(!is_month_key("catalog"));
+        assert!(!is_month_key("fingerprint"));
     }
 
     #[test]

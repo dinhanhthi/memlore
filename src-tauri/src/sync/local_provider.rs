@@ -548,6 +548,9 @@ impl SyncProvider for LocalSyncProvider {
                                                 name.strip_suffix(".thumb").unwrap_or(&name),
                                             ))))
                         }
+                        FileKind::Index => {
+                            memlore_core::month_index::is_month_index_file_name(&name)
+                        }
                         FileKind::DeviceRoot => unreachable!("matched Some(subfolder)"),
                     };
                     if !accepted {
@@ -754,6 +757,24 @@ mod tests {
             vec![
                 "dev-a/media/mediauuid1".to_string(),
                 "dev-a/media/mediauuid2".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn list_files_index_returns_month_files_and_catalog_only() {
+        let (dir, p) = fixture();
+        p.write_file("dev-a/index/2026-01.bin", b"m").await.unwrap();
+        p.write_file("dev-a/index/months.bin", b"c").await.unwrap();
+        // Safe-stem .bin that is not a month or the catalog — rejected.
+        p.write_file("dev-a/index/batch-1.bin", b"x").await.unwrap();
+        std::fs::write(dir.path().join("dev-a/index/notes.txt"), b"hi").unwrap();
+        let files = p.list_files("dev-a", FileKind::Index).await.unwrap();
+        assert_eq!(
+            files,
+            vec![
+                "dev-a/index/2026-01.bin".to_string(),
+                "dev-a/index/months.bin".to_string(),
             ]
         );
     }
