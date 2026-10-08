@@ -1297,5 +1297,21 @@
   },
   "settings_panel": {
     "loading": "Loading…"
+  },
+  "web_read_only": {
+    "chat_note": "Read-only on the web. Open the desktop app to chat.",
+    "chat_empty_sessions": "No conversations to show.",
+    "chat_no_session_hint": "Pick a conversation on the left to read it.",
+    "chat_empty_messages": "No messages to show.",
+    "chat_hidden_message": "Hidden: refers to a locked entry",
+    "chats_too_large_for_web": "Some chats are too large for the web. Open them in the desktop app.",
+    "chats_unreadable_on_web": "Some chats couldn't be read on the web. Open them in the desktop app.",
+    "memory_note": "Memories and persona are read-only on the web. Scan, build and edit them in the desktop app.",
+    "memory_empty": "No memories to show.",
+    "memory_too_large_for_web": "Your memory is too large for the web. Open it in the desktop app.",
+    "memory_unreadable_on_web": "Your memory couldn't be read on the web. Open it in the desktop app.",
+    "persona_on": "On",
+    "persona_off": "Off",
+    "view": "View"
   }
 }

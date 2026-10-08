@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useActiveView, useUpdateActiveTab } from '../../hooks/useActiveTab'
 import { useAiDailyChatEnabled } from '../../hooks/useAiDailyChatEnabled'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useJournals } from '../../hooks/useJournals'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
 import { cn } from '../../lib/cn'
@@ -59,6 +60,7 @@ export function Sidebar() {
   const activeView = useActiveView()
   const updateActiveTab = useUpdateActiveTab()
   const dailyChatEnabled = useAiDailyChatEnabled()
+  const caps = useCapabilities()
   // Every nav item shows on every platform — views the build doesn't support
   // render an "unsupported on web" placeholder via TwoPanelLayout instead of
   // being hidden. Splice AI nav items before Settings when their toggles are
@@ -66,7 +68,8 @@ export function Sidebar() {
   const beforeSettings = NAV_ITEMS.slice(0, -1)
   const settingsItem = NAV_ITEMS[NAV_ITEMS.length - 1]
   const aiItems: NavItem[] = []
-  if (dailyChatEnabled === true) aiItems.push(CHAT_ITEM)
+  // The web has no AI toggle to read, but lists synced chats read-only.
+  if (dailyChatEnabled === true || (!caps.ai && caps.chatRead)) aiItems.push(CHAT_ITEM)
   const displayItems: NavItem[] = [...beforeSettings, ...aiItems, settingsItem, ABOUT_ITEM]
   const { createJournal } = useJournals()
   const [contextMenu, setContextMenu] = useState<{

@@ -2246,6 +2246,11 @@ export interface PersonaRow {
   userEdited: boolean
   generatedAt: number | null
   updatedAt: number
+  /** Web only: a desktop's memory was too large to download, so this persona
+   *  (and the memory list) may be incomplete. */
+  tooLargeForWeb?: boolean
+  /** Web only: a desktop's memory could not be read. */
+  unreadableOnWeb?: boolean
 }
 
 /** Result of a manual persona build. `styleReady` is false when there are too
@@ -2763,7 +2768,7 @@ export const listAllMediaPaged = (
 export const dailyChatListSessionsPaged = (
   page: number,
   query?: string,
-): Promise<PagedResult<import('../types/ai').ChatSessionMeta>> =>
+): Promise<import('../types/ai').ChatSessionPage> =>
   invoke('daily_chat_list_sessions_paged', { page, query: query ?? null })
 
 // ─── Device list (V2 keyring) ─────────────────────────────────────────────────

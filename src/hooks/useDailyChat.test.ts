@@ -212,6 +212,76 @@ describe('useDailyChat', () => {
     expect(result.current.turn).toEqual({ kind: 'idle' })
   })
 
+  it('keeps a hidden message as a placeholder with its hidden reason', async () => {
+    vi.mocked(tauri.dailyChatLoadSession).mockResolvedValueOnce({
+      id: SID,
+      title: null,
+      persona: 'empathetic',
+      language: 'auto',
+      createdAt: 0,
+      updatedAt: 0,
+      messages: [
+        {
+          id: 'h1',
+          role: 'assistant',
+          content: '',
+          seq: 0,
+          createdAt: 1,
+          attachments: [],
+          sourceEntryIds: null,
+          memoryIds: null,
+          hiddenReason: 'locked_source',
+        },
+      ],
+      convertedEntryId: null,
+      convertedThroughSeq: null,
+    })
+    const { result } = renderHook(() => useDailyChat(SID))
+    await waitFor(() => expect(result.current.messages).toHaveLength(1))
+    expect(result.current.messages[0]).toMatchObject({ id: 'h1', hiddenReason: 'locked_source' })
+    expect(result.current.webGap).toBeNull()
+  })
+
+  it.each([
+    ['too_large_for_web', new Error('too_large_for_web: open this on a desktop')],
+    ['unreadable_on_web', new Error('unreadable_on_web: open this on a desktop')],
+  ] as const)('a %s load error is reported instead of an empty transcript', async (gap, err) => {
+    vi.mocked(tauri.dailyChatLoadSession).mockRejectedValueOnce(err)
+    const { result } = renderHook(() => useDailyChat(SID))
+    await waitFor(() => expect(result.current.webGap).toBe(gap))
+    expect(result.current.messages).toHaveLength(0)
+  })
+
+  it('a not-found load reports no web gap', async () => {
+    vi.mocked(tauri.dailyChatLoadSession).mockRejectedValueOnce(
+      new Error('AI_DAILY_CHAT_SESSION_NOT_FOUND'),
+    )
+    const { result } = renderHook(() => useDailyChat(SID))
+    await waitFor(() => expect(tauri.dailyChatLoadSession).toHaveBeenCalled())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.webGap).toBeNull()
+  })
+
+  it('a loaded session carrying a too-large flag reports the web gap', async () => {
+    vi.mocked(tauri.dailyChatLoadSession).mockResolvedValueOnce({
+      id: SID,
+      title: 'Past',
+      persona: 'empathetic',
+      language: 'auto',
+      createdAt: 0,
+      updatedAt: 0,
+      messages: [{ id: 'm1', role: 'user', content: 'Hi', seq: 0, createdAt: 1 }],
+      convertedEntryId: null,
+      convertedThroughSeq: null,
+      tooLargeForWeb: true,
+    })
+    const { result } = renderHook(() => useDailyChat(SID))
+    await waitFor(() => expect(result.current.messages).toHaveLength(1))
+    expect(result.current.webGap).toBe('too_large_for_web')
+  })
+
   it('sendMessage with no session is a no-op', async () => {
     const { result } = renderHook(() => useDailyChat(null))
     await act(async () => {

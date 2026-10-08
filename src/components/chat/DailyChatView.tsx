@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useDailyChatSessions } from '../../hooks/useDailyChatSessions'
 import { useAiDailyChatReady, isDailyChatActionEnabled } from '../../hooks/useAiDailyChatReady'
 import { useActiveTab, useUpdateActiveTab } from '../../hooks/useActiveTab'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
 import { cn } from '../../lib/cn'
 import { useChatComposerAttachmentsStore } from '../../stores/chatComposerAttachmentsStore'
@@ -47,7 +48,10 @@ export function DailyChatView() {
     setPage,
     searchQuery,
     setSearchQuery,
+    webGap,
   } = useDailyChatSessions()
+  // Web: no AI, so chats are read-only — no composer, new chat, rename, pin or delete.
+  const readOnly = !useCapabilities().ai
   const isLocked = useSettingsStore((s) => s.isLocked)
   const activeTab = useActiveTab()
   const updateActiveTab = useUpdateActiveTab()
@@ -100,7 +104,7 @@ export function DailyChatView() {
   function handleCreateNew() {
     // Gate at the action boundary too (button is disabled, but keyboard /
     // double-click paths must not mint drafts when AI is unusable here).
-    if (!isDailyChatActionEnabled(ready)) return
+    if (readOnly || !isDailyChatActionEnabled(ready)) return
     // Do NOT hit the backend — a new chat is a draft until the first message.
     // Mint a stable client id (via `randomId`, which works in non-secure
     // contexts unlike `crypto.randomUUID`) so the transcript pane and the
@@ -158,6 +162,8 @@ export function DailyChatView() {
         onSearchQueryChange={setSearchQuery}
         ready={ready}
         onOpenAiSettings={handleOpenAiSettings}
+        readOnly={readOnly}
+        webGap={webGap}
       />
       {/* Clay matches the Entries editor card; Signature/Clean stay fused. */}
       <div
@@ -181,6 +187,7 @@ export function DailyChatView() {
           key={currentSessionId ?? 'none'}
           sessionId={currentSessionId}
           ready={ready}
+          readOnly={readOnly}
           onSavedAsEntry={() => {
             void invalidate()
           }}

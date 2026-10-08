@@ -64,10 +64,19 @@ export interface Capabilities {
   /** Security settings: password, rotation, recovery. */
   vaultAdmin: boolean
   writes: boolean
+  /** Reading Daily Chat sessions (read-only on web; sending still needs `ai`). */
+  chatRead: boolean
+  /** Reading memory items and the persona (read-only on web; editing still needs `ai`). */
+  memoryRead: boolean
+  /** Writing streak. */
+  streak: boolean
+  /** Exporting one entry as Markdown. */
+  entryMarkdownExport: boolean
 }
 
-/** Static capabilities: every feature on desktop; none on web. `writes` on web is
- * overridden at runtime by `capabilitiesStore` (see `useCapabilities`). */
+/** Static capabilities: every feature on desktop; on web only the read-only flags
+ * at the end. `writes` on web is overridden at runtime by `capabilitiesStore`
+ * (see `useCapabilities`). */
 export const capabilities: Capabilities = {
   windowChrome: !isWeb,
   biometric: !isWeb,
@@ -93,4 +102,8 @@ export const capabilities: Capabilities = {
   syncAdmin: !isWeb,
   vaultAdmin: !isWeb,
   writes: !isWeb,
+  chatRead: true,
+  memoryRead: true,
+  streak: true,
+  entryMarkdownExport: true,
 }

@@ -1297,5 +1297,21 @@
   },
   "settings_panel": {
     "loading": "Đang tải…"
+  },
+  "web_read_only": {
+    "chat_note": "Chỉ xem trên web. Mở ứng dụng máy tính để trò chuyện.",
+    "chat_empty_sessions": "Không có cuộc trò chuyện nào để hiển thị.",
+    "chat_no_session_hint": "Chọn một cuộc trò chuyện bên trái để đọc.",
+    "chat_empty_messages": "Không có tin nhắn nào để hiển thị.",
+    "chat_hidden_message": "Đã ẩn: liên quan đến một mục bị khóa",
+    "chats_too_large_for_web": "Một số cuộc trò chuyện quá lớn để mở trên web. Hãy mở chúng trong ứng dụng máy tính.",
+    "chats_unreadable_on_web": "Không đọc được một số cuộc trò chuyện trên web. Hãy mở chúng trong ứng dụng máy tính.",
+    "memory_note": "Ký ức và persona chỉ xem được trên web. Hãy quét, tạo và chỉnh sửa chúng trong ứng dụng máy tính.",
+    "memory_empty": "Không có ký ức nào để hiển thị.",
+    "memory_too_large_for_web": "Ký ức của bạn quá lớn để mở trên web. Hãy mở trong ứng dụng máy tính.",
+    "memory_unreadable_on_web": "Không đọc được ký ức của bạn trên web. Hãy mở trong ứng dụng máy tính.",
+    "persona_on": "Bật",
+    "persona_off": "Tắt",
+    "view": "Xem"
   }
 }

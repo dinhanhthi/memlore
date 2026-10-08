@@ -12,6 +12,9 @@ const NEW_CAPABILITY_FLAGS = [
   'vaultAdmin',
 ]
 
+/** Read-only flags that hold on both platforms. */
+const BOTH_PLATFORM_FLAGS = ['chatRead', 'memoryRead', 'streak', 'entryMarkdownExport']
+
 async function load() {
   vi.resetModules()
   return import('./platform')
@@ -32,14 +35,16 @@ describe('platform', () => {
     expect(Object.values(p.capabilities).every((v) => v === true)).toBe(true)
   })
 
-  it('web: isWeb true, isMacOS false even on a Mac UA, capabilities false', async () => {
+  it('web: isWeb true, isMacOS false even on a Mac UA, desktop-only capabilities false', async () => {
     vi.stubEnv('VITE_MEMLORE_PLATFORM', 'web')
     vi.stubGlobal('navigator', { platform: 'MacIntel', userAgent: 'Macintosh' })
     const p = await load()
     expect(p.isWeb).toBe(true)
     expect(p.isMacOS()).toBe(false)
     expect(Object.keys(p.capabilities)).toEqual(expect.arrayContaining(NEW_CAPABILITY_FLAGS))
-    expect(Object.values(p.capabilities).every((v) => v === false)).toBe(true)
+    for (const [flag, value] of Object.entries(p.capabilities)) {
+      expect(value, flag).toBe(BOTH_PLATFORM_FLAGS.includes(flag))
+    }
   })
 
   it('desktop: isMacOS follows the user agent', async () => {

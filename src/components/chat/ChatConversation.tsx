@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Check,
   Copy,
+  EyeOff,
   FileText,
   MessageCircleMore,
   MessageSquare,
@@ -60,6 +61,7 @@ import { useChatPendingAttachmentsStore } from '../../stores/chatPendingAttachme
 import type { ChatAttachment, ChatAttachmentRef, ChatContextRefusal } from '../../types/ai'
 import { MessageInfoPopover } from '../ai/MessageInfoPopover'
 import { Button } from '../common/Button'
+import { Callout } from '../common/Callout'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ShimmerText } from '../common/ShimmerText'
 import { InlineOrb } from '../common/ThinkingOrb'
@@ -220,6 +222,9 @@ interface ChatConversationProps {
   /** Called after a successful "Save as entry" flow so the parent can
    *  optionally drop the session or refresh state. */
   onSavedAsEntry?: () => void
+  /** No AI on this platform (web): transcript only — no composer, attach,
+   *  RAG toggle or convert-to-entry. */
+  readOnly?: boolean
 }
 
 /**
@@ -233,6 +238,7 @@ export function ChatConversation({
   sessionId,
   ready = null,
   onSavedAsEntry,
+  readOnly = false,
 }: ChatConversationProps) {
   const { t, i18n } = useTranslation(['ai', 'editor'])
   const {
@@ -246,6 +252,7 @@ export function ChatConversation({
     convertDelta,
     markConverted,
     convertToEntry,
+    webGap,
   } = useDailyChat(sessionId)
   const wasStreaming = useRef(false)
   const streamedMessageId = useRef<string | null>(null)
@@ -750,9 +757,11 @@ export function ChatConversation({
           {t('daily_chat.no_session_title', { defaultValue: 'No conversation selected' })}
         </p>
         <p className="max-w-80 text-xs">
-          {t('daily_chat.no_session_hint', {
-            defaultValue: 'Click "New chat" on the left to start a new conversation.',
-          })}
+          {readOnly
+            ? t('web_read_only.chat_no_session_hint')
+            : t('daily_chat.no_session_hint', {
+                defaultValue: 'Click "New chat" on the left to start a new conversation.',
+              })}
         </p>
       </div>
     )
@@ -781,7 +790,7 @@ export function ChatConversation({
           </h2>
         </div>
         <div className="flex items-center gap-1">
-          {buttonState.kind === 'save' && (
+          {!readOnly && buttonState.kind === 'save' && (
             <Button
               variant="primary"
               size="sm"
@@ -792,7 +801,7 @@ export function ChatConversation({
               <span>{t('daily_chat.save_as_entry', { defaultValue: 'Save as entry' })}</span>
             </Button>
           )}
-          {buttonState.kind === 'update' && (
+          {!readOnly && buttonState.kind === 'update' && (
             <Button
               variant="primary"
               size="sm"
@@ -803,7 +812,7 @@ export function ChatConversation({
               <span>{t('daily_chat.update_entry', { defaultValue: 'Update the entry' })}</span>
             </Button>
           )}
-          {buttonState.kind === 'update-disabled' && (
+          {!readOnly && buttonState.kind === 'update-disabled' && (
             <Tooltip
               content={t('daily_chat.update_no_new', {
                 defaultValue: 'No new messages since you last saved this conversation.',
@@ -848,13 +857,16 @@ export function ChatConversation({
       <div ref={transcriptRef} className="flex-1 overflow-y-auto px-4 py-4">
         {/* Same horizontal span as the composer below — full pane width. */}
         <div className="flex w-full flex-col gap-4">
-          {messages.length === 0 && (
+          {webGap !== null && <Callout tone="warning" title={t(`web_read_only.chats_${webGap}`)} />}
+          {messages.length === 0 && webGap === null && (
             <div className="text-fg-secondary py-12 text-center text-sm">
               <p>
-                {t('daily_chat.empty_hint', {
-                  defaultValue:
-                    "Tell me about your day. I'll ask follow-up questions to help you reflect.",
-                })}
+                {readOnly
+                  ? t('web_read_only.chat_empty_messages')
+                  : t('daily_chat.empty_hint', {
+                      defaultValue:
+                        "Tell me about your day. I'll ask follow-up questions to help you reflect.",
+                    })}
               </p>
             </div>
           )}
@@ -913,50 +925,62 @@ export function ChatConversation({
                         t={t}
                       />
                     )}
-                    <article
-                      className={cn(
-                        'w-fit max-w-full text-sm',
-                        isUser
-                          ? // Squared bottom-right corner is the tail pointing
-                            // back at the composer. Pair is mode-aware (warm
-                            // paper chip in Signature light, graphite in dark).
-                            'bg-bubble-user text-bubble-user-text rounded-2xl rounded-br-md px-3.5 pt-2.5 pb-2.5'
-                          : // Flat — no bubble. Assistant replies sit as plain
-                            // text on the pane background so the user's own
-                            // messages carry the visual weight. No left padding:
-                            // the logo + gap already separate the mark from the
-                            // first line.
-                            'text-fg pt-0.5',
-                      )}
-                      data-role={m.role}
-                    >
-                      {m.role === 'assistant' ? (
-                        <div>
-                          {m.content ? (
-                            renderSimpleMarkdown(m.content, { renderEntryRef })
-                          ) : m.streaming ? (
-                            <span className="text-fg-secondary inline-flex items-center gap-2">
-                              <InlineOrb state="solving" aria-hidden />
-                              <ShimmerText className="text-sm">
-                                {t('daily_chat.thinking', { defaultValue: 'Thinking…' })}
-                              </ShimmerText>
-                            </span>
-                          ) : null}
-                          {m.errorCode && (
-                            <p className="text-danger-text mt-1 text-xs">
-                              {knownErrorCodes[m.errorCode]
-                                ? t(knownErrorCodes[m.errorCode])
-                                : (m.errorMessage ??
-                                  t('daily_chat.error_unknown', {
-                                    defaultValue: "Couldn't generate a reply.",
-                                  }))}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{m.content}</p>
-                      )}
-                    </article>
+                    {m.hiddenReason ? (
+                      // Web: the message refers to a locked entry and was blanked
+                      // by the backend. Neutral for both roles — no bubble colour.
+                      <p
+                        className="border-border-default text-fg-muted inline-flex w-fit max-w-full items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-sm italic"
+                        data-role={m.role}
+                      >
+                        <EyeOff className="size-3.5 shrink-0" aria-hidden />
+                        {t('web_read_only.chat_hidden_message')}
+                      </p>
+                    ) : (
+                      <article
+                        className={cn(
+                          'w-fit max-w-full text-sm',
+                          isUser
+                            ? // Squared bottom-right corner is the tail pointing
+                              // back at the composer. Pair is mode-aware (warm
+                              // paper chip in Signature light, graphite in dark).
+                              'bg-bubble-user text-bubble-user-text rounded-2xl rounded-br-md px-3.5 pt-2.5 pb-2.5'
+                            : // Flat — no bubble. Assistant replies sit as plain
+                              // text on the pane background so the user's own
+                              // messages carry the visual weight. No left padding:
+                              // the logo + gap already separate the mark from the
+                              // first line.
+                              'text-fg pt-0.5',
+                        )}
+                        data-role={m.role}
+                      >
+                        {m.role === 'assistant' ? (
+                          <div>
+                            {m.content ? (
+                              renderSimpleMarkdown(m.content, { renderEntryRef })
+                            ) : m.streaming ? (
+                              <span className="text-fg-secondary inline-flex items-center gap-2">
+                                <InlineOrb state="solving" aria-hidden />
+                                <ShimmerText className="text-sm">
+                                  {t('daily_chat.thinking', { defaultValue: 'Thinking…' })}
+                                </ShimmerText>
+                              </span>
+                            ) : null}
+                            {m.errorCode && (
+                              <p className="text-danger-text mt-1 text-xs">
+                                {knownErrorCodes[m.errorCode]
+                                  ? t(knownErrorCodes[m.errorCode])
+                                  : (m.errorMessage ??
+                                    t('daily_chat.error_unknown', {
+                                      defaultValue: "Couldn't generate a reply.",
+                                    }))}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="whitespace-pre-wrap">{m.content}</p>
+                        )}
+                      </article>
+                    )}
                     {showMeta && (
                       <div className={cn('mt-1 flex items-center gap-2', isUser && 'px-3.5')}>
                         {typeof m.createdAt === 'number' && (
@@ -994,94 +1018,97 @@ export function ChatConversation({
       </div>
 
       {/* Full-width composer: footer is 100% of the conversation panel;
-          the textarea takes remaining row space via flex-1. */}
-      <footer className="border-border-default w-full shrink-0 border-t px-2 py-2">
-        <div className="flex w-full min-w-0 flex-col gap-2">
-          <ChatAttachmentBar
-            attachments={attachments}
-            onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))}
-            preflight={preflight}
-            refusal={inlineRefusal(refusal)}
-          />
-          <div className="flex w-full min-w-0 items-center gap-1.5">
-            <Button
-              ref={attachButtonRef}
-              variant="ghost"
-              size="sm"
-              aria-label={t('daily_chat.attach', { defaultValue: 'Attach' })}
-              aria-haspopup="dialog"
-              aria-expanded={attachPopoverOpen}
-              aria-controls={attachPopoverOpen ? attachPopoverId : undefined}
-              onClick={() => setAttachPopoverOpen((open) => !open)}
-              className="shrink-0"
-              icon={<Paperclip className="size-4" aria-hidden />}
+          the textarea takes remaining row space via flex-1. Read-only (web)
+          has no composer. */}
+      {!readOnly && (
+        <footer className="border-border-default w-full shrink-0 border-t px-2 py-2">
+          <div className="flex w-full min-w-0 flex-col gap-2">
+            <ChatAttachmentBar
+              attachments={attachments}
+              onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))}
+              preflight={preflight}
+              refusal={inlineRefusal(refusal)}
             />
-            <ChatRagToggle />
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                const next = e.target.value
-                setInput(next)
-                if (sessionId) useChatComposerDraftStore.getState().setDraft(sessionId, next)
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={t('daily_chat.input_placeholder', {
-                defaultValue: 'Tell me about your day…',
-              })}
-              disabled={isStreaming}
-              rows={1}
-              className="border-border-default bg-panel-1 text-fg max-h-40 min-h-9 min-w-0 flex-1 resize-none overflow-y-auto rounded-lg border px-3 py-2 text-sm leading-normal wrap-break-word [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
-            />
-            {isStreaming ? (
+            <div className="flex w-full min-w-0 items-center gap-1.5">
               <Button
+                ref={attachButtonRef}
                 variant="ghost"
                 size="sm"
-                onClick={cancelTurn}
-                aria-label={t('daily_chat.stop', { defaultValue: 'Stop' })}
-                className="h-auto w-auto shrink-0 px-2 py-0 hover:bg-transparent"
-                icon={<Square className="size-4" aria-hidden />}
+                aria-label={t('daily_chat.attach', { defaultValue: 'Attach' })}
+                aria-haspopup="dialog"
+                aria-expanded={attachPopoverOpen}
+                aria-controls={attachPopoverOpen ? attachPopoverId : undefined}
+                onClick={() => setAttachPopoverOpen((open) => !open)}
+                className="shrink-0"
+                icon={<Paperclip className="size-4" aria-hidden />}
               />
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void doSend()}
-                disabled={!input.trim() || !isDailyChatActionEnabled(ready)}
-                aria-label={t('daily_chat.send', { defaultValue: 'Send' })}
-                className="text-accent hover:text-accent h-auto w-auto shrink-0 px-2 py-0 hover:bg-transparent disabled:opacity-40"
-                icon={<SendHorizontal className="size-5" aria-hidden />}
+              <ChatRagToggle />
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setInput(next)
+                  if (sessionId) useChatComposerDraftStore.getState().setDraft(sessionId, next)
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={t('daily_chat.input_placeholder', {
+                  defaultValue: 'Tell me about your day…',
+                })}
+                disabled={isStreaming}
+                rows={1}
+                className="border-border-default bg-panel-1 text-fg max-h-40 min-h-9 min-w-0 flex-1 resize-none overflow-y-auto rounded-lg border px-3 py-2 text-sm leading-normal wrap-break-word [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
               />
-            )}
+              {isStreaming ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelTurn}
+                  aria-label={t('daily_chat.stop', { defaultValue: 'Stop' })}
+                  className="h-auto w-auto shrink-0 px-2 py-0 hover:bg-transparent"
+                  icon={<Square className="size-4" aria-hidden />}
+                />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void doSend()}
+                  disabled={!input.trim() || !isDailyChatActionEnabled(ready)}
+                  aria-label={t('daily_chat.send', { defaultValue: 'Send' })}
+                  className="text-accent hover:text-accent h-auto w-auto shrink-0 px-2 py-0 hover:bg-transparent disabled:opacity-40"
+                  icon={<SendHorizontal className="size-5" aria-hidden />}
+                />
+              )}
+            </div>
           </div>
-        </div>
-        <ChatAttachPopover
-          open={attachPopoverOpen}
-          onClose={() => setAttachPopoverOpen(false)}
-          anchorRef={attachButtonRef}
-          id={attachPopoverId}
-          attachments={attachments}
-          onSelect={(attachment) => {
-            setAttachments((prev) => [...prev, attachment])
-            setAttachPopoverOpen(false)
-          }}
-          onCommitEntries={(entries) => {
-            // Replace entry-kind attachments with the popover's final
-            // selection (dedupe by id is enforced there); keep period-kind
-            // attachments untouched, and preserve the existing order for
-            // anything still selected instead of reshuffling the chip bar —
-            // only genuinely new picks get appended at the end.
-            setAttachments((prev) => {
-              const selectedIds = new Set(entries.map((e) => e.id))
-              const kept = prev.filter((a) => a.kind !== 'entry' || selectedIds.has(a.id))
-              const keptIds = new Set(kept.flatMap((a) => (a.kind === 'entry' ? [a.id] : [])))
-              const added = entries.filter((e) => !keptIds.has(e.id))
-              return [...kept, ...added]
-            })
-            setAttachPopoverOpen(false)
-          }}
-        />
-      </footer>
+          <ChatAttachPopover
+            open={attachPopoverOpen}
+            onClose={() => setAttachPopoverOpen(false)}
+            anchorRef={attachButtonRef}
+            id={attachPopoverId}
+            attachments={attachments}
+            onSelect={(attachment) => {
+              setAttachments((prev) => [...prev, attachment])
+              setAttachPopoverOpen(false)
+            }}
+            onCommitEntries={(entries) => {
+              // Replace entry-kind attachments with the popover's final
+              // selection (dedupe by id is enforced there); keep period-kind
+              // attachments untouched, and preserve the existing order for
+              // anything still selected instead of reshuffling the chip bar —
+              // only genuinely new picks get appended at the end.
+              setAttachments((prev) => {
+                const selectedIds = new Set(entries.map((e) => e.id))
+                const kept = prev.filter((a) => a.kind !== 'entry' || selectedIds.has(a.id))
+                const keptIds = new Set(kept.flatMap((a) => (a.kind === 'entry' ? [a.id] : [])))
+                const added = entries.filter((e) => !keptIds.has(e.id))
+                return [...kept, ...added]
+              })
+              setAttachPopoverOpen(false)
+            }}
+          />
+        </footer>
+      )}
 
       {showConvertDialog && (
         <ConvertToEntryDialog

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { extractAiErrorCode } from '../lib/aiErrorCode'
+import { chatWebGapFromError, chatWebGapOf, type ChatWebGap } from '../lib/chatWebGap'
 import {
   cancelSuggestion,
   convertChatDeltaToEntry,
@@ -74,6 +75,9 @@ export interface ChatMessage {
    *  reloaded yet (they have no row yet). Drives the conversion
    *  high-water comparison against `convertedThroughSeq`. */
   seq?: number
+  /** Web only: the message was blanked because it refers to an entry the web
+   *  may not show. Rendered as a neutral placeholder. */
+  hiddenReason?: 'locked_source'
 }
 
 export type TurnState =
@@ -440,6 +444,14 @@ export function useDailyChat(sessionId: string | null) {
     newSinceConversion: false,
   })
 
+  // Web only: why this session could not be shown in full. Keyed by session id
+  // so a switch never shows the previous session's gap, without a reset write.
+  const [loadedGap, setLoadedGap] = useState<{ sessionId: string; gap: ChatWebGap | null }>({
+    sessionId: '',
+    gap: null,
+  })
+  const webGap = sessionId !== null && loadedGap.sessionId === sessionId ? loadedGap.gap : null
+
   const turnRef = useRef<TurnState>({ kind: 'idle' })
   turnRef.current = state.turn
 
@@ -541,6 +553,7 @@ export function useDailyChat(sessionId: string | null) {
       try {
         const session = await dailyChatLoadSession(sessionId)
         if (!alive) return
+        setLoadedGap({ sessionId, gap: chatWebGapOf(session) })
         if (messagesRef.current.length > 0 || turnRef.current.kind !== 'idle') return
         const messages: ChatMessage[] = session.messages.map((m) => ({
           id: m.id,
@@ -552,6 +565,7 @@ export function useDailyChat(sessionId: string | null) {
           sourceEntryIds: m.sourceEntryIds ?? undefined,
           memoryIds: m.memoryIds ?? undefined,
           seq: m.seq,
+          hiddenReason: m.hiddenReason,
         }))
         dispatch({
           type: 'load',
@@ -559,8 +573,11 @@ export function useDailyChat(sessionId: string | null) {
           convertedEntryId: session.convertedEntryId,
           convertedThroughSeq: session.convertedThroughSeq,
         })
-      } catch {
+      } catch (e) {
         if (!alive) return
+        // The web rejects with a gap code when the session lives in a desktop
+        // bin it could not read; any other failure (not-found draft) stays silent.
+        setLoadedGap({ sessionId, gap: chatWebGapFromError(e) })
         if (messagesRef.current.length > 0 || turnRef.current.kind !== 'idle') return
         dispatch({ type: 'reset' })
       }
@@ -691,6 +708,8 @@ export function useDailyChat(sessionId: string | null) {
     convertedEntryId: state.convertedEntryId,
     convertedThroughSeq: state.convertedThroughSeq,
     newSinceConversion: state.newSinceConversion,
+    /** Web only: the session could not be read in full (too large / unreadable). */
+    webGap,
     sendMessage,
     cancelTurn,
     reset,

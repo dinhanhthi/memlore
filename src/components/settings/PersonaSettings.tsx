@@ -1,4 +1,4 @@
-import { Pencil, Sparkles } from 'lucide-react'
+import { Eye, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../common/Button'
@@ -9,6 +9,7 @@ import { PersonaInterviewModal } from './PersonaInterviewModal'
 import { Toggle } from './Toggle'
 import { personaNeedsMoreStyleMaterial, useUserMemory } from '../../hooks/useUserMemory'
 import { presetNeedsApiKey } from '../../lib/aiProviderStatus'
+import { chatWebGapOf } from '../../lib/chatWebGap'
 import { errMsg, formatLastScanned } from '../../lib/memorySettings'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
 
@@ -27,6 +28,9 @@ interface PersonaSettingsProps {
    *  not been read yet; the caller must send it rather than a premature
    *  `false`, or this tab warns on a working device. */
   generationStatus?: GenerationSlotStatus
+  /** Web (no AI): show the synced persona only — no toggle, rebuild, interview
+   *  or edits, and none of the desktop setup warnings. */
+  readOnly?: boolean
 }
 
 export type GenerationSlotStatus = 'connected' | 'not_selected' | 'not_connected' | 'unknown'
@@ -58,6 +62,7 @@ type PersonaTextSection = 'traits' | 'style'
 export function PersonaSettings({
   onChanged,
   generationStatus = 'connected',
+  readOnly = false,
 }: PersonaSettingsProps = {}) {
   const { t, i18n } = useTranslation('ai')
   const memory = useUserMemory()
@@ -143,13 +148,17 @@ export function PersonaSettings({
    *  picked on the Models tab. */
   const personaWarnings: ('needs_generation_model' | 'needs_generation' | 'needs_memory_slots')[] =
     []
-  if (generationStatus === 'not_selected') personaWarnings.push('needs_generation_model')
-  else if (generationStatus === 'not_connected') personaWarnings.push('needs_generation')
-  // `hydrated` covers the memory slots only — it is set by `getAiSettings`,
-  // while the generation slot rides `getAiProviders` + the credential registry
-  // (folded into `generationStatus === 'unknown'` by the caller). Two load
-  // paths, two guards.
-  if (hydrated && !slotsReady) personaWarnings.push('needs_memory_slots')
+  // Every remedy below is a desktop setting, so read-only (web) shows none.
+  if (!readOnly) {
+    if (generationStatus === 'not_selected') personaWarnings.push('needs_generation_model')
+    else if (generationStatus === 'not_connected') personaWarnings.push('needs_generation')
+    // `hydrated` covers the memory slots only — it is set by `getAiSettings`,
+    // while the generation slot rides `getAiProviders` + the credential registry
+    // (folded into `generationStatus === 'unknown'` by the caller). Two load
+    // paths, two guards.
+    if (hydrated && !slotsReady) personaWarnings.push('needs_memory_slots')
+  }
+  const webGap = chatWebGapOf(persona)
 
   async function rebuild(force: boolean) {
     setConfirmOpen(false)
@@ -166,6 +175,7 @@ export function PersonaSettings({
 
   return (
     <div className="space-y-4">
+      {webGap !== null && <Callout tone="warning" title={t(`web_read_only.memory_${webGap}`)} />}
       {/* Two DIFFERENT blockers, each with its own remedy and its own tab:
             · Using the persona injects `traits_text`/`style_text` into the
               normal generation path, so it needs the MAIN generation slot.
@@ -205,7 +215,12 @@ export function PersonaSettings({
               )}
             </p>
           </div>
-          {persona && (
+          {persona && readOnly && (
+            <span className="text-fg-muted shrink-0 text-xs font-medium">
+              {persona.enabled ? t('web_read_only.persona_on') : t('web_read_only.persona_off')}
+            </span>
+          )}
+          {persona && !readOnly && (
             <span className="shrink-0">
               <Toggle
                 checked={persona.enabled}
@@ -215,19 +230,21 @@ export function PersonaSettings({
             </span>
           )}
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Sparkles className="size-3.5" />}
-          loading={rebuilding}
-          disabled={!persona || rebuilding || !slotsReady}
-          onClick={() => {
-            if (persona?.userEdited) setConfirmOpen(true)
-            else void rebuild(false)
-          }}
-        >
-          {t('user_memory.persona.rebuild')}
-        </Button>
+        {!readOnly && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Sparkles className="size-3.5" />}
+            loading={rebuilding}
+            disabled={!persona || rebuilding || !slotsReady}
+            onClick={() => {
+              if (persona?.userEdited) setConfirmOpen(true)
+              else void rebuild(false)
+            }}
+          >
+            {t('user_memory.persona.rebuild')}
+          </Button>
+        )}
       </div>
 
       {/* One row per persona part — title + what it is + a way in. */}
@@ -236,9 +253,11 @@ export function PersonaSettings({
         description={t('user_memory.persona.answers_description')}
         note={answers.length === 0 ? t('user_memory.persona.answers_empty') : undefined}
         actionLabel={
-          answers.length > 0
-            ? t('user_memory.persona.edit_answers')
-            : t('user_memory.persona.answer_questions')
+          readOnly
+            ? undefined
+            : answers.length > 0
+              ? t('user_memory.persona.edit_answers')
+              : t('user_memory.persona.answer_questions')
         }
         actionDisabled={!persona}
         actionTestAttr="data-persona-interview-trigger"
@@ -250,8 +269,8 @@ export function PersonaSettings({
         note={
           persona?.traitsText.trim() ? undefined : t('user_memory.persona.not_enough_material_body')
         }
-        actionLabel={t('user_memory.edit')}
-        actionIcon={<Pencil className="size-3.5" />}
+        actionLabel={readOnly ? t('web_read_only.view') : t('user_memory.edit')}
+        actionIcon={readOnly ? <Eye className="size-3.5" /> : <Pencil className="size-3.5" />}
         actionDisabled={!persona}
         onAction={() => setOpenSection('traits')}
       />
@@ -263,8 +282,8 @@ export function PersonaSettings({
             ? t('user_memory.persona.not_enough_style_material_body')
             : undefined
         }
-        actionLabel={t('user_memory.edit')}
-        actionIcon={<Pencil className="size-3.5" />}
+        actionLabel={readOnly ? t('web_read_only.view') : t('user_memory.edit')}
+        actionIcon={readOnly ? <Eye className="size-3.5" /> : <Pencil className="size-3.5" />}
         actionDisabled={!persona}
         onAction={() => setOpenSection('style')}
       />
@@ -295,7 +314,7 @@ export function PersonaSettings({
           value={
             openSection === 'traits' ? (persona?.traitsText ?? '') : (persona?.styleText ?? '')
           }
-          onSave={(next) => saveSection(openSection, next)}
+          onSave={readOnly ? undefined : (next) => saveSection(openSection, next)}
           onClose={() => setOpenSection(null)}
         />
       )}
@@ -308,7 +327,7 @@ export function PersonaSettings({
         onConfirm={() => rebuild(true)}
         onClose={() => setConfirmOpen(false)}
       />
-      {interviewOpen && persona && (
+      {!readOnly && interviewOpen && persona && (
         <PersonaInterviewModal
           answersJson={persona.answersJson}
           onClose={() => setInterviewOpen(false)}
@@ -324,7 +343,8 @@ interface PersonaPartCardProps {
   description: string
   /** Optional state line — e.g. "nothing here yet, and why". */
   note?: string
-  actionLabel: string
+  /** Omitted when the part has no action (read-only interview answers). */
+  actionLabel?: string
   actionIcon?: React.ReactNode
   actionDisabled?: boolean
   /** Extra data-attribute name set on the button (E2E hook). */
@@ -352,18 +372,20 @@ function PersonaPartCard({
         <p className="text-fg-muted mt-0.5 text-xs leading-snug">{description}</p>
         {note && <p className="text-empty-text mt-1.5 text-xs leading-snug">{note}</p>}
       </div>
-      <span className="shrink-0">
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={actionIcon}
-          disabled={actionDisabled}
-          onClick={onAction}
-          {...extra}
-        >
-          {actionLabel}
-        </Button>
-      </span>
+      {actionLabel !== undefined && (
+        <span className="shrink-0">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={actionIcon}
+            disabled={actionDisabled}
+            onClick={onAction}
+            {...extra}
+          >
+            {actionLabel}
+          </Button>
+        </span>
+      )}
     </div>
   )
 }
@@ -373,7 +395,8 @@ interface PersonaTextModalProps {
   description: string
   placeholder: string
   value: string
-  onSave: (next: string) => Promise<void>
+  /** Omitted on web: the modal only shows the text. */
+  onSave?: (next: string) => Promise<void>
   onClose: () => void
 }
 
@@ -393,6 +416,7 @@ function PersonaTextModal({
   const [error, setError] = useState<string | null>(null)
 
   async function save() {
+    if (!onSave) return
     setSaving(true)
     try {
       await onSave(draft.trim())
@@ -412,6 +436,7 @@ function PersonaTextModal({
           value={draft}
           rows={14}
           placeholder={placeholder}
+          readOnly={!onSave}
           onChange={(event) => setDraft(event.target.value)}
           className="border-border-default bg-surface-hi text-fg w-full resize-y rounded-xl border px-3 py-2 text-sm leading-relaxed outline-none"
         />
@@ -422,12 +447,20 @@ function PersonaTextModal({
         )}
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
-          {t('action.forget_cancel')}
-        </Button>
-        <Button variant="secondary" size="sm" loading={saving} onClick={() => void save()}>
-          {t('action.save')}
-        </Button>
+        {onSave ? (
+          <>
+            <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
+              {t('action.forget_cancel')}
+            </Button>
+            <Button variant="secondary" size="sm" loading={saving} onClick={() => void save()}>
+              {t('action.save')}
+            </Button>
+          </>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t('action.close')}
+          </Button>
+        )}
       </Modal.Footer>
     </Modal>
   )

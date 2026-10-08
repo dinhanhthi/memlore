@@ -1405,6 +1405,18 @@ export interface ChatMessage {
    *  so a since-deleted/disabled memory drops out of the "N memories used"
    *  chip instead of showing a stale count. */
   memoryIds?: string[] | null
+  /** Web only: the message was blanked (empty `content`, no sources) because it
+   *  refers to an entry the web may not show. */
+  hiddenReason?: 'locked_source'
+}
+
+/** One page of the session list. The web build adds the gap flags when a
+ *  desktop's chats could not be read, so the list may be incomplete. */
+export interface ChatSessionPage {
+  items: ChatSessionMeta[]
+  total: number
+  tooLargeForWeb?: boolean
+  unreadableOnWeb?: boolean
 }
 
 export interface ChatSession {
@@ -1423,6 +1435,11 @@ export interface ChatSession {
    *  {@link convertedEntryId}. `null` when nothing has been converted
    *  yet. Mirrors `ChatSessionWire.converted_through_seq`. */
   convertedThroughSeq: number | null
+  /** Web only: a desktop's chats were too large to download, so this session
+   *  may be missing messages. */
+  tooLargeForWeb?: boolean
+  /** Web only: a desktop's chats could not be read. */
+  unreadableOnWeb?: boolean
 }
 
 export type DailyChatPersona =

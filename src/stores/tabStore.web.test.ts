@@ -66,14 +66,14 @@ describe('tabStore on web', () => {
     ])
   })
 
-  it('applyLaunchView moves persisted media/onthisday/map/chat tabs to entries', () => {
+  it('applyLaunchView moves persisted media/onthisday/map tabs to entries, keeps chat', () => {
     useTabStore.setState({
       tabs: [
         makeTab({ id: 'tab-1', activeView: 'calendar' }),
         makeTab({ id: 'tab-2', activeView: 'media' }),
         makeTab({ id: 'tab-3', activeView: 'onthisday' }),
         makeTab({ id: 'tab-4', activeView: 'map' }),
-        // Persisted by older web builds where page.chat was ungated.
+        // Daily Chat is available read-only on web, so this tab stays.
         makeTab({ id: 'tab-5', activeView: 'chat' }),
         makeTab({ id: 'tab-6', activeView: 'tags' }),
       ],
@@ -87,7 +87,7 @@ describe('tabStore on web', () => {
       'entries',
       'entries',
       'entries',
-      'entries',
+      'chat',
       'tags',
     ])
   })

@@ -8,6 +8,7 @@ import {
   dailyChatRenameSession,
   dailyChatSetSessionPinned,
 } from '../lib/tauri'
+import { chatWebGapOf, type ChatWebGap } from '../lib/chatWebGap'
 import { useChatComposerAttachmentsStore } from '../stores/chatComposerAttachmentsStore'
 import { useChatSessionStore } from '../stores/chatSessionStore'
 import type { ChatSessionMeta } from '../types/ai'
@@ -40,8 +41,16 @@ export function useDailyChatSessions() {
     return () => window.clearTimeout(timeout)
   }, [searchQuery])
 
+  /** Web only: a desktop's chats could not be read, so the list may be incomplete. */
+  const [webGap, setWebGap] = useState<ChatWebGap | null>(null)
+
+  // `usePagedQuery` keeps only `items`/`total`, so the web gap flags are read here.
   const fetcher = useCallback(
-    (page: number) => dailyChatListSessionsPaged(page, settledQuery),
+    async (page: number) => {
+      const result = await dailyChatListSessionsPaged(page, settledQuery)
+      setWebGap(chatWebGapOf(result))
+      return result
+    },
     [settledQuery],
   )
   const paged = usePagedQuery<ChatSessionMeta>({
@@ -200,5 +209,6 @@ export function useDailyChatSessions() {
     renameSession,
     setPinned,
     recentlyUpdatedTitleId,
+    webGap,
   }
 }

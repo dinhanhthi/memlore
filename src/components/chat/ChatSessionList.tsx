@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, MessageSquare, MessagesSquare, Pin, Check, X, Search, Sparkle } from 'lucide-react'
 import type { ChatSessionMeta } from '../../types/ai'
+import type { ChatWebGap } from '../../lib/chatWebGap'
 import type { DailyChatReady } from '../../hooks/useAiDailyChatReady'
 import { isDailyChatActionEnabled } from '../../hooks/useAiDailyChatReady'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
@@ -46,6 +47,10 @@ interface ChatSessionListProps {
   ready?: DailyChatReady | null
   /** Open Settings → AI (Providers) from the unconfigured banner CTA. */
   onOpenAiSettings?: () => void
+  /** No AI on this platform (web): list and read only — no New, rename, pin or delete. */
+  readOnly?: boolean
+  /** Web only: some desktop's chats could not be read, so the list may be incomplete. */
+  webGap?: ChatWebGap | null
 }
 
 export function ChatSessionList({
@@ -66,6 +71,8 @@ export function ChatSessionList({
   onSearchQueryChange,
   ready = null,
   onOpenAiSettings,
+  readOnly = false,
+  webGap = null,
 }: ChatSessionListProps) {
   const { t, i18n } = useTranslation('ai')
   const { panelAfterMain } = useLayoutFlags()
@@ -82,7 +89,7 @@ export function ChatSessionList({
   const openMenuId = openMenu?.id ?? null
   const hasSearchQuery = searchQuery.trim().length > 0
   const canCreate = isDailyChatActionEnabled(ready)
-  const showGateBanner = ready === 'needs_provider' || ready === 'needs_privacy'
+  const showGateBanner = !readOnly && (ready === 'needs_provider' || ready === 'needs_privacy')
   // Title-only warning (no long body) — CTA carries the next step.
   const gateTitleKey =
     ready === 'needs_privacy' ? 'daily_chat.gate_privacy' : 'daily_chat.gate_no_provider'
@@ -113,16 +120,35 @@ export function ChatSessionList({
         <h1 className="font-title text-fg text-xl font-extrabold tracking-[-.4px]">
           {t('daily_chat.sessions_title', { defaultValue: 'Conversations' })}
         </h1>
-        <Button
-          size="sm"
-          icon={<Plus className="size-3.5" strokeWidth={1.75} />}
-          onClick={() => void onCreateNew()}
-          disabled={!canCreate}
-          aria-label={t('daily_chat.new_chat', { defaultValue: 'New chat' })}
-        >
-          {t('daily_chat.new_chat_short', { defaultValue: 'New' })}
-        </Button>
+        {!readOnly && (
+          <Button
+            size="sm"
+            icon={<Plus className="size-3.5" strokeWidth={1.75} />}
+            onClick={() => void onCreateNew()}
+            disabled={!canCreate}
+            aria-label={t('daily_chat.new_chat', { defaultValue: 'New chat' })}
+          >
+            {t('daily_chat.new_chat_short', { defaultValue: 'New' })}
+          </Button>
+        )}
       </div>
+
+      {readOnly && (
+        <p className="border-border-default text-fg-muted shrink-0 border-b px-4 py-2 text-xs">
+          {t('web_read_only.chat_note')}
+        </p>
+      )}
+
+      {webGap !== null && (
+        <div className="bg-elevated">
+          <Callout
+            tone="warning"
+            flush
+            className="border-border-default shrink-0 border-b"
+            title={t(`web_read_only.chats_${webGap}`)}
+          />
+        </div>
+      )}
 
       {/* Search field — a regular boxed TextInput (Clay paints it as a well)
           with equal padding on every side. */}
@@ -216,9 +242,11 @@ export function ChatSessionList({
               ? t('daily_chat.no_search_results', {
                   defaultValue: 'No conversations match your search.',
                 })
-              : t('daily_chat.empty_sessions', {
-                  defaultValue: 'No conversations yet. Click "New chat".',
-                })}
+              : readOnly
+                ? t('web_read_only.chat_empty_sessions')
+                : t('daily_chat.empty_sessions', {
+                    defaultValue: 'No conversations yet. Click "New chat".',
+                  })}
           </div>
         )}
         <ul className="flex flex-col">
@@ -256,7 +284,8 @@ export function ChatSessionList({
                     // Same action menu as the "…" button, at the cursor — matches
                     // EntryCard / tab right-click. Skip while renaming so the
                     // native input menu still works for cut/copy/paste.
-                    if (isEditing) return
+                    // Read-only rows have no actions, so the native menu stays.
+                    if (isEditing || readOnly) return
                     e.preventDefault()
                     e.stopPropagation()
                     setOpenMenu({ id: s.id, position: { x: e.clientX, y: e.clientY } })
@@ -382,57 +411,60 @@ export function ChatSessionList({
                         )}
                       </div>
 
-                      {/* Hover actions: the dots menu (rename · pin · remove) */}
+                      {/* Hover actions: the dots menu (rename · pin · remove).
+                          Read-only (web) rows have none. */}
                       {/* `focus-within` matters as much as `hover`: opacity-0
                           leaves the trigger in the tab order, so without it you
                           could tab to an invisible menu button (WCAG 2.4.7). */}
-                      <div
-                        className={cn(
-                          'absolute top-2 right-2 transition-opacity',
-                          // The menu is portalled to document.body, so neither
-                          // group-hover nor group-focus-within holds once it is
-                          // open — without a force-visible branch the trigger
-                          // vanishes underneath its own popover. Right-click
-                          // opens stay cursor-anchored: keep "…" hidden even if
-                          // the pointer is still over the row.
-                          openMenuId === s.id && openMenu?.position != null
-                            ? 'pointer-events-none opacity-0'
-                            : openMenuId === s.id
-                              ? 'pointer-events-auto opacity-100'
-                              : [
-                                  'pointer-events-none opacity-0',
-                                  'group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-                                  'group-hover:pointer-events-auto group-hover:opacity-100',
-                                ],
-                        )}
-                      >
-                        <ChatSessionMenu
-                          session={s}
-                          open={openMenuId === s.id}
-                          position={openMenuId === s.id ? (openMenu?.position ?? null) : null}
-                          onOpenChange={(next) => {
-                            // Button path has no cursor anchor — drop `position`
-                            // so the panel re-anchors to the "…" trigger.
-                            setOpenMenu(next ? { id: s.id } : null)
-                          }}
-                          onRename={(sess) => {
-                            // Clear the open id in the PARENT, not just via the
-                            // child's post-handler close: `startRename` flips
-                            // `editingId`, which unmounts ChatSessionMenu (the
-                            // whole hover block lives inside the
-                            // `editingId !== s.id` branch), so relying on the
-                            // child to close itself races its own unmount. A
-                            // stale `openMenuId` would make the menu spring open
-                            // again the next time that row is hovered.
-                            setOpenMenu(null)
-                            startRename(sess)
-                          }}
-                          onDelete={(sess) => setConfirmDeleteId(sess.id)}
-                          onSetPinned={(sess, pinned) => {
-                            void onSetPinned(sess.id, pinned)
-                          }}
-                        />
-                      </div>
+                      {!readOnly && (
+                        <div
+                          className={cn(
+                            'absolute top-2 right-2 transition-opacity',
+                            // The menu is portalled to document.body, so neither
+                            // group-hover nor group-focus-within holds once it is
+                            // open — without a force-visible branch the trigger
+                            // vanishes underneath its own popover. Right-click
+                            // opens stay cursor-anchored: keep "…" hidden even if
+                            // the pointer is still over the row.
+                            openMenuId === s.id && openMenu?.position != null
+                              ? 'pointer-events-none opacity-0'
+                              : openMenuId === s.id
+                                ? 'pointer-events-auto opacity-100'
+                                : [
+                                    'pointer-events-none opacity-0',
+                                    'group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                                    'group-hover:pointer-events-auto group-hover:opacity-100',
+                                  ],
+                          )}
+                        >
+                          <ChatSessionMenu
+                            session={s}
+                            open={openMenuId === s.id}
+                            position={openMenuId === s.id ? (openMenu?.position ?? null) : null}
+                            onOpenChange={(next) => {
+                              // Button path has no cursor anchor — drop `position`
+                              // so the panel re-anchors to the "…" trigger.
+                              setOpenMenu(next ? { id: s.id } : null)
+                            }}
+                            onRename={(sess) => {
+                              // Clear the open id in the PARENT, not just via the
+                              // child's post-handler close: `startRename` flips
+                              // `editingId`, which unmounts ChatSessionMenu (the
+                              // whole hover block lives inside the
+                              // `editingId !== s.id` branch), so relying on the
+                              // child to close itself races its own unmount. A
+                              // stale `openMenuId` would make the menu spring open
+                              // again the next time that row is hovered.
+                              setOpenMenu(null)
+                              startRename(sess)
+                            }}
+                            onDelete={(sess) => setConfirmDeleteId(sess.id)}
+                            onSetPinned={(sess, pinned) => {
+                              void onSetPinned(sess.id, pinned)
+                            }}
+                          />
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -451,7 +483,7 @@ export function ChatSessionList({
       />
 
       <ConfirmDialog
-        open={confirmDeleteId !== null}
+        open={!readOnly && confirmDeleteId !== null}
         title={t('daily_chat.delete_confirm_title', { defaultValue: 'Delete this chat?' })}
         description={t('daily_chat.delete_confirm_body', {
           defaultValue: 'This conversation will be permanently removed.',

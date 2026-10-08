@@ -30,11 +30,24 @@ const GATED_VIEWS: readonly ActiveView[] = [
 // In this (desktop) test environment every flag is true.
 const DESKTOP_CAPS: Capabilities = capabilities
 
-// Web build: every flag false — mirrors `capabilities` when isWeb.
-const WEB_CAPS: Capabilities = Object.keys(capabilities).reduce<Capabilities>(
+// Every flag false — the baseline the per-flag tests switch one flag on from.
+const NO_CAPS: Capabilities = Object.keys(capabilities).reduce<Capabilities>(
   (caps, key) => ({ ...caps, [key]: false }),
   { ...capabilities },
 )
+
+// Web build: mirrors `capabilities` when isWeb — every desktop-only flag false,
+// the read-only flags that hold on both platforms true.
+const WEB_CAPS: Capabilities = {
+  ...NO_CAPS,
+  chatRead: true,
+  memoryRead: true,
+  streak: true,
+  entryMarkdownExport: true,
+}
+
+// Views with no web implementation; Daily Chat is available read-only.
+const WEB_HIDDEN_VIEWS: readonly ActiveView[] = GATED_VIEWS.filter((v) => v !== 'chat')
 
 describe('isViewAvailable', () => {
   it('desktop: every view is available', () => {
@@ -43,10 +56,15 @@ describe('isViewAvailable', () => {
     }
   })
 
-  it('web: gated views are unavailable, ungated ones stay available', () => {
+  it('web: daily chat is available read-only, the other gated views stay hidden', () => {
     for (const view of ALL_VIEWS) {
-      expect(isViewAvailable(view, WEB_CAPS)).toBe(!GATED_VIEWS.includes(view))
+      expect(isViewAvailable(view, WEB_CAPS)).toBe(!WEB_HIDDEN_VIEWS.includes(view))
     }
+  })
+
+  it('web: chat is available while ai stays false', () => {
+    expect(WEB_CAPS.ai).toBe(false)
+    expect(isViewAvailable('chat', WEB_CAPS)).toBe(true)
   })
 
   it('defaults to the platform capabilities', () => {
@@ -63,23 +81,17 @@ describe('isViewAvailable', () => {
     ['media', 'gallery'],
     ['onthisday', 'lookback'],
     ['map', 'maps'],
+    ['chat', 'chatRead'],
   ] as const)('view %s is gated only by caps.%s', (view, flag) => {
-    const caps: Capabilities = { ...WEB_CAPS, [flag]: true }
+    const caps: Capabilities = { ...NO_CAPS, [flag]: true }
     for (const gated of GATED_VIEWS) {
       expect(isViewAvailable(gated, caps)).toBe(gated === view)
     }
   })
 
-  // Chat needs BOTH ai and chat — either flag alone leaves it unavailable.
+  // Reading chats needs no AI: `ai` and `chat` alone never open the view.
   it.each([['ai'], ['chat']] as const)('view chat stays unavailable with only caps.%s', (flag) => {
-    const caps: Capabilities = { ...WEB_CAPS, [flag]: true }
+    const caps: Capabilities = { ...NO_CAPS, [flag]: true }
     expect(isViewAvailable('chat', caps)).toBe(false)
-  })
-
-  it('view chat is available only when caps.ai && caps.chat', () => {
-    const caps: Capabilities = { ...WEB_CAPS, ai: true, chat: true }
-    for (const gated of GATED_VIEWS) {
-      expect(isViewAvailable(gated, caps)).toBe(gated === 'chat')
-    }
   })
 })

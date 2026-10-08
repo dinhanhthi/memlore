@@ -418,4 +418,23 @@ describe('useDailyChatSessions', () => {
 
     expect(useChatSessionStore.getState().chatSessionsById.s1.title).toBe('Fresh generated title')
   })
+
+  it('reports no web gap for a complete list', async () => {
+    const { result } = renderHook(() => useDailyChatSessions())
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.webGap).toBeNull()
+  })
+
+  it.each([
+    ['too_large_for_web', { tooLargeForWeb: true }],
+    ['unreadable_on_web', { unreadableOnWeb: true }],
+  ] as const)('reports the %s flag the web list carries', async (gap, flags) => {
+    vi.mocked(tauri.dailyChatListSessionsPaged).mockResolvedValue({
+      ...makePagedResult([makeSession()]),
+      ...flags,
+    })
+    const { result } = renderHook(() => useDailyChatSessions())
+    await waitFor(() => expect(result.current.webGap).toBe(gap))
+    expect(result.current.sessions).toHaveLength(1)
+  })
 })

@@ -425,6 +425,11 @@ export function SettingsPanel() {
   }
 
   const activeMeta = activeCat
+  // AI is unavailable on web, but its Memories and Persona tabs render read-only
+  // there. Kept out of `isSettingsCategoryAvailable` so the palette's AI deep
+  // links (providers, models, features) stay hidden on web.
+  const activeAvailable =
+    isSettingsCategoryAvailable(activeMeta.id, caps) || (activeMeta.id === 'ai' && caps.memoryRead)
 
   return (
     <div
@@ -537,7 +542,7 @@ export function SettingsPanel() {
             isClay ? 'xj-main-panel bg-elevated rounded-2xl' : 'bg-panel-3 dark:bg-transparent',
           )}
         >
-          {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+          {activeAvailable ? (
             <DetailContent category={activeMeta.id} />
           ) : (
             <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />
@@ -564,7 +569,7 @@ export function SettingsPanel() {
                   {t(`categories.${activeMeta.id}.description`)}
                 </p>
               </div>
-              {isSettingsCategoryAvailable(activeMeta.id, caps) ? (
+              {activeAvailable ? (
                 <DetailContent category={activeMeta.id} />
               ) : (
                 <UnsupportedOnWeb title={t(`categories.${activeMeta.id}.label`)} />

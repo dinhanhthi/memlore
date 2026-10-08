@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAIProviderConfig } from '../../hooks/useAIProviderConfig'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { useDefaultSearchMode } from '../../hooks/useDefaultSearchMode'
 import { useEmbeddingStatus } from '../../hooks/useEmbeddingStatus'
 import { useOllamaInstalledModels } from '../../hooks/useOllamaInstalledModels'
@@ -162,7 +163,114 @@ function slotNeedsPrivacyNotice(
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+/** Full AI settings where AI runs; on web only read-only Memory and Persona. */
 export function AISettingsPanel() {
+  const caps = useCapabilities()
+  return caps.ai ? <FullAISettingsPanel /> : <ReadOnlyAISettingsPanel />
+}
+
+/** Tabs the web build can show: reading synced memories and the persona. */
+const READ_ONLY_AI_TABS = AI_TABS.filter((tab) => tab.id === 'memories' || tab.id === 'persona')
+
+/**
+ * Web AI settings: no providers, models or features, and nothing that writes.
+ * Only the synced memory list and persona, read-only. A persisted `aiTab` the
+ * web cannot show (the default is `'chat'`) falls back to Memory at render
+ * time, so the tab store keeps the desktop choice untouched.
+ */
+function ReadOnlyAISettingsPanel() {
+  const { t } = useTranslation('ai')
+  const storedTab = useTabStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeTabId)
+    return tab?.aiTab ?? 'memories'
+  })
+  const activeTab: AITab = READ_ONLY_AI_TABS.some((tab) => tab.id === storedTab)
+    ? storedTab
+    : 'memories'
+  const setActiveTab = (tab: AITab) => useTabStore.getState().updateActiveTab({ aiTab: tab })
+  const slideDir = useTabSlideDirection(
+    READ_ONLY_AI_TABS.map((tab) => tab.id),
+    activeTab,
+  )
+  const tabOptions = useMemo(
+    () =>
+      READ_ONLY_AI_TABS.map((tab) => {
+        const label = t(tab.labelKey, { defaultValue: tab.defaultLabel })
+        const Icon = tab.icon
+        return {
+          id: tab.id,
+          ariaLabel: label,
+          label: (
+            <>
+              <Icon className="hidden size-4 shrink-0 @max-[640px]:block" aria-hidden="true" />
+              <span className="truncate whitespace-nowrap @max-[640px]:hidden" aria-hidden="true">
+                {label}
+              </span>
+            </>
+          ),
+        }
+      }),
+    [t],
+  )
+
+  return (
+    <div className="@container flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 px-6 pt-6 pb-3">
+        <h1 className="font-title text-fg text-3xl font-extrabold">
+          {t('page.ai_settings_title', { defaultValue: 'AI Settings' })}
+        </h1>
+        <p className="text-fg-muted mt-1 max-w-prose text-sm leading-snug">
+          {t('web_read_only.memory_note')}
+        </p>
+      </div>
+
+      <SettingsTabList
+        tabs={tabOptions}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel={t('tab_sections.ai')}
+        tabId={aiTabId}
+        panelId={aiPanelId}
+        tabClassName="min-w-0"
+      />
+
+      <div className="min-h-0 flex-1">
+        {READ_ONLY_AI_TABS.map((tab) => {
+          const isActive = activeTab === tab.id
+          return (
+            <RestoredScroll
+              key={tab.id}
+              view="settings"
+              sub={`ai:${tab.id}`}
+              id={aiPanelId(tab.id)}
+              role="tabpanel"
+              aria-labelledby={aiTabId(tab.id)}
+              aria-hidden={!isActive}
+              inert={!isActive}
+              tabIndex={0}
+              style={{ display: isActive ? 'block' : 'none' }}
+              className={cn(
+                'h-full overflow-y-auto p-6 outline-none',
+                isActive && slideDir === 'right' && 'tab-slide-in-right',
+                isActive && slideDir === 'left' && 'tab-slide-in-left',
+              )}
+            >
+              <div className="max-w-180">
+                {tab.id === 'memories' ? (
+                  <MemoriesSettings readOnly />
+                ) : (
+                  <PersonaSettings readOnly />
+                )}
+              </div>
+            </RestoredScroll>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function FullAISettingsPanel() {
   const { t } = useTranslation('ai')
   const {
     settings,
