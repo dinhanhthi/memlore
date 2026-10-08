@@ -1668,6 +1668,25 @@ export interface SyncStatusEvent {
   lastSync: number | null
   entriesPending: number
   error: string | null
+  /**
+   * Web only: intent-retention notices, set on the one `synced` event that
+   * carries them. The desktop never sends this.
+   */
+  notices?: WebNotice[]
+}
+
+/**
+ * Structured web sync notice — mirrors `WebNotice` in
+ * `web/src/backend/sync/outbox.ts` (src/ must not import from web/). `field`
+ * is a raw key (`title`, `entry_date`, …, `tag_add:<id>`, `tag_remove:<id>`),
+ * `reason` a raw desktop refusal code. A `refused` notice without `field` is
+ * a new entry the desktop could not add.
+ */
+export interface WebNotice {
+  kind: 'replaced' | 'refused' | 'waiting_newer_desktop'
+  field?: string
+  title?: string
+  reason?: string
 }
 
 /** Per-loop-boundary progress event.  Separate from {@link SYNC_STATUS_EVENT}. */

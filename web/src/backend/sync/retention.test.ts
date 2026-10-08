@@ -268,7 +268,9 @@ describe('intent retention', () => {
     await r.acks('desk-a', [ack('e1', { decision: 'refused', reason: 'journal' })])
     const res = await r.run()
     expect(res.dropped).toEqual(['e1'])
-    expect(res.notices).toEqual(['Your desktop could not apply: title (journal)'])
+    expect(res.notices).toEqual([
+      { kind: 'refused', field: 'title', title: 'Old', reason: 'journal' },
+    ])
   })
 
   it('drops a created-on-web draft every desktop refused to create, with a notice', async () => {
@@ -282,7 +284,7 @@ describe('intent retention', () => {
     await r.acks('desk-b', [refused])
     expect(await r.run()).toEqual({
       dropped: ['e9'],
-      notices: ['This entry could not be added on your desktop: no_journal'],
+      notices: [{ kind: 'refused', title: 'New', reason: 'no_journal' }],
       changed: true,
     })
   })
@@ -329,7 +331,7 @@ describe('intent retention', () => {
     r.now.secs = T0 + 30 * DAY
     expect(await r.run()).toEqual({
       dropped: ['e1'],
-      notices: ['This edit was replaced by a change from your desktop: title of Old'],
+      notices: [{ kind: 'replaced', field: 'title', title: 'Old' }],
       changed: true,
     })
   })
@@ -421,7 +423,7 @@ describe('intent retention', () => {
       const res = await r.run()
       expect(res).toEqual({
         dropped: [],
-        notices: ['This edit was replaced by a change from your desktop: title of Desk'],
+        notices: [{ kind: 'replaced', field: 'title', title: 'Desk' }],
         changed: true,
       })
       const overlay = r.vault.getOutboxIntent('e1')

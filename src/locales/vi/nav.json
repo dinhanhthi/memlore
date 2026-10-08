@@ -154,6 +154,40 @@
       "pulling-chats": "Kéo trò chuyện",
       "pulling-streak": "Kéo chuỗi",
       "pulling-ai-audit": "Kéo nhật ký AI"
+    },
+    "web_notice": {
+      "title": "Từ bản desktop",
+      "dismiss": "Bỏ qua",
+      "count_one": "{{count}} ghi chú đồng bộ",
+      "count_other": "{{count}} ghi chú đồng bộ",
+      "view_details": "Xem ghi chú đồng bộ trong Cài đặt",
+      "replaced": "Chỉnh sửa của bạn ({{field}}) cho “{{title}}” đã bị thay thế bởi một thay đổi từ bản desktop.",
+      "refused": "Bản desktop không thể áp dụng chỉnh sửa của bạn ({{field}}) cho “{{title}}”: {{reason}}.",
+      "refused_create": "Bản desktop không thể thêm mục mới “{{title}}”: {{reason}}.",
+      "waiting_newer_desktop": "Một thay đổi bạn thực hiện ở đây đang chờ một bản desktop chạy phiên bản Memlore mới hơn.",
+      "waiting_newer_desktop_titled": "Thay đổi của bạn cho “{{title}}” đang chờ một bản desktop chạy phiên bản Memlore mới hơn.",
+      "untitled": "Không tiêu đề",
+      "field": {
+        "title": "tiêu đề",
+        "entry_date": "ngày",
+        "emotion": "cảm xúc",
+        "is_favorite": "yêu thích",
+        "journal_id": "nhật ký",
+        "tag_add": "thêm thẻ",
+        "tag_remove": "gỡ thẻ",
+        "unknown": "{{field}}"
+      },
+      "reason": {
+        "journal": "nhật ký không có trên bản desktop",
+        "tag_not_found": "thẻ không còn tồn tại trên bản desktop",
+        "invalid_date": "ngày không hợp lệ",
+        "no_journal": "không có nhật ký nào để thêm vào",
+        "error": "đã xảy ra lỗi không mong muốn",
+        "entry_trashed": "mục đã được chuyển vào Thùng rác trên bản desktop",
+        "name_taken": "tên này đã được sử dụng",
+        "changed_on_desktop": "mục đã được thay đổi trên bản desktop trong lúc đó",
+        "unknown": "lý do không xác định ({{code}})"
+      }
     }
   },
   "embedding_status": {

@@ -348,6 +348,95 @@ describe('syncStore', () => {
     expect(useSyncStore.getState().phase).toBe('synced')
   })
 
+  it('keeps web notices from the synced event that carries them', async () => {
+    await useSyncStore.getState().init()
+    expect(useSyncStore.getState().notices).toEqual([])
+    const notices = [
+      { kind: 'replaced' as const, field: 'title', title: 'Trip' },
+      { kind: 'refused' as const, reason: 'no_journal' },
+    ]
+    fireStatus({
+      state: 'synced',
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: 1_700_000_000,
+      entriesPending: 0,
+      error: null,
+      notices,
+    })
+    expect(useSyncStore.getState().notices).toEqual(notices)
+  })
+
+  it('keeps notices through later events that carry none', async () => {
+    await useSyncStore.getState().init()
+    const notices = [{ kind: 'waiting_newer_desktop' as const }]
+    const base = {
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: 1_700_000_000,
+      entriesPending: 0,
+      error: null,
+    }
+    fireStatus({ ...base, state: 'synced', notices })
+    fireStatus({ ...base, state: 'syncing' })
+    fireStatus({ ...base, state: 'synced' })
+    expect(useSyncStore.getState().notices).toEqual(notices)
+  })
+
+  it('accumulates notices across events until dismissed', async () => {
+    await useSyncStore.getState().init()
+    const base = {
+      state: 'synced' as const,
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: 1_700_000_000,
+      entriesPending: 0,
+      error: null,
+    }
+    const first = { kind: 'refused' as const, field: 'emotion', reason: 'error' }
+    const next = { kind: 'replaced' as const, field: 'journal_id' }
+    fireStatus({ ...base, notices: [first] })
+    fireStatus({ ...base, notices: [next] })
+    expect(useSyncStore.getState().notices).toEqual([first, next])
+    useSyncStore.getState().dismissNotices()
+    expect(useSyncStore.getState().notices).toEqual([])
+  })
+
+  it('caps accumulated notices at the newest 50', async () => {
+    await useSyncStore.getState().init()
+    const base = {
+      state: 'synced' as const,
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: 1_700_000_000,
+      entriesPending: 0,
+      error: null,
+    }
+    const batch = (from: number, n: number) =>
+      Array.from({ length: n }, (_, i) => ({ kind: 'replaced' as const, title: `t${from + i}` }))
+    fireStatus({ ...base, notices: batch(0, 40) })
+    fireStatus({ ...base, notices: batch(40, 20) })
+    const notices = useSyncStore.getState().notices
+    expect(notices).toHaveLength(50)
+    expect(notices[0]?.title).toBe('t10')
+    expect(notices[49]?.title).toBe('t59')
+  })
+
+  it('dismissNotices clears the notices', async () => {
+    await useSyncStore.getState().init()
+    fireStatus({
+      state: 'synced',
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: 1_700_000_000,
+      entriesPending: 0,
+      error: null,
+      notices: [{ kind: 'replaced', field: 'title' }],
+    })
+    useSyncStore.getState().dismissNotices()
+    expect(useSyncStore.getState().notices).toEqual([])
+  })
+
   it('refreshes AI providers once on a fresh transition into synced', async () => {
     const refreshProviders = vi
       .spyOn(useAiSettingsStore.getState(), 'refreshProviders')

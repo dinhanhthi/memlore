@@ -77,8 +77,20 @@ export interface OutboxAcksV1 {
   acks: OutboxAckEntry[]
 }
 
-export interface FieldNotice {
-  text: string
+/**
+ * A sync notice for the UI to translate (JSON-serializable: it crosses the invoke shim). No English
+ * text: `field` is the raw field key (`title`, `journal_id`, `tag_add:<id>`, ...), `reason` the raw
+ * desktop refusal code (unknown codes pass through). A `refused` notice without `field` is an
+ * entry the desktop could not create.
+ */
+export interface WebNotice {
+  kind: 'replaced' | 'refused' | 'waiting_newer_desktop'
+  field?: string
+  title?: string
+  reason?: string
+}
+
+export interface FieldNotice extends WebNotice {
   kind: 'replaced' | 'refused'
   /** Identity of the decision, so a notice is shown once per `(entry, field, change_seq)`. */
   field: string
@@ -119,14 +131,6 @@ export const decisionKey = (field: string, changeSeq: number): string => `${fiel
 
 export const REFUSAL_BOUND_SECS = 30 * 86400
 
-const FIELD_LABELS: Record<string, string> = {
-  title: 'title',
-  entry_date: 'entry date',
-  emotion: 'emotion',
-  is_favorite: 'favorite',
-  journal_id: 'journal',
-}
-
 export function createEmptyOutboxFields(): OutboxFields {
   return {
     title: null,
@@ -139,18 +143,16 @@ export function createEmptyOutboxFields(): OutboxFields {
   }
 }
 
+/** Builds a notice, omitting every absent part (so it compares and serializes cleanly). */
 export function formatNotice(
-  kind: 'replaced' | 'refused' | 'create_refused',
-  detail: string,
-  entryTitleOrId?: string,
-): string {
-  if (kind === 'replaced') {
-    return `This edit was replaced by a change from your desktop: ${detail} of ${entryTitleOrId ?? ''}`
-  }
-  if (kind === 'refused') {
-    return `Your desktop could not apply: ${detail}`
-  }
-  return `This entry could not be added on your desktop: ${detail}`
+  kind: WebNotice['kind'],
+  parts: { field?: string; title?: string; reason?: string } = {},
+): WebNotice {
+  const notice: WebNotice = { kind }
+  if (parts.field !== undefined) notice.field = parts.field
+  if (parts.title !== undefined) notice.title = parts.title
+  if (parts.reason !== undefined) notice.reason = parts.reason
+  return notice
 }
 
 function syncedStateReflects<T>(
@@ -215,16 +217,14 @@ export function resolveField<T>(params: ResolveFieldParams<T>): FieldResolution 
     nowSecs,
     entryTitleOrId,
   } = params
-  const label =
-    FIELD_LABELS[fieldName] ??
-    (fieldName.startsWith('tag_add:')
-      ? 'added tag'
-      : fieldName.startsWith('tag_remove:')
-        ? 'removed tag'
-        : fieldName)
-  const notice = (kind: FieldNotice['kind'], text: string): FieldResolution => ({
+  const notice = (kind: FieldNotice['kind'], reason?: string): FieldResolution => ({
     resolved: true,
-    notice: { kind, text, field: fieldName, change_seq: change.change_seq },
+    notice: {
+      ...formatNotice(kind, { field: fieldName, title: entryTitleOrId, reason }),
+      kind,
+      field: fieldName,
+      change_seq: change.change_seq,
+    },
   })
 
   // 1. If synced state already reflects it, resolved silently
@@ -262,7 +262,7 @@ export function resolveField<T>(params: ResolveFieldParams<T>): FieldResolution 
     const maxU = Math.max(...appliedDecisions.map((d) => d.decision.decided_updated_at))
     if (syncedEntry !== null && syncedEntry.updated_at >= maxU) {
       // Superseded by a later desktop edit!
-      return notice('replaced', formatNotice('replaced', label, entryTitleOrId))
+      return notice('replaced')
     }
     // Still in flight: do not drop, no notice
     return { resolved: false }
@@ -278,8 +278,7 @@ export function resolveField<T>(params: ResolveFieldParams<T>): FieldResolution 
     // desktop (`journal`, `tag_not_found`, `invalid_date`, `error` or a setter's error text).
     const deterministic = refusedDecisions.find((d) => !isConflictRefusal(d.decision))
     if (deterministic && allDecided) {
-      const reason = deterministic.decision.reason ?? 'error'
-      return notice('refused', formatNotice('refused', `${label} (${reason})`))
+      return notice('refused', deterministic.decision.reason ?? 'error')
     }
 
     // Conflict refusal: final if all decided and synced.updated_at != base_updated_at, OR 30 days elapsed
@@ -293,7 +292,7 @@ export function resolveField<T>(params: ResolveFieldParams<T>): FieldResolution 
       ((allDecided && syncedEntry !== null && syncedEntry.updated_at !== change.base_updated_at) ||
         thirtyDaysElapsed)
     ) {
-      return notice('replaced', formatNotice('replaced', label, entryTitleOrId))
+      return notice('replaced')
     }
   }
 
@@ -515,7 +514,7 @@ export interface RetainParams {
 export interface RetainResult {
   retain: boolean
   /** The create-refused notice (the intent is dropped). */
-  notice?: string
+  notice?: WebNotice
   /** The intent's fields minus every resolved one: what the overlay and the next rewrite use. */
   cleanedFields: OutboxFields
   /** Fields resolved by this evaluation, `<field>@<change_seq>`. */
@@ -550,7 +549,11 @@ export function shouldRetainIntent(params: RetainParams): RetainResult {
   if (intent.created_on_web && contentHash !== null) {
     const refusal = createRefusal(allAcks, intentPath, contentHash, capableDesktops)
     if (refusal !== null) {
-      return { retain: false, notice: formatNotice('create_refused', refusal), ...untouched }
+      const notice = formatNotice('refused', {
+        title: intent.fields.title?.value || undefined,
+        reason: refusal,
+      })
+      return { retain: false, notice, ...untouched }
     }
   }
 

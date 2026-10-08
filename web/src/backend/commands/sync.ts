@@ -5,8 +5,9 @@
  *
  * Desktop contract followed here (src-tauri/src/commands/sync.rs, src/lib/tauri.ts):
  *   Event  "sync:status-changed" `{state, enabled, configured, provider, lastSync, entriesPending,
- *          error}`, `state` is `'idle' | 'syncing' | 'synced' | 'error'` (there is no "offline" or
- *          "incompatible" phase: both are `error` with a message). A clean run ends in `synced`.
+ *          error, notices?}`, `state` is `'idle' | 'syncing' | 'synced' | 'error'` (there is no
+ *          "offline" or "incompatible" phase: both are `error` with a message). A clean run ends
+ *          in `synced`.
  *          `lastSync` is Unix SECONDS. `provider` is `'gdrive'` (CloudProviderKind), never
  *          "google_drive".
  *   Event  "memlore:entries-changed" (window CustomEvent + shim, through the 10.3 emitter) after a
@@ -69,6 +70,7 @@ import { onDraftSaved, unpushedDraftCount } from '../drafts'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, isUnlocked, onLock } from '../keys'
 import type { Handler } from '../router'
+import type { WebNotice } from '../sync/outbox'
 import type { PushResult } from '../sync/push'
 import { readEnv, type PullOutcome } from './readSession'
 
@@ -86,7 +88,8 @@ export const MSG_FORMAT_READ_ONLY =
 
 /**
  * Shown (as the status `error` of a `synced` phase) when a device's data could not be read fully.
- * Intent-retention notices (`PullOutcome.notices`) use the same channel, merged into one note, once.
+ * Intent-retention notices (`PullOutcome.notices`) do NOT use this channel: they ride, structured,
+ * in the status `notices` of one `synced` event.
  */
 export const MSG_SYNC_DEGRADED = "sync degraded: a device's data could not be read fully"
 
@@ -98,6 +101,11 @@ export interface SyncStatus {
   provider: string | null
   lastSync: number | null
   entriesPending: number
+  /**
+   * Intent-retention notices, structured for the UI to translate. Set only on the one `synced`
+   * status event that carries them; `get_sync_status` never has them.
+   */
+  notices?: WebNotice[]
 }
 
 export interface SyncStatusEvent extends SyncStatus {
@@ -202,18 +210,11 @@ let formatReadOnly: string | null = null
 const pullNote = (): string | null => formatReadOnly ?? (degraded ? MSG_SYNC_DEGRADED : null)
 /**
  * Intent-retention notices of every pull, oldest first, until a `synced` status carries them once
- * (merged into one note in `error`, like `MSG_SYNC_DEGRADED`). An error status leaves them queued.
+ * (in `notices`, beside whatever note `error` holds). An error status leaves them queued.
  * Memory only: a lock or restart drops them, and they are not shown again after a reload because
  * retention already persisted them as shown before returning them.
  */
-let pendingNotices: string[] = []
-
-/** The first notice, plus how many more were queued with it. */
-function mergeNotices(notices: string[]): string {
-  const more = notices.length - 1
-  if (more === 0) return notices[0]
-  return `${notices[0]} (and ${more} more ${more === 1 ? 'edit' : 'edits'})`
-}
+let pendingNotices: WebNotice[] = []
 /** The pull in flight, tagged with the schedule epoch it started under. */
 let inflight: { epoch: number; promise: Promise<PullReport> } | null = null
 let lastAttemptAt = 0
@@ -283,13 +284,12 @@ function setPhase(next: SyncPhase, error: string | null): void {
   const keepPushError = next === 'synced' && pushError !== null
   phase = keepPushError ? 'error' : next
   lastError = keepPushError ? pushError : error
-  // A notice rides on one `synced` status only; `lastError` keeps the note it replaced.
-  let shown = lastError
+  const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: lastError }
+  // Notices ride on one `synced` status only.
   if (phase === 'synced' && pendingNotices.length > 0) {
-    shown = mergeNotices(pendingNotices)
+    payload.notices = pendingNotices
     pendingNotices = []
   }
-  const payload: SyncStatusEvent = { ...snapshot(), state: phase, error: shown }
   reportedPending = payload.entriesPending
   env().emit(STATUS_EVENT, payload)
 }

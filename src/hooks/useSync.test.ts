@@ -272,8 +272,9 @@ describe('useSync', () => {
   it('lifecycle event updates phase, status and isSyncing', async () => {
     const { result } = renderHook(() => useSync())
     await waitFor(() => expect(result.current.deviceId).toBe('test-device-uuid'))
-    // Four listeners: status-changed, progress, recovery-status, retry-scheduled.
-    expect(listeners.length).toBe(4)
+    // Five listeners: status-changed, progress, recovery-status, retry-scheduled,
+    // format-guard-latched.
+    expect(listeners.length).toBe(5)
 
     await act(async () => {
       listeners[0]!({
@@ -361,9 +362,9 @@ describe('useSync', () => {
     const a = renderHook(() => useSync())
     const b = renderHook(() => useSync())
     await waitFor(() => expect(a.result.current.deviceId).toBe('test-device-uuid'))
-    // Four listeners per store: status + progress + recovery + retry. Init is
-    // idempotent so two hook consumers share one store → still four total.
-    expect(listeners.length).toBe(4)
+    // Five listeners per store: status + progress + recovery + retry + format
+    // guard. Init is idempotent so two hook consumers share one store → still five.
+    expect(listeners.length).toBe(5)
 
     await act(async () => {
       listeners[0]!({

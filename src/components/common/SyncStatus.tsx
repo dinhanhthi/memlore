@@ -5,8 +5,17 @@ import { useSync } from '../../hooks/useSync'
 import { useSyncStore } from '../../stores/syncStore'
 import { useUpdateActiveTab } from '../../hooks/useActiveTab'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
-import { RefreshCw, AlertCircle, CloudUpload, Cloud, CloudOff, type LucideIcon } from 'lucide-react'
+import {
+  RefreshCw,
+  AlertCircle,
+  CloudUpload,
+  Cloud,
+  CloudOff,
+  Info,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { formatWebNotice } from '../../lib/webNotice'
 import { Button } from './Button'
 import { ShimmerText } from './ShimmerText'
 import { InlineOrb } from './ThinkingOrb'
@@ -19,6 +28,7 @@ const SYNC_ICONS = {
   // lucide-react < 0.408 doesn't expose CloudCheck — use Cloud as the resting icon
   CloudCheck: Cloud,
   CloudOff,
+  Info,
 } satisfies Record<string, LucideIcon>
 
 interface SyncStatusProps {
@@ -96,6 +106,9 @@ export function SyncStatus({
   // tell "sync is off" from "we don't know yet". Show a loading row in that
   // window instead of the misleading "Sync off".
   const initialized = useSyncStore((s) => s.initialized)
+  // Web-only intent-retention notices; always empty on desktop.
+  const notices = useSyncStore((s) => s.notices)
+  const dismissNotices = useSyncStore((s) => s.dismissNotices)
   const updateActiveTab = useUpdateActiveTab()
 
   // Prefer the i18n key over the raw backend string. Frontend-originated
@@ -173,6 +186,10 @@ export function SyncStatus({
   const displayPhase = isSyncing ? 'syncing' : phase
   const hasPending = status.entriesPending > 0
   const hasError = displayPhase === 'error' || !!resolvedError
+  // Notices outrank the resting pending/synced label, never an error,
+  // a running sync or recovery.
+  const showNotices =
+    notices.length > 0 && !recoveryBlocksSync && displayPhase !== 'syncing' && !hasError
 
   // Authoritative recovery takes priority over ordinary sync chrome so Sync
   // Now blocked by recovery is never mislabeled as "sync in progress".
@@ -182,9 +199,11 @@ export function SyncStatus({
       ? 'RefreshCw'
       : hasError
         ? 'AlertCircle'
-        : hasPending
-          ? 'CloudUpload'
-          : 'CloudCheck'
+        : showNotices
+          ? 'Info'
+          : hasPending
+            ? 'CloudUpload'
+            : 'CloudCheck'
 
   const label = recoveryBlocksSync
     ? t('sync.recovery_in_progress')
@@ -194,12 +213,14 @@ export function SyncStatus({
         : t('sync.syncing')
       : hasError
         ? t('sync.error')
-        : hasPending
-          ? t('sync.pending', { count: status.entriesPending })
-          : formatSyncedLabel(status.lastSync, t)
+        : showNotices
+          ? t('sync.web_notice.count', { count: notices.length })
+          : hasPending
+            ? t('sync.pending', { count: status.entriesPending })
+            : formatSyncedLabel(status.lastSync, t)
 
   const summaryTooltip =
-    !recoveryBlocksSync && displayPhase !== 'syncing' && !hasError && lastSummary
+    !recoveryBlocksSync && displayPhase !== 'syncing' && !hasError && !showNotices && lastSummary
       ? t('sync.last_summary', {
           pushed: lastSummary.pushed,
           pulled: lastSummary.pulled,
@@ -266,6 +287,11 @@ export function SyncStatus({
       openSyncSettings()
       return
     }
+    // Same for notices: they are listed, with a dismiss, in Settings → Sync.
+    if (compact && showNotices) {
+      openSyncSettings()
+      return
+    }
     void syncNow().catch(() => {
       /* Error is surfaced via the lifecycle event; no extra handling. */
     })
@@ -287,7 +313,9 @@ export function SyncStatus({
               ? t('sync.sync_in_progress')
               : hasError
                 ? t('sync.view_error_details')
-                : t('sync.sync_now')
+                : showNotices
+                  ? t('sync.web_notice.view_details')
+                  : t('sync.sync_now')
         }
         data-testid="sync-status"
         data-state={recoveryBlocksSync ? 'recovery' : displayPhase}
@@ -378,6 +406,27 @@ export function SyncStatus({
           )}
         </div>
       </div>
+      {notices.length > 0 && (
+        <div
+          className="border-border-subtle bg-panel-2 flex w-full flex-col gap-2 rounded-xl border p-3"
+          data-testid="sync-web-notices"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-fg-secondary flex items-center gap-1.5 text-sm font-medium">
+              <Info className="size-4 shrink-0" strokeWidth={1.75} />
+              {t('sync.web_notice.title')}
+            </span>
+            <Button variant="ghost" size="sm" onClick={dismissNotices}>
+              {t('sync.web_notice.dismiss')}
+            </Button>
+          </div>
+          <ul className="text-fg-secondary flex flex-col gap-1 text-sm">
+            {notices.map((notice, i) => (
+              <li key={i}>{formatWebNotice(notice, (key, values) => t(key, values))}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="secondary"

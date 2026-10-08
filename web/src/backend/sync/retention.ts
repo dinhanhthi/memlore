@@ -10,7 +10,8 @@
  *  - resolved fields leave the overlay intent at once, so the synced value shows. The stored draft
  *    keeps them until the next rewrite, which builds on the overlay intent (`priorIntent`), so they
  *    are omitted then: resolving alone causes no upload;
- *  - each "replaced" / "could not apply" / "could not be added" notice is returned once.
+ *  - each "replaced" / "refused" notice (a structured `WebNotice`, translated by the UI) is
+ *    returned once.
  *
  * Importer-capable desktop: a device with a slot (`.meta/keyring/devices/<id>.json`) AND a manifest
  * that has an `outbox-acks.bin`. A slot holder with a manifest but no acks file yet counts as
@@ -41,9 +42,11 @@ import {
   ackIntentPath,
   decisionKey,
   shouldRetainIntent,
+  type FieldNotice,
   type OutboxAcksV1,
   type OutboxEntryV1,
   type OutboxFields,
+  type WebNotice,
 } from './outbox'
 
 export const UNDECIDED_GRACE_SECS = 7 * 86400
@@ -79,12 +82,17 @@ export interface RetentionDeps {
 export interface RetentionResult {
   dropped: string[]
   /** New notices, oldest first; each is persisted as shown before it is returned. */
-  notices: string[]
+  notices: WebNotice[]
   /** The overlay changed (a draft dropped or a field hidden). */
   changed: boolean
 }
 
 const NOTHING: RetentionResult = { dropped: [], notices: [], changed: false }
+
+/** The UI's view of a field notice: its decision identity (`change_seq`) stays here. */
+function toWebNotice({ change_seq: _seq, ...notice }: FieldNotice): WebNotice {
+  return notice
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -277,7 +285,7 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
         result.dropped.push(id)
         result.changed = true
         if (res.notice !== undefined) result.notices.push(res.notice)
-        for (const n of res.fieldNotices) result.notices.push(n.text)
+        for (const n of res.fieldNotices) result.notices.push(toWebNotice(n))
       }
       continue
     }
@@ -285,7 +293,7 @@ export async function runRetention(deps: RetentionDeps): Promise<RetentionResult
     // Persist first, so a notice is never repeated (a reload between the two loses it instead).
     for (const k of res.resolvedKeys)
       await deps.db.meta.put({ key: `${RESOLVED}${id}:${k}`, value: true })
-    for (const n of res.fieldNotices) result.notices.push(n.text)
+    for (const n of res.fieldNotices) result.notices.push(toWebNotice(n))
     const all = new Set([...known, ...res.resolvedKeys])
     if (all.size > 0) {
       const next = { ...intent, fields: withoutKeys(intent.fields, all) }

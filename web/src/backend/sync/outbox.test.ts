@@ -188,8 +188,8 @@ describe('outbox field resolution', () => {
     expect(res.resolved).toBe(true)
     expect(res.notice).toEqual({
       kind: 'replaced',
-      text: 'This edit was replaced by a change from your desktop: title of Original Title',
       field: 'title',
+      title: 'Original Title',
       change_seq: 42,
     })
   })
@@ -240,8 +240,9 @@ describe('outbox field resolution', () => {
     expect(res.resolved).toBe(true)
     expect(res.notice).toEqual({
       kind: 'refused',
-      text: 'Your desktop could not apply: journal (journal)',
       field: 'journal_id',
+      title: 'Original Title',
+      reason: 'journal',
       change_seq: 42,
     })
   })
@@ -628,8 +629,8 @@ describe('retention rules (desktop ack format)', () => {
       resolved: true,
       notice: {
         kind: 'replaced',
-        text: 'This edit was replaced by a change from your desktop: title of Old',
         field: 'title',
+        title: 'Old',
         change_seq: 7,
       },
     })
@@ -646,11 +647,22 @@ describe('retention rules (desktop ack format)', () => {
     expect(pending.resolved).toBe(false)
     const b = decision('desk-b', { decision: 'refused', reason: 'tag_not_found' })
     const final = resolve([a, b], { capableDesktops: ['desk-a', 'desk-b'], syncedEntry: synced })
-    expect(final.notice?.kind).toBe('refused')
-    expect(final.notice?.text).toBe('Your desktop could not apply: title (tag_not_found)')
+    expect(final.notice).toEqual({
+      kind: 'refused',
+      field: 'title',
+      title: 'Old',
+      reason: 'tag_not_found',
+      change_seq: 7,
+    })
   })
 
-  it('names tag fields in plain words, never the raw tag_add:<id> key', () => {
+  it('passes an unknown desktop refusal code through as the reason', () => {
+    const a = decision('desk-a', { decision: 'refused', reason: 'some_future_code' })
+    const res = resolve([a], { syncedEntry: synced })
+    expect(res.notice).toMatchObject({ kind: 'refused', reason: 'some_future_code' })
+  })
+
+  it('carries the raw tag field key, never an English label', () => {
     const field = 'tag_add:7f9c2d1e-0000-4000-8000-000000000001'
     const res = resolve(
       [decision('desk-a', { decision: 'refused', reason: 'tag_not_found', field })],
@@ -666,7 +678,7 @@ describe('retention rules (desktop ack format)', () => {
         syncedEntry: synced,
       },
     )
-    expect(res.notice?.text).toBe('Your desktop could not apply: added tag (tag_not_found)')
+    expect(res.notice).toMatchObject({ kind: 'refused', field, reason: 'tag_not_found' })
   })
 
   function docBytes(text: string, base?: Uint8Array): Uint8Array {
@@ -766,10 +778,23 @@ describe('retention rules (desktop ack format)', () => {
         ...base,
         allAcks: [ack('desk-a', 'h', 'no_journal'), ack('desk-b', 'h', 'no_journal')],
       })
-      expect(both).toMatchObject({
-        retain: false,
-        notice: 'This entry could not be added on your desktop: no_journal',
+      expect(both.retain).toBe(false)
+      // An entry-level refusal: no `field`, the raw desktop code as the reason.
+      // The draft has no title, so the notice carries no `title` key.
+      expect(both.notice).toEqual({ kind: 'refused', reason: 'no_journal' })
+    })
+
+    it('names the refused draft by its title when it has one', () => {
+      const res = retain({
+        ...base,
+        intent: intentOf({
+          created_on_web: true,
+          fields: { ...createEmptyOutboxFields(), title },
+        }),
+        allAcks: [ack('desk-a', 'h', 'no_journal'), ack('desk-b', 'h', 'no_journal')],
       })
+      expect(res.retain).toBe(false)
+      expect(res.notice).toEqual({ kind: 'refused', title: title.value, reason: 'no_journal' })
     })
 
     it('ignores refusals of an older revision and is overridden by any created: true', () => {

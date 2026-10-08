@@ -210,7 +210,7 @@ describe('intent retention against real sealed acks', () => {
 
     const outcome = await env.session.pull()
 
-    expect(outcome.notices).toEqual(['This entry could not be added on your desktop: no_journal'])
+    expect(outcome.notices).toEqual([{ kind: 'refused', title: 'T', reason: 'no_journal' }])
     expect(await env.db.drafts.get(ENTRY)).toBeUndefined()
     expect(env.session.vault.getOutboxIntent(ENTRY)).toBeUndefined()
   })

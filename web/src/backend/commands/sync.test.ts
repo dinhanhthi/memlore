@@ -4,6 +4,7 @@ import { oauth } from '../drive/oauth'
 import { createDraftManager, resetDraftsAutostartForTest, type DraftManager } from '../drafts'
 import { dispose, lock, setKeyRing, type KeyRing } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb } from '../storage/idb'
+import type { WebNotice } from '../sync/outbox'
 import type { PushResult } from '../sync/push'
 import type { PullOutcome } from './readSession'
 import {
@@ -231,23 +232,30 @@ describe('schedule triggers', () => {
     expect(await syncHandlers.get_sync_status({})).not.toHaveProperty('error')
   })
 
-  it('merges every retention notice of a pull into one synced note, then clears it', async () => {
+  it('carries every retention notice of a pull on one synced status, then clears them', async () => {
     const h = harness()
-    h.outcome = { stale: [], changed: false, notices: ['first notice', 'second', 'third'] }
+    const notices: WebNotice[] = [
+      { kind: 'replaced', field: 'title', title: 'Old' },
+      { kind: 'refused', field: 'journal_id', title: 'Old', reason: 'journal' },
+      { kind: 'refused', reason: 'some_future_code' },
+    ]
+    h.outcome = { stale: [], changed: false, notices }
     startSyncSchedule()
     await h.settle()
-    expect(h.last()).toMatchObject({ state: 'synced', error: 'first notice (and 2 more edits)' })
+    expect(h.last()).toMatchObject({ state: 'synced', error: null, notices })
     h.outcome = NOOP
     await syncHandlers.sync_now({})
     expect(h.last()).toMatchObject({ state: 'synced', error: null })
+    expect(h.last()).not.toHaveProperty('notices')
   })
 
-  it('shows a single notice as is', async () => {
+  it('never puts notice text into error, nor notices into get_sync_status', async () => {
     const h = harness()
-    h.outcome = { stale: [], changed: false, notices: ['only notice'] }
+    h.outcome = { stale: [], changed: false, notices: [{ kind: 'refused', reason: 'no_journal' }] }
     startSyncSchedule()
     await h.settle()
-    expect(h.last()).toMatchObject({ state: 'synced', error: 'only notice' })
+    expect(h.last()).toMatchObject({ state: 'synced', error: null })
+    expect(await syncHandlers.get_sync_status({})).not.toHaveProperty('notices')
   })
 
   it('a push error wins over notices; all of them show once the error clears', async () => {
@@ -258,31 +266,40 @@ describe('schedule triggers', () => {
     startSyncSchedule()
     await h.settle()
     expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
-    for (const notice of ['notice a', 'notice b']) {
+    const a: WebNotice = { kind: 'replaced', field: 'title', title: 'A' }
+    const b: WebNotice = { kind: 'replaced', field: 'emotion', title: 'B' }
+    for (const notice of [a, b]) {
       h.outcome = { stale: [], changed: false, notices: [notice] }
       await h.advance(FOCUS_MIN_AGE_MS + 1)
       h.focus()
       await h.settle()
       expect(h.last()).toMatchObject({ state: 'error', error: 'quota' })
+      expect(h.last()).not.toHaveProperty('notices')
     }
     expect(h.pulls).toBe(3)
     h.outcome = NOOP
     h.pushResult = PUSHED_ALL
     h.online()
     await h.settle()
-    expect(h.last()).toMatchObject({ state: 'synced', error: 'notice a (and 1 more edit)' })
+    expect(h.last()).toMatchObject({ state: 'synced', error: null, notices: [a, b] })
   })
 
-  it('a notice is shown over the degraded note once, then the degraded note returns', async () => {
+  it('a notice rides beside the degraded note once, which stays in error', async () => {
     const h = harness()
     const degraded: PullOutcome['degraded'] = [{ device: 'd1', reason: 'manifest-oversize' }]
-    h.outcome = { stale: [], changed: false, degraded, notices: ['a notice'] }
+    const notice: WebNotice = { kind: 'replaced', field: 'title', title: 'Old' }
+    h.outcome = { stale: [], changed: false, degraded, notices: [notice] }
     startSyncSchedule()
     await h.settle()
-    expect(h.last()).toMatchObject({ state: 'synced', error: 'a notice' })
+    expect(h.last()).toMatchObject({
+      state: 'synced',
+      error: MSG_SYNC_DEGRADED,
+      notices: [notice],
+    })
     h.outcome = { stale: [], changed: false, degraded }
     await syncHandlers.sync_now({})
     expect(h.last()).toMatchObject({ state: 'synced', error: MSG_SYNC_DEGRADED })
+    expect(h.last()).not.toHaveProperty('notices')
   })
 
   it('does not pull on start while the tab is hidden, then pulls once it is visible', async () => {

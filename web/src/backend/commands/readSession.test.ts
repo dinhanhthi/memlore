@@ -708,7 +708,7 @@ describe('drafts rehydrate the outbox overlay', () => {
       const second = await r.session.pull()
       expect(second).toMatchObject({
         changed: true,
-        notices: ['This entry could not be added on your desktop: no_journal'],
+        notices: [{ kind: 'refused', title: 'Web title', reason: 'no_journal' }],
       })
       expect(await r.db.drafts.get('e9')).toBeUndefined()
       expect((await r.session.pull()).notices).toBeUndefined()

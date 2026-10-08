@@ -36,7 +36,7 @@ import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '
 import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
-import type { OutboxEntryV1 } from '../sync/outbox'
+import type { OutboxEntryV1, WebNotice } from '../sync/outbox'
 import type { ForeignIntentFile, Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 
@@ -93,7 +93,7 @@ export interface PullOutcome {
    * Intent-retention notices raised since the previous pull, oldest first (Phase 16.6.8). Each
    * is returned once: it is persisted as shown before it is queued.
    */
-  notices?: string[]
+  notices?: WebNotice[]
   /**
    * Set while the format guard is latched (an unknown manifest, envelope or metadata format was
    * read): why. Reads go on; every write is refused until reload. Absent: not latched.
@@ -347,7 +347,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
 
   // Intent retention (sync/retention.ts): one pass at a time, under the outbox mutex, so it never
   // interleaves with an outbox write. Its notices wait for the next pull.
-  let notices: string[] = []
+  let notices: WebNotice[] = []
   const retain = async (): Promise<boolean> => {
     const started = epoch
     const release = await acquireOutboxLock()

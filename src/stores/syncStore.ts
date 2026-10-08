@@ -28,6 +28,7 @@ import {
   type SyncStatus,
   type SyncStatusEvent,
   type SyncSummary,
+  type WebNotice,
 } from '../lib/tauri'
 import { hydrateLayoutPreset } from '../hooks/useLayoutPreset'
 import { hydrateDashboardCards } from '../hooks/useDashboardCards'
@@ -49,6 +50,9 @@ const WATCHDOG_MS = 130_000
  * keep the two strings identical. Never fires on desktop.
  */
 const FORMAT_GUARD_LATCHED_EVENT = 'memlore:format-guard-latched'
+
+/** Upper bound on accumulated web notices; the oldest are dropped first. */
+const MAX_NOTICES = 50
 
 /**
  * Global sync state — single source of truth shared by every sync UI surface
@@ -104,6 +108,11 @@ interface SyncStoreState {
    * Null when no backoff is active (success / manual Sync now / first run).
    */
   retryAt: number | null
+  /**
+   * Web-only intent-retention notices. Each is delivered exactly once, so
+   * batches accumulate (newest MAX_NOTICES kept) until dismissed.
+   */
+  notices: WebNotice[]
 
   // ── Internal ────────────────────────────────────────────────────────────
   /** True once `init()` has wired the listener and kicked off initial fetches. */
@@ -135,6 +144,7 @@ interface SyncStoreState {
   preflightLocalRecovery: () => Promise<LocalAuthoritativePreflightResult>
   /** Start cloud→local recovery staging (creates/resumes job + backup). */
   beginCloudRecoveryStaging: () => Promise<CloudAuthoritativeStagingResult>
+  dismissNotices: () => void
 }
 
 const emptySummary: SyncSummary = { pushed: 0, pulled: 0, merged: 0, errors: [] }
@@ -217,6 +227,7 @@ const initialSnapshot = {
   progress: null,
   recovery: null as SyncRecoveryStatus | null,
   retryAt: null,
+  notices: [] as WebNotice[],
   initialized: false,
   initPromise: null,
   unlisten: null,
@@ -456,6 +467,11 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
             lastError: payload.error ?? (payload.state === 'synced' ? null : get().lastError),
             lastErrorKey: nextErrorKey,
             lastErrorAction: nextErrorAction,
+            // Notices arrive once (web only): append each batch and keep them
+            // until a dismiss, so a later batch must not drop unseen ones.
+            ...(payload.notices?.length
+              ? { notices: [...get().notices, ...payload.notices].slice(-MAX_NOTICES) }
+              : {}),
             // Clear the retry timer when a new sync starts or completes —
             // the backend emits its own clear too, but this covers the
             // UI-driven syncNow path instantly.
@@ -678,6 +694,8 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
       }
     }
   },
+
+  dismissNotices: () => set({ notices: [] }),
 
   pushEntry: async (entryId) => {
     await tauriPushEntry(entryId)

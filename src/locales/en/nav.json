@@ -154,6 +154,40 @@
       "pulling-chats": "Pulling chats",
       "pulling-streak": "Pulling streak",
       "pulling-ai-audit": "Pulling AI audit"
+    },
+    "web_notice": {
+      "title": "From your desktop",
+      "dismiss": "Dismiss",
+      "count_one": "{{count}} sync note",
+      "count_other": "{{count}} sync notes",
+      "view_details": "View sync notes in Settings",
+      "replaced": "Your edit ({{field}}) to “{{title}}” was replaced by a change from your desktop.",
+      "refused": "Your desktop couldn't apply your edit ({{field}}) to “{{title}}”: {{reason}}.",
+      "refused_create": "Your desktop couldn't add the new entry “{{title}}”: {{reason}}.",
+      "waiting_newer_desktop": "A change you made here is waiting for a desktop running a newer version of Memlore.",
+      "waiting_newer_desktop_titled": "Your change to “{{title}}” is waiting for a desktop running a newer version of Memlore.",
+      "untitled": "Untitled",
+      "field": {
+        "title": "title",
+        "entry_date": "date",
+        "emotion": "emotion",
+        "is_favorite": "favorite",
+        "journal_id": "journal",
+        "tag_add": "tag added",
+        "tag_remove": "tag removed",
+        "unknown": "{{field}}"
+      },
+      "reason": {
+        "journal": "the journal isn't available on your desktop",
+        "tag_not_found": "the tag no longer exists on your desktop",
+        "invalid_date": "the date isn't valid",
+        "no_journal": "there is no journal to add it to",
+        "error": "an unexpected error occurred",
+        "entry_trashed": "the entry was moved to Trash on your desktop",
+        "name_taken": "that name is already in use",
+        "changed_on_desktop": "it was changed on your desktop in the meantime",
+        "unknown": "unknown reason ({{code}})"
+      }
     }
   },
   "embedding_status": {
