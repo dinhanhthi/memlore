@@ -1435,6 +1435,67 @@ describe('other web devices outbox (read-only)', () => {
   })
 })
 
+describe('desktop capabilities (outbox v2 + month index source)', () => {
+  const addSlot = (drive: FakeDrive, device: string): void => {
+    drive.addFile(`${device}.json`, drive.chain('Memlore', '.meta', 'keyring', 'devices'), '{}')
+  }
+  const advertise = (m: Record<string, unknown>, generatedAt: number): void => {
+    m.outbox_versions = [1, 2]
+    m.index_present = true
+    m.generated_at = generatedAt
+  }
+
+  it('without a marker: no v2 desktop and no index source', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    expect([...env.puller.v2Desktops]).toEqual([])
+    expect(env.puller.indexSource).toBeNull()
+  })
+
+  it('ignores the marker of a device that no longer holds a slot (revoked)', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [])
+    patchManifest(env.drive, OTHER_DEVICE, (m) => advertise(m, NEWEST + 50))
+    expect((await env.puller.refresh()).devices).toContain(OTHER_DEVICE)
+    expect([...env.puller.v2Desktops]).toEqual([])
+    expect(env.puller.indexSource).toBeNull()
+  })
+
+  it('two slotted desktops, one advertising: only that one is v2 and the index source', async () => {
+    const env = await setup()
+    addSecondDevice(env.drive, [])
+    addSlot(env.drive, OTHER_DEVICE)
+    patchManifest(env.drive, OTHER_DEVICE, (m) => advertise(m, NEWEST + 50))
+    await env.puller.refresh()
+    expect([...env.puller.v2Desktops]).toEqual([OTHER_DEVICE])
+    expect(env.puller.indexSource).toBe(OTHER_DEVICE)
+
+    // Both advertise: the index source is the newest manifest; v2 lists both.
+    patchManifest(env.drive, env.desktop, (m) => advertise(m, NEWEST + 90))
+    await env.puller.refresh()
+    expect([...env.puller.v2Desktops].sort()).toEqual([env.desktop, OTHER_DEVICE].sort())
+    expect(env.puller.indexSource).toBe(env.desktop)
+
+    // A keep-previous (unreadable) manifest cannot vouch for a fresh index; it stays v2 capable.
+    const manifest = env.drive.find(['Memlore', ...manifestPath().split('/')])
+    if (!manifest) throw new Error('layout')
+    const good = manifest.content
+    manifest.content = bytes('not json')
+    await env.puller.refresh()
+    expect(env.puller.getDegradedDevices().map((d) => d.device)).toEqual([env.desktop])
+    expect(env.puller.indexSource).toBe(OTHER_DEVICE)
+    expect(env.puller.v2Desktops.has(env.desktop)).toBe(true)
+    manifest.content = good
+
+    // The index withdrawn on the newest desktop: the other one takes over.
+    patchManifest(env.drive, env.desktop, (m) => {
+      delete m.index_present
+    })
+    await env.puller.refresh()
+    expect(env.puller.indexSource).toBe(OTHER_DEVICE)
+  })
+})
+
 describe('primeFromCache', () => {
   const prime = (puller: Puller): Promise<boolean> => puller.primeFromCache()
 

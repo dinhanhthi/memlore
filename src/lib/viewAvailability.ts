@@ -16,7 +16,7 @@ export function isViewAvailable(view: ActiveView, caps: Capabilities = capabilit
   if (view === 'stats') return caps.stats
   if (view === 'media') return caps.gallery
   if (view === 'onthisday') return caps.lookback
-  if (view === 'map') return caps.maps
+  if (view === 'map') return caps.mapView
   // Reading chats needs no AI: the web lists and loads sessions read-only.
   // Sending, rename, pin and delete stay gated on `caps.ai` inside the view.
   if (view === 'chat') return caps.chatRead

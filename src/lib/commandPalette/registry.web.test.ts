@@ -20,6 +20,7 @@ vi.mock('../platform', async (importOriginal) => {
       dashboard: false,
       stats: false,
       maps: false,
+      mapView: false,
       chat: false,
       reminders: false,
       importExport: false,

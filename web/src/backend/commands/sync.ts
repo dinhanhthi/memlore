@@ -12,6 +12,11 @@
  *          "google_drive".
  *   Event  "memlore:entries-changed" (window CustomEvent + shim, through the 10.3 emitter) after a
  *          pull whose result differs from what was shown; never after a no-op pull.
+ *   Event  "memlore:web-capabilities" `{outboxV2, monthIndex}` (web only, Phase 15.3) when a pull's
+ *          `PullOutcome.capabilities` differ from the last ones emitted (before its `synced`
+ *          status; an absent field counts as none); reset to both false on lock. `main.tsx`
+ *          feeds it to `capabilitiesStore`, which starts at false, so the first all-false pull
+ *          emits nothing.
  *   Event  "sync:progress" is deliberately NOT emitted: the UI treats every `pulling-*` tick as
  *          "rows are landing" and refetches all lists, which a no-op pull must not trigger. The
  *          lists refresh through the two events above (and syncStore does it on `synced` anyway).
@@ -75,6 +80,7 @@ import type { PushResult } from '../sync/push'
 import { readEnv, type PullOutcome } from './readSession'
 
 export const STATUS_EVENT = 'sync:status-changed'
+export const CAPABILITIES_EVENT = 'memlore:web-capabilities'
 const CHANGED_EVENT = 'memlore:entries-changed'
 
 export const FOCUS_MIN_AGE_MS = 30_000
@@ -244,6 +250,14 @@ let reportedPending = 0
 /** The last push result reported: `pushAll` resolves every joiner of a run to the same object. */
 let lastReported: PushResult | null = null
 
+export interface WebCapabilities {
+  outboxV2: boolean
+  monthIndex: boolean
+}
+const NO_CAPABILITIES: WebCapabilities = { outboxV2: false, monthIndex: false }
+/** The last `CAPABILITIES_EVENT` payload (the UI store starts at none). */
+let emittedCapabilities: WebCapabilities = NO_CAPABILITIES
+
 /** Test seam: override injected pieces and reset all state. Pass `{}` to restore the defaults. */
 export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   stopSyncSchedule()
@@ -266,6 +280,18 @@ export function configureSyncEnv(partial: Partial<SyncEnv>): void {
   pushError = null
   reportedPending = 0
   lastReported = null
+  emittedCapabilities = NO_CAPABILITIES
+}
+
+/** Emits `CAPABILITIES_EVENT` when the flags differ from the last ones emitted. */
+function emitCapabilities(next: WebCapabilities): void {
+  if (
+    next.outboxV2 === emittedCapabilities.outboxV2 &&
+    next.monthIndex === emittedCapabilities.monthIndex
+  )
+    return
+  emittedCapabilities = { outboxV2: next.outboxV2, monthIndex: next.monthIndex }
+  env().emit(CAPABILITIES_EVENT, emittedCapabilities)
 }
 
 const snapshot = (): SyncStatus => {
@@ -350,6 +376,7 @@ async function doPull(): Promise<PullReport> {
     // Reads go on; every write is refused until reload, so no automatic push is attempted.
     if (formatReadOnly !== null) pushHalted = true
     pendingNotices.push(...(outcome.notices ?? []))
+    emitCapabilities(outcome.capabilities ?? NO_CAPABILITIES)
     setPhase('synced', pullNote())
     if (outcome.changed) e.emitChanged()
     // The revocation check just ran: drafts saved before it (a primed session writes at once) or
@@ -587,7 +614,10 @@ export function startSyncSchedule(): void {
   const unsubscribeFlag = e.onWriteFlagOn(() => {
     if (e.pendingCount() > 0) requestPush('start')
   })
-  const unregisterLock = onLock(() => stopSyncSchedule())
+  const unregisterLock = onLock(() => {
+    stopSyncSchedule()
+    emitCapabilities(NO_CAPABILITIES)
+  })
   active = {
     stop: () => {
       e.window?.removeEventListener('focus', onFocus)

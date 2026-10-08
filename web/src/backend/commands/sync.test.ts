@@ -591,6 +591,70 @@ describe('events', () => {
     expect(h.names()).toEqual(['sync:status-changed', 'sync:status-changed'])
   })
 
+  it('emits memlore:web-capabilities after a pull, before the synced status', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: true, monthIndex: false } }
+    startSyncSchedule()
+    await h.settle()
+    expect(h.names()).toEqual([
+      'sync:status-changed',
+      'memlore:web-capabilities',
+      'sync:status-changed',
+    ])
+    expect(h.events[1]?.payload).toEqual({ outboxV2: true, monthIndex: false })
+  })
+
+  it('emits the capabilities only when they change', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: true, monthIndex: true } }
+    startSyncSchedule()
+    await h.settle()
+    await h.advance(INTERVAL_MS)
+    expect(h.names().filter((n) => n === 'memlore:web-capabilities')).toHaveLength(1)
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: false, monthIndex: true } }
+    await h.advance(INTERVAL_MS)
+    const caps = h.events.filter((e) => e.event === 'memlore:web-capabilities')
+    expect(caps.map((e) => e.payload)).toEqual([
+      { outboxV2: true, monthIndex: true },
+      { outboxV2: false, monthIndex: true },
+    ])
+  })
+
+  it('an outcome without capabilities counts as none', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: true, monthIndex: true } }
+    startSyncSchedule()
+    await h.settle()
+    h.outcome = NOOP
+    await h.advance(INTERVAL_MS)
+    const caps = h.events.filter((e) => e.event === 'memlore:web-capabilities')
+    expect(caps.at(-1)?.payload).toEqual({ outboxV2: false, monthIndex: false })
+  })
+
+  it('resets the capabilities to false on lock', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: true, monthIndex: true } }
+    startSyncSchedule()
+    await h.settle()
+    lock('manual')
+    const caps = h.events.filter((e) => e.event === 'memlore:web-capabilities')
+    expect(caps.map((e) => e.payload)).toEqual([
+      { outboxV2: true, monthIndex: true },
+      { outboxV2: false, monthIndex: false },
+    ])
+  })
+
+  it('a restart without a lock keeps the capabilities (no reset event)', async () => {
+    const h = harness()
+    h.outcome = { stale: [], changed: false, capabilities: { outboxV2: true, monthIndex: true } }
+    startSyncSchedule()
+    await h.settle()
+    startSyncSchedule()
+    await h.settle()
+    const caps = h.events.filter((e) => e.event === 'memlore:web-capabilities')
+    expect(caps).toHaveLength(1)
+  })
+
   it('never emits sync:progress', async () => {
     const h = harness()
     h.outcome = { stale: ['a'], changed: true }

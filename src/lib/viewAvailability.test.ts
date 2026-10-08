@@ -80,13 +80,18 @@ describe('isViewAvailable', () => {
     ['stats', 'stats'],
     ['media', 'gallery'],
     ['onthisday', 'lookback'],
-    ['map', 'maps'],
+    ['map', 'mapView'],
     ['chat', 'chatRead'],
   ] as const)('view %s is gated only by caps.%s', (view, flag) => {
     const caps: Capabilities = { ...NO_CAPS, [flag]: true }
     for (const gated of GATED_VIEWS) {
       expect(isViewAvailable(gated, caps)).toBe(gated === view)
     }
+  })
+
+  // `maps` gates location/weather writes, not the map view.
+  it('view map stays unavailable with only caps.maps', () => {
+    expect(isViewAvailable('map', { ...NO_CAPS, maps: true })).toBe(false)
   })
 
   // Reading chats needs no AI: `ai` and `chat` alone never open the view.

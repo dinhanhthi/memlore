@@ -106,6 +106,8 @@ async function rig(): Promise<Rig> {
     index: null as Map<string, IndexEntry> | null,
     foreignIntents: [] as never[],
     desktops: { manifests: [] as string[], slots: null, tombstones: new Set<string>() },
+    v2Desktops: new Set<string>() as ReadonlySet<string>,
+    indexSource: null as string | null,
     getDegradedDevices: () => [] as Array<{ device: string; reason: string }>,
     primeFromCache: null as unknown as ReturnType<typeof vi.fn>,
     refresh: null as unknown as ReturnType<typeof vi.fn>,
@@ -209,6 +211,22 @@ describe('read session and lock races', () => {
     latchFormatGuard('devA/metadata.json', 'Unknown field(s) found: x')
     expect((await r.session.pull()).formatReadOnly).toBe('Unknown field(s) found: x')
     resetFormatGuardLatch()
+  })
+
+  it('pull() reports the desktop capabilities the refresh observed', async () => {
+    const r = await rig()
+    expect((await r.session.pull()).capabilities).toEqual({ outboxV2: false, monthIndex: false })
+    Object.assign(fakes.puller as object, { v2Desktops: new Set(['devA']), indexSource: 'devB' })
+    expect((await r.session.pull()).capabilities).toEqual({ outboxV2: true, monthIndex: true })
+  })
+
+  it('wires the month index reader and clears it on lock', async () => {
+    const r = await rig()
+    const reader = r.session.monthIndex
+    expect(reader).toBeDefined()
+    const clear = vi.spyOn(reader!, 'clear')
+    r.lock()
+    expect(clear).toHaveBeenCalledTimes(1)
   })
 
   it('the vault metadata guard latches on an unknown EntryMetadata field without throwing', async () => {
@@ -386,6 +404,8 @@ describe('drafts rehydrate the outbox overlay', () => {
       getDegradedDevices: () => [],
       desktops,
       foreignIntents: [],
+      v2Desktops: new Set<string>(),
+      indexSource: null,
     }
     const db = await openWebDb({ factory: new IDBFactory() })
     await db.device.put({

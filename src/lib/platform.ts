@@ -36,11 +36,16 @@ export interface Capabilities {
   ai: boolean
   dashboard: boolean
   stats: boolean
+  /** Location and weather on entries (editor and context menu writes, location settings). */
   maps: boolean
+  /** Map view / page (on web: from the desktop month index). */
+  mapView: boolean
   chat: boolean
   reminders: boolean
   importExport: boolean
   versions: boolean
+  /** Reading entry version history (on web: from the desktop month index). */
+  versionsRead: boolean
   secondLock: boolean
   onDeviceModels: boolean
   /** App updates; also covers start-at-login and uninstall. */
@@ -51,6 +56,8 @@ export interface Capabilities {
   lookback: boolean
   /** Journal/tag/template create, edit, delete. */
   taxonomyEdits: boolean
+  /** Creating journals and tags (on web: needs a desktop that imports outbox v2 intents). */
+  taxonomyCreate: boolean
   /** Soft-deleting entries. */
   deleteEntries: boolean
   /** Entry Trash: restore, delete forever, empty. */
@@ -77,8 +84,8 @@ export interface Capabilities {
 }
 
 /** Static capabilities: every feature on desktop; on web only the read-only flags
- * at the end. `writes` on web is overridden at runtime by `capabilitiesStore`
- * (see `useCapabilities`). */
+ * at the end. On web, `writes` and the flags derived from the runtime desktop
+ * capabilities are overridden by `capabilitiesStore` (see `useCapabilities`). */
 export const capabilities: Capabilities = {
   windowChrome: !isWeb,
   biometric: !isWeb,
@@ -87,16 +94,19 @@ export const capabilities: Capabilities = {
   dashboard: !isWeb,
   stats: !isWeb,
   maps: !isWeb,
+  mapView: !isWeb,
   chat: !isWeb,
   reminders: !isWeb,
   importExport: !isWeb,
   versions: !isWeb,
+  versionsRead: !isWeb,
   secondLock: !isWeb,
   onDeviceModels: !isWeb,
   updater: !isWeb,
   gallery: !isWeb,
   lookback: !isWeb,
   taxonomyEdits: !isWeb,
+  taxonomyCreate: !isWeb,
   deleteEntries: !isWeb,
   trash: !isWeb,
   audioRecording: !isWeb,

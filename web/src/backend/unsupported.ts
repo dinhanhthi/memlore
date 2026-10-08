@@ -130,6 +130,8 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   basemap_status: { status: 'not_downloaded', path: null, size_bytes: null },
   // TODO(later): see docs/LATER.md - reminders and notifications
   list_reminders: [],
+  // Trash: web never manages the Trash (desktop only), so it lists nothing.
+  list_trashed_entries: [],
   // TODO(later): see docs/LATER.md - version history
   list_entry_versions: [],
   get_version_retention_days: 7,
@@ -371,6 +373,10 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'stop_recording',
   // TODO(later): see docs/LATER.md - Entry delete
   'soft_delete_entry',
+  // Trash: web never manages the Trash (restore, delete forever, empty are desktop only).
+  'delete_entry_forever',
+  'empty_trash',
+  'restore_entry',
   // TODO(later): see docs/LATER.md - Vault creation, password and biometric management (companion app: the vault is created on desktop)
   'begin_first_time_setup',
   'cancel_first_time_setup',

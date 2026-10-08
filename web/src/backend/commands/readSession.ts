@@ -37,6 +37,7 @@ import type { DriveReader } from '../drive/client'
 import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1, WebNotice } from '../sync/outbox'
+import type { MonthIndexReader } from '../sync/monthIndex'
 import type { ForeignIntentFile, Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 import type { DeviceBinLoader } from './deviceBins'
@@ -100,6 +101,12 @@ export interface PullOutcome {
    * read): why. Reads go on; every write is refused until reload. Absent: not latched.
    */
   formatReadOnly?: string
+  /**
+   * What the synced desktops offer, read from this refresh (Phase 15.1): `outboxV2` = a slotted
+   * desktop imports outbox v2 intents, `monthIndex` = a desktop publishes the month index.
+   * Absent: none.
+   */
+  capabilities?: { outboxV2: boolean; monthIndex: boolean }
 }
 
 /** What the media commands (Phase 11.1) need besides the vault: ciphertext cache, reader, core. */
@@ -117,6 +124,11 @@ export interface ReadSession {
   media?: MediaBackend
   /** On-demand `chats.bin` / `memory.bin` and cached `streak.bin` (Phase 5). Absent in test doubles. */
   deviceBins?: DeviceBinLoader
+  /**
+   * Month index rows of the index source desktop (Phase 15.2). Await `ready()` before
+   * `getMonths`: the journal exclusion it applies is set there. Absent in test doubles.
+   */
+  monthIndex?: MonthIndexReader
   db?: WebDb
   core?: Core
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
@@ -269,6 +281,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     { runRetention },
     { checkEntryMetadata, getFormatGuardReason, passesFormatGuard },
     { createDeviceBinLoader },
+    { createMonthIndexReader },
   ] = await Promise.all([
     import('../sync/pull'),
     import('../vault'),
@@ -276,6 +289,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     import('../sync/retention'),
     import('../sync/formatGuard'),
     import('./deviceBins'),
+    import('../sync/monthIndex'),
   ])
   const puller = createPuller({ reader, db, core })
   const deviceBins = createDeviceBinLoader({ puller, db, core })
@@ -285,6 +299,12 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     guardMetadata: (id, json) => {
       passesFormatGuard(() => checkEntryMetadata(core, `entries/${id}.bin#metadata`, json))
     },
+  })
+  const monthIndex = createMonthIndexReader({
+    puller,
+    db,
+    core,
+    isJournalExcluded: (journalId) => vault.isJournalExcluded(journalId),
   })
 
   let cache: { key: unknown; value: Taxonomy } | null = null
@@ -312,6 +332,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     foreignKey = ''
     notices = []
     deviceBins.clear()
+    monthIndex.clear()
   })
   const assertSameEpoch = (started: number): void => {
     if (started !== epoch) throw new VaultLockedError()
@@ -500,6 +521,10 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
       degraded: puller.getDegradedDevices(),
       ...(raised.length > 0 ? { notices: raised } : {}),
       ...(formatReadOnly === null ? {} : { formatReadOnly }),
+      capabilities: {
+        outboxV2: puller.v2Desktops.size > 0,
+        monthIndex: puller.indexSource !== null,
+      },
     }
   }
 
@@ -507,6 +532,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     vault,
     media: { db, reader, core, limit: puller.limit },
     deviceBins,
+    monthIndex,
     db,
     core,
     ready,

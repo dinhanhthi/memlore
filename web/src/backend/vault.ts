@@ -690,6 +690,17 @@ export class Vault {
     }
   }
 
+  /**
+   * True when entries of this journal are hidden: the journal is locked or invisible, or (once the
+   * known set is given) its record is unknown. Stricter than the vault views, for callers that
+   * filter rows the vault never loaded (the month index): it fails closed before the first
+   * `setExcludedJournalIds` with a known set, and for an empty journal id.
+   */
+  isJournalExcluded(journalId: string): boolean {
+    if (this.#knownJournals === null || journalId === '') return true
+    return this.#journalExcluded(journalId)
+  }
+
   #journalExcluded(journalId: string): boolean {
     if (this.#excludedJournals.has(journalId)) return true
     return this.#knownJournals !== null && journalId !== '' && !this.#knownJournals.has(journalId)

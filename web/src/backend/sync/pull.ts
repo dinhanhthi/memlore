@@ -39,6 +39,11 @@
  *     are re-downloaded on every pull (the listing carries no change marker).
  *  7. A cached `metadata.json` of a device that is no longer listed is pruned: a ghost device's
  *     stale rows must not survive into `primeFromCache`.
+ *  8. Desktop capabilities (Phase 15.1), from the optional manifest flags: `v2Desktops` lists the
+ *     desktops that still hold a device slot and import outbox v2 intents (`outbox_versions`
+ *     contains 2); `indexSource` is the slotted desktop with `index_present` whose manifest was
+ *     read FRESH this pull (a keep-previous copy cannot vouch that the index is still current)
+ *     with the newest `generated_at` (tie: greater device id).
  *
  * `primeFromCache()` rebuilds the index straight from the cached manifests — IndexedDB only, no
  * Drive reads — so a reload can paint the list while `refresh()` revalidates in the background
@@ -215,6 +220,12 @@ interface Manifest {
   /** Normalized manifest JSON from the core (what is cached for the next `computeDiff`). */
   text: string
   entries: ManifestEntryRow[]
+  /** `outbox_versions` (desktop v0.3.0+); empty when absent or malformed. */
+  outboxVersions: readonly number[]
+  /** `index_present` is exactly `true`. */
+  indexPresent: boolean
+  /** `generated_at`, or 0 when it is not a number. */
+  generatedAt: number
 }
 
 /** One device's manifest-read result, folded into the pull in `devices` order. */
@@ -343,6 +354,10 @@ export class Puller {
   #foreignIntents: ForeignIntentFile[] = []
   /** Slot ids listed by the authority check of the refresh in progress. */
   #listedSlots: Set<string> | null = null
+  /** Slotted desktops whose manifest advertises outbox v2 import, from the last refresh. */
+  #v2Desktops: ReadonlySet<string> = new Set()
+  /** The desktop whose month index the web reads, from the last refresh (null: none). */
+  #indexSource: string | null = null
   /**
    * Entry downloads in progress by path. Only the registered task may cache its bytes: `#revoke`
    * and a refresh that marks a path stale remove the entry, detaching the old download.
@@ -380,6 +395,22 @@ export class Puller {
    */
   get foreignIntents(): readonly ForeignIntentFile[] {
     return this.#foreignIntents
+  }
+
+  /**
+   * Desktops that still hold a device slot and whose manifest `outbox_versions` contains 2, from
+   * the last refresh (empty before one and after `primeFromCache`).
+   */
+  get v2Desktops(): ReadonlySet<string> {
+    return this.#v2Desktops
+  }
+
+  /**
+   * The slotted desktop with `index_present` and the newest manifest `generated_at` (read fresh
+   * by the last refresh), or null.
+   */
+  get indexSource(): string | null {
+    return this.#indexSource
   }
 
   /** Completed `refresh()` runs: a new value means device files may have changed on Drive. */
@@ -513,8 +544,31 @@ export class Puller {
     this.#foreignIntents = foreignIntents
     const tombstones = tombstonesOf(manifests, this.#index)
     this.#desktops = { manifests: [...manifests.keys()], slots: this.#listedSlots, tombstones }
+    this.#setCapabilities(manifests, degraded)
     this.#pulls += 1
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
+  }
+
+  /** `v2Desktops` and `indexSource` from this refresh's manifests (see step 8 above). */
+  #setCapabilities(manifests: ReadonlyMap<string, Manifest>, degraded: DegradedDevice[]): void {
+    const slots = this.#listedSlots
+    const stale = new Set(degraded.map((d) => d.device))
+    const v2 = new Set<string>()
+    let source: { device: string; generatedAt: number } | null = null
+    for (const [device, manifest] of manifests) {
+      if (slots?.has(device) !== true) continue
+      if (manifest.outboxVersions.includes(2)) v2.add(device)
+      if (!manifest.indexPresent || stale.has(device)) continue
+      if (
+        source === null ||
+        manifest.generatedAt > source.generatedAt ||
+        (manifest.generatedAt === source.generatedAt && device > source.device)
+      ) {
+        source = { device, generatedAt: manifest.generatedAt }
+      }
+    }
+    this.#v2Desktops = v2
+    this.#indexSource = source?.device ?? null
   }
 
   /**
@@ -562,10 +616,21 @@ export class Puller {
   }
 
   #toManifest(device: string, normalized: string, warnings: string[]): Manifest {
-    const { rows, dropped } = entryRows(JSON.parse(normalized))
+    const parsed: unknown = JSON.parse(normalized)
+    const { rows, dropped } = entryRows(parsed)
     if (dropped > 0)
       warnings.push(`${device}: ${dropped} manifest row(s) with an unsafe id or time ignored`)
-    return { text: normalized, entries: rows }
+    const fields = isRecord(parsed) ? parsed : {}
+    const versions = fields.outbox_versions
+    return {
+      text: normalized,
+      entries: rows,
+      outboxVersions: Array.isArray(versions)
+        ? versions.filter((v): v is number => typeof v === 'number')
+        : [],
+      indexPresent: fields.index_present === true,
+      generatedAt: typeof fields.generated_at === 'number' ? fields.generated_at : 0,
+    }
   }
 
   /**
@@ -647,6 +712,8 @@ export class Puller {
     this.#index = null
     this.#foreignIntents = []
     this.#desktops = { manifests: [], slots: null, tombstones: new Set() }
+    this.#v2Desktops = new Set()
+    this.#indexSource = null
     this.#inflight.clear() // a download that started earlier must not re-cache ciphertext
     this.#lockKeys('revoked')
     reonboardReason = reason

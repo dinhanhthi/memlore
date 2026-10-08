@@ -383,6 +383,18 @@ describe('exclusions', () => {
     expect((await f.vault.load(['a'])).loaded).toEqual(['a'])
   })
 
+  it('isJournalExcluded applies the excluded and the unknown-journal rule', () => {
+    const f = setup()
+    // Fail closed: before the taxonomy is loaded no journal is known to be visible.
+    expect(f.vault.isJournalExcluded('j1')).toBe(true)
+    expect(f.vault.isJournalExcluded('')).toBe(true)
+    f.vault.setExcludedJournalIds(['secret-j'], ['j1', 'secret-j'])
+    expect(f.vault.isJournalExcluded('secret-j')).toBe(true)
+    expect(f.vault.isJournalExcluded('ghost')).toBe(true)
+    expect(f.vault.isJournalExcluded('j1')).toBe(false)
+    expect(f.vault.isJournalExcluded('')).toBe(true)
+  })
+
   it('lists a stubbed entry again once the index winner is newer than the stub', async () => {
     const f = setup()
     f.put({ entry_id: 'a', is_locked: true, updated_at: 100 })

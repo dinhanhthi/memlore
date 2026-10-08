@@ -11,6 +11,9 @@ const NEW_CAPABILITY_FLAGS = [
   'fontDownloads',
   'syncAdmin',
   'vaultAdmin',
+  'versionsRead',
+  'taxonomyCreate',
+  'mapView',
 ]
 
 /** Read-only flags that hold on both platforms. */

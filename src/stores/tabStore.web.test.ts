@@ -16,6 +16,7 @@ vi.mock('../lib/platform', async (importOriginal) => {
       gallery: false,
       lookback: false,
       maps: false,
+      mapView: false,
       ai: false,
       chat: false,
     },

@@ -197,7 +197,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.map',
     icon: MapPin,
     keywords: ['location', 'places', 'geo'],
-    available: () => capabilities.maps,
+    available: () => capabilities.mapView,
     run: () => useTabStore.getState().updateActiveTab({ activeView: 'map', selectedEntryId: null }),
   },
   {
