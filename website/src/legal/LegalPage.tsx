@@ -81,6 +81,38 @@ export function BlockView({ block, intro }: { block: LegalBlock; intro?: boolean
       </ul>
     )
   }
+  if (block.type === 'table') {
+    const style = (column: number) => {
+      const align = block.align[column]
+      return align ? { textAlign: align } : undefined
+    }
+    return (
+      <div className="docs-table-wrap">
+        <table className="docs-table">
+          <thead>
+            <tr>
+              {block.header.map((text, column) => (
+                <th key={column} style={style(column)}>
+                  <Inline text={text} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((text, column) => (
+                  <td key={column} style={style(column)}>
+                    <Inline text={text} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
   if (block.type === 'widget') {
     const Widget = WIDGETS[block.name]
     return <Widget />

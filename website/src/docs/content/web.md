@@ -1,8 +1,8 @@
 ---
 title: Web companion
 description: How Memlore Web works, how to sign in with your recovery phrase, and what is supported.
-updated: 2026-10-04
-sources: website/src/legal/privacy.md, docs/web/desktop-vs-web.md, docs/web/architecture.md, docs/web/sync-and-encryption.md
+updated: 2026-10-08
+sources: website/src/legal/privacy.md
 ---
 
 # Web Companion
@@ -31,20 +31,7 @@ Memlore Web opens an **existing vault** that has already been created on your de
 
 ## What works and what is desktop-only
 
-Memlore Web is designed for reading, fast lookup, and writing entries while away from your primary computer.
-
-:::cards
-
-- **Read entries & view media** — Streamed and decrypted on demand from your Google Drive `appDataFolder`.
-- **Write & edit entries (rolling out)** — Saved to your private web outbox, then imported and merged by desktop. Editing may be turned off while it rolls out; the app then opens your journal read-only.
-- **Assign tags & journals (rolling out)** — Assign existing tags and journals to your entries, once editing is turned on.
-- **Delete entries (Desktop only)** — Irreversible deletion cascades are reserved for the native desktop app.
-- **Create tags or journals (Desktop only)** — Taxonomy definitions are managed on your primary desktop.
-- **AI assistant & chat (Desktop only)** — The zero-telemetry web companion omits external AI connections.
-- **Full statistics & heatmap (Desktop only)** — Preserves the web's lightweight, on-demand pull model.
-- **iCloud Drive sync (Desktop only)** — Web connects to Google Drive; Apple provides no web API for iCloud Drive folders.
-
-:::
+You can read and search your journal on the web today. Writing and editing are rolling out, and most other features stay on the desktop app. See [Web vs desktop](/docs/web-vs-desktop) for the full feature-by-feature table.
 
 For security invariants and technical design, see the [Privacy Policy](/privacy) and [Sync documentation](/docs/sync).
 

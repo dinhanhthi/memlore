@@ -45,6 +45,7 @@ export type DocsSlug =
   | 'maps'
   | 'editor'
   | 'web'
+  | 'web-vs-desktop'
 
 export type DocsPage = {
   slug: DocsSlug
@@ -157,6 +158,12 @@ export const DOCS_PAGES: readonly DocsPage[] = [
           title: 'Web companion',
           description:
             'How Memlore Web works, how to sign in with your recovery phrase, and what is supported.',
+          group: 'features' as const,
+        },
+        {
+          slug: 'web-vs-desktop' as const,
+          title: 'Web vs desktop',
+          description: 'What Memlore Web can do today, what stays on the desktop app, and why.',
           group: 'features' as const,
         },
       ]

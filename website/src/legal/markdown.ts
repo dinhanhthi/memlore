@@ -18,6 +18,9 @@ export type LegalBlock =
   | { type: 'details'; summary: string; blocks: LegalBlock[] }
   | { type: 'cards'; items: { title: string; text: string }[] }
   | { type: 'widget'; name: WidgetName }
+  | { type: 'table'; header: string[]; align: TableAlign[]; rows: string[][] }
+
+export type TableAlign = 'left' | 'center' | 'right' | null
 
 export type LegalDoc = {
   meta: LegalMeta
@@ -100,6 +103,50 @@ function parseCards(lines: string[]): { title: string; text: string }[] {
   }
   if (!items.length) throw new Error('empty cards block')
   return items
+}
+
+/** Cells of a GFM pipe row: outer pipes optional, `\|` is a literal pipe. */
+function splitTableRow(line: string): string[] {
+  const cells: string[] = []
+  let cell = ''
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index]
+    if (char === '\\' && line[index + 1] === '|') {
+      cell += '|'
+      index++
+    } else if (char === '|') {
+      cells.push(cell)
+      cell = ''
+    } else {
+      cell += char
+    }
+  }
+  cells.push(cell)
+  if (line.trim().startsWith('|')) cells.shift()
+  if (cells.length > 1 && !cell.trim()) cells.pop()
+  return cells.map((value) => value.trim())
+}
+
+function hasTablePipe(line: string): boolean {
+  return /(^|[^\\])\|/.test(line)
+}
+
+const TABLE_SEPARATOR_CELL = /^:?-+:?$/
+
+/** Column alignments when `line` is a separator row for `header`, else null. */
+function tableAlign(line: string, header: string[]): TableAlign[] | null {
+  if (!hasTablePipe(line)) return null
+  const cells = splitTableRow(line)
+  if (cells.length !== header.length) return null
+  if (!cells.every((cell) => TABLE_SEPARATOR_CELL.test(cell))) return null
+  return cells.map((cell) => {
+    const left = cell.startsWith(':')
+    const right = cell.endsWith(':')
+    if (left && right) return 'center'
+    if (right) return 'right'
+    if (left) return 'left'
+    return null
+  })
 }
 
 function parseBlocks(
@@ -187,6 +234,25 @@ function parseBlocks(
       continue
     }
     if (line.trim().startsWith(':::')) throw new Error(`unexpected fence: ${line.trim()}`)
+    const header = hasTablePipe(line) ? splitTableRow(line) : null
+    const align = header && index + 1 < lines.length ? tableAlign(lines[index + 1], header) : null
+    if (header && align) {
+      endParagraph()
+      endList()
+      const rows: string[][] = []
+      index++
+      while (
+        index + 1 < lines.length &&
+        lines[index + 1].trim() &&
+        hasTablePipe(lines[index + 1])
+      ) {
+        index++
+        const cells = splitTableRow(lines[index].trimEnd())
+        rows.push(header.map((_, column) => cells[column] ?? ''))
+      }
+      blocks.push({ type: 'table', header, align, rows })
+      continue
+    }
     if (/^- /.test(line)) {
       endParagraph()
       if (listKind === 'ol') endList()
@@ -287,6 +353,17 @@ function renderBlock(block: LegalBlock, intro?: boolean): string {
         `<li><strong>${escapeHtml(item.title)}</strong><span>${renderInline(item.text)}</span></li>`,
     )
     return `<ul class="docs-cards">${items.join('')}</ul>`
+  }
+  if (block.type === 'table') {
+    const cell = (tag: 'th' | 'td', text: string, column: number) => {
+      const align = block.align[column]
+      return `<${tag}${align ? ` style="text-align:${align}"` : ''}>${renderInline(text)}</${tag}>`
+    }
+    const head = `<tr>${block.header.map((text, column) => cell('th', text, column)).join('')}</tr>`
+    const body = block.rows
+      .map((row) => `<tr>${row.map((text, column) => cell('td', text, column)).join('')}</tr>`)
+      .join('')
+    return `<div class="docs-table-wrap"><table class="docs-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`
   }
   if (block.type === 'widget') {
     return `<figure class="docs-widget">${DIAGRAMS[WIDGET_FALLBACK[block.name]]}</figure>`

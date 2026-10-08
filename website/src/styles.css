@@ -2921,6 +2921,48 @@ tbody th {
   margin-top: var(--space-2xs);
   color: var(--color-ink-soft);
 }
+/* GFM pipe table — scrolls inside its wrapper so the page never scrolls sideways. */
+.legal-article .docs-table-wrap {
+  margin: var(--space-md) var(--cell-inline);
+  max-width: calc(100% - 2 * var(--cell-inline));
+  overflow-x: auto;
+  border: var(--rule-width) solid var(--color-rule-strong);
+  border-radius: var(--radius-panel);
+}
+.docs-table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+  line-height: 1.5;
+  overflow-wrap: normal;
+  color: var(--color-ink-soft);
+}
+.docs-table th,
+.docs-table td {
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  vertical-align: top;
+  border-top: none;
+  border-bottom: var(--rule-width) solid var(--color-rule-strong);
+}
+/* Undo the global comparison-table rules (stripe, first-column width). */
+.docs-table tbody tr {
+  background: none;
+}
+.docs-table th:first-child,
+.docs-table td:first-child {
+  width: auto;
+}
+.docs-table th {
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--color-ink);
+  background: var(--color-panel);
+}
+.docs-table tbody tr:last-child td {
+  border-bottom: 0;
+}
 /* :::widget — frame for interactive explainers. */
 .legal-article .docs-widget {
   margin: var(--space-lg) var(--cell-inline);
