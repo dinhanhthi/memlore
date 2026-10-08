@@ -62,10 +62,13 @@ describe('isViewAvailable', () => {
     }
   })
 
-  it('web: gallery and lookback open once a desktop publishes the month index', () => {
-    const caps: Capabilities = { ...WEB_CAPS, gallery: true, lookback: true }
+  it('web: gallery, lookback and map open once a desktop publishes the month index', () => {
+    const caps: Capabilities = { ...WEB_CAPS, gallery: true, lookback: true, mapView: true }
     expect(isViewAvailable('media', caps)).toBe(true)
     expect(isViewAvailable('onthisday', caps)).toBe(true)
+    // Location writes stay desktop-only; only the map view opens.
+    expect(caps.maps).toBe(false)
+    expect(isViewAvailable('map', caps)).toBe(true)
   })
 
   it('web: chat is available while ai stays false', () => {
@@ -110,7 +113,7 @@ describe('isViewAvailable', () => {
 describe('needsMonthIndex', () => {
   it('names the views a desktop month index unlocks on web', () => {
     for (const view of ALL_VIEWS) {
-      expect(needsMonthIndex(view)).toBe(view === 'media' || view === 'onthisday')
+      expect(needsMonthIndex(view)).toBe(view === 'media' || view === 'onthisday' || view === 'map')
     }
   })
 })

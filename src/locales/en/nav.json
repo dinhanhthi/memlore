@@ -336,7 +336,31 @@
     "pin_count_one": "{{count}} pin",
     "pin_count_other": "{{count}} pins",
     "close_tooltip": "Close (Esc)",
-    "close_aria": "Close entry"
+    "close_aria": "Close entry",
+    "places_title": "Places",
+    "places_empty": "No entries with a place yet.",
+    "unnamed_place": "Unnamed place",
+    "entry_count_one": "{{count}} entry",
+    "entry_count_other": "{{count}} entries",
+    "open_entry_aria": "Open the entry from {{date}}",
+    "tiles": {
+      "title": "Show places on a map",
+      "body": "Map tiles come from MapTiler. Loading them tells MapTiler which area you are viewing and your IP address. Your entries are never sent.",
+      "use": "Use map tiles",
+      "key_label": "Your MapTiler API key",
+      "key_placeholder": "Paste your key",
+      "key_hint": "A key restricted by HTTP origin or referrer will not work, because Memlore sends no referrer.",
+      "key_stored": "The key is stored encrypted in this browser.",
+      "get_key": "Get a free MapTiler key",
+      "learn_more": "Web vs desktop",
+      "save_and_use": "Save key and show map",
+      "cancel": "Cancel",
+      "stop": "Stop using map tiles",
+      "error": "Could not turn on map tiles. Try again.",
+      "change_key": "Use a different key",
+      "remove_key": "Remove key",
+      "remove_error": "Could not remove the key. Try again."
+    }
   },
   "onthisday_view": {
     "title": "On This Day",

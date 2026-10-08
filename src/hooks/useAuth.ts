@@ -4,6 +4,7 @@ import * as tauri from '../lib/tauri'
 import { lockApp } from '../lib/lock'
 import { isWeb } from '../lib/platform'
 import { useSettingsStore } from '../stores/settingsStore'
+import { resetMapSourceSnapshot } from './useMapSourceSettings'
 import type { EncryptionMode } from '../lib/tauri'
 
 /// `useAuth` owns the app-lock + encryption-key lifecycle.
@@ -124,12 +125,16 @@ export function useAuth() {
   // Web only: the backend auto-locks itself (idle / hidden tab) and emits
   // `app:locked`. Mirror it into the store so the UI shows the lock screen
   // instead of failing every command with VaultLockedError. Desktop locks
-  // only through the UI, so it needs no listener.
+  // only through the UI, so it needs no listener. The web backend emits it on
+  // every lock (manual too), so it also drops the in-memory MapTiler key.
   useEffect(() => {
     if (!isWeb) return
     let cancelled = false
     let unlisten: (() => void) | undefined
-    void listen('app:locked', () => setLocked(true)).then(
+    void listen('app:locked', () => {
+      resetMapSourceSnapshot()
+      setLocked(true)
+    }).then(
       (fn) => {
         if (cancelled) fn()
         else unlisten = fn

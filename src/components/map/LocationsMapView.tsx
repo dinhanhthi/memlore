@@ -15,6 +15,10 @@ import { useUiStore } from '../../stores/uiStore'
 import { useMapSourceSettings } from '../../hooks/useMapSourceSettings'
 import { useMapSourceUsable } from '../../hooks/useMapSourceUsable'
 import { MapSourceGate } from './MapSourceGate'
+import { MapPinsList } from './MapPinsList'
+import { MapTilesConsent, MapTilesStopButton } from './MapTilesConsent'
+import { isWeb } from '../../lib/platform'
+import { useCapabilities } from '../../hooks/useCapabilities'
 // Match the editor's primary reading column so content reflow stays
 // consistent between the in-overlay editor and the main editor view.
 // Width is clamped to the viewport so it never overflows on narrow windows.
@@ -34,6 +38,11 @@ const OVERLAY_WIDTH_CLASS = 'w-[min(720px,90vw)]'
  * key, or a compile-time MapKit token), `MapSourceGate` replaces the map.
  * After the gate, tiles come from the local PMTiles archive, MapTiler, or
  * Apple MapKit JS — never OSM / Carto hosts.
+ *
+ * Web: no `MapSourceGate` (offline basemap and MapKit are desktop-only). The
+ * view shows a places list (no network) plus `MapTilesConsent`; once the user
+ * opts in with their own MapTiler key, the same `LeafletMap` renders MapTiler
+ * tiles, and `MapTilesStopButton` returns to the list.
  */
 export function LocationsMapView() {
   const designSystem = useUiStore((s) => s.designSystem)
@@ -46,6 +55,7 @@ export function LocationsMapView() {
   const selectedEntryId = useSelectedEntryId()
   const updateActiveTab = useUpdateActiveTab()
   const { pins, isLoading, error, isEmpty } = useMapPins()
+  const caps = useCapabilities()
 
   const overlayOpen = selectedEntryId !== null
 
@@ -80,9 +90,11 @@ export function LocationsMapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlayOpen])
 
-  const handlePinClick = (pin: MapPin) => {
-    updateActiveTab({ selectedEntryId: pin.entryId })
+  const openEntry = (entryId: string) => {
+    updateActiveTab({ selectedEntryId: entryId })
   }
+
+  const handlePinClick = (pin: MapPin) => openEntry(pin.entryId)
 
   const showCount = !isLoading && !error && !isEmpty
   const countLabel = tNav('locations_view.pin_count', { count: pins.length })
@@ -100,21 +112,37 @@ export function LocationsMapView() {
           {tNav('locations_view.title')}
           {showCount ? ` · ${countLabel}` : ''}
         </h1>
-        <Tooltip content={t('settings.location', { defaultValue: 'Settings → Location' })}>
-          <button
-            type="button"
-            onClick={openLocationSettings}
-            aria-label={t('settings.location', { defaultValue: 'Settings → Location' })}
-            data-testid="locations-settings-button"
-            className="text-fg-muted hover:bg-elevated hover:text-fg inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors motion-reduce:transition-none"
-          >
-            <Settings className="size-4" />
-          </button>
-        </Tooltip>
+        {isWeb && usable && <MapTilesStopButton />}
+        {/* Settings → Location is desktop-only (location writes); the web
+            manages its MapTiler key in MapTilesConsent. */}
+        {caps.maps && (
+          <Tooltip content={t('settings.location', { defaultValue: 'Settings → Location' })}>
+            <button
+              type="button"
+              onClick={openLocationSettings}
+              aria-label={t('settings.location', { defaultValue: 'Settings → Location' })}
+              data-testid="locations-settings-button"
+              className="text-fg-muted hover:bg-elevated hover:text-fg inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors motion-reduce:transition-none"
+            >
+              <Settings className="size-4" />
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {sourceLoading ? (
         <LocationsMapSkeleton />
+      ) : isWeb && !usable ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+          {error && (
+            <p className="text-danger-text text-sm" role="alert">
+              {error}
+            </p>
+          )}
+          {isLoading && !error && <LocationsMapSkeleton />}
+          {!isLoading && !error && <MapPinsList pins={pins} onOpenEntry={openEntry} />}
+          <MapTilesConsent />
+        </div>
       ) : !usable ? (
         <MapSourceGate />
       ) : (

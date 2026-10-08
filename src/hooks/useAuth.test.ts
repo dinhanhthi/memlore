@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import { useAuth } from './useAuth'
 import { useSettingsStore } from '../stores/settingsStore'
 import * as tauri from '../lib/tauri'
+import { resetMapSourceSnapshot } from './useMapSourceSettings'
 
 // `isWeb` is a module-level const; a getter lets each test pick the platform.
 const platform = vi.hoisted(() => ({ isWeb: false }))
@@ -21,6 +22,7 @@ type EventHandler = (event: { payload: unknown }) => void
 const eventHandlers: Record<string, EventHandler> = {}
 const unlistenSpy = vi.fn()
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
+vi.mock('./useMapSourceSettings', () => ({ resetMapSourceSnapshot: vi.fn() }))
 
 vi.mock('../lib/tauri', () => ({
   isPasswordSet: vi.fn(),
@@ -523,9 +525,13 @@ describe('useAuth (password-only model)', () => {
     await waitFor(() => expect(result.current.encryptionMode).toBe('password'))
     expect(result.current.isLocked).toBe(false)
 
+    expect(resetMapSourceSnapshot).not.toHaveBeenCalled()
+
     act(() => eventHandlers['app:locked']({ payload: undefined }))
 
     expect(result.current.isLocked).toBe(true)
+    // The plaintext MapTiler key must not outlive the web session in memory.
+    expect(resetMapSourceSnapshot).toHaveBeenCalledTimes(1)
   })
 
   it('web: unsubscribes from app:locked on unmount', async () => {

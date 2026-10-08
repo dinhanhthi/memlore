@@ -1,7 +1,7 @@
 ---
 title: Memlore — Privacy Policy
 description: How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.
-updated: 4 October 2026
+updated: 8 October 2026
 ---
 
 # Privacy Policy
@@ -81,6 +81,7 @@ Memlore Web is an optional browser companion that lets you read your existing Me
 - **The Cloudflare Worker:** An ephemeral Cloudflare Worker at `web.memlore.app/api/*` handles the OAuth 2.0 PKCE token exchange with Google so client secrets stay protected. The Worker never sees, parses, or logs your master recovery phrase, encryption keys, or journal content, and maintains no persistent database or access logs of tokens.
 - **Hosting infrastructure:** Memlore Web is hosted on Cloudflare Pages. Like any web server, Cloudflare processes standard HTTP request headers and IP addresses strictly for DDoS mitigation and content delivery.
 - **Google Drive scope:** Memlore Web connects exclusively to Google Drive's limited `drive.appdata` scope (hidden application data). It cannot view, read, or modify any of your personal Google Drive documents, photos, or spreadsheets.
+- **Map tiles (optional, off by default):** The web map page first lists your places without contacting any map provider. Only after you turn on map tiles with your own MapTiler API key does your browser load tiles from MapTiler, which then receives the map area you view and your IP address. Your API key is stored encrypted in this browser. You can stop using map tiles at any time.
 - **No analytics:** Memlore Web contains no analytics trackers, advertising scripts, tracking cookies, or behavioral telemetry.
 - **How to delete everything:** You can remove all web traces at any time:
   1. In your browser's settings, clear the site data for web.memlore.app. This deletes everything Memlore Web stored in that browser (the encrypted cache, unsent edits and the password-wrapped key). The **Clear cache** button in Memlore Web settings removes cached photos and videos only.

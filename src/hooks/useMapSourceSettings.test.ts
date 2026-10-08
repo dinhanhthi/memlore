@@ -13,6 +13,7 @@ import {
   formatBasemapSizeGb,
   isMapSourceUsable,
   MAP_TILE_SOURCES,
+  resetMapSourceSnapshot,
   useMapSourceSettings,
 } from './useMapSourceSettings'
 
@@ -256,6 +257,25 @@ describe('useMapSourceSettings', () => {
     expect(mockedSet).toHaveBeenCalledWith('map_tile_source', '')
     expect(result.current.source).toBe(null)
     expect(result.current.maptilerKey).toBe('mt_keep')
+  })
+
+  // Web lock: the plaintext MapTiler key must not outlive the session in the
+  // module snapshot `clearMapTileSource` republishes.
+  it('resetMapSourceSnapshot drops the key from mounted hooks and the module snapshot', async () => {
+    mockedGet.mockResolvedValueOnce('maptiler').mockResolvedValueOnce('mt_secret')
+
+    const { result } = renderHook(() => useMapSourceSettings())
+    await waitFor(() => expect(result.current.maptilerKey).toBe('mt_secret'))
+
+    act(() => resetMapSourceSnapshot())
+
+    expect(result.current.source).toBe(null)
+    expect(result.current.maptilerKey).toBe('')
+
+    await act(async () => {
+      await clearMapTileSource()
+    })
+    expect(result.current.maptilerKey).toBe('')
   })
 })
 

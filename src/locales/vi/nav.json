@@ -299,7 +299,31 @@
     "close_tooltip": "Đóng (Esc)",
     "pin_count_one": "{{count}} ghim",
     "pin_count_other": "{{count}} ghim",
-    "title": "Địa điểm"
+    "title": "Địa điểm",
+    "places_title": "Các địa điểm",
+    "places_empty": "Chưa có mục nào gắn địa điểm.",
+    "unnamed_place": "Địa điểm chưa đặt tên",
+    "entry_count_one": "{{count}} mục",
+    "entry_count_other": "{{count}} mục",
+    "open_entry_aria": "Mở mục ngày {{date}}",
+    "tiles": {
+      "title": "Hiện các địa điểm trên bản đồ",
+      "body": "Ô bản đồ được tải từ MapTiler. Khi tải, MapTiler sẽ biết khu vực bạn đang xem và địa chỉ IP của bạn. Nội dung các mục không bao giờ được gửi đi.",
+      "use": "Dùng ô bản đồ",
+      "key_label": "API key MapTiler của bạn",
+      "key_placeholder": "Dán key của bạn",
+      "key_hint": "Key bị giới hạn theo HTTP origin hoặc referrer sẽ không hoạt động, vì Memlore không gửi referrer.",
+      "key_stored": "Key được lưu mã hóa trong trình duyệt này.",
+      "get_key": "Lấy key MapTiler miễn phí",
+      "learn_more": "Bản web và bản máy tính",
+      "save_and_use": "Lưu key và hiện bản đồ",
+      "cancel": "Hủy",
+      "stop": "Ngừng dùng ô bản đồ",
+      "error": "Không bật được ô bản đồ. Hãy thử lại.",
+      "change_key": "Dùng key khác",
+      "remove_key": "Xóa key",
+      "remove_error": "Không xóa được key. Hãy thử lại."
+    }
   },
   "media_gallery": {
     "empty": {

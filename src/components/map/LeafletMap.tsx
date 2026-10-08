@@ -33,7 +33,7 @@ const MAP_MAX_ZOOM = 18
 
 function maptilerTileUrl(resolvedTheme: 'light' | 'dark', key: string): string {
   const darkSuffix = resolvedTheme === 'dark' ? '-dark' : ''
-  return `https://api.maptiler.com/maps/streets-v2${darkSuffix}/{z}/{x}/{y}.png?key=${key}`
+  return `https://api.maptiler.com/maps/streets-v2${darkSuffix}/{z}/{x}/{y}.png?key=${encodeURIComponent(key.trim())}`
 }
 
 type LeafletLayerOptions = NonNullable<Parameters<typeof leafletLayer>[0]>

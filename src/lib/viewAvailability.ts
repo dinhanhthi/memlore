@@ -10,7 +10,7 @@ import { capabilities, type Capabilities } from './platform'
  * TwoPanelLayout renders an "unsupported on web" placeholder — but
  * `applyLaunchView` still moves persisted tabs off it on launch.
  *
- * On web the gallery and lookback views turn on at runtime once a synced
+ * On web the gallery, lookback and map views turn on at runtime once a synced
  * desktop publishes the month index (`useCapabilities`).
  */
 export function isViewAvailable(view: ActiveView, caps: Capabilities = capabilities): boolean {
@@ -28,5 +28,5 @@ export function isViewAvailable(view: ActiveView, caps: Capabilities = capabilit
 /** Views the web serves from the desktop month index: without one, the
  *  placeholder asks the user to update the desktop app instead. */
 export function needsMonthIndex(view: ActiveView): boolean {
-  return view === 'media' || view === 'onthisday'
+  return view === 'media' || view === 'onthisday' || view === 'map'
 }

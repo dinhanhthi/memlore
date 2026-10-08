@@ -53,7 +53,7 @@ export function formatBasemapSizeGb(bytes: number): string {
   return (bytes / 1_000_000_000).toFixed(2)
 }
 
-interface MapSourceSnapshot {
+export interface MapSourceSnapshot {
   source: MapTileSource | null
   maptilerKey: string
 }
@@ -62,7 +62,9 @@ const listeners = new Set<(snap: MapSourceSnapshot) => void>()
 
 let lastMapSourceSnapshot: MapSourceSnapshot = { source: null, maptilerKey: '' }
 
-function publishMapSource(snap: MapSourceSnapshot) {
+/** Broadcast persisted settings to every mounted `useMapSourceSettings`. Callers write the
+ *  settings first (see `useWebMapTiles`). */
+export function publishMapSource(snap: MapSourceSnapshot) {
   lastMapSourceSnapshot = snap
   for (const listener of listeners) listener(snap)
 }
@@ -73,6 +75,12 @@ function publishMapSource(snap: MapSourceSnapshot) {
 export async function clearMapTileSource(): Promise<void> {
   await setSetting('map_tile_source', '')
   publishMapSource({ source: null, maptilerKey: lastMapSourceSnapshot.maptilerKey })
+}
+
+/** Drop the in-memory source and plaintext MapTiler key (web lock), and
+ *  broadcast the empty snapshot to mounted hooks. Persisted settings stay. */
+export function resetMapSourceSnapshot(): void {
+  publishMapSource({ source: null, maptilerKey: '' })
 }
 
 /// `useMapSourceSettings` — reads and writes `map_tile_source` and

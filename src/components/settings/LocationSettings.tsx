@@ -31,6 +31,7 @@ import { AddLocationPopup } from './AddLocationPopup'
 import { GeocodeCheckButton } from './GeocodeCheckButton'
 import { SettingsTabList } from './SettingsTabList'
 import { useTabSlideDirection } from './useTabSlideDirection'
+import { MAPTILER_KEYS_URL } from '../../lib/mapLinks'
 
 interface ProviderOption {
   id: GeocodingProvider
@@ -68,7 +69,6 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
 
 const MAPBOX_TOKEN_URL = 'https://account.mapbox.com/access-tokens/'
 const GOOGLE_API_URL = 'https://console.cloud.google.com/google/maps-apis/credentials'
-const MAPTILER_KEYS_URL = 'https://cloud.maptiler.com/account/keys/'
 
 const CARD_BODY = 'space-y-3 p-4'
 
