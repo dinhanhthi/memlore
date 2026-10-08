@@ -119,7 +119,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   stats_streak_calendar: [],
   stats_location_density: [],
   // TODO(later): see docs/LATER.md - maps, geocoding, weather
-  list_map_pins: [],
   list_location_aliases: [],
   get_location_alias: null,
   find_nearby_aliases: [],

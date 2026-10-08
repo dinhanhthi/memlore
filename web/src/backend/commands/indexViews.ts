@@ -28,10 +28,21 @@
  * As in `media.ts`, the vault decides per entry: a loaded entry lists only the index media its
  * copy still carries live (not tombstoned), with that copy's title and preview, and an entry the
  * vault refuses (locked, invisible, deleted, excluded journal) lists nothing.
+ *
+ * MAP PINS (Phase 17.1): desktop `list_map_pins` shape (`MapPin`, src/types/map.ts) from every
+ * catalog month. An entry pin per row with coordinates (label = `location_label`, which the
+ * places list groups by) and a photo pin per `image/*` media with EXIF coordinates, both under the
+ * gallery's vault rule (a loaded entry: its copy's location and live media; refused: nothing).
+ * Coordinates must be finite and in range, else the pin is skipped. Entry pins sort by
+ * `entry_date` (the index has no `created_at`), photo pins by the media's `created_at`, newest
+ * first, entry before photo on ties, capped at the desktop `MAP_PIN_SOFT_CAP`. `thumbnailPath` is
+ * always null on the web (a `memlore-web://` path cannot load in a marker `<img>`), so every pin
+ * renders the generic icon. TODO(later): blob-URL marker thumbnails, see docs/LATER.md.
  */
 
 import type { Entry, EmotionKey } from '../../../../src/types/entry'
 import type { GalleryMediaRow } from '../../../../src/lib/tauri'
+import type { MapPin } from '../../../../src/types/map'
 import type { PagedResult } from '../../../../src/types/pagination'
 import { VaultLockedError } from '../keys'
 import type { Handler } from '../router'
@@ -41,6 +52,8 @@ import { WEB_MEDIA_PATH_PREFIX, hasLiveMedia, isSafeMediaId } from './media'
 import { readEnv, type VaultApi } from './readSession'
 
 const ON_THIS_DAY_LIMIT = 200
+/** Desktop `MAP_PIN_SOFT_CAP` (commands/entries.rs). */
+const MAP_PIN_SOFT_CAP = 1000
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 500
 const EMOTIONS: readonly string[] = ['bad', 'neutral', 'good']
@@ -232,7 +245,112 @@ const listAllMediaPaged: Handler = async (args) => {
   return { items: items.slice(start, start + pageSize), total: items.length }
 }
 
+/** Finite, in-range coordinates, else null (`asNumber` already rejects NaN and infinities). */
+const pinCoords = (
+  lat: number | null,
+  lng: number | null,
+): { latitude: number; longitude: number } | null =>
+  lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+    ? { latitude: lat, longitude: lng }
+    : null
+
+/** Image media eligible for a pin or a marker thumbnail, oldest first (desktop order). */
+const imagesOf = (media: readonly MonthIndexMedia[], source: GallerySource): MonthIndexMedia[] =>
+  media
+    .filter((m) => m.file_type.startsWith('image/') && isSafeMediaId(m.id) && source.includes(m.id))
+    .sort((a, b) => a.created_at - b.created_at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+interface EntryLocation {
+  latitude: number | null
+  longitude: number | null
+  label: string | null
+  entryDate: number
+}
+
+/** Location and date of a row's entry: the loaded copy's (it carries web edits), else the row's. */
+function entryLocation(vault: VaultApi, row: MonthIndexRow): EntryLocation {
+  if (vault.status(row.entry_id) !== 'visible') {
+    const { latitude, longitude, location_label: label, entry_date: entryDate } = row
+    return { latitude, longitude, label, entryDate }
+  }
+  const entry = toEntry(vault.getEntry(row.entry_id))
+  return {
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    label: entry.location_label,
+    entryDate: entry.entry_date,
+  }
+}
+
+/** Pins of one row (sort key alongside), or none when the vault refuses the entry. */
+function rowPins(vault: VaultApi, row: MonthIndexRow): Array<{ pin: MapPin; at: number }> {
+  const source = gallerySource(vault, row)
+  if (source === null) return []
+  let location: EntryLocation
+  try {
+    location = entryLocation(vault, row)
+  } catch {
+    return []
+  }
+  const images = imagesOf(row.media, source)
+  const out: Array<{ pin: MapPin; at: number }> = []
+  const coords = pinCoords(asNumber(location.latitude), asNumber(location.longitude))
+  if (coords !== null) {
+    out.push({
+      at: location.entryDate,
+      pin: {
+        id: `entry:${row.entry_id}`,
+        kind: 'entry',
+        entryId: row.entry_id,
+        ...coords,
+        label: location.label,
+        entryDate: location.entryDate,
+        // Web pins carry no thumbnail: `markerIcons.ts` passes it through `convertFileSrc` (identity
+        // on the web) into `<img src>`, where a `memlore-web://` path never loads; null renders the
+        // generic pin icon. TODO(later): resolve marker thumbnails to blob URLs (docs/LATER.md).
+        thumbnailPath: null,
+      },
+    })
+  }
+  for (const media of images) {
+    const exif = pinCoords(asNumber(media.exif_latitude), asNumber(media.exif_longitude))
+    if (exif === null) continue
+    out.push({
+      at: media.created_at,
+      pin: {
+        id: `photo:${media.id}`,
+        kind: 'photo',
+        entryId: row.entry_id,
+        ...exif,
+        label: null,
+        entryDate: location.entryDate,
+        thumbnailPath: null,
+      },
+    })
+  }
+  return out
+}
+
+const listMapPins: Handler = async () => {
+  const { vault, reader } = await openIndex()
+  if (reader === null) return []
+  const months = await reader.listMonths()
+  if (months.length === 0) return []
+  const { rows } = await reader.getMonths(months)
+  return rows
+    .flatMap((row) => rowPins(vault, row))
+    .sort(
+      (a, b) =>
+        b.at - a.at ||
+        (a.pin.kind === b.pin.kind ? 0 : a.pin.kind === 'entry' ? -1 : 1) ||
+        (a.pin.id < b.pin.id ? 1 : a.pin.id > b.pin.id ? -1 : 0),
+    )
+    .slice(0, MAP_PIN_SOFT_CAP)
+    .map(({ pin }) => pin)
+}
+
 export const indexViewHandlers: Record<string, Handler> = {
   list_all_media_paged: listAllMediaPaged,
+  list_map_pins: listMapPins,
   list_on_this_day: listOnThisDay,
 }

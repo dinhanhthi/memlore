@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Entry } from '../../../../src/types/entry'
+import type { MapPin } from '../../../../src/types/map'
 import type { GalleryMediaRow } from '../../../../src/lib/tauri'
 import type { PagedResult } from '../../../../src/types/pagination'
 import type { KeyRing } from '../keys'
@@ -21,6 +22,8 @@ interface MediaSpec {
   type?: string
   createdAt: number
   order?: number
+  /** EXIF `[latitude, longitude]`. */
+  exif?: [number, number]
 }
 
 interface RowSpec {
@@ -30,6 +33,9 @@ interface RowSpec {
   journal?: string
   title?: string
   media?: MediaSpec[]
+  /** Row coordinates; default `[1.5, 2.5]`, null = none. */
+  coords?: [number, number] | null
+  label?: string | null
 }
 
 const monthOf = (secs: number): string => new Date(secs * 1000).toISOString().slice(0, 7)
@@ -45,9 +51,9 @@ const toRow = (r: RowSpec) => ({
   word_count: 3,
   title: r.title ?? `title ${r.id}`,
   preview_text: `preview ${r.id}`,
-  latitude: 1.5,
-  longitude: 2.5,
-  location_label: 'Hanoi',
+  latitude: r.coords === null ? null : (r.coords?.[0] ?? 1.5),
+  longitude: r.coords === null ? null : (r.coords?.[1] ?? 2.5),
+  location_label: r.label === undefined ? 'Hanoi' : r.label,
   media: (r.media ?? []).map((m) => ({
     id: m.id,
     file_name: 'f.bin',
@@ -60,8 +66,8 @@ const toRow = (r: RowSpec) => ({
     height: 3,
     duration_seconds: m.type?.startsWith('audio/') ? 23 : null,
     exif_date: null,
-    exif_latitude: null,
-    exif_longitude: null,
+    exif_latitude: m.exif?.[0] ?? null,
+    exif_longitude: m.exif?.[1] ?? null,
   })),
   versions: [],
 })
@@ -417,12 +423,149 @@ describe('list_all_media_paged', () => {
   })
 })
 
+const pins = () => call<MapPin[]>('list_map_pins', { lockedView: 'revealed', activeVaultId: null })
+
+describe('list_map_pins', () => {
+  it('maps entry and photo pins to the desktop shape, newest first', async () => {
+    rig([
+      {
+        id: 'e1',
+        date: utc(2024, 3, 5),
+        label: 'Hanoi',
+        media: [
+          { id: 'newer', createdAt: 20, order: 0 },
+          { id: 'older', createdAt: 10, order: 1, exif: [48.85, 2.35] },
+          { id: 'clip', type: 'video/mp4', createdAt: 5, exif: [1, 1] },
+        ],
+      },
+      { id: 'e2', date: utc(2025, 1, 2), coords: [-33.9, 151.2], label: null },
+    ])
+    const result = await pins()
+    expect(result.map((p) => p.id)).toEqual(['entry:e2', 'entry:e1', 'photo:older'])
+    expect(result[1]).toEqual({
+      id: 'entry:e1',
+      kind: 'entry',
+      entryId: 'e1',
+      latitude: 1.5,
+      longitude: 2.5,
+      label: 'Hanoi',
+      entryDate: utc(2024, 3, 5),
+      // Web pins carry no thumbnail: markerIcons would hand a memlore-web:// path to <img src>.
+      thumbnailPath: null,
+    })
+    expect(result[0]).toMatchObject({ label: null, thumbnailPath: null, latitude: -33.9 })
+    expect(result[2]).toEqual({
+      id: 'photo:older',
+      kind: 'photo',
+      entryId: 'e1',
+      latitude: 48.85,
+      longitude: 2.35,
+      label: null,
+      entryDate: utc(2024, 3, 5),
+      thumbnailPath: null,
+    })
+  })
+
+  it('skips rows and photos without valid coordinates', async () => {
+    rig([
+      { id: 'none', date: utc(2024, 3, 5), coords: null },
+      { id: 'lat-out', date: utc(2024, 3, 6), coords: [91, 0] },
+      { id: 'lng-out', date: utc(2024, 3, 7), coords: [0, -181] },
+      {
+        id: 'ok',
+        date: utc(2024, 3, 8),
+        coords: null,
+        media: [
+          { id: 'bad-exif', createdAt: 1, exif: [0, 200] },
+          { id: '../evil', createdAt: 2, exif: [1, 1] },
+          { id: 'good', createdAt: 3, exif: [90, -180] },
+        ],
+      },
+    ])
+    expect((await pins()).map((p) => p.id)).toEqual(['photo:good'])
+  })
+
+  it('leaves out stale, trashed and excluded-journal rows', async () => {
+    const r = rig([
+      { id: 'a', date: utc(2024, 3, 5) },
+      { id: 'stale', date: utc(2023, 3, 5), media: [{ id: 'p1', createdAt: 1, exif: [1, 1] }] },
+      { id: 'trashed', date: utc(2022, 3, 5) },
+      { id: 'hidden', date: utc(2021, 3, 5), journal: 'locked-journal' },
+    ])
+    r.index.set('stale', {
+      entryId: 'stale',
+      authorDevice: OTHER,
+      updatedAt: 999,
+      isDeleted: false,
+    })
+    r.index.set('trashed', {
+      entryId: 'trashed',
+      authorDevice: OTHER,
+      updatedAt: 100,
+      isDeleted: false,
+      trashedAt: 50,
+    })
+    r.excluded.add('locked-journal')
+    expect((await pins()).map((p) => p.id)).toEqual(['entry:a'])
+  })
+
+  it('serves a loaded entry from its vault copy and drops one the vault refuses', async () => {
+    const r = rig(
+      [
+        {
+          id: 'moved',
+          date: utc(2024, 3, 5),
+          media: [
+            { id: 'm0', createdAt: 1, exif: [5, 5] },
+            { id: 'm1', createdAt: 2, exif: [6, 6] },
+          ],
+        },
+        { id: 'cleared', date: utc(2024, 3, 4) },
+        { id: 'locked', date: utc(2024, 3, 3), media: [{ id: 'lp', createdAt: 1, exif: [7, 7] }] },
+      ],
+      {
+        specs: [
+          {
+            id: 'moved',
+            updatedAt: 100,
+            entryDate: utc(2024, 3, 5),
+            latitude: 10,
+            longitude: 20,
+            locationLabel: 'Paris',
+            media: 2,
+            deletedMedia: ['m0'],
+          },
+          { id: 'cleared', updatedAt: 100, entryDate: utc(2024, 3, 4) },
+          { id: 'locked', updatedAt: 100, entryDate: utc(2024, 3, 3), locked: true },
+        ],
+      },
+    )
+    await r.vault.load(['moved', 'cleared', 'locked'])
+    const result = await pins()
+    expect(result.map((p) => p.id)).toEqual(['entry:moved', 'photo:m1'])
+    expect(result[0]).toMatchObject({
+      latitude: 10,
+      longitude: 20,
+      label: 'Paris',
+      thumbnailPath: null,
+    })
+  })
+
+  it('is empty without an index source or reader', async () => {
+    rig([{ id: 'a', date: utc(2024, 3, 5) }], { source: null })
+    expect(await pins()).toEqual([])
+    rig([{ id: 'a', date: utc(2024, 3, 5) }], { withReader: false })
+    expect(await pins()).toEqual([])
+  })
+})
+
 describe('locked vault', () => {
-  it('rejects both handlers and reads nothing', async () => {
+  it('rejects every handler and reads nothing', async () => {
     const r = rig([{ id: 'a', date: utc(2024, 3, 5) }])
     r.setUnlocked(false)
     await expect(call('list_on_this_day', { month: 3, day: 5 })).rejects.toThrow('vault is locked')
     await expect(gallery(1, 20)).rejects.toThrow('vault is locked')
+    await expect(pins()).rejects.toThrow('vault is locked')
     expect(r.reads).toEqual([])
   })
 })

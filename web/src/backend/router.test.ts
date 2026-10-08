@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { configureWebSettingsEnv } from './commands/webSettings'
+import { VaultLockedError } from './keys'
 import { handlers, route } from './router'
 import { ACTION_UNSUPPORTED, QUERY_DEFAULTS, WebUnsupportedError } from './unsupported'
 
@@ -168,5 +170,64 @@ describe('in-memory settings', () => {
     await route('set_setting', { key: 'b', value: '2' })
     await route('delete_setting', { key: 'a' })
     await expect(route('get_setting', { key: 'b' })).resolves.toBe('2')
+  })
+})
+
+describe('persisted web settings routing', () => {
+  afterEach(() => {
+    configureWebSettingsEnv({})
+  })
+
+  it('routes the three map settings to webSettings and keeps other keys in memory', async () => {
+    const stored = new Map<string, string | number | boolean>()
+    let locked = false
+    configureWebSettingsEnv({
+      openDb: async () => ({
+        meta: {
+          get: async (key: string) =>
+            stored.has(key) ? { key, value: stored.get(key) as string } : undefined,
+          put: async ({ key, value }: { key: string; value: string | number | boolean }) => {
+            stored.set(key, value)
+          },
+          delete: async (key: string) => {
+            stored.delete(key)
+          },
+          listByPrefix: async () => [],
+        },
+      }),
+      loadCore: async () => ({
+        sealOutboxMedia: (_ring: unknown, plain: Uint8Array) => Uint8Array.from([7, ...plain]),
+        openMedia: (_ring: unknown, bytes: Uint8Array) => bytes.subarray(1),
+      }),
+      getKeyRing: () => {
+        if (locked) throw new VaultLockedError()
+        return {} as never
+      },
+    })
+    await route('set_setting', { key: 'web_map_tiles_consent', value: '1' })
+    await route('set_setting', { key: 'map_tile_source', value: 'maptiler' })
+    await route('set_setting', { key: 'maptiler_api_key', value: 'pk-123' })
+    await route('set_setting', { key: 'theme', value: 'dark' })
+    expect([...stored.keys()].sort()).toEqual([
+      'web-setting:map_tile_source',
+      'web-setting:maptiler_api_key',
+      'web-setting:web_map_tiles_consent',
+    ])
+    expect(JSON.stringify([...stored.values()])).not.toContain('pk-123')
+    await expect(route('get_setting', { key: 'maptiler_api_key' })).resolves.toBe('pk-123')
+    await expect(route('get_setting', { key: 'map_tile_source' })).resolves.toBe('maptiler')
+    await expect(route('get_setting', { key: 'theme' })).resolves.toBe('dark')
+    await route('delete_setting', { key: 'maptiler_api_key' })
+    await expect(route('get_setting', { key: 'maptiler_api_key' })).resolves.toBeNull()
+    locked = true
+    await expect(route('get_setting', { key: 'map_tile_source' })).rejects.toThrow(
+      'vault is locked',
+    )
+    // Session-only keys keep working while locked, as before.
+    await expect(route('get_setting', { key: 'theme' })).resolves.toBe('dark')
+  })
+
+  it('serves list_map_pins from the handler table', () => {
+    expect(classes('list_map_pins')).toEqual(['implemented'])
   })
 })

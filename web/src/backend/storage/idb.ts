@@ -36,6 +36,13 @@ export const OUTBOX_META_PREFIX = 'outbox-'
 /** Retention's "first seen pushed" times (`<prefix><entryId>`), reset with `drafts.clearPushed`. */
 export const OUTBOX_PUSHED_AT_PREFIX = `${OUTBOX_META_PREFIX}pushed-at:`
 
+/**
+ * Meta keys with this prefix hold the persisted web settings (`commands/webSettings.ts`, Phase
+ * 17.2: map tiles consent, tile source, the SEALED MapTiler key). Preferences, not cache: they
+ * survive `clearCache()`; `clearAll()` wipes them.
+ */
+export const WEB_SETTING_PREFIX = 'web-setting:'
+
 /** The device store holds a single record under this out-of-line key. */
 const DEVICE_KEY = 'self'
 
@@ -45,7 +52,10 @@ export const WRAPPED_MASTER_HEX_LEN = 134
 const RAW_KEY_HEX_LEN = 64
 
 const isPreservedMetaKey = (k: string): boolean =>
-  k.startsWith(JOURNAL_SEEN_PREFIX) || k.startsWith(OUTBOX_META_PREFIX) || k === CACHE_LIMIT_KEY
+  k.startsWith(JOURNAL_SEEN_PREFIX) ||
+  k.startsWith(OUTBOX_META_PREFIX) ||
+  k.startsWith(WEB_SETTING_PREFIX) ||
+  k === CACHE_LIMIT_KEY
 
 export class StorageUnavailableError extends Error {
   constructor(message = 'IndexedDB is unavailable (private mode or blocked)') {
@@ -638,7 +648,7 @@ export class WebDb {
   /**
    * Drops cached ciphertext (files, blobs, meta). KEEPS unpushed drafts and their `outbox/` media, the device record, the
    * `journal-seen:` lock-state hints (see `JOURNAL_SEEN_PREFIX`), the drafts' `outbox-` retention
-   * state and the `CACHE_LIMIT_KEY` preference.
+   * state, the `CACHE_LIMIT_KEY` preference and the `WEB_SETTING_PREFIX` web settings.
    */
   clearCache(): Promise<void> {
     return this.tx([STORE_FILES, STORE_BLOBS, STORE_META], 'readwrite', async (stores) => {

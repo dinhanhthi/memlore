@@ -8,6 +8,7 @@ import {
   OUTBOX_META_PREFIX,
   StorageQuotaError,
   StorageUnavailableError,
+  WEB_SETTING_PREFIX,
   WRAPPED_MASTER_HEX_LEN,
   assertDeviceRecord,
   openWebDb,
@@ -376,6 +377,15 @@ describe('clearCache / clearAll', () => {
     expect((await db.meta.get(CACHE_LIMIT_KEY))?.value).toBe(123)
     await db.clearAll()
     expect(await db.meta.get(CACHE_LIMIT_KEY)).toBeUndefined()
+  })
+
+  it('clearCache keeps the persisted web settings and clearAll wipes them', async () => {
+    const key = `${WEB_SETTING_PREFIX}web_map_tiles_consent`
+    await db.meta.put({ key, value: '1' })
+    await db.clearCache()
+    expect((await db.meta.get(key))?.value).toBe('1')
+    await db.clearAll()
+    expect(await db.meta.get(key)).toBeUndefined()
   })
 
   it('blobs.clear drops only blobs', async () => {
