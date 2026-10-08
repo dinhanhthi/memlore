@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadCore, type Core } from '../../core/core'
+import { loadCore, sealOutboxIntentV2, type Core } from '../../core/core'
 import { DriveReader, DriveWriter, VaultNotReadyError } from '../drive/client'
 import {
   FakeDrive,
@@ -707,6 +707,34 @@ describe('onboardComplete: device id', () => {
     await env.db.drafts.put({ entryId, sealed, updatedAt: 1, pushedHash })
     await run(env)
     expect(await env.db.drafts.list()).toEqual([{ entryId, sealed, updatedAt: 1 }])
+  })
+
+  it('no device record + a v2 (journal) draft of THIS vault: onboards, not a conflict', async () => {
+    const env = await setup()
+    const meta = JSON.parse(text(fixtureBytes(fixture, META))) as { master_fingerprint: string }
+    const recovery = JSON.parse(text(fixtureBytes(fixture, RECOVERY))) as { wrapped_master: string }
+    const ring = core.KeyRing.fromRecovery(
+      fixture.recovery_phrase,
+      recovery.wrapped_master,
+      meta.master_fingerprint,
+    )
+    ring.loadContentList(text(fixtureBytes(fixture, CONTENT)))
+    const journalId = 'eeeeeeee-1111-4222-8333-000000000001'
+    const sealed = sealOutboxIntentV2(core, ring, {
+      kind: 'create_journal',
+      web_device_id: FIXED_ID,
+      web_updated_at_secs: 1_700_000_000,
+      journal_id: journalId,
+      name: 'Travel',
+      color: null,
+      auto_tag_ids: [],
+    })
+    ring.lock()
+    await env.db.drafts.put({ entryId: `j-${journalId}`, kind: 'journal', sealed, updatedAt: 1 })
+    await run(env)
+    expect(await env.db.drafts.list()).toEqual([
+      { entryId: `j-${journalId}`, kind: 'journal', sealed, updatedAt: 1 },
+    ])
   })
 
   it('no device record + drafts that do not open under this vault: refused, ZERO writes', async () => {

@@ -26,6 +26,21 @@
  * flag off: returns without touching Drive. Single-flight per tab: a call during a run returns ONE
  * shared follow-up run, so a save made during a push is pushed by it. The Web Lock serializes tabs.
  *
+ * Outbox v2 (Phase 20.3): a journal, tag, template or trash draft holds sealed v2 bytes and is
+ * uploaded as-is under `[jtpd]-<id>.bin` (safeUpload re-opens it with `openOutboxIntent`). Entry
+ * drafts are untouched: the same v1 bytes under `<entryId>.bin`. Three rules keep drafts queued
+ * (counted in `held` and `pending`, never `skipped`, nothing written for them):
+ *  - v2 drafts while no slot-holding desktop advertises `outbox_versions ∋ 2` (`outboxV2Capable`);
+ *  - hold-back: an entry draft whose `journal_id` or `tags_add` names a journal / tag this browser
+ *    created (a journal or tag draft is still stored, pushed or not) that the pulled `journals/` /
+ *    `tags.bin` do not show yet. So no desktop ever reads the entry before the create, whose
+ *    absence it would refuse for good (`journal_not_found` / `tag_not_found`). A held draft is
+ *    retried by the next push (every interval pull requests one while drafts are pending);
+ *  - a trash draft `d-<E>` while an entry draft `<E>` is still unpushed after this run's entry
+ *    uploads (held, failed or skipped). Trash drafts upload after every entry draft of a run. A
+ *    desktop refuses a trash of an entry it does not have for good (`absent`), and that entry
+ *    would then appear live. (Its importer applies `<E>.bin` before `d-<E>.bin` in one cycle.)
+ *
  * Heavy modules are imported lazily by the default env, so importing this file has no side effects.
  */
 
@@ -35,14 +50,23 @@ import type { DriveReader, DriveWriterDeps } from '../drive/client'
 import { createDraftManager, type DraftManager } from '../drafts'
 import { ERROR_NAMES } from '../errorNames'
 import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '../keys'
-import { OUTBOX_BLOB_PREFIX, type DraftRecord, type WebDb } from '../storage/idb'
+import { outboxIntentPath } from '../drive/paths'
+import {
+  OUTBOX_BLOB_PREFIX,
+  draftKind,
+  draftTargetId,
+  type DraftRecord,
+  type WebDb,
+} from '../storage/idb'
 import type { ExpectedVaultState } from './fence'
 import { META_PATH, parseMetaText, readVersions, type MetaState } from './onboard'
 import { packOutboxUploadIntents, type OutboxEntryV1 } from './outbox'
 import {
   SealVerifyError,
   createOutboxWriter,
+  openV2Intent,
   safeEnsureOutboxFolder,
+  v2IntentTarget,
   type SafeUploadDeps,
   type SafeUploadIntent,
 } from './safeUpload'
@@ -54,6 +78,8 @@ export interface PushResult {
   skipped: number
   /** Unpushed drafts after the run. */
   pending: number
+  /** Drafts kept queued by the v2 capability, hold-back or trash rule (see the header). Absent: none. */
+  held?: number
   /** Why the run stopped early. Every draft not yet pushed is kept. */
   error?: unknown
 }
@@ -78,7 +104,25 @@ export interface PushDeps {
   /** Default `fetchWriteFlag` (inside `safeUpload`). */
   fetchWriteFlagImpl?: () => Promise<boolean>
   revalidatePull?: () => Promise<void> | void
+  /**
+   * The v2 capability and the reflected taxonomy, read only when some draft is a v2 draft.
+   * Absent or failing: no capability and nothing reflected (fail-closed: v2 and dependent entry
+   * drafts stay queued).
+   */
+  v2State?: () => Promise<V2PushState>
 }
+
+/** What the pulled cloud says, for the v2 rules (see the header). */
+export interface V2PushState {
+  /** Some slot-holding desktop advertises `outbox_versions ∋ 2` (`Puller.v2Desktops`). */
+  outboxV2Capable: boolean
+  /** Journal ids in the pulled `journals/`, any state (`Taxonomy.knownJournalIds`). */
+  journalIds: ReadonlySet<string>
+  /** Live tag ids in the pulled `tags.bin`. */
+  tagIds: ReadonlySet<string>
+}
+
+const NO_V2: V2PushState = { outboxV2Capable: false, journalIds: new Set(), tagIds: new Set() }
 
 export interface PushEnv {
   isUnlocked: () => boolean
@@ -121,6 +165,15 @@ async function buildDeps(): Promise<PushDeps> {
     // A fence refusal re-validates through the read session's pull (it never writes).
     revalidatePull: async () => {
       await (await readEnv().session()).pull()
+    },
+    v2State: async () => {
+      const session = await readEnv().session()
+      const taxonomy = await session.ready()
+      return {
+        outboxV2Capable: session.outboxV2Capable?.() ?? false,
+        journalIds: new Set(taxonomy.knownJournalIds),
+        tagIds: new Set(taxonomy.tags.map((t) => t.id)),
+      }
     },
   }
 }
@@ -246,6 +299,32 @@ function openEntry(core: Core, ring: KeyRing, draft: DraftRecord): OutboxEntryV1
   return parsed as unknown as OutboxEntryV1
 }
 
+/** The upload intent of one v2 draft, or null (logged) when it must be skipped. */
+function packV2Draft(
+  s: PushSession,
+  p: Prepared,
+  ring: KeyRing,
+  draft: DraftRecord,
+): SafeUploadIntent[] | null {
+  try {
+    const intent = openV2Intent(s.deps.core, ring, draft.sealed)
+    const { prefix, id } = v2IntentTarget(intent)
+    // The key names the body's kind and id, as the desktop requires of the file name.
+    if (draft.entryId !== `${prefix}-${id}`) throw new Error('not a v2 intent for this draft')
+    return [
+      {
+        path: outboxIntentPath(p.ownId, p.localGen, prefix, id),
+        bytes: draft.sealed,
+        intended: { kind: 'intent_v2', intent },
+      },
+    ]
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : typeof error
+    console.warn(`Skipping draft ${draft.entryId}: it cannot be pushed yet (${reason})`)
+    return null
+  }
+}
+
 /** The sealed outbox blob at `path` and its plaintext (throws when missing or unopenable). */
 async function openBlob(
   s: PushSession,
@@ -302,6 +381,85 @@ async function packDraft(
 }
 
 // ---------------------------------------------------------------------------------------------
+// v2 capability and hold-back
+// ---------------------------------------------------------------------------------------------
+
+async function readV2State(s: PushSession): Promise<V2PushState> {
+  if (s.deps.v2State === undefined) return NO_V2
+  try {
+    return await s.deps.v2State()
+  } catch (error) {
+    if (error instanceof VaultLockedError) throw error
+    return NO_V2
+  }
+}
+
+/** Does this entry draft name a journal / tag created on this browser and not reflected yet? */
+function isHeldBack(
+  core: Core,
+  ring: KeyRing,
+  draft: DraftRecord,
+  created: { journals: ReadonlySet<string>; tags: ReadonlySet<string> },
+  state: V2PushState,
+): boolean {
+  let entry: OutboxEntryV1
+  try {
+    entry = openEntry(core, ring, draft)
+  } catch {
+    return false // `packDraft` logs and skips it
+  }
+  const journal = entry.fields.journal_id?.value
+  if (journal !== undefined && created.journals.has(journal) && !state.journalIds.has(journal)) {
+    return true
+  }
+  return Object.keys(entry.fields.tags_add).some(
+    (tag) => created.tags.has(tag) && !state.tagIds.has(tag),
+  )
+}
+
+/**
+ * Splits the unpushed drafts into those this run may push and the number held (see the header).
+ * The v2 state is read only when a v2 draft exists, so a vault without any keeps today's path.
+ */
+async function selectDrafts(
+  s: PushSession,
+  unpushed: readonly DraftRecord[],
+): Promise<{ ready: DraftRecord[]; held: number }> {
+  const all = await s.deps.db.drafts.list()
+  const createdOf = (kind: 'journal' | 'tag'): Set<string> =>
+    new Set(all.filter((d) => draftKind(d) === kind).map(draftTargetId))
+  const created = { journals: createdOf('journal'), tags: createdOf('tag') }
+  const anyV2 = all.some((d) => draftKind(d) !== 'entry')
+  if (!anyV2) return { ready: [...unpushed], held: 0 }
+  const state = await readV2State(s)
+  const ring = getKeyRing()
+  const ready: DraftRecord[] = []
+  const heldEntries = new Set<string>()
+  for (const draft of unpushed) {
+    const kind = draftKind(draft)
+    const hold =
+      kind === 'entry'
+        ? isHeldBack(s.deps.core, ring, draft, created, state)
+        : !state.outboxV2Capable
+    if (!hold) ready.push(draft)
+    else if (kind === 'entry') heldEntries.add(draft.entryId)
+  }
+  // A trash waits for its held entry draft; the rest of the trash goes after every entry.
+  const trash = ready.filter((d) => draftKind(d) === 'trash')
+  const pushable = [
+    ...ready.filter((d) => draftKind(d) !== 'trash'),
+    ...trash.filter((d) => !heldEntries.has(draftTargetId(d))),
+  ]
+  return { ready: pushable, held: unpushed.length - pushable.length }
+}
+
+/** Entry ids with an unpushed entry draft right now. */
+async function unpushedEntryIds(s: PushSession): Promise<Set<string>> {
+  const unpushed = await s.drafts.listUnpushedDrafts()
+  return new Set(unpushed.filter((d) => draftKind(d) === 'entry').map((d) => d.entryId))
+}
+
+// ---------------------------------------------------------------------------------------------
 // pushAll
 // ---------------------------------------------------------------------------------------------
 
@@ -318,15 +476,22 @@ async function pushOnce(): Promise<PushResult> {
   }
   let pushed = 0
   let skipped = 0
+  let held = 0
   let s: PushSession | null = null
+  const withHeld = (r: PushResult): PushResult => (held > 0 ? { ...r, held } : r)
   try {
     s = await getSession()
     assertSameEpoch()
     if (!env.cachedWriteFlag()) return { pushed, skipped, pending: await pending(s) }
-    const drafts = [...(await s.drafts.listUnpushedDrafts())].sort(
+    const unpushed = [...(await s.drafts.listUnpushedDrafts())].sort(
       (a, b) => a.updatedAt - b.updatedAt,
     )
-    if (drafts.length === 0) return { pushed, skipped, pending: 0 }
+    if (unpushed.length === 0) return { pushed, skipped, pending: 0 }
+    const selected = await selectDrafts(s, unpushed)
+    assertSameEpoch()
+    held = selected.held
+    const drafts = selected.ready
+    if (drafts.length === 0) return withHeld({ pushed, skipped, pending: await pending(s) })
     const p = await prepare(s)
     assertSameEpoch()
     if (!s.folderReady) {
@@ -334,10 +499,22 @@ async function pushOnce(): Promise<PushResult> {
       assertSameEpoch()
       s.folderReady = true
     }
+    let unpushedEntries: Set<string> | null = null
     for (const draft of drafts) {
       assertSameEpoch()
+      if (draftKind(draft) === 'trash') {
+        // Every entry draft of this run is done (trash goes last): is the target's still pending?
+        unpushedEntries ??= await unpushedEntryIds(s)
+        if (unpushedEntries.has(draftTargetId(draft))) {
+          held += 1
+          continue
+        }
+      }
       const ring = getKeyRing()
-      const intents = await packDraft(s, p, ring, draft)
+      const intents =
+        draftKind(draft) === 'entry'
+          ? await packDraft(s, p, ring, draft)
+          : packV2Draft(s, p, ring, draft)
       if (intents === null) {
         assertSameEpoch() // a lock zeroizes the ring, so the open failed: stop, do not skip
         skipped += 1
@@ -363,10 +540,10 @@ async function pushOnce(): Promise<PushResult> {
         skipped += 1
       }
     }
-    return { pushed, skipped, pending: await pending(s) }
+    return withHeld({ pushed, skipped, pending: await pending(s) })
   } catch (error) {
     const left = s === null ? 0 : await pending(s).catch(() => 0)
-    return { pushed, skipped, pending: left, error }
+    return withHeld({ pushed, skipped, pending: left, error })
   }
 }
 

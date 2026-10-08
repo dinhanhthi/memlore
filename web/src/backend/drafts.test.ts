@@ -54,6 +54,31 @@ describe('DraftManager', () => {
     expect(await manager.getDraft('entry-1')).toBeUndefined()
   })
 
+  it('lists entry drafts only for the entry overlay, legacy drafts included', async () => {
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+    await db.drafts.put({ entryId: id, sealed: new Uint8Array([1]), updatedAt: 1 })
+    await db.drafts.put({ entryId: 'e2', kind: 'entry', sealed: new Uint8Array([2]), updatedAt: 2 })
+    await db.drafts.put({
+      entryId: `j-${id}`,
+      kind: 'journal',
+      sealed: new Uint8Array([3]),
+      updatedAt: 3,
+    })
+    await db.drafts.put({
+      entryId: `d-${id}`,
+      kind: 'trash',
+      sealed: new Uint8Array([4]),
+      updatedAt: 4,
+    })
+
+    const entries = await manager.listEntryDrafts()
+
+    expect(entries.map((d) => d.entryId).sort()).toEqual([id, 'e2'].sort())
+    // Every kind is still an unsent change.
+    expect(await manager.listUnpushedDrafts()).toHaveLength(4)
+    expect(unpushedDraftCount()).toBe(4)
+  })
+
   it('installs beforeunload listener that warns when dirty', async () => {
     const listeners: Record<string, ((e: BeforeUnloadEvent) => void)[]> = {}
     const mockWindow = {

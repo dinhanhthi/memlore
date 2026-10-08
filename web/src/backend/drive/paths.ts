@@ -66,6 +66,23 @@ export function outboxMediaPath(
   return `${outboxFolderPath(ownId, generation)}/m-${mediaId}${thumb ? '.thumb' : ''}`
 }
 
+/** File-name prefix of a v2 outbox intent (memlore-core `OutboxIntentPrefix`). */
+export type OutboxIntentPrefix = 'j' | 't' | 'p' | 'd'
+
+/**
+ * `generations/g-<N>/<ownId>/outbox/<prefix>-<id>.bin`: a v2 intent (journal, tag, template,
+ * trash). The desktop importer refuses the file unless `<id>` is the body's target id.
+ */
+export function outboxIntentPath(
+  ownId: string,
+  generation: number,
+  prefix: OutboxIntentPrefix,
+  id: string,
+): string {
+  if (!isUuid(id)) throw new RangeError('v2 intent id must be a uuid')
+  return `${outboxFolderPath(ownId, generation)}/${prefix}-${id}.bin`
+}
+
 export function outboxFolderPath(ownId: string, generation: number): string {
   return `${GENERATIONS_FOLDER}/${generationFolderName(generation)}/${ownId}/${OUTBOX_FOLDER}`
 }
@@ -73,7 +90,8 @@ export function outboxFolderPath(ownId: string, generation: number): string {
 /**
  * The ONLY paths the web may write (safety contract 1):
  * the own device slot, and the FLAT own outbox of the local generation (any generation number,
- * 0 included). Anything else is false: protocol files, entries/, media/, peers, other
+ * 0 included): `<uuid>.bin`, `[jtpd]-<uuid>.bin` (v2 intents), `m-<uuid>` and `m-<uuid>.thumb`.
+ * Keep in sync with `isOutboxIntentPath` in `sync/safeUpload.ts`. Anything else is false: protocol files, entries/, media/, peers, other
  * generations, traversal, unusual characters. Validates its inputs before building a pattern.
  */
 export function isAllowedWritePath(path: unknown, ownId: unknown, localGen: unknown): boolean {
@@ -82,7 +100,7 @@ export function isAllowedWritePath(path: unknown, ownId: unknown, localGen: unkn
   }
   const slot = new RegExp(`^\\.meta/keyring/devices/${ownId}\\.json$`)
   const outbox = new RegExp(
-    `^generations/g-${localGen}/${ownId}/outbox/(?:${UUID_SOURCE}\\.bin|m-${UUID_SOURCE}(?:\\.thumb)?)$`,
+    `^generations/g-${localGen}/${ownId}/outbox/(?:(?:[jtpd]-)?${UUID_SOURCE}\\.bin|m-${UUID_SOURCE}(?:\\.thumb)?)$`,
   )
   return slot.test(path) || outbox.test(path)
 }

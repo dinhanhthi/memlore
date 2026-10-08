@@ -7,6 +7,7 @@ import {
   isValidGeneration,
   isValidOwnId,
   outboxEntryPath,
+  outboxIntentPath,
   outboxMediaPath,
   parseLogicalPath,
   splitPath,
@@ -50,6 +51,30 @@ describe('paths', () => {
     expect(isAllowedWritePath(outboxEntryPath(OWN, 0, UUID), OWN, 0)).toBe(true)
     expect(isAllowedWritePath(outboxMediaPath(OWN, 4, UUID), OWN, 4)).toBe(true)
     expect(isAllowedWritePath(outboxMediaPath(OWN, 4, UUID, true), OWN, 4)).toBe(true)
+  })
+
+  it('allows v2 intent names j-|t-|p-|d-<uuid>.bin in the own outbox only', () => {
+    for (const prefix of ['j', 't', 'p', 'd'] as const) {
+      const path = outboxIntentPath(OWN, 3, prefix, UUID)
+      expect(path).toBe(`generations/g-3/${OWN}/outbox/${prefix}-${UUID}.bin`)
+      expect(isAllowedWritePath(path, OWN, 3), path).toBe(true)
+    }
+    const outbox = `generations/g-0/${OWN}/outbox`
+    for (const bad of [
+      `${outbox}/x-${UUID}.bin`,
+      `${outbox}/jj-${UUID}.bin`,
+      `${outbox}/j-${UUID}`,
+      `${outbox}/j-${UUID}.thumb`,
+      `${outbox}/j-${UUID}.bin.thumb`,
+      `${outbox}/j-journal-0001.bin`,
+      `${outbox}/j-${UUID.toUpperCase()}.bin`,
+      `${outbox}/j-../${UUID}.bin`,
+      `${outbox}/../outbox/j-${UUID}.bin`,
+      `generations/g-1/${OWN}/outbox/j-${UUID}.bin`,
+    ]) {
+      expect(isAllowedWritePath(bad, OWN, 0), bad).toBe(false)
+    }
+    expect(() => outboxIntentPath(OWN, 0, 'j', 'not-a-uuid')).toThrow(RangeError)
   })
 
   it('rejects when inputs are invalid or non-strings', () => {

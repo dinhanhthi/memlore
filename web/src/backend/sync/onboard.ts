@@ -40,7 +40,7 @@
  *  - If the phrase is wrong AND the generation mismatches, the wrong phrase wins (as desktop).
  */
 
-import { loadCore, type Core } from '../../core/core'
+import { loadCore, openOutboxIntent, type Core } from '../../core/core'
 import {
   DriveHttpError,
   DriveNotFoundError,
@@ -54,7 +54,7 @@ import { deviceSlotPath, isValidGeneration, isValidOwnId } from '../drive/paths'
 import { ERROR_NAMES } from '../errorNames'
 import { resetReadSession } from '../commands/readSession'
 import { lock, setKeyRing, type KeyRing } from '../keys'
-import type { DeviceRecord, WebDb } from '../storage/idb'
+import { draftKind, type DeviceRecord, type DraftRecord, type WebDb } from '../storage/idb'
 
 // ---------------------------------------------------------------------------------------------
 // Errors
@@ -512,9 +512,11 @@ export function applyContentText(ring: KeyRing, text: string | null, v: Versions
 }
 
 /** True when `sealed` is an outbox intent this ring can open. */
-function opensUnder(core: Core, ring: KeyRing, sealed: Uint8Array): boolean {
+function opensUnder(core: Core, ring: KeyRing, draft: DraftRecord): boolean {
   try {
-    core.openOutboxEntry(ring, sealed)
+    // A v2 draft (journal, tag, template, trash) is frame 2, which `openOutboxEntry` refuses.
+    if (draftKind(draft) === 'entry') core.openOutboxEntry(ring, draft.sealed)
+    else openOutboxIntent(core, ring, draft.sealed)
     return true
   } catch {
     return false
@@ -692,7 +694,7 @@ export async function onboardComplete(
     }
     // No record to tell which vault the drafts belong to: they are this vault's only if every one
     // opens under its keys. Otherwise they would be orphaned exactly like another vault's drafts.
-    if (existing === undefined && drafts.some((d) => !opensUnder(core, ring, d.sealed))) {
+    if (existing === undefined && drafts.some((d) => !opensUnder(core, ring, d))) {
       throw new DeviceRecordConflictError()
     }
     // IndexedDB must accept writes BEFORE the cloud slot is written, or a storage failure would

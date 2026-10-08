@@ -134,6 +134,11 @@ export interface ReadSession {
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
   ready: () => Promise<Taxonomy>
   /**
+   * Phase 20.3: some slot-holding desktop of the last refresh advertises `outbox_versions ∋ 2`.
+   * Absent in test doubles (= false).
+   */
+  outboxV2Capable?: () => boolean
+  /**
    * Waits for the outbox mutex (held by one retention pass or one outbox write at a time) and
    * resolves its release. Never await `ready()` or `pull()` while holding it: both can run
    * retention, which waits for the same mutex.
@@ -414,12 +419,12 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     return value
   }
 
-  // Lists every draft (pushed ones too: a pushed edit may not be imported yet), which also
-  // recomputes the page's dirty flag after a reload. Intents already in the overlay win: they
-  // were set by a write after these drafts were read.
+  // Lists every entry draft (pushed ones too: a pushed edit may not be imported yet; v2 drafts
+  // carry no entry intent), which also recomputes the page's dirty flag after a reload. Intents
+  // already in the overlay win: they were set by a write after these drafts were read.
   const hydrate = async (): Promise<void> => {
     const started = epoch
-    const drafts = await createDraftManager({ db }).listDrafts()
+    const drafts = await createDraftManager({ db }).listEntryDrafts()
     assertSameEpoch(started)
     if (drafts.length === 0) return
     const ring = getKeyRing()
@@ -536,6 +541,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     db,
     core,
     ready,
+    outboxV2Capable: () => puller.v2Desktops.size > 0,
     acquireOutboxLock,
     pull,
     dispose: () => {

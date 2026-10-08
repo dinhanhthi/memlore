@@ -108,8 +108,29 @@ async function deleteCachedBlobs(blobs: IDBObjectStore): Promise<void> {
   )
 }
 
+/** What a draft carries: an entry intent (v1) or one v2 outbox intent (Phase 20.2). */
+export type DraftKind = 'entry' | 'journal' | 'tag' | 'template' | 'trash'
+
+/**
+ * Key prefix of each non-entry draft kind: the v2 outbox file-name prefix (memlore-core
+ * `OutboxIntentPrefix`). Entry drafts keep the bare entry id, so a trash draft and an edit draft
+ * of the same entry coexist.
+ */
+const DRAFT_KEY_PREFIX = {
+  journal: 'j-',
+  tag: 't-',
+  template: 'p-',
+  trash: 'd-',
+} as const satisfies Record<Exclude<DraftKind, 'entry'>, string>
+
 export interface DraftRecord {
+  /**
+   * The store key. An entry draft: the entry id. Any other kind: `DRAFT_KEY_PREFIX[kind]` + the
+   * target id (journal, tag, template or the trashed entry).
+   */
   entryId: string
+  /** Absent (every record written before Phase 20, and every entry draft) = `'entry'`. */
+  kind?: DraftKind
   /** Sealed (encrypted) draft bytes. Sealing happens outside this module. */
   sealed: Uint8Array
   updatedAt: number
@@ -118,6 +139,16 @@ export interface DraftRecord {
    * 16.5) or different from the hash of `sealed`: the draft is unpushed.
    */
   pushedHash?: string
+}
+
+export function draftKind(rec: Pick<DraftRecord, 'kind'>): DraftKind {
+  return rec.kind ?? 'entry'
+}
+
+/** The id the draft acts on: the entry id, or the key without its kind prefix. */
+export function draftTargetId(rec: Pick<DraftRecord, 'kind' | 'entryId'>): string {
+  const kind = draftKind(rec)
+  return kind === 'entry' ? rec.entryId : rec.entryId.slice(DRAFT_KEY_PREFIX[kind].length)
 }
 
 /** No field here can hold raw key bytes: `wrappedMasterHex` is the wrapped blob, `kekSaltHex` is public. */
@@ -217,8 +248,28 @@ function assertBlobRecord(r: BlobRecord): void {
 
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/
 
+const DRAFT_KEY_PREFIX_RE = /^[jtpd]-/
+
+function assertDraftKey(r: DraftRecord): void {
+  const kind: unknown = r.kind
+  if (kind === undefined || kind === 'entry') {
+    if (DRAFT_KEY_PREFIX_RE.test(r.entryId)) {
+      throw new TypeError('an entry draft key must not carry an intent prefix')
+    }
+    return
+  }
+  if (typeof kind !== 'string' || !Object.hasOwn(DRAFT_KEY_PREFIX, kind)) {
+    throw new TypeError('draft kind is unknown')
+  }
+  const prefix = DRAFT_KEY_PREFIX[kind as keyof typeof DRAFT_KEY_PREFIX]
+  if (!r.entryId.startsWith(prefix) || r.entryId.length === prefix.length) {
+    throw new TypeError(`a ${kind} draft key must be "${prefix}<id>"`)
+  }
+}
+
 function assertDraftRecord(r: DraftRecord): void {
   assertString(r.entryId, 'draft entryId')
+  assertDraftKey(r)
   assertBytes(r.sealed, 'draft sealed bytes')
   assertNumber(r.updatedAt, 'draft updatedAt')
   const hash: unknown = r.pushedHash

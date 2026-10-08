@@ -11,6 +11,8 @@ import {
   WEB_SETTING_PREFIX,
   WRAPPED_MASTER_HEX_LEN,
   assertDeviceRecord,
+  draftKind,
+  draftTargetId,
   openWebDb,
   sameBytes,
   type DeviceRecord,
@@ -142,6 +144,54 @@ describe('drafts and meta', () => {
           updatedAt: 1,
           pushedHash: bad as unknown as string,
         }),
+      ).toThrow(TypeError)
+    }
+  })
+
+  it('reads a draft stored without a kind (older builds) as an entry draft', async () => {
+    await db.drafts.put({ entryId: 'e1', sealed: bytes(8), updatedAt: 1 })
+    const rec = await db.drafts.get('e1')
+    expect(rec).toBeDefined()
+    expect(rec && 'kind' in rec).toBe(false)
+    expect(rec && draftKind(rec)).toBe('entry')
+    expect(rec && draftTargetId(rec)).toBe('e1')
+  })
+
+  it('keys a non-entry draft by its kind prefix and target id', async () => {
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+    const cases = [
+      ['journal', 'j-'],
+      ['tag', 't-'],
+      ['template', 'p-'],
+      ['trash', 'd-'],
+    ] as const
+    for (const [kind, prefix] of cases) {
+      await db.drafts.put({ entryId: `${prefix}${id}`, kind, sealed: bytes(8), updatedAt: 1 })
+      const rec = await db.drafts.get(`${prefix}${id}`)
+      expect(rec && draftKind(rec)).toBe(kind)
+      expect(rec && draftTargetId(rec)).toBe(id)
+    }
+    // A trash draft and an edit draft of the same entry coexist.
+    await db.drafts.put({ entryId: id, sealed: bytes(8), updatedAt: 1 })
+    expect(await db.drafts.list()).toHaveLength(5)
+    const bad: Array<[string, unknown]> = [
+      [id, 'journal'], // kind without its prefix
+      [`t-${id}`, 'journal'], // prefix of another kind
+      [`j-${id}`, undefined], // a prefixed key is never an entry draft
+      [`j-${id}`, 'entry'],
+      ['j-', 'journal'], // no target id
+      [`x-${id}`, 'other'], // unknown kind
+    ]
+    for (const [entryId, kind] of bad) {
+      expect(
+        () =>
+          db.drafts.put({
+            entryId,
+            kind: kind as 'journal',
+            sealed: bytes(8),
+            updatedAt: 1,
+          }),
+        `${entryId} ${String(kind)}`,
       ).toThrow(TypeError)
     }
   })

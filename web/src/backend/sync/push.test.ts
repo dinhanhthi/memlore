@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadCore, type Core } from '../../core/core'
+import { loadCore, sealOutboxIntentV2, type Core, type OutboxIntentV2 } from '../../core/core'
 import { resetClock } from '../clock'
 import {
   DriveProtocolError,
@@ -33,7 +33,7 @@ import { RecoveryFenceError, resumeWrites } from './fence'
 import { resetFormatGuardLatch } from './formatGuard'
 import { META_PATH, parseMetaText, readVersions } from './onboard'
 import { packOutboxUploadIntents, type OutboxEntryV1, type OutboxMediaRef } from './outbox'
-import { MissingVaultStateError, configurePushEnv, pushAll } from './push'
+import { MissingVaultStateError, configurePushEnv, pushAll, type V2PushState } from './push'
 import { createOutboxWriter, type SafeUploadDeps } from './safeUpload'
 
 const WEB_ID = 'cccccccc-1111-4222-8333-dddddddddddd'
@@ -43,6 +43,9 @@ const CONTENT = '.meta/keyring/_content.json'
 const ENTRY_A = '00000000-0000-4000-8000-00000000000a'
 const ENTRY_B = '00000000-0000-4000-8000-00000000000b'
 const MEDIA_1 = '00000000-0000-4000-8000-000000000101'
+const JOURNAL_1 = '00000000-0000-4000-8000-0000000000c1'
+const TAG_1 = '00000000-0000-4000-8000-0000000000c2'
+const TEMPLATE_1 = '00000000-0000-4000-8000-0000000000c3'
 
 let realCore: Core
 let fixture: DesktopFixture
@@ -63,6 +66,11 @@ let onFreshFlag: ((call: number) => void) | null
 let freshFlagCalls: number
 let cachedFlag: boolean
 let unlocked: boolean
+/** What the read session reports to the push (capability + reflected taxonomy). */
+let v2: V2PushState
+let v2Reads: number
+/** When set, the read session's v2 state read throws it. */
+let v2Error: unknown
 
 function intent(entryId: string, media: OutboxMediaRef[] = []): OutboxEntryV1 {
   return {
@@ -99,6 +107,56 @@ async function putDraft(entry: OutboxEntryV1, updatedAt: number): Promise<Uint8A
   await db.drafts.put({ entryId: entry.entry_id, sealed, updatedAt })
   return sealed
 }
+
+const BASE = { web_device_id: WEB_ID, web_updated_at_secs: 1_700_000_000 }
+
+const V2_CASES: Array<{
+  key: string
+  kind: 'journal' | 'tag' | 'template' | 'trash'
+  intent: OutboxIntentV2
+}> = [
+  {
+    key: `j-${JOURNAL_1}`,
+    kind: 'journal',
+    intent: {
+      ...BASE,
+      kind: 'create_journal',
+      journal_id: JOURNAL_1,
+      name: 'Travel',
+      color: null,
+      auto_tag_ids: [],
+    },
+  },
+  {
+    key: `t-${TAG_1}`,
+    kind: 'tag',
+    intent: { ...BASE, kind: 'create_tag', tag_id: TAG_1, name: 'beach', color: '#aabbcc' },
+  },
+  {
+    key: `p-${TEMPLATE_1}`,
+    kind: 'template',
+    intent: { ...BASE, kind: 'delete_template', template_id: TEMPLATE_1, base_updated_at: 5 },
+  },
+  {
+    key: `d-${ENTRY_B}`,
+    kind: 'trash',
+    intent: { ...BASE, kind: 'trash_entry', entry_id: ENTRY_B, base_updated_at: 7 },
+  },
+]
+
+async function putV2Draft(c: (typeof V2_CASES)[number], updatedAt: number): Promise<Uint8Array> {
+  const sealed = sealOutboxIntentV2(realCore, ring, c.intent)
+  await db.drafts.put({ entryId: c.key, kind: c.kind, sealed, updatedAt })
+  return sealed
+}
+
+const change = <T>(value: T, base: T) => ({
+  value,
+  base,
+  base_updated_at: 0,
+  change_seq: 2,
+  changed_at_secs: 1_700_000_000,
+})
 
 async function putMedia(mediaId: string, withThumb: boolean): Promise<OutboxMediaRef> {
   const sealed = realCore.sealOutboxMedia(ring, new Uint8Array([1, 2, 3, 4]))
@@ -226,6 +284,9 @@ beforeEach(async () => {
   freshFlagCalls = 0
   cachedFlag = true
   unlocked = true
+  v2 = { outboxV2Capable: true, journalIds: new Set(), tagIds: new Set() }
+  v2Reads = 0
+  v2Error = null
   configurePushEnv({
     isUnlocked: () => unlocked,
     cachedWriteFlag: () => cachedFlag,
@@ -238,6 +299,11 @@ beforeEach(async () => {
         freshFlagCalls += 1
         onFreshFlag?.(freshFlagCalls)
         return freshFlag
+      },
+      v2State: async () => {
+        v2Reads += 1
+        if (v2Error !== null) throw v2Error
+        return v2
       },
     }),
   })
@@ -562,5 +628,187 @@ describe('pushAll', () => {
     expect((await db.drafts.get(ENTRY_A))?.pushedHash).toBe(await sha256Hex(sealedY))
     expect(await isPushed(ENTRY_B)).toBe(true)
     expect(locks.maxActive).toBe(1)
+  })
+})
+
+describe('pushAll: outbox v2 intents (Phase 20.3)', () => {
+  it('uploads each v2 kind under its prefixed name with the sealed v2 bytes', async () => {
+    const sealed = new Map<string, Uint8Array>()
+    for (const [i, c] of V2_CASES.entries()) sealed.set(c.key, await putV2Draft(c, i + 1))
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 4, skipped: 0, pending: 0 })
+    expect(uploadedNames()).toEqual(V2_CASES.map((c) => `${c.key}.bin`))
+    for (const c of V2_CASES) {
+      expect(outbox(`${c.key}.bin`)?.content).toEqual(sealed.get(c.key))
+      expect(await isPushed(c.key)).toBe(true)
+    }
+  })
+
+  it('keeps entry drafts byte-identical v1 next to v2 drafts, and a trash beside an edit of the same entry', async () => {
+    const entrySealed = await putDraft(intent(ENTRY_B), 1)
+    await putV2Draft(V2_CASES[3], 2) // d-<ENTRY_B>
+
+    const result = await pushAll()
+
+    expect(result.pushed).toBe(2)
+    expect(outbox(`${ENTRY_B}.bin`)?.content).toEqual(entrySealed)
+    expect(
+      realCore.openOutboxEntry(ring, outbox(`${ENTRY_B}.bin`)?.content ?? new Uint8Array()),
+    ).toBe(realCore.openOutboxEntry(ring, entrySealed))
+    expect(outbox(`d-${ENTRY_B}.bin`)).toBeDefined()
+  })
+
+  it('keeps v2 drafts queued, writing nothing for them, while no desktop takes v2', async () => {
+    v2 = { ...v2, outboxV2Capable: false }
+    for (const [i, c] of V2_CASES.entries()) await putV2Draft(c, i + 1)
+    await putDraft(intent(ENTRY_A), 10)
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 1, skipped: 0, pending: 4, held: 4 })
+    expect(uploadedNames()).toEqual([`${ENTRY_A}.bin`])
+    for (const c of V2_CASES) expect(await isPushed(c.key)).toBe(false)
+  })
+
+  it('writes nothing at all when every unpushed draft is held', async () => {
+    v2 = { ...v2, outboxV2Capable: false }
+    await putV2Draft(V2_CASES[0], 1)
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 0, skipped: 0, pending: 1, held: 1 })
+    expect(drive.mutating()).toEqual([])
+  })
+
+  it('does not read the v2 state when no v2 draft exists', async () => {
+    await putDraft(intent(ENTRY_A), 1)
+
+    await pushAll()
+
+    expect(v2Reads).toBe(0)
+  })
+
+  it('holds an entry that references a web-created journal until the journal is reflected', async () => {
+    await putV2Draft(V2_CASES[0], 1)
+    const entry = intent(ENTRY_A)
+    entry.fields.journal_id = change(JOURNAL_1, 'other-journal')
+    const sealed = await putDraft(entry, 2)
+
+    // Run 1: the create is pushed, the entry waits (the desktop has not imported it yet).
+    const first = await pushAll()
+    expect(first).toEqual({ pushed: 1, skipped: 0, pending: 1, held: 1 })
+    expect(outbox(`${ENTRY_A}.bin`)).toBeUndefined()
+
+    // Still not in the pulled journals/: still held.
+    const second = await pushAll()
+    expect(second).toEqual({ pushed: 0, skipped: 0, pending: 1, held: 1 })
+
+    // Reflected: pushed.
+    v2 = { ...v2, journalIds: new Set([JOURNAL_1]) }
+    const third = await pushAll()
+    expect(third).toEqual({ pushed: 1, skipped: 0, pending: 0 })
+    expect(outbox(`${ENTRY_A}.bin`)?.content).toEqual(sealed)
+  })
+
+  it('holds an entry that adds a web-created tag until the tag is reflected, even without v2', async () => {
+    v2 = { ...v2, outboxV2Capable: false }
+    await putV2Draft(V2_CASES[1], 1)
+    const entry = intent(ENTRY_A)
+    entry.fields.tags_add = { [TAG_1]: change(true, false) }
+    await putDraft(entry, 2)
+    const other = intent(ENTRY_B)
+    other.fields.tags_add = { 'desktop-tag-0001': change(true, false) }
+    await putDraft(other, 3)
+
+    const result = await pushAll()
+
+    // B references a tag this browser did not create: not held.
+    expect(result).toEqual({ pushed: 1, skipped: 0, pending: 2, held: 2 })
+    expect(uploadedNames()).toEqual([`${ENTRY_B}.bin`])
+
+    v2 = { outboxV2Capable: true, journalIds: new Set(), tagIds: new Set([TAG_1]) }
+    const next = await pushAll()
+    expect(next).toEqual({ pushed: 2, skipped: 0, pending: 0 })
+  })
+
+  it('holds a trash with its held entry draft, then uploads the entry before the trash', async () => {
+    await putV2Draft(V2_CASES[0], 1) // j-<JOURNAL_1>
+    await putV2Draft(V2_CASES[3], 2) // d-<ENTRY_B>, older than its entry draft
+    const entry = intent(ENTRY_B)
+    entry.fields.journal_id = change(JOURNAL_1, 'other-journal')
+    await putDraft(entry, 3)
+
+    const first = await pushAll()
+    expect(first).toEqual({ pushed: 1, skipped: 0, pending: 2, held: 2 })
+    expect(outbox(`${ENTRY_B}.bin`)).toBeUndefined()
+    expect(outbox(`d-${ENTRY_B}.bin`)).toBeUndefined()
+
+    v2 = { ...v2, journalIds: new Set([JOURNAL_1]) }
+    const second = await pushAll()
+    expect(second).toEqual({ pushed: 2, skipped: 0, pending: 0 })
+    expect(uploadedNames()).toEqual([`j-${JOURNAL_1}.bin`, `${ENTRY_B}.bin`, `d-${ENTRY_B}.bin`])
+  })
+
+  it('holds a trash whose entry draft failed to upload in the same run', async () => {
+    await putV2Draft(V2_CASES[3], 1) // d-<ENTRY_B>
+    // Media referenced but never stored: the entry draft is skipped.
+    await putDraft(
+      intent(ENTRY_B, [
+        {
+          media_id: MEDIA_1,
+          file_name: 'a.jpg',
+          file_type: 'image/jpeg',
+          size: 4,
+          has_thumb: false,
+        },
+      ]),
+      2,
+    )
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 0, skipped: 1, pending: 2, held: 1 })
+    expect(outbox(`d-${ENTRY_B}.bin`)).toBeUndefined()
+    expect(await isPushed(`d-${ENTRY_B}`)).toBe(false)
+  })
+
+  it('fails closed when the v2 state cannot be read: v2 and dependent entry drafts stay held', async () => {
+    v2Error = new Error('pull failed')
+    await putV2Draft(V2_CASES[0], 1)
+    const dependent = intent(ENTRY_A)
+    dependent.fields.journal_id = change(JOURNAL_1, 'other-journal')
+    await putDraft(dependent, 2)
+    await putDraft(intent(ENTRY_B), 3)
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 1, skipped: 0, pending: 2, held: 2 })
+    expect(uploadedNames()).toEqual([`${ENTRY_B}.bin`])
+  })
+
+  it('stops the run as locked when the v2 state read reports a lock', async () => {
+    v2Error = new VaultLockedError()
+    await putV2Draft(V2_CASES[0], 1)
+    await putDraft(intent(ENTRY_B), 2)
+
+    const result = await pushAll()
+
+    expect(result.error).toBeInstanceOf(VaultLockedError)
+    expect(result).toMatchObject({ pushed: 0, skipped: 0, pending: 2 })
+    expect(drive.mutating()).toEqual([])
+  })
+
+  it('skips a v2 draft whose body does not match its key, and keeps it', async () => {
+    const sealed = sealOutboxIntentV2(realCore, ring, V2_CASES[0].intent)
+    // A journal body stored under a tag key.
+    await db.drafts.put({ entryId: `t-${JOURNAL_1}`, kind: 'tag', sealed, updatedAt: 1 })
+
+    const result = await pushAll()
+
+    expect(result).toEqual({ pushed: 0, skipped: 1, pending: 1 })
+    expect(uploadedNames()).toEqual([])
+    expect(await db.drafts.get(`t-${JOURNAL_1}`)).toBeDefined()
   })
 })
