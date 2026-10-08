@@ -36,8 +36,10 @@ the desktop updater reads GitHub Releases, so one would break desktop updates.
 ## What one release actually does
 
 `/cf-ship` reads the commits since the platform's last published tag, picks a
-version, writes both changelogs, bumps the version file(s), commits, tags,
-pushes, then waits for CI and verifies what it published.
+version, runs `pnpm format` and commits the formatter's changes on their own
+(`style(release): format before release`), then writes both changelogs, bumps
+the version file(s), commits, tags, pushes, and finally waits for CI and
+verifies what it published.
 
 - **mac:** CI signs, notarizes and publishes a universal `.dmg` plus the
   `latest.json` the in-app updater reads. **25-35 minutes**, almost all of it
