@@ -238,12 +238,12 @@
     "unlock_second_lock_title": "Enter second-lock password",
     "generating_title": "Generating title…",
     "video_cover_aria": "Video attachment",
-    "delete_aria": "Delete entry",
+    "delete_aria": "Move to Trash",
     "locked_entry": "Locked entry",
-    "delete_title": "Delete entry",
-    "delete_description": "This entry will be permanently deleted. This action cannot be undone.",
+    "delete_title": "Move to Trash",
+    "delete_description": "Restore it from Settings → Data → Recently deleted within 30 days.",
     "delete_cancel": "Cancel",
-    "delete_confirm": "Delete"
+    "delete_confirm": "Move to Trash"
   },
   "entry_context": {
     "lock": "Lock",
@@ -276,7 +276,7 @@
     "set_emotion": "Set emotion",
     "set_location": "Set location",
     "move_to_journal": "Move to journal",
-    "delete": "Delete entry",
+    "delete": "Move to Trash",
     "move_to_journal_aria": "Pick destination journal",
     "set_emotion_aria": "Pick an emotion",
     "clear_emotion": "Clear emotion",
@@ -390,7 +390,12 @@
     "not_found": "Entry not found",
     "math_load_failed": "Could not load math rendering. Restart the app and try again.",
     "loading": "Loading...",
-    "title_placeholder": "Untitled"
+    "title_placeholder": "Untitled",
+    "trashed_banner": "In Trash — restore to edit",
+    "trashed_restore": "Restore",
+    "trashed_restore_failed": "Could not restore this entry.",
+    "trashed_save_lost": "Changes to an entry in the Trash were not saved.",
+    "deleted_banner": "This entry was deleted"
   },
   "voice_memo": {
     "title": "Voice memo",

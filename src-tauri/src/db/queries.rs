@@ -2693,6 +2693,7 @@ pub enum LiveEntryError {
     NotFound,
     #[error("entry is deleted")]
     Deleted,
+    // src/lib/trashedEntryError.ts matches this exact text; keep them in sync.
     #[error("entry is in Trash; restore it to edit")]
     Trashed,
     #[error(transparent)]

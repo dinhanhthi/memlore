@@ -5,6 +5,7 @@ const NEW_CAPABILITY_FLAGS = [
   'lookback',
   'taxonomyEdits',
   'deleteEntries',
+  'trash',
   'audioRecording',
   'fileAttachments',
   'fontDownloads',

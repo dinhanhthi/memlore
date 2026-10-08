@@ -238,12 +238,12 @@
     "unlock_second_lock_title": "Nhập mật khẩu khóa phụ",
     "generating_title": "Đang tạo tiêu đề…",
     "video_cover_aria": "Video đính kèm",
-    "delete_aria": "Xóa mục",
+    "delete_aria": "Chuyển vào Thùng rác",
     "locked_entry": "Mục đã khóa",
-    "delete_title": "Xóa mục",
-    "delete_description": "Mục này sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.",
+    "delete_title": "Chuyển vào Thùng rác",
+    "delete_description": "Khôi phục trong Cài đặt → Dữ liệu → Đã xóa gần đây trong vòng 30 ngày.",
     "delete_cancel": "Hủy",
-    "delete_confirm": "Xóa"
+    "delete_confirm": "Chuyển vào Thùng rác"
   },
   "entry_context": {
     "lock": "Khóa",
@@ -272,7 +272,7 @@
     "add_tags": "Thêm thẻ",
     "clear_emotion": "Xóa cảm xúc",
     "clear_location": "Xóa vị trí",
-    "delete": "Xóa mục",
+    "delete": "Chuyển vào Thùng rác",
     "edit_date": "Sửa ngày",
     "generate_title": "Tạo tiêu đề",
     "menu_aria": "Thao tác với mục",
@@ -371,7 +371,12 @@
     "math_load_failed": "Không tải được bộ hiển thị công thức toán. Hãy khởi động lại ứng dụng và thử lại.",
     "no_selection": "Chọn một mục để xem nội dung và bắt đầu viết",
     "not_found": "Không tìm thấy mục",
-    "title_placeholder": "Không tiêu đề"
+    "title_placeholder": "Không tiêu đề",
+    "trashed_banner": "Trong Thùng rác — khôi phục để chỉnh sửa",
+    "trashed_restore": "Khôi phục",
+    "trashed_restore_failed": "Không thể khôi phục mục này.",
+    "trashed_save_lost": "Các thay đổi cho một mục trong Thùng rác chưa được lưu.",
+    "deleted_banner": "Mục này đã bị xóa"
   },
   "summary_modal": {
     "close": "Đóng",

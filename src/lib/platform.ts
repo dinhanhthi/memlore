@@ -53,6 +53,8 @@ export interface Capabilities {
   taxonomyEdits: boolean
   /** Soft-deleting entries. */
   deleteEntries: boolean
+  /** Entry Trash: restore, delete forever, empty. */
+  trash: boolean
   /** Voice memo recording. */
   audioRecording: boolean
   /** Attaching files to entries. */
@@ -96,6 +98,7 @@ export const capabilities: Capabilities = {
   lookback: !isWeb,
   taxonomyEdits: !isWeb,
   deleteEntries: !isWeb,
+  trash: !isWeb,
   audioRecording: !isWeb,
   fileAttachments: !isWeb,
   fontDownloads: !isWeb,

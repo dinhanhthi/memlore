@@ -681,7 +681,7 @@ export function EntryContextMenu({
                 <div className="bg-border-default my-1 h-px" />
                 <MenuItem
                   icon={<Trash2 className="size-3.5" />}
-                  label={t('entry_context.delete', { defaultValue: 'Delete entry' })}
+                  label={t('entry_context.delete')}
                   onClick={handleDelete}
                   onMouseEnter={closeSubmenu}
                   danger

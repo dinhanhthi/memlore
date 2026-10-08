@@ -63,7 +63,7 @@ export function DeleteConfirmModal({
       </Modal.Header>
       <Modal.Footer>
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={isBusy}>
-          {cancelLabel ?? t('delete_modal.cancel', { defaultValue: 'Cancel' })}
+          {cancelLabel ?? t('delete_modal.cancel')}
         </Button>
         <Button
           variant="destructive"
@@ -71,7 +71,7 @@ export function DeleteConfirmModal({
           loading={isBusy}
           onClick={() => void handleConfirm()}
         >
-          {confirmLabel ?? t('delete_modal.delete', { defaultValue: 'Delete' })}
+          {confirmLabel ?? t('delete_modal.delete')}
         </Button>
       </Modal.Footer>
     </Modal>

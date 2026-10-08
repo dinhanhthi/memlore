@@ -42,6 +42,12 @@ import { Editor } from '../editor/Editor'
 import { EditorFindBar } from '../editor/EditorFindBar'
 import { ChatBackRefBanner } from '../editor/ChatBackRefBanner'
 import { Callout } from '../common/Callout'
+import { TrashedEntryBanner } from '../editor/TrashedEntryBanner'
+import {
+  isEntryInTrash,
+  isTrashedEntryError,
+  shouldResaveAfterRestore,
+} from '../../lib/trashedEntryError'
 import { EmotionPicker } from '../common/EmotionPicker'
 import type { EmotionKey } from '../../types/entry'
 import { SuggestTitlePill } from '../editor/SuggestTitlePill'
@@ -86,10 +92,17 @@ interface EditorPanelProps {
 
 type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error'
 
+/** A trashed rejection for an entry the user already left: the editor can't
+ * show its banner, so surface the lost write instead of dropping it. */
+function warnTrashedSaveLost(entryId: string, message: string) {
+  console.warn('[EditorPanel] save rejected for an entry in Trash:', entryId)
+  toast(message, { duration: 4000 })
+}
+
 export function EditorPanel({ entryId }: EditorPanelProps) {
   const { t } = useTranslation('editor')
   const { t: tAi } = useTranslation('ai')
-  const { writes, versions } = useCapabilities()
+  const { writes, versions, trash } = useCapabilities()
   const [entry, setEntry] = useState<Awaited<ReturnType<typeof getEntry>>>(null)
   const [notFound, setNotFound] = useState(false)
   const [title, setTitle] = useState('')
@@ -100,14 +113,6 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
   const lockedView = useSecondLockStore((s) => s.lockedView())
 
-  // Mirror save state into the active tab's `dirty` flag so the global
-  // <FooterBar/> (Chunk D) can render Saving…/Saved/Error without us
-  // having to colocate the indicator with the editor.
-  useEffect(() => {
-    const isTitleUnsaved = title !== savedTitle
-    const dirty = saveStatus === 'saving' || saveStatus === 'unsaved' || isTitleUnsaved
-    updateActiveTab({ dirty })
-  }, [saveStatus, title, savedTitle, updateActiveTab])
   const [doc, setDoc] = useState<Y.Doc | null>(null)
   const [pendingTemplate, setPendingTemplate] = useState<Template | null>(null)
   const [pendingChatDraftHtml, setPendingChatDraftHtml] = useState<string | null>(null)
@@ -209,6 +214,39 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   useEffect(() => {
     docRef.current = doc
   }, [doc])
+  // A write was rejected because the entry was trashed elsewhere (stale tab).
+  // `trashedLocally` makes the editor read-only and shows the banner at once,
+  // even while `entry.trashed_at` is still the stale null; the ref tells the
+  // refetch after a Restore to re-save the unsaved in-memory text.
+  const [trashedLocally, setTrashedLocally] = useState(false)
+  // Mirror save state into the active tab's `dirty` flag so the global
+  // <FooterBar/> (Chunk D) can render Saving…/Saved/Error without us
+  // having to colocate the indicator with the editor. A title rejected as
+  // trashed is not "saving" (it can't be saved until restored), so it must
+  // not keep the tab dirty and block the lock.
+  useEffect(() => {
+    const isTitleUnsaved = !trashedLocally && title !== savedTitle
+    const dirty = saveStatus === 'saving' || saveStatus === 'unsaved' || isTitleUnsaved
+    updateActiveTab({ dirty })
+  }, [saveStatus, title, savedTitle, trashedLocally, updateActiveTab])
+  const contentRejectedRef = useRef(false)
+  // Title rejected the same way: the restore refetch re-saves it if it still
+  // differs from the persisted title. Kept apart from the content flag so a
+  // title-only rejection does not re-save an unchanged doc. Refs because that
+  // handler's effect does not re-subscribe on every title keystroke.
+  const titleRejectedRef = useRef(false)
+  // `triggerAutoSave` is a stable callback; read `t` through a ref for the
+  // lost-save toast it raises.
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
+  const titleRef = useRef('')
+  const savedTitleRef = useRef('')
+  const handleTitleSaveRef = useRef<((newTitle: string) => Promise<void>) | null>(null)
+  // Debounced title save timer — declared here so the entry-load cleanup can
+  // flush or clear it.
+  const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Version history: session-based snapshot (Phase 3) ──────────────────────
   // All four refs are reset whenever the open entryId changes (see the
@@ -323,6 +361,12 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
         setDoc(null)
         setPendingTemplate(null)
         setPendingChatDraftHtml(null)
+        if (titleSaveTimer.current) {
+          clearTimeout(titleSaveTimer.current)
+          titleSaveTimer.current = null
+        }
+        setTitle('')
+        setSavedTitle('')
         // `appendToApply` is owned by `useChatAppendToApply` (reset keyed on
         // entryId, which fires on entryId → null too), so it's not reset here.
         useEditorMetricsStore.getState().clear()
@@ -459,15 +503,41 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       if (autoSaveTimer.current) {
         clearTimeout(autoSaveTimer.current)
         autoSaveTimer.current = null
-        if (docRef.current && entryIdRef.current) {
+        // A content save already rejected as trashed cannot succeed; the
+        // lost-save toast below covers it.
+        if (!contentRejectedRef.current && docRef.current && entryIdRef.current) {
           triggerAutoSaveRef.current?.(docRef.current, entryIdRef.current)
         }
+      }
+      // Same for a pending debounced title save.
+      if (titleSaveTimer.current) {
+        clearTimeout(titleSaveTimer.current)
+        titleSaveTimer.current = null
+        if (!titleRejectedRef.current) {
+          void handleTitleSaveRef.current?.(titleRef.current)
+        }
+      }
+      // Leaving an entry whose write was rejected as trashed (never restored)
+      // drops the in-memory edits with the Y.Doc; say so instead of silently.
+      if (
+        entryIdRef.current &&
+        (contentRejectedRef.current ||
+          (titleRejectedRef.current && titleRef.current !== savedTitleRef.current))
+      ) {
+        warnTrashedSaveLost(entryIdRef.current, tRef.current('panel.trashed_save_lost'))
       }
       setEntry(null)
       setNotFound(false)
       setDoc(null)
       setSaveStatus('saved')
       setSaveError(null)
+      setTrashedLocally(false)
+      contentRejectedRef.current = false
+      titleRejectedRef.current = false
+      // Reset the title pair with the flags, or a rejected title keeps
+      // `title !== savedTitle` and re-marks the tab dirty after leaving.
+      setTitle('')
+      setSavedTitle('')
       // NOTE: clearing `appendToApply` lives in `useChatAppendToApply`'s
       // entryId-keyed reset — deliberately NOT here, so a
       // `activeVaultId`/`updateActiveTab` change (which re-runs this effect
@@ -547,6 +617,21 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       .catch((err: unknown) => {
         if (!isLatestSaveGenerationForEntry(saveGenerationByEntryRef.current, currentEntryId, gen))
           return
+        // Trashed elsewhere (stale tab): stop quietly; the In Trash banner
+        // explains why and the editor goes read-only.
+        if (isTrashedEntryError(err)) {
+          // A flush of the previous entry on switch must not mark the new one;
+          // its text is lost, so say so instead of dropping it silently.
+          if (currentEntryId === entryIdRef.current) {
+            setSaveStatus('saved')
+            setSaveError(null)
+            contentRejectedRef.current = true
+            setTrashedLocally(true)
+          } else {
+            warnTrashedSaveLost(currentEntryId, tRef.current('panel.trashed_save_lost'))
+          }
+          return
+        }
         setSaveStatus('error')
         setSaveError(err instanceof Error ? err.message : 'Auto-save failed')
       })
@@ -568,13 +653,31 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
     const handler = () => {
       void getEntry(entryId, activeVaultId).then((fetched) => {
         if (!fetched) return
-        setEntry(fetched)
         // Sync the canonical lookup map so tab titles on OTHER tabs that
         // point at this entry pick up the rename. The local entries
         // array may not contain this entry (different journal scope), so
         // mergeEntries is used instead of updateEntry to avoid relying
         // on the array having a matching row.
         useEntryStore.getState().mergeEntries([fetched])
+        // The user switched entries while this fetch was in flight: never
+        // write another entry's doc or title into this one.
+        if (entryIdRef.current !== entryId) return
+        setEntry(fetched)
+        // Restored after a trashed rejection: persist the text still held in
+        // the Y.Doc (never reload it from the DB, which lacks those edits).
+        const contentRejected = contentRejectedRef.current
+        const titleRejected = titleRejectedRef.current
+        if (shouldResaveAfterRestore(contentRejected || titleRejected, fetched)) {
+          contentRejectedRef.current = false
+          titleRejectedRef.current = false
+          setTrashedLocally(false)
+          if (contentRejected && docRef.current) {
+            triggerAutoSaveRef.current?.(docRef.current, entryId)
+          }
+          if (titleRejected && titleRef.current !== savedTitleRef.current) {
+            void handleTitleSaveRef.current?.(titleRef.current)
+          }
+        }
       })
     }
     const onPatched = (e: Event) => {
@@ -658,6 +761,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
         .catch((err: unknown) => {
           // Best-effort: a missed session-snapshot doesn't corrupt anything,
           // it just means one fewer history checkpoint for this session.
+          if (isTrashedEntryError(err)) return
           console.error('[EditorPanel] session snapshot failed:', err)
         })
     }
@@ -683,23 +787,42 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       if (!entry) return
       try {
         const updated = await updateEntry(entry.id, newTitle, undefined, undefined)
-        setEntry(updated)
         useEntryStore.getState().updateEntry(updated)
-        setSavedTitle(newTitle)
-        setSaveError(null)
+        // A save flushed on leave resolves after the panel moved on; don't
+        // write the old entry's state into the next one.
+        if (entry.id === entryIdRef.current) {
+          setEntry(updated)
+          setSavedTitle(newTitle)
+          setSaveError(null)
+        }
         // In-place patch instead of full invalidate — same reasoning as
         // the auto-save path: title editing should not flash the list to
         // a Loading placeholder on every debounced save tick.
         emitEntryPatched(entry.id, { title: updated.title })
       } catch (err: unknown) {
+        // Trashed elsewhere: stop quietly, same as the content auto-save.
+        if (isTrashedEntryError(err)) {
+          if (entry.id === entryIdRef.current) {
+            setSaveStatus('saved')
+            setSaveError(null)
+            titleRejectedRef.current = true
+            setTrashedLocally(true)
+          } else {
+            warnTrashedSaveLost(entry.id, tRef.current('panel.trashed_save_lost'))
+          }
+          return
+        }
         setSaveError(err instanceof Error ? err.message : 'Save failed')
       }
     },
     [entry],
   )
+  useEffect(() => {
+    handleTitleSaveRef.current = handleTitleSave
+    titleRef.current = title
+    savedTitleRef.current = savedTitle
+  }, [handleTitleSave, title, savedTitle])
 
-  // Debounced title save
-  const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const titleInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Auto-grow the title textarea so wrapped lines stay visible without
@@ -929,6 +1052,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
         snapshotEntryVersion(restoreEntryId, currentBytes, currentPreview)
           .then(() => emitEntryVersionsChanged(restoreEntryId))
           .catch((err: unknown) => {
+            if (isTrashedEntryError(err)) return
             console.error('[EditorPanel] pre-restore snapshot failed:', err)
           })
         // Prevents handleEditorUpdate from taking a near-duplicate snapshot
@@ -1138,10 +1262,28 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
     )
   }
 
+  // A trashed entry (stale tab / persisted selection) opens read-only until
+  // restored; the backend rejects writes to it anyway. Any deleted row stays
+  // read-only, including a purged tombstone (`is_deleted`, no `trashed_at`),
+  // which cannot be restored.
+  const isReadOnlyDeleted = entry.is_deleted || trashedLocally
+  const showTrashBanner = isEntryInTrash(entry) || (trashedLocally && !entry.is_deleted)
+  const showDeletedNotice = entry.is_deleted && (!trash || !isEntryInTrash(entry))
+  const editable = writes && !isReadOnlyDeleted
+
   // Layout: EditorHeader (metadata pills) stays fixed; titleSlot pins the
   // entry title above the scrollable ProseMirror canvas (640px column).
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {trash && showTrashBanner && <TrashedEntryBanner entryId={entry.id} />}
+      {showDeletedNotice && (
+        <div
+          role="status"
+          className="bg-panel-2 text-fg-secondary border-border-subtle shrink-0 border-b px-4 py-2 text-sm"
+        >
+          {t('panel.deleted_banner')}
+        </div>
+      )}
       {!writes && (
         <div
           role="status"
@@ -1166,7 +1308,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       <Editor
         doc={doc}
         mathExtensions={mathExtensions}
-        editable={writes}
+        editable={editable}
         onUpdate={handleEditorUpdate}
         onApplyTemplate={handleApplyTemplate}
         initialTemplate={pendingTemplate}
@@ -1220,7 +1362,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
               <textarea
                 ref={titleInputRef}
                 value={title}
-                readOnly={!writes}
+                readOnly={!editable}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 onKeyDown={(e) => {
                   // Title is a single logical field — Enter should move focus
@@ -1238,7 +1380,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
                 style={{ fontFamily: 'var(--font-title)' }}
                 className="xj-entry-title text-fg block flex-1 resize-none overflow-hidden border-none bg-transparent py-1 text-3xl leading-tight font-bold tracking-tight wrap-break-word outline-none"
               />
-              {writes && (
+              {editable && (
                 <div className="shrink-0 pt-2">
                   <SuggestTitlePill
                     entryId={entry?.id ?? null}

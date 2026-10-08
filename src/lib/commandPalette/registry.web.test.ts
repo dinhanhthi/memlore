@@ -31,6 +31,7 @@ vi.mock('../platform', async (importOriginal) => {
       lookback: false,
       taxonomyEdits: false,
       deleteEntries: false,
+      trash: false,
       audioRecording: false,
       fileAttachments: false,
       fontDownloads: false,
