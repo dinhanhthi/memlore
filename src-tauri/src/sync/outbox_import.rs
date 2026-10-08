@@ -66,7 +66,8 @@
 //!
 //! Following the precedent established in `commands/mcp.rs`:
 //! - **Write guards (`commands/mcp.rs:357-395`):**
-//!   `require_writable_entry` refuses locked, invisible, or deleted entries.
+//!   `require_writable_entry` refuses locked, invisible, or deleted entries. An entry in
+//!   Trash is refused before it, with reason `entry_trashed`.
 //!   `visible_journal` verifies that the target journal exists and is neither deleted nor invisible.
 //! - **Emotion & tag validation:**
 //!   `validate_emotion` (`mcp.rs:425`) enforces 3-state emotion values (`good`, `neutral`, `bad`).
@@ -164,6 +165,8 @@ use memlore_core::outbox::{
 };
 
 const PREVIEW_MAX_CHARS: usize = 200;
+/// Refusal reason (ack `refused_reason`) for a v1 edit to an entry in Trash.
+const ENTRY_TRASHED: &str = "entry_trashed";
 
 fn sync_io(e: impl ToString) -> SyncError {
     SyncError::Io(e.to_string())
@@ -918,6 +921,33 @@ pub fn apply_intent_full(
     }
 
     // ── Present Entry Path ──────────────────────────────────────────────────
+    // A trashed entry (`is_deleted = 1` + `trashed_at`) is read-only until
+    // restored. Refuse with its own reason so the web can tell it apart from
+    // a purged or missing entry (which stay on `require_writable_entry`).
+    if raw_entry
+        .as_ref()
+        .is_some_and(|e| e.is_deleted && e.trashed_at.is_some())
+    {
+        let rec = WebOutboxImportRecord {
+            path: intent.path.clone(),
+            revision: intent.revision.clone(),
+            content_hash: intent.content_hash.clone(),
+            outcome: "refused".to_string(),
+            imported_at: chrono::Utc::now().timestamp(),
+            last_applied_updated_at: None,
+            post_import_fingerprint: None,
+            decided_fields: serde_json::to_string(&decided_map).ok(),
+            pending_revision: None,
+            pending_plan: Some(ENTRY_TRASHED.to_string()),
+            created: sticky_created,
+        };
+        let _ = outbox_import_record(conn, &rec);
+        return ApplyResult {
+            outcome: Outcome::Refused(ENTRY_TRASHED.to_string()),
+            touched_entry_ids: vec![],
+            bridge_event: None,
+        };
+    }
     let entry = match require_writable_entry(conn, &intent.entry.entry_id) {
         Ok(e) => e,
         Err(e) => {
@@ -2512,7 +2542,12 @@ mod tests {
 
         let intent_del = make_base_intent(&local_deleted.id, "web-dev-1");
         let (outcome_del, _) = apply_intent(&conn, &ctx, &intent_del);
-        assert!(matches!(outcome_del, Outcome::Refused(_)));
+        // A trashed target is refused with its own reason, which is what the
+        // ack carries (`refused_reason` comes from `pending_plan`).
+        assert_eq!(outcome_del, Outcome::Refused("entry_trashed".to_string()));
+        let rec = outbox_import_get(&conn, &intent_del.path).unwrap().unwrap();
+        assert_eq!(rec.outcome, "refused");
+        assert_eq!(rec.pending_plan.as_deref(), Some("entry_trashed"));
 
         // 2. Locked target
         let local_locked = crate::commands::entries::create_entry_impl(

@@ -2591,7 +2591,7 @@ pub fn soft_delete_entry(conn: &Connection, id: &str) -> Result<()> {
 /// Move a live entry to Trash at `now` (unix seconds). `trashed_at = now`;
 /// `updated_at` becomes `max(updated_at + 1, now)` so the trash beats the
 /// edit it follows under LWW even when that edit came from a peer whose
-/// clock is ahead (same rule as [`restore_entry`]). Errors with
+/// clock is ahead (as [`restore_entry`] does, with `+ 2`). Errors with
 /// `QueryReturnedNoRows` when `id` is missing or not live (already trashed,
 /// purged or a legacy tombstone).
 pub fn trash_entry(conn: &Connection, id: &str, now: i64) -> Result<()> {
@@ -2607,14 +2607,19 @@ pub fn trash_entry(conn: &Connection, id: &str, now: i64) -> Result<()> {
     Ok(())
 }
 
-/// Bring a trashed entry back. `updated_at` becomes `max(updated_at + 1, now)`
+/// Bring a trashed entry back. `updated_at` becomes `max(updated_at + 2, now)`
 /// so the restore always beats the trash it undoes under LWW, even with a
-/// clock behind the trashing device. Errors with `QueryReturnedNoRows` when
-/// `id` is not in Trash (live, purged, legacy tombstone or missing).
+/// clock behind the trashing device. `+ 2`, not `+ 1`: a concurrent purge on
+/// another device stamps the trashed `updated_at + 1` (see
+/// [`purge_entry_mark`]), and `compute_diff` only pulls a strictly newer
+/// stamp (`>`), so with equal stamps neither device would ever pull the
+/// other's side and the two would diverge forever. Errors with
+/// `QueryReturnedNoRows` when `id` is not in Trash (live, purged, legacy
+/// tombstone or missing).
 pub fn restore_entry(conn: &Connection, id: &str, now: i64) -> Result<()> {
     let affected = conn.execute(
         "UPDATE entries SET is_deleted = 0, trashed_at = NULL, \
-             updated_at = MAX(updated_at + 1, ?1) \
+             updated_at = MAX(updated_at + 2, ?1) \
          WHERE id = ?2 AND trashed_at IS NOT NULL",
         rusqlite::params![now, id],
     )?;
@@ -16641,7 +16646,10 @@ mod tests {
         let e = get_entry(&conn, &eid).unwrap().unwrap();
         assert!(!e.is_deleted);
         assert_eq!(e.trashed_at, None);
-        assert_eq!(e.updated_at, 5_001);
+        assert_eq!(
+            e.updated_at, 5_002,
+            "+2, not +1: a concurrent purge elsewhere stamps trashed + 1"
+        );
         assert_eq!(list_all_entries(&conn).unwrap().len(), 1);
 
         trash_entry(&conn, &eid, 6_000).unwrap();

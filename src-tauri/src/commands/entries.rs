@@ -360,9 +360,38 @@ pub(crate) fn save_entry_content_impl(
 /// Media rows, files and the embedding index are deliberately KEPT so a
 /// restore finds them; they go at purge time ([`purge_entry_impl`]).
 pub(crate) fn soft_delete_entry_impl(conn: &Connection, id: &str) -> Result<(), String> {
+    soft_delete_entry_at(conn, id, chrono::Utc::now().timestamp())
+}
+
+/// [`soft_delete_entry_impl`] with an explicit wall-clock `wall_now`.
+///
+/// The trash stamp is `max(wall_now, watermark - MAX_CLOCK_SKEW_SECS)`, the
+/// watermark being the persisted sweep watermark
+/// ([`TRASH_SWEEP_LAST_RUN_KEY`]) when there is one: a wall clock far behind
+/// (dead RTC, VM restore) would otherwise stamp an entry that is already due
+/// once the clock is corrected, and the next sweep would purge it
+/// irreversibly. Only lengthens retention. With no watermark yet, it is
+/// seeded at `wall_now`, so the sweep's clock guard bounds a later jump.
+pub(crate) fn soft_delete_entry_at(
+    conn: &Connection,
+    id: &str,
+    wall_now: i64,
+) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     db::queries::require_live_entry(&tx, id).map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().timestamp();
+    let watermark = db::get_setting(&tx, TRASH_SWEEP_LAST_RUN_KEY)
+        .map_err(|e| e.to_string())?
+        .and_then(|v| v.parse::<i64>().ok());
+    let now = match watermark {
+        Some(w) => wall_now.max(w.saturating_sub(crate::sync::engine::MAX_CLOCK_SKEW_SECS)),
+        None => {
+            // Seed the watermark so a later clock correction cannot make
+            // this trash immediately due.
+            db::set_setting(&tx, TRASH_SWEEP_LAST_RUN_KEY, &wall_now.to_string())
+                .map_err(|e| e.to_string())?;
+            wall_now
+        }
+    };
     db::queries::trash_entry(&tx, id, now).map_err(|e| e.to_string())?;
     db::mark_entry_pending(&tx, id).map_err(|e| e.to_string())?;
     db::memory::cleanup_memory_for_deleted_source(&tx, "journal_entry", id, now)
@@ -526,6 +555,182 @@ pub(crate) fn empty_trash_impl(
     tx.commit().map_err(|e| e.to_string())?;
     remove_purged_media_files(&media);
     Ok(ids.len())
+}
+
+/// How long an entry stays in Trash before the retention sweep purges it.
+pub(crate) const TRASH_RETENTION_SECS: i64 = 30 * 86_400;
+
+/// Settings key of the sweep watermark (unix seconds; see
+/// [`purge_expired_trash`]). Device-local: not in `SYNCABLE_SETTING_KEYS`.
+pub(crate) const TRASH_SWEEP_LAST_RUN_KEY: &str = "trash_sweep_last_run";
+
+/// How far past the session base one app launch may move the sweep clock,
+/// on top of the real (monotonic) time elapsed since its first sweep.
+pub(crate) const TRASH_SWEEP_MAX_ADVANCE_SECS: i64 = 86_400;
+
+/// Process-lifetime anchor of the sweep clock, captured at the first sweep
+/// of the process: `base` is the persisted watermark then (or `now` on the
+/// very first sweep ever) and `started` the [`monotonic_secs_with_sleep`]
+/// reading it was taken at.
+///
+/// Within one process the base comes from the first DB swept: a vault reset
+/// in-process keeps the old base, which errs safe (a newer base only lets
+/// retention advance further).
+pub(crate) struct SweepSession {
+    started: Option<u64>,
+    base: i64,
+}
+
+/// Seconds on a monotonic clock that keeps counting while the machine
+/// sleeps and that a wall-clock change cannot move: `CLOCK_MONOTONIC` on
+/// Apple platforms (it includes sleep there), `CLOCK_BOOTTIME` on Linux and
+/// Android. `std::time::Instant` would stop during sleep on both, so
+/// retention would lag real time when the app stays open across sleeps.
+/// `None` when the clock cannot be read; the sweep then counts no elapsed
+/// time (errs safe).
+#[cfg(unix)]
+fn monotonic_secs_with_sleep() -> Option<u64> {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    const CLOCK: libc::clockid_t = libc::CLOCK_BOOTTIME;
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    const CLOCK: libc::clockid_t = libc::CLOCK_MONOTONIC;
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `ts` is a valid, writable `timespec` for the duration of the call.
+    let rc = unsafe { libc::clock_gettime(CLOCK, &mut ts) };
+    if rc != 0 {
+        return None;
+    }
+    u64::try_from(ts.tv_sec).ok()
+}
+
+/// Windows: `Instant` (QueryPerformanceCounter) already counts sleep.
+#[cfg(not(unix))]
+fn monotonic_secs_with_sleep() -> Option<u64> {
+    static ORIGIN: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    ORIGIN
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs()
+        .into()
+}
+
+/// The production sweep session, shared by the unlock and post-pull sweeps.
+#[cfg(not(test))]
+static SWEEP_SESSION: std::sync::Mutex<Option<SweepSession>> = std::sync::Mutex::new(None);
+
+/// The 30-day retention sweep: purge every entry trashed at or before
+/// `sweep_at - TRASH_RETENTION_SECS` (unix seconds), regardless of lock or
+/// vault visibility. One transaction; files are unlinked after commit.
+/// Returns how many were purged (0 when nothing is due, so a repeat call is
+/// a no-op). Re-arms the own-cloud media prune when anything was purged.
+///
+/// Clock guard: `sweep_at = min(now, base + TRASH_SWEEP_MAX_ADVANCE_SECS +
+/// elapsed)`, where `base` is the persisted watermark
+/// ([`TRASH_SWEEP_LAST_RUN_KEY`]) at the process's first sweep and `elapsed`
+/// the time since then including sleep, from a monotonic clock that a
+/// wall-clock change cannot move ([`monotonic_secs_with_sleep`]), so
+/// however often the sweep runs (after every clean pull), one app launch
+/// advances retention at most 1 day past the last persisted watermark plus
+/// real elapsed time; a long real gap is caught up at most a day per launch.
+/// With no persisted watermark (first sweep ever) the run only seeds it at
+/// `now` and purges nothing. The watermark becomes `max(watermark,
+/// sweep_at)` (never lowered, so a clock stepping back never sweeps ahead of
+/// itself) and is written in the sweep's transaction.
+pub(crate) fn purge_expired_trash(conn: &Connection, now: i64) -> Result<usize, String> {
+    #[cfg(not(test))]
+    let mut session = SWEEP_SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    // Tests get a fresh session per call (each one a new "launch"): a
+    // process-wide base would couple unrelated tests through their clocks.
+    #[cfg(test)]
+    let mut session: Option<SweepSession> = None;
+    purge_expired_trash_in_session(conn, now, &mut session, |s| {
+        match (monotonic_secs_with_sleep(), s.started) {
+            (Some(now), Some(started)) => now.saturating_sub(started),
+            _ => 0,
+        }
+    })
+}
+
+/// [`purge_expired_trash`] against an explicit session; `elapsed` returns
+/// the seconds elapsed since the session started.
+pub(crate) fn purge_expired_trash_in_session(
+    conn: &Connection,
+    now: i64,
+    session: &mut Option<SweepSession>,
+    elapsed: impl Fn(&SweepSession) -> u64,
+) -> Result<usize, String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let persisted = db::get_setting(&tx, TRASH_SWEEP_LAST_RUN_KEY)
+        .map_err(|e| e.to_string())?
+        .and_then(|v| match v.parse::<i64>() {
+            Ok(t) => Some(t),
+            Err(_) => {
+                log::warn!("trash: unparseable sweep watermark {v:?}; reseeding at {now}");
+                None
+            }
+        });
+    let Some(last_run) = persisted else {
+        db::set_setting(&tx, TRASH_SWEEP_LAST_RUN_KEY, &now.to_string())
+            .map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+        session.get_or_insert(SweepSession {
+            started: monotonic_secs_with_sleep(),
+            base: now,
+        });
+        return Ok(0);
+    };
+    let s = session.get_or_insert(SweepSession {
+        started: monotonic_secs_with_sleep(),
+        base: last_run,
+    });
+    let elapsed = i64::try_from(elapsed(s)).unwrap_or(i64::MAX);
+    let bound = s
+        .base
+        .saturating_add(TRASH_SWEEP_MAX_ADVANCE_SECS)
+        .saturating_add(elapsed);
+    let sweep_at = now.min(bound);
+    if sweep_at < now {
+        log::warn!(
+            "trash: sweep clock capped at {sweep_at} (now {now}, session base {})",
+            s.base
+        );
+    }
+    db::set_setting(
+        &tx,
+        TRASH_SWEEP_LAST_RUN_KEY,
+        &last_run.max(sweep_at).to_string(),
+    )
+    .map_err(|e| e.to_string())?;
+    let ids = db::queries::list_trash_due(&tx, sweep_at - TRASH_RETENTION_SECS)
+        .map_err(|e| e.to_string())?;
+    let mut media = Vec::new();
+    for id in &ids {
+        media.extend(purge_entry_in_tx(&tx, id, sweep_at)?);
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    remove_purged_media_files(&media);
+    if !ids.is_empty() {
+        crate::sync::engine::reset_session_own_cloud_reconciled();
+    }
+    Ok(ids.len())
+}
+
+/// Unlock-time retention sweep. Runs only when no sync cycle will run
+/// (no provider, or sync disabled — the scheduler's own gate); otherwise the
+/// sweep waits for a successful pull so a peer's restore is seen first.
+/// Failures are logged, never surfaced.
+pub(crate) fn purge_expired_trash_on_unlock(conn: &Connection, now: i64) {
+    let sync_active = db::get_sync_enabled(conn).unwrap_or(false)
+        && db::get_sync_provider(conn).ok().flatten().is_some();
+    if sync_active {
+        return;
+    }
+    if let Err(e) = purge_expired_trash(conn, now) {
+        log::warn!("trash: unlock retention sweep failed: {e}");
+    }
 }
 
 pub(crate) fn update_entry_language_impl(
@@ -3479,6 +3684,351 @@ mod tests {
         let remaining = list_trashed_entries_impl(&conn, LockedView::Revealed, None).unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, locked);
+    }
+
+    /// One retention sweep against a test-owned session (never the
+    /// process-wide one, which parallel tests would share).
+    fn sweep(
+        conn: &Connection,
+        now: i64,
+        session: &mut Option<SweepSession>,
+        elapsed: u64,
+    ) -> usize {
+        purge_expired_trash_in_session(conn, now, session, |_| elapsed).unwrap()
+    }
+
+    fn seed_watermark(conn: &Connection, at: i64) {
+        db::set_setting(conn, TRASH_SWEEP_LAST_RUN_KEY, &at.to_string()).unwrap();
+    }
+
+    fn watermark(conn: &Connection) -> Option<i64> {
+        db::get_setting(conn, TRASH_SWEEP_LAST_RUN_KEY)
+            .unwrap()
+            .map(|v| v.parse().unwrap())
+    }
+
+    #[test]
+    fn purge_expired_trash_purges_due_entries_keeps_recent_and_is_idempotent() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let due = new_entry(&conn, &jid, "Due");
+        let recent = new_entry(&conn, &jid, "Recent");
+        let live = new_entry(&conn, &jid, "Live");
+        let files = attach_two_media_with_files(&conn, &due, tmp.path());
+        let now = crate::utils::time::now_unix();
+        db::queries::trash_entry(&conn, &due, now - TRASH_RETENTION_SECS).unwrap();
+        soft_delete_entry_impl(&conn, &recent).unwrap();
+        let version = local_version(&conn, &due);
+        seed_watermark(&conn, now - 60);
+        let mut session = None;
+
+        assert_eq!(sweep(&conn, now, &mut session, 0), 1);
+
+        let row = db::get_entry(&conn, &due).unwrap().unwrap();
+        assert!(row.is_deleted);
+        assert_eq!(row.trashed_at, None, "a purged entry leaves Trash");
+        assert_eq!(local_version(&conn, &due), version + 1, "marked pending");
+        assert!(db::get_media_for_entry(&conn, &due).unwrap().is_empty());
+        assert!(files.iter().all(|f| !f.exists()), "files unlinked");
+        assert!(
+            db::get_entry(&conn, &recent)
+                .unwrap()
+                .unwrap()
+                .trashed_at
+                .is_some(),
+            "a not-yet-due entry stays in Trash"
+        );
+        assert!(!db::get_entry(&conn, &live).unwrap().unwrap().is_deleted);
+        assert_eq!(watermark(&conn), Some(now));
+
+        assert_eq!(
+            sweep(&conn, now, &mut session, 0),
+            0,
+            "a second sweep is a no-op"
+        );
+    }
+
+    fn trashed_at_offset(conn: &Connection, jid: &str, title: &str, at: i64) -> String {
+        let id = new_entry(conn, jid, title);
+        db::queries::trash_entry(conn, &id, at).unwrap();
+        id
+    }
+
+    fn still_in_trash(conn: &Connection, id: &str) -> bool {
+        db::get_entry(conn, id)
+            .unwrap()
+            .unwrap()
+            .trashed_at
+            .is_some()
+    }
+
+    /// A local trash with the wall clock far behind (dead RTC, VM restore)
+    /// is stamped no earlier than `watermark - MAX_CLOCK_SKEW_SECS`, so once
+    /// the clock is corrected the next sweep does not purge it at once.
+    #[test]
+    fn soft_delete_with_a_clock_far_behind_the_watermark_is_not_purged_once_corrected() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let real = crate::utils::time::now_unix();
+        let id = new_entry(&conn, &jid, "Behind");
+        seed_watermark(&conn, real - 60);
+        let behind = real - 40 * 86_400;
+
+        soft_delete_entry_at(&conn, &id, behind).unwrap();
+
+        let row = db::get_entry(&conn, &id).unwrap().unwrap();
+        let floor = real - 60 - crate::sync::engine::MAX_CLOCK_SKEW_SECS;
+        assert_eq!(
+            row.trashed_at,
+            Some(floor),
+            "stamp floored at the watermark"
+        );
+        assert!(row.updated_at >= floor, "updated_at uses the floored now");
+        assert_eq!(sweep(&conn, real, &mut None, 0), 0);
+        assert!(still_in_trash(&conn, &id), "not purged once corrected");
+    }
+
+    /// With no watermark yet, a trash seeds it at the wall clock, so a far-
+    /// behind clock corrected later cannot make the trash immediately due.
+    #[test]
+    fn soft_delete_without_a_watermark_seeds_it_so_a_corrected_clock_does_not_purge() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let real = crate::utils::time::now_unix();
+        let id = new_entry(&conn, &jid, "Behind");
+        let behind = real - 40 * 86_400;
+
+        soft_delete_entry_at(&conn, &id, behind).unwrap();
+
+        assert_eq!(watermark(&conn), Some(behind), "watermark seeded");
+        let mut session = None;
+        assert_eq!(sweep(&conn, real, &mut session, 0), 0);
+        assert_eq!(sweep(&conn, real, &mut session, 0), 0);
+        assert!(still_in_trash(&conn, &id), "not purged once corrected");
+    }
+
+    /// With no watermark, or a wall clock ahead of it, the trash stamp is
+    /// the wall clock itself.
+    #[test]
+    fn soft_delete_stamps_wall_now_when_not_behind_the_watermark() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let real = crate::utils::time::now_unix();
+        let a = new_entry(&conn, &jid, "A");
+        let b = new_entry(&conn, &jid, "B");
+
+        soft_delete_entry_at(&conn, &a, real).unwrap();
+        seed_watermark(&conn, real - 10 * 86_400);
+        soft_delete_entry_at(&conn, &b, real).unwrap();
+
+        for id in [&a, &b] {
+            let row = db::get_entry(&conn, id).unwrap().unwrap();
+            assert_eq!(row.trashed_at, Some(real));
+        }
+    }
+
+    /// With no persisted watermark there is nothing to bound a clock jump
+    /// against, so the first sweep ever only seeds it; later sweeps in the
+    /// same process then purge normally.
+    #[test]
+    fn purge_expired_trash_first_run_ever_seeds_the_watermark_without_purging() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let old = trashed_at_offset(&conn, &jid, "Old", now - 40 * 86_400);
+        let mut session = None;
+
+        assert_eq!(sweep(&conn, now, &mut session, 0), 0);
+        assert!(
+            still_in_trash(&conn, &old),
+            "the seeding run purges nothing"
+        );
+        assert_eq!(watermark(&conn), Some(now));
+
+        assert_eq!(sweep(&conn, now, &mut session, 0), 1);
+        assert!(!still_in_trash(&conn, &old));
+    }
+
+    /// Within one process the sweep clock is bounded by the session base
+    /// (the watermark at the first sweep) + 1 day + real elapsed time, which
+    /// a wall-clock jump cannot move: a +1 year jump, swept repeatedly,
+    /// purges only what is due by that bound.
+    #[test]
+    fn purge_expired_trash_wall_clock_jump_is_bounded_by_session_base_plus_a_day_and_elapsed() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let day = 86_400;
+        let elapsed = 3_600_u64;
+        let bound = now + TRASH_SWEEP_MAX_ADVANCE_SECS + 3_600;
+        let edge = trashed_at_offset(&conn, &jid, "Edge", bound - TRASH_RETENTION_SECS);
+        let past = trashed_at_offset(&conn, &jid, "Past", bound - TRASH_RETENTION_SECS + 1);
+        let fresh = trashed_at_offset(&conn, &jid, "Fresh", now);
+        seed_watermark(&conn, now);
+        let mut session = None;
+
+        let year_later = now + 365 * day;
+        assert_eq!(sweep(&conn, year_later, &mut session, elapsed), 1);
+        assert!(!still_in_trash(&conn, &edge), "due by the bound");
+        assert!(still_in_trash(&conn, &past), "beyond the bound: kept");
+        assert!(still_in_trash(&conn, &fresh));
+        assert_eq!(watermark(&conn), Some(bound));
+
+        // Sweeping again (every clean pull does) does not advance it.
+        for _ in 0..5 {
+            assert_eq!(sweep(&conn, year_later, &mut session, elapsed), 0);
+        }
+        assert!(still_in_trash(&conn, &past));
+        assert_eq!(watermark(&conn), Some(bound));
+    }
+
+    /// A long real gap (old watermark) is caught up at most 1 day (+ real
+    /// elapsed time) per app launch, each launch rebasing on the watermark
+    /// the previous one persisted.
+    #[test]
+    fn purge_expired_trash_long_gap_catches_up_at_most_a_day_per_launch() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let day = 86_400;
+        let last = now - 90 * day;
+        let first = trashed_at_offset(&conn, &jid, "First", last + day - TRASH_RETENTION_SECS);
+        let second =
+            trashed_at_offset(&conn, &jid, "Second", last + 2 * day - TRASH_RETENTION_SECS);
+        let third = trashed_at_offset(
+            &conn,
+            &jid,
+            "Third",
+            last + 2 * day - TRASH_RETENTION_SECS + 1,
+        );
+        seed_watermark(&conn, last);
+
+        let mut launch_one = None;
+        assert_eq!(sweep(&conn, now, &mut launch_one, 0), 1);
+        assert!(!still_in_trash(&conn, &first));
+        assert!(still_in_trash(&conn, &second));
+        assert_eq!(watermark(&conn), Some(last + day));
+
+        let mut launch_two = None;
+        assert_eq!(sweep(&conn, now, &mut launch_two, 0), 1);
+        assert!(!still_in_trash(&conn, &second));
+        assert!(still_in_trash(&conn, &third));
+        assert_eq!(watermark(&conn), Some(last + 2 * day));
+    }
+
+    /// Normal operation: an app left running purges each entry on its due
+    /// day as real time elapses.
+    #[test]
+    fn purge_expired_trash_daily_runs_purge_on_the_due_day() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let day = 86_400;
+        let due_tomorrow = trashed_at_offset(&conn, &jid, "Tomorrow", now - 29 * day);
+        let due_in_two = trashed_at_offset(&conn, &jid, "Two", now - 28 * day);
+        seed_watermark(&conn, now);
+        let mut session = None;
+
+        assert_eq!(sweep(&conn, now, &mut session, 0), 0);
+        assert_eq!(sweep(&conn, now + day, &mut session, day as u64), 1);
+        assert!(!still_in_trash(&conn, &due_tomorrow));
+        assert!(still_in_trash(&conn, &due_in_two));
+        assert_eq!(sweep(&conn, now + 2 * day, &mut session, 2 * day as u64), 1);
+        assert!(!still_in_trash(&conn, &due_in_two));
+    }
+
+    /// A clock that steps back is honoured (never sweeps ahead of it), and
+    /// the watermark is never lowered.
+    #[test]
+    fn purge_expired_trash_backward_clock_does_not_sweep_ahead_or_lower_the_watermark() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let day = 86_400;
+        let id = trashed_at_offset(&conn, &jid, "Due at now+1d", now - 29 * day);
+        seed_watermark(&conn, now);
+        let mut session = None;
+
+        assert_eq!(sweep(&conn, now + 5 * day, &mut session, 0), 1);
+        assert!(!still_in_trash(&conn, &id));
+        assert_eq!(watermark(&conn), Some(now + day));
+        let back = trashed_at_offset(&conn, &jid, "Back", now - 29 * day + 60);
+        assert_eq!(sweep(&conn, now, &mut session, 0), 0);
+        assert!(still_in_trash(&conn, &back), "clock back: not due at `now`");
+        assert_eq!(
+            watermark(&conn),
+            Some(now + day),
+            "the watermark is never lowered"
+        );
+    }
+
+    #[test]
+    fn purge_expired_trash_ignores_lock_and_vault_visibility() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let locked = trashed_at_offset(&conn, &jid, "Locked", now - TRASH_RETENTION_SECS);
+        let invisible = trashed_at_offset(&conn, &jid, "Invisible", now - TRASH_RETENTION_SECS);
+        db::set_entry_locked(&conn, &locked, true).unwrap();
+        db::set_entry_invisible(&conn, &invisible, true, Some("vault-a")).unwrap();
+        seed_watermark(&conn, now - 60);
+
+        assert_eq!(sweep(&conn, now, &mut None, 0), 2);
+        for id in [&locked, &invisible] {
+            let row = db::get_entry(&conn, id).unwrap().unwrap();
+            assert!(row.is_deleted);
+            assert_eq!(row.trashed_at, None);
+        }
+    }
+
+    // The on-unlock tests go through `purge_expired_trash` (a fresh session
+    // per call under test) with a watermark just behind `now`, so the sweep
+    // is live and the 1-day bound does not cap it.
+    #[test]
+    fn purge_expired_trash_on_unlock_runs_only_without_active_sync() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let a = trashed_at_offset(&conn, &jid, "A", now - TRASH_RETENTION_SECS - 1);
+        let b = trashed_at_offset(&conn, &jid, "B", now - TRASH_RETENTION_SECS - 1);
+        seed_watermark(&conn, now - 60);
+
+        // Sync configured and enabled: the post-pull hook owns the sweep.
+        db::set_sync_provider(&conn, "local").unwrap();
+        db::set_sync_enabled(&conn, true).unwrap();
+        purge_expired_trash_on_unlock(&conn, now);
+        assert!(still_in_trash(&conn, &a) && still_in_trash(&conn, &b));
+
+        // Provider set but sync turned off: no cycle will run, so unlock sweeps.
+        db::set_sync_enabled(&conn, false).unwrap();
+        purge_expired_trash_on_unlock(&conn, now);
+        assert!(!still_in_trash(&conn, &a) && !still_in_trash(&conn, &b));
+    }
+
+    #[test]
+    fn purge_expired_trash_on_unlock_sweeps_when_no_provider_is_set() {
+        let state = make_state();
+        let jid = journal_id(&state);
+        let conn = state.lock().unwrap();
+        let now = crate::utils::time::now_unix();
+        let a = trashed_at_offset(&conn, &jid, "A", now - TRASH_RETENTION_SECS - 1);
+        seed_watermark(&conn, now - 60);
+
+        purge_expired_trash_on_unlock(&conn, now);
+
+        assert_eq!(db::get_entry(&conn, &a).unwrap().unwrap().trashed_at, None);
     }
 
     #[test]

@@ -98,6 +98,12 @@ fn recover_with_passphrase_post_unlock(state: &AppState, now_ms: i64) {
     }) {
         log::warn!("recover_with_passphrase: post-unlock retention purge failed: {e}");
     }
+    if let Err(e) = state.with_conn(|c| {
+        crate::commands::entries::purge_expired_trash_on_unlock(c, now_ms / 1000);
+        Ok(())
+    }) {
+        log::warn!("trash: unlock retention sweep skipped: {e}");
+    }
 }
 
 /// Test-only password-mode first-run setup helper (no Tauri state wrappers).
@@ -900,6 +906,12 @@ fn initialize_encryption_inner(
     });
     if let Err(e) = purge_result {
         log::warn!("ai audit: post-unlock retention purge failed: {e}");
+    }
+    if let Err(e) = state.with_conn(|c| {
+        crate::commands::entries::purge_expired_trash_on_unlock(c, now_ms / 1000);
+        Ok(())
+    }) {
+        log::warn!("trash: unlock retention sweep skipped: {e}");
     }
 
     // Backfill the recovery slot into the boot file for vaults set up
@@ -4894,6 +4906,45 @@ mod tests {
             "only the expired audit row should be purged"
         );
         assert_eq!(remaining[0].created_at, recent_ms);
+    }
+
+    /// With no sync configured, the post-unlock maintenance also runs the
+    /// 30-day Trash retention sweep (a sync cycle owns it otherwise).
+    #[test]
+    fn recover_with_passphrase_post_unlock_purges_due_trash_without_sync() {
+        let conn = setup();
+        let jid: String = conn
+            .query_row("SELECT id FROM journals LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        let id = crate::commands::entries::create_entry_impl(
+            &conn,
+            &jid,
+            Some("t"),
+            Some("body"),
+            None,
+            1_700_000_000,
+        )
+        .unwrap()
+        .id;
+        let now_s = 200 * 86_400i64;
+        db::queries::trash_entry(&conn, &id, now_s - 31 * 86_400).unwrap();
+        // A prior sweep's watermark, so this one is live, not seed-only.
+        db::set_setting(
+            &conn,
+            crate::commands::entries::TRASH_SWEEP_LAST_RUN_KEY,
+            &(now_s - 60).to_string(),
+        )
+        .unwrap();
+
+        let state = AppState::new(conn);
+        recover_with_passphrase_post_unlock(&state, now_s * 1000);
+
+        let row = state
+            .with_conn(|c| db::get_entry(c, &id).map_err(|e| e.to_string()))
+            .unwrap()
+            .unwrap();
+        assert!(row.is_deleted);
+        assert_eq!(row.trashed_at, None, "due entry purged on unlock");
     }
 
     // ─── CryptoTestState: fast setup builder for integration tests ───────────

@@ -3250,7 +3250,10 @@ impl SyncEngine {
             longitude: entry.longitude,
             emotion: entry.emotion.clone(),
             is_favorite: entry.is_favorite,
-            is_deleted: entry.is_deleted,
+            // Trash wire form: a trashed row (`is_deleted = 1` + `trashed_at`)
+            // goes out as `is_deleted = false` + `trashed_at`, so older peers
+            // keep showing it until purge. Other rows serialize unchanged.
+            is_deleted: entry.is_deleted && entry.trashed_at.is_none(),
             is_locked: entry.is_locked,
             is_invisible: entry.is_invisible,
             vault_id: entry.vault_id.clone(),
@@ -3260,7 +3263,13 @@ impl SyncEngine {
             tag_ids,
             media,
             deleted_media,
-            trashed_at: None,
+            // Only a deleted row is in Trash: a live row an older build left
+            // with a stale `trashed_at` (downgrade) must not publish as one.
+            trashed_at: if entry.is_deleted {
+                entry.trashed_at
+            } else {
+                None
+            },
         };
         let meta_plain =
             serde_json::to_vec(&meta).map_err(|e| SyncError::Serialization(e.to_string()))?;
@@ -4768,10 +4777,11 @@ impl SyncEngine {
                         Ok(rows) => {
                             if rows > 0 {
                                 peer_deleted += 1;
-                                // C2 fix: a peer-applied tombstone must
-                                // cascade the same AI User Memory cleanup
-                                // `soft_delete_entry_impl` runs locally —
-                                // otherwise this device's copy of the
+                                // C2 fix: a peer-applied tombstone (a
+                                // purge, or a legacy delete) must cascade
+                                // the same AI User Memory cleanup
+                                // `purge_entry_in_tx` runs locally (also run
+                                // at trash time; idempotent) — otherwise this device's copy of the
                                 // entry's distilled memory survives
                                 // orphaned. Same transaction as the
                                 // tombstone write above.
@@ -4806,9 +4816,11 @@ impl SyncEngine {
                                 )
                                 .map_err(sync_io)?;
                                 // A peer-applied tombstone must also cascade
-                                // the media cleanup `soft_delete_entry_impl`
-                                // runs locally. There is no restore path for
-                                // entries, so without this the entry's media
+                                // the media cleanup `purge_entry_in_tx` runs
+                                // locally. A tombstone is a purge: unlike a
+                                // trashed row (which keeps its media for a
+                                // restore) it has no restore path, so
+                                // without this the entry's media
                                 // survives on THIS device forever: rows kept,
                                 // files on disk, `list_pending_uploads` has no
                                 // `is_deleted` filter so they keep uploading,
@@ -5299,8 +5311,10 @@ impl SyncEngine {
                 errors
             );
         }
-        // Only LIVE peer rows count as ownership. A tombstoned (is_deleted)
-        // summary is a deletion record, not a live claim — counting it would
+        // Only LIVE peer rows count as ownership. A trashed entry is still
+        // owned and syncable: its wire form is `is_deleted = false` +
+        // `trashed_at`, so it passes the check below unchanged. A tombstoned
+        // (is_deleted) summary is a deletion record, not a live claim — counting it would
         // make `sync_repair_from_this_device` skip this device's newer live
         // local copy, letting a stale remote tombstone suppress the only good
         // copy.
@@ -5395,6 +5409,19 @@ impl SyncEngine {
             }
             Err(e) => out.errors.push(format!("pull: {e}")),
         }
+        // Trash retention sweep, only after a clean pull so a peer's restore
+        // of a due entry is merged first. A failure is logged, never fails
+        // the sync.
+        if out.pull_clean {
+            let swept = access
+                .with_conn(|c| Ok(crate::commands::entries::purge_expired_trash(c, now_unix())));
+            match swept {
+                Ok(Ok(0)) => {}
+                Ok(Ok(n)) => log::info!("trash: retention sweep purged {n} entries"),
+                Ok(Err(e)) => log::warn!("trash: retention sweep failed: {e}"),
+                Err(e) => log::warn!("trash: retention sweep failed: {e}"),
+            }
+        }
         // Per-leg errors are pushed as formatted strings by sub-routines
         // (push_local / pull_remote propagate provider errors via
         // `format!("...: {e}")`). `SyncError::ScopeMismatch`'s Display is
@@ -5475,8 +5502,10 @@ impl SyncEngine {
                      a rotated key this device does not hold (re-pair required): {e}"
                 ))
             })?;
-        let remote_meta: EntryMetadata = serde_json::from_slice(&meta_plain)
+        let mut remote_meta: EntryMetadata = serde_json::from_slice(&meta_plain)
             .map_err(|e| SyncError::Serialization(e.to_string()))?;
+        remote_meta.trashed_at =
+            clamp_peer_trashed_at(remote_meta.trashed_at, remote_meta.updated_at, now_unix());
         if remote_meta.entry_id != entry_id {
             return Err(SyncError::Serialization(format!(
                 "payload entry_id {:?} does not match path id {entry_id:?}",
@@ -5584,11 +5613,12 @@ impl SyncEngine {
             Some(final_yjs_plain)
         };
 
-        // LWW merge for non-Yjs fields when a local row exists.
-        // `Some` only when the local row is in Trash AND wins LWW: the
-        // write-back must keep it in Trash, not turn it into a purge.
-        let mut local_trashed_at: Option<i64> = None;
-        let merged_meta = if let Some(ref local) = existing {
+        // LWW merge for non-Yjs fields when a local row exists. Both sides
+        // are in the trash wire form (`is_deleted = false` + `trashed_at`
+        // for a trashed row), so the winner's `trashed_at` — remote or
+        // local — carries through to `upsert_entry_from_sync`, which maps it
+        // back to the local columns.
+        let mut merged_meta = if let Some(ref local) = existing {
             // Snapshot the local entry's tag set so the LWW winner's
             // tag_ids field reflects whichever side is authoritative.
             let local_tag_ids = db::get_tag_ids_for_entry(conn, &local.id).map_err(sync_io)?;
@@ -5613,7 +5643,7 @@ impl SyncEngine {
                 longitude: local.longitude,
                 emotion: local.emotion.clone(),
                 is_favorite: local.is_favorite,
-                is_deleted: local.is_deleted,
+                is_deleted: local.is_deleted && local.trashed_at.is_none(),
                 is_locked: local.is_locked,
                 is_invisible: local.is_invisible,
                 vault_id: local.vault_id.clone(),
@@ -5623,14 +5653,15 @@ impl SyncEngine {
                 tag_ids: local_tag_ids,
                 media: vec![],
                 deleted_media: vec![],
-                trashed_at: None,
+                // See `push_single_entry`: a stale `trashed_at` on a live row
+                // must not turn the write-back into a trash.
+                trashed_at: if local.is_deleted {
+                    local.trashed_at
+                } else {
+                    None
+                },
             };
-            let merged = merge_metadata_lww(&local_meta, &remote_meta);
-            // LWW returns the local side verbatim when it wins.
-            if merged == local_meta {
-                local_trashed_at = local.trashed_at;
-            }
-            merged
+            merge_metadata_lww(&local_meta, &remote_meta)
         } else {
             remote_meta.clone()
         };
@@ -5640,6 +5671,39 @@ impl SyncEngine {
             merged_meta.is_invisible,
             merged_meta.vault_id.clone(),
         );
+
+        // A live local row the merge moves into Trash loses its derived AI
+        // User Memory here, as `soft_delete_entry_impl` does on the trashing
+        // device ("memories removed at trash"). Runs BEFORE the upsert: an
+        // `Err` from `ingest_entry` is non-fatal and its chunk still commits,
+        // so a failure after the upsert would land the trash without its
+        // cleanup, and the LWW guard would never re-ingest it (same hazard
+        // as the I8 note on the peer-tombstone cascade). Idempotent. The
+        // stamp is clamped like the peer-tombstone path's.
+        let enters_trash = !merged_meta.is_deleted && merged_meta.trashed_at.is_some();
+        let goes_live_to_trash = enters_trash && existing.as_ref().is_some_and(|e| !e.is_deleted);
+        // Retention runs on this device's clock: any merged Trash stamp is
+        // floored at `now - MAX_CLOCK_SKEW_SECS`, so a peer whose clock is
+        // far behind (a self-consistent stamp that passes the clamp) cannot
+        // get it purged by the next sweep. That covers a live row, a row
+        // first seen already trashed, a purge / legacy tombstone revived into
+        // Trash, and a row already in local Trash moved to an EARLIER stamp.
+        // Only lengthens retention; a row already in local Trash whose merged
+        // stamp does not go earlier keeps the merged stamp.
+        let keeps_local_trash = existing.as_ref().is_some_and(|e| {
+            e.is_deleted
+                && e.trashed_at
+                    .is_some_and(|l| merged_meta.trashed_at.is_some_and(|t| t >= l))
+        });
+        if enters_trash && !keeps_local_trash {
+            let floor = now_unix() - MAX_CLOCK_SKEW_SECS;
+            merged_meta.trashed_at = merged_meta.trashed_at.map(|t| t.max(floor));
+        }
+        if goes_live_to_trash {
+            let stamp = merged_meta.updated_at.min(now_unix() + MAX_CLOCK_SKEW_SECS);
+            db::memory::cleanup_memory_for_deleted_source(conn, "journal_entry", entry_id, stamp)
+                .map_err(sync_io)?;
+        }
 
         db::upsert_entry_from_sync(
             conn,
@@ -5660,9 +5724,8 @@ impl SyncEngine {
                 weather_icon: merged_meta.weather_icon.as_deref(),
                 emotion: merged_meta.emotion.as_deref(),
                 is_favorite: merged_meta.is_favorite,
-                // Wire form (see `SyncEntryRow::trashed_at`): a kept local
-                // trash is `is_deleted = false` + `trashed_at`.
-                is_deleted: merged_meta.is_deleted && local_trashed_at.is_none(),
+                // Wire form (see `SyncEntryRow::trashed_at`).
+                is_deleted: merged_meta.is_deleted,
                 is_locked,
                 is_invisible,
                 vault_id: vault_id.as_deref(),
@@ -5670,10 +5733,7 @@ impl SyncEngine {
                 cover_media_id: merged_meta.cover_media_id.as_deref(),
                 entry_date_user_edited: merged_meta.entry_date_user_edited,
                 content_language: merged_meta.content_language.as_deref(),
-                // Phase 10 carries a remote winner's `trashed_at` here once
-                // the wire mapping lands; until then only a winning local
-                // trash is preserved.
-                trashed_at: local_trashed_at,
+                trashed_at: merged_meta.trashed_at,
             },
         )
         .map_err(sync_io)?;
@@ -6013,7 +6073,13 @@ fn build_local_manifest(
     memory_present: bool,
 ) -> rusqlite::Result<DeviceMetadata> {
     let mut stmt = conn.prepare(
-        "SELECT e.id, e.updated_at, s.local_version, e.is_deleted
+        // Trash wire form (see `push_single_entry`): a trashed row is
+        // published as not deleted + `trashed_at`; a live or purged row has
+        // no `trashed_at` and serializes as before (a live row's stale
+        // `trashed_at` from a downgrade is dropped by the CASE).
+        "SELECT e.id, e.updated_at, s.local_version,
+                e.is_deleted = 1 AND e.trashed_at IS NULL,
+                CASE WHEN e.is_deleted = 1 THEN e.trashed_at END
          FROM entries e
          INNER JOIN sync_state s ON s.entry_id = e.id
          ORDER BY e.id",
@@ -6025,7 +6091,7 @@ fn build_local_manifest(
                 updated_at: row.get::<_, i64>(1)?,
                 local_version: row.get::<_, i64>(2)?,
                 is_deleted: row.get::<_, i64>(3)? != 0,
-                trashed_at: None,
+                trashed_at: row.get::<_, Option<i64>>(4)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -6052,6 +6118,24 @@ fn build_local_manifest(
     })
 }
 
+/// Bound an untrusted peer `trashed_at` before it can reach the 30-day
+/// retention sweep (a purge is irreversible and propagates). A trash stamps
+/// `updated_at >= trashed_at` at the same moment, so a genuine value lies
+/// within `MAX_CLOCK_SKEW_SECS` below the payload's `updated_at` (itself
+/// capped at `now + MAX_CLOCK_SKEW_SECS`, as the upsert does) and never
+/// below 0; anything outside `[that, now + MAX_CLOCK_SKEW_SECS]` is pulled
+/// to the nearest bound. Clamping the remote side only (before the LWW
+/// merge) leaves a winning local value untouched.
+fn clamp_peer_trashed_at(trashed_at: Option<i64>, updated_at: i64, now: i64) -> Option<i64> {
+    let hi = now.saturating_add(MAX_CLOCK_SKEW_SECS);
+    let lo = updated_at
+        .min(hi)
+        .saturating_sub(MAX_CLOCK_SKEW_SECS)
+        .max(0);
+    // Not `clamp`: it panics if a pre-1970 clock ever made `lo > hi`.
+    trashed_at.map(|t| t.max(lo).min(hi))
+}
+
 /// Build the **full** local-state view used as `local` in `compute_diff`.
 ///
 /// Unlike `build_local_manifest`, this includes every entry in the DB —
@@ -6061,12 +6145,12 @@ fn build_local_manifest(
 /// redundantly re-pull it (and re-count it in `PullStats.pulled`).
 fn build_local_diff_view(conn: &Connection, device_id: &str) -> rusqlite::Result<DeviceMetadata> {
     let mut stmt = conn.prepare(
-        // A trashed row counts as not deleted here (its wire form), so a
-        // newer peer tombstone still lands in `to_delete_locally` and takes
-        // it out of Trash. Diff input only; the published manifest is
-        // unchanged.
+        // Same trash wire form as `build_local_manifest`: a trashed row
+        // counts as not deleted, so a newer peer tombstone still lands in
+        // `to_delete_locally` and takes it out of Trash.
         "SELECT e.id, e.updated_at, COALESCE(s.local_version, 0),
-                e.is_deleted = 1 AND e.trashed_at IS NULL
+                e.is_deleted = 1 AND e.trashed_at IS NULL,
+                CASE WHEN e.is_deleted = 1 THEN e.trashed_at END
          FROM entries e
          LEFT JOIN sync_state s ON s.entry_id = e.id",
     )?;
@@ -6077,7 +6161,7 @@ fn build_local_diff_view(conn: &Connection, device_id: &str) -> rusqlite::Result
                 updated_at: row.get::<_, i64>(1)?,
                 local_version: row.get::<_, i64>(2)?,
                 is_deleted: row.get::<_, i64>(3)? != 0,
-                trashed_at: None,
+                trashed_at: row.get::<_, Option<i64>>(4)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -13600,9 +13684,18 @@ mod tests {
             "precondition: B must have the media row before the delete"
         );
 
-        // A deletes the entry. `now_unix()` has 1-second resolution, so bump
-        // `updated_at` explicitly to give the diff a strictly-newer remote.
+        // A deletes the entry for good (trash, then purge: a trash alone is
+        // not a tombstone on the wire and keeps the media). `now_unix()` has
+        // 1-second resolution, so bump `updated_at` explicitly to give the
+        // diff a strictly-newer remote.
         crate::commands::entries::soft_delete_entry_impl(&conn_a, &entry.id).unwrap();
+        crate::commands::entries::purge_entry_impl(
+            &conn_a,
+            &entry.id,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
         conn_a
             .execute(
                 "UPDATE entries SET updated_at = updated_at + 1000 WHERE id = ?1",
@@ -13943,6 +14036,15 @@ mod tests {
     fn ingest_older_remote_over_local_deleted_row(
         local_trashed_at: Option<i64>,
     ) -> (bool, Option<i64>) {
+        ingest_older_remote_over_local_row(true, local_trashed_at)
+    }
+
+    /// Ingest an older remote live payload over a local row with the given
+    /// `(is_deleted, trashed_at)` and return the row's `(is_deleted, trashed_at)`.
+    fn ingest_older_remote_over_local_row(
+        local_is_deleted: bool,
+        local_trashed_at: Option<i64>,
+    ) -> (bool, Option<i64>) {
         let key = test_key();
         let conn = fresh_db();
         let dir = TempDir::new().unwrap();
@@ -13961,8 +14063,8 @@ mod tests {
         )
         .unwrap();
         conn.execute(
-            "UPDATE entries SET is_deleted = 1, trashed_at = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![local_trashed_at, local_updated, entry.id],
+            "UPDATE entries SET is_deleted = ?1, trashed_at = ?2, updated_at = ?3 WHERE id = ?4",
+            rusqlite::params![local_is_deleted, local_trashed_at, local_updated, entry.id],
         )
         .unwrap();
 
@@ -14023,12 +14125,460 @@ mod tests {
         );
     }
 
+    /// A newer local live row with a stale `trashed_at` (downgrade) wins LWW
+    /// over an older remote and must stay live, not be written back as a
+    /// trash through the wire form.
+    #[test]
+    fn ingest_entry_keeps_a_newer_local_live_row_with_stale_trashed_at_live() {
+        assert_eq!(
+            ingest_older_remote_over_local_row(false, Some(1_234)),
+            (false, None)
+        );
+    }
+
     #[test]
     fn ingest_entry_keeps_a_newer_local_purge_tombstone_purged() {
         assert_eq!(
             ingest_older_remote_over_local_deleted_row(None),
             (true, None)
         );
+    }
+
+    // ─── Phase 10: trash wire mapping ───────────────────────────────────────
+
+    /// Seed a fixed journal plus three fixed rows — live, in Trash, purged —
+    /// each with a `sync_state` row, so serialized bytes are reproducible.
+    fn seed_wire_rows(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO journals (id, name, color, created_at, updated_at)
+             VALUES ('journal-wire-0001', 'Wire', NULL, 100, 100)",
+            [],
+        )
+        .unwrap();
+        for (id, is_deleted, trashed_at) in [
+            ("entry-live-00001", 0, None),
+            ("entry-trash-0001", 1, Some(150_i64)),
+            ("entry-purge-0001", 1, None),
+        ] {
+            conn.execute(
+                "INSERT INTO entries (id, journal_id, title, preview_text, content_text,
+                    entry_date, created_at, updated_at, is_favorite, is_deleted, trashed_at)
+                 VALUES (?1, 'journal-wire-0001', 't', 'p', 'c', 100, 100, 200, 0, ?2, ?3)",
+                rusqlite::params![id, is_deleted, trashed_at],
+            )
+            .unwrap();
+            db::mark_entry_pending(conn, id).unwrap();
+        }
+    }
+
+    /// Golden: live and purged rows serialize exactly as before Phase 10 (no
+    /// `trashed_at` key, so v0.2.x peers and the web see identical bytes and
+    /// the hash gate does not re-push), while a trashed row goes out as
+    /// `is_deleted:false` + `trashed_at`.
+    #[test]
+    fn manifest_entries_use_the_trash_wire_form() {
+        let conn = fresh_db();
+        seed_wire_rows(&conn);
+        let manifest = build_local_manifest(&conn, "dev-a", false, false).unwrap();
+        let json = serde_json::to_string(&manifest.entries).unwrap();
+        assert_eq!(
+            json,
+            "[{\"entry_id\":\"entry-live-00001\",\"updated_at\":200,\"local_version\":1,\"is_deleted\":false},\
+             {\"entry_id\":\"entry-purge-0001\",\"updated_at\":200,\"local_version\":1,\"is_deleted\":true},\
+             {\"entry_id\":\"entry-trash-0001\",\"updated_at\":200,\"local_version\":1,\"is_deleted\":false,\"trashed_at\":150}]"
+        );
+    }
+
+    async fn pushed_meta_json(
+        conn: &Connection,
+        dir: &TempDir,
+        engine: &SyncEngine,
+        id: &str,
+    ) -> String {
+        let key = test_key();
+        engine.push_single_entry(conn, &key, id).await.unwrap();
+        let bytes = std::fs::read(dir.path().join(format!("dev-a/entries/{id}.bin"))).unwrap();
+        let payload = super::super::entry_sync::deserialize_payload(&bytes).unwrap();
+        let ks = engine.make_key_state(&key);
+        let plain = decrypt_data_with_state(&payload.metadata_ciphertext, &ks).unwrap();
+        String::from_utf8(plain).unwrap()
+    }
+
+    #[tokio::test]
+    async fn entry_payload_metadata_uses_the_trash_wire_form() {
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        seed_wire_rows(&conn);
+
+        assert_eq!(
+            pushed_meta_json(&conn, &dir, &engine, "entry-live-00001").await,
+            "{\"entry_id\":\"entry-live-00001\",\"device_id\":\"dev-a\",\"updated_at\":200,\"entry_date\":100,\"created_at\":100,\
+             \"journal_id\":\"journal-wire-0001\",\"journal_name\":\"Wire\",\"journal_color\":null,\"journal_updated_at\":100,\
+             \"title\":\"t\",\"preview_text\":\"p\",\"content_text\":\"c\",\"location_label\":null,\"location_address\":null,\
+             \"weather_summary\":null,\"weather_icon\":null,\"latitude\":null,\"longitude\":null,\"emotion\":null,\
+             \"is_favorite\":false,\"is_deleted\":false,\"is_locked\":false,\"is_invisible\":false,\"vault_id\":null,\
+             \"cover_media_id\":null,\"entry_date_user_edited\":false,\"content_language\":null,\"tag_ids\":[],\
+             \"media\":[],\"deleted_media\":[]}"
+        );
+        let purged = pushed_meta_json(&conn, &dir, &engine, "entry-purge-0001").await;
+        assert!(purged.contains("\"is_deleted\":true,"), "{purged}");
+        assert!(!purged.contains("trashed_at"), "{purged}");
+        let trashed = pushed_meta_json(&conn, &dir, &engine, "entry-trash-0001").await;
+        assert!(trashed.contains("\"is_deleted\":false,"), "{trashed}");
+        assert!(trashed.ends_with(",\"trashed_at\":150}"), "{trashed}");
+    }
+
+    /// A live row an older build left with a stale `trashed_at` (downgrade:
+    /// restored by a build that did not know the column) must publish
+    /// byte-identical to a plain live row. Publishing the stale value would
+    /// read as a trash on peers, whose sweep would then purge a live entry.
+    #[tokio::test]
+    async fn live_row_with_stale_trashed_at_publishes_as_plain_live() {
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        seed_wire_rows(&conn);
+        conn.execute(
+            "INSERT INTO entries (id, journal_id, title, preview_text, content_text,
+                entry_date, created_at, updated_at, is_favorite, is_deleted, trashed_at)
+             VALUES ('entry-stale-0001', 'journal-wire-0001', 't', 'p', 'c', 100, 100, 200, 0, 0, 150)",
+            [],
+        )
+        .unwrap();
+        db::mark_entry_pending(&conn, "entry-stale-0001").unwrap();
+
+        let summary_json = |view: &DeviceMetadata, id: &str| {
+            let row = view.entries.iter().find(|e| e.entry_id == id).unwrap();
+            serde_json::to_string(row).unwrap()
+        };
+        let manifest = build_local_manifest(&conn, "dev-a", false, false).unwrap();
+        let live = summary_json(&manifest, "entry-live-00001");
+        assert_eq!(
+            summary_json(&manifest, "entry-stale-0001"),
+            live.replace("entry-live-00001", "entry-stale-0001")
+        );
+        let diff_view = build_local_diff_view(&conn, "dev-a").unwrap();
+        assert_eq!(
+            summary_json(&diff_view, "entry-stale-0001"),
+            summary_json(&diff_view, "entry-live-00001")
+                .replace("entry-live-00001", "entry-stale-0001")
+        );
+
+        let live_payload = pushed_meta_json(&conn, &dir, &engine, "entry-live-00001").await;
+        assert_eq!(
+            pushed_meta_json(&conn, &dir, &engine, "entry-stale-0001").await,
+            live_payload.replace("entry-live-00001", "entry-stale-0001")
+        );
+    }
+
+    /// Two-step: trash through the real command, then push — the payload
+    /// and the published manifest both carry the trash wire form.
+    #[tokio::test]
+    async fn local_trash_pushes_trashed_wire_form_in_payload_and_manifest() {
+        let key = test_key();
+        let conn = fresh_db();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        let id = make_entry_with_content(&conn, &key, "body");
+        crate::commands::entries::soft_delete_entry_impl(&conn, &id).unwrap();
+        let trashed_at = db::get_entry_raw(&conn, &id)
+            .unwrap()
+            .unwrap()
+            .trashed_at
+            .unwrap();
+
+        engine
+            .push_local(&conn, &key, &key_state_from_key(&key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        let bytes = std::fs::read(dir.path().join(format!("dev-a/entries/{id}.bin"))).unwrap();
+        let payload = super::super::entry_sync::deserialize_payload(&bytes).unwrap();
+        let ks = engine.make_key_state(&key);
+        let plain = decrypt_data_with_state(&payload.metadata_ciphertext, &ks).unwrap();
+        let meta: EntryMetadata = serde_json::from_slice(&plain).unwrap();
+        assert!(!meta.is_deleted);
+        assert_eq!(meta.trashed_at, Some(trashed_at));
+
+        let manifest: DeviceMetadata =
+            serde_json::from_slice(&std::fs::read(dir.path().join("dev-a/metadata.json")).unwrap())
+                .unwrap();
+        let row = manifest.entries.iter().find(|e| e.entry_id == id).unwrap();
+        assert!(!row.is_deleted);
+        assert_eq!(row.trashed_at, Some(trashed_at));
+    }
+
+    /// Ingest `remote` (authored by `dev-a`) into `conn` as `dev-b`.
+    fn ingest_remote_meta(conn: &Connection, remote: &EntryMetadata) {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-b");
+        let ks = engine.make_key_state(&key);
+        let fp = ks.with_sync_key(|k| Ok(key_fingerprint(k))).unwrap();
+        let metadata_ciphertext =
+            encrypt_data_with_state(&serde_json::to_vec(remote).unwrap(), &ks).unwrap();
+        let yjs_blob_ciphertext = encrypt_data_with_state(&make_yjs_blob("body"), &ks).unwrap();
+        let payload = SyncEntryPayload::new(fp, yjs_blob_ciphertext, metadata_ciphertext);
+        engine
+            .ingest_entry(conn, &key_state_from_key(&key), &remote.entry_id, &payload)
+            .unwrap();
+    }
+
+    /// A remote payload for an existing local `entry`, newer by 60 s.
+    fn newer_remote_meta(entry: &db::Entry, trashed_at: Option<i64>) -> EntryMetadata {
+        EntryMetadata {
+            entry_id: entry.id.clone(),
+            device_id: "dev-a".to_string(),
+            updated_at: entry.updated_at + 60,
+            entry_date: entry.entry_date,
+            created_at: entry.created_at,
+            journal_id: entry.journal_id.clone(),
+            journal_name: Some("Synced".to_string()),
+            journal_color: None,
+            journal_updated_at: Some(entry.updated_at),
+            title: entry.title.clone(),
+            preview_text: entry.preview_text.clone(),
+            content_text: entry.content_text.clone(),
+            location_label: None,
+            location_address: None,
+            weather_summary: None,
+            weather_icon: None,
+            latitude: None,
+            longitude: None,
+            emotion: None,
+            is_favorite: false,
+            is_deleted: false,
+            is_locked: false,
+            is_invisible: false,
+            vault_id: None,
+            cover_media_id: None,
+            entry_date_user_edited: false,
+            content_language: None,
+            tag_ids: vec![],
+            media: vec![],
+            deleted_media: vec![],
+            trashed_at,
+        }
+    }
+
+    #[test]
+    fn ingest_of_a_remote_trashed_winner_trashes_locally_and_cleans_memories() {
+        let key = test_key();
+        let conn = fresh_db();
+        let id = make_entry_with_content(&conn, &key, "body");
+        add_memory_item(&conn, "memory-trash-01", "fact", "journal_entry", 100);
+        db::memory::add_memory_source(&conn, "memory-trash-01", "journal_entry", &id).unwrap();
+        let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+
+        let trashed_at = entry.updated_at + 30;
+        ingest_remote_meta(&conn, &newer_remote_meta(&entry, Some(trashed_at)));
+
+        let after = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        assert_eq!(
+            (after.is_deleted, after.trashed_at),
+            (true, Some(trashed_at))
+        );
+        let memory_deleted: i64 = conn
+            .query_row(
+                "SELECT is_deleted FROM memory_items WHERE id = 'memory-trash-01'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(memory_deleted, 1, "trash must remove derived memories");
+    }
+
+    /// An untrusted peer `trashed_at` is clamped into
+    /// `[updated_at - MAX_CLOCK_SKEW_SECS, now + MAX_CLOCK_SKEW_SECS]` (never
+    /// below 0) on ingest, so a 0 / i64::MIN / far-past value is not purged
+    /// by the very next sweep and a far-future one cannot pin it forever.
+    #[test]
+    fn ingest_clamps_an_untrusted_remote_trashed_at_before_the_sweep() {
+        for raw in [0, i64::MIN, -5, i64::MAX, 1] {
+            let key = test_key();
+            let conn = fresh_db();
+            let id = make_entry_with_content(&conn, &key, "body");
+            let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+            let remote = newer_remote_meta(&entry, Some(raw));
+
+            ingest_remote_meta(&conn, &remote);
+
+            let stored = db::get_entry_raw(&conn, &id)
+                .unwrap()
+                .unwrap()
+                .trashed_at
+                .unwrap();
+            if raw == i64::MAX {
+                assert!(
+                    stored <= now_unix() + MAX_CLOCK_SKEW_SECS,
+                    "{raw}: {stored}"
+                );
+                assert!(stored >= remote.updated_at, "{raw}: {stored}");
+            } else {
+                assert_eq!(stored, remote.updated_at - MAX_CLOCK_SKEW_SECS, "{raw}");
+            }
+            assert_eq!(
+                sweep_now(&conn),
+                0,
+                "{raw}: a clamped trash must not be purged right after ingest"
+            );
+            assert!(db::get_entry_raw(&conn, &id)
+                .unwrap()
+                .unwrap()
+                .trashed_at
+                .is_some());
+        }
+    }
+
+    /// A live retention sweep at the real `now` right after ingest: the
+    /// watermark is seeded just behind `now` (so it is not a seeding no-op)
+    /// and the session is test-owned.
+    fn sweep_now(conn: &Connection) -> usize {
+        let now = now_unix();
+        db::set_setting(
+            conn,
+            crate::commands::entries::TRASH_SWEEP_LAST_RUN_KEY,
+            &(now - 60).to_string(),
+        )
+        .unwrap();
+        crate::commands::entries::purge_expired_trash_in_session(conn, now, &mut None, |_| 0)
+            .unwrap()
+    }
+
+    /// A peer whose clock is 35 days behind trashes with a self-consistent
+    /// `trashed_at ~= updated_at` that passes the clamp. Entering Trash on
+    /// this device (a live row, or a row first seen already trashed) floors
+    /// the stored stamp at local `now - MAX_CLOCK_SKEW_SECS`, so the sweep
+    /// right after does not purge it.
+    #[test]
+    fn ingest_floors_a_far_behind_peer_trashed_at_entering_trash() {
+        let day = 86_400;
+        for new_row in [false, true] {
+            let key = test_key();
+            let conn = fresh_db();
+            let other = fresh_db();
+            let source: &Connection = if new_row { &other } else { &conn };
+            let id = make_entry_with_content(source, &key, "body");
+            let behind = now_unix() - 35 * day;
+            source
+                .execute(
+                    "UPDATE entries SET updated_at = ?1 WHERE id = ?2",
+                    rusqlite::params![behind - 5 * day, id],
+                )
+                .unwrap();
+            let entry = db::get_entry_raw(source, &id).unwrap().unwrap();
+            let mut remote = newer_remote_meta(&entry, Some(behind));
+            remote.updated_at = behind;
+
+            ingest_remote_meta(&conn, &remote);
+
+            let stored = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+            assert!(stored.is_deleted, "new_row={new_row}: trashed locally");
+            let t = stored.trashed_at.unwrap();
+            assert!(
+                t >= now_unix() - MAX_CLOCK_SKEW_SECS - 5,
+                "new_row={new_row}: floored, got {t}"
+            );
+            assert_eq!(sweep_now(&conn), 0, "new_row={new_row}: not purged");
+            assert!(db::get_entry_raw(&conn, &id)
+                .unwrap()
+                .unwrap()
+                .trashed_at
+                .is_some());
+        }
+    }
+
+    /// A row already in local Trash whose merged stamp moves it EARLIER
+    /// (a newer peer payload from a clock far behind) is floored at local
+    /// `now - MAX_CLOCK_SKEW_SECS` too, so the next sweep does not purge it.
+    #[test]
+    fn ingest_floors_a_far_behind_peer_trashed_at_lowering_a_local_trash() {
+        let day = 86_400;
+        let key = test_key();
+        let conn = fresh_db();
+        let id = make_entry_with_content(&conn, &key, "body");
+        let behind = now_unix() - 35 * day;
+        conn.execute(
+            "UPDATE entries SET is_deleted = 1, trashed_at = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![now_unix() - 2 * day, behind - 5 * day, id],
+        )
+        .unwrap();
+        let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        let mut remote = newer_remote_meta(&entry, Some(behind));
+        remote.updated_at = behind;
+
+        ingest_remote_meta(&conn, &remote);
+
+        let t = db::get_entry_raw(&conn, &id)
+            .unwrap()
+            .unwrap()
+            .trashed_at
+            .unwrap();
+        assert!(
+            t >= now_unix() - MAX_CLOCK_SKEW_SECS - 5,
+            "floored, got {t}"
+        );
+        assert_eq!(sweep_now(&conn), 0, "not purged");
+    }
+
+    /// A local purge / legacy tombstone (`is_deleted = 1`, `trashed_at`
+    /// NULL) resurrected into Trash by a newer payload from a peer clock far
+    /// behind is floored at local `now - MAX_CLOCK_SKEW_SECS`, so the sweep
+    /// right after does not purge it again (and propagate that purge).
+    #[test]
+    fn ingest_floors_a_far_behind_peer_trashed_at_reviving_a_local_tombstone() {
+        let day = 86_400;
+        let key = test_key();
+        let conn = fresh_db();
+        let id = make_entry_with_content(&conn, &key, "body");
+        let behind = now_unix() - 35 * day;
+        conn.execute(
+            "UPDATE entries SET is_deleted = 1, trashed_at = NULL, updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![behind - 5 * day, id],
+        )
+        .unwrap();
+        let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        let mut remote = newer_remote_meta(&entry, Some(behind));
+        remote.updated_at = behind;
+
+        ingest_remote_meta(&conn, &remote);
+
+        let stored = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        let t = stored.trashed_at.expect("revived into Trash");
+        assert!(
+            t >= now_unix() - MAX_CLOCK_SKEW_SECS - 5,
+            "floored, got {t}"
+        );
+        assert_eq!(sweep_now(&conn), 0, "not purged");
+    }
+
+    #[test]
+    fn ingest_keeps_a_plausible_remote_trashed_at_unchanged() {
+        let key = test_key();
+        let conn = fresh_db();
+        let id = make_entry_with_content(&conn, &key, "body");
+        let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        let remote = newer_remote_meta(&entry, Some(entry.updated_at - 3_600));
+
+        ingest_remote_meta(&conn, &remote);
+
+        let after = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        assert_eq!(after.trashed_at, Some(entry.updated_at - 3_600));
+    }
+
+    #[test]
+    fn ingest_of_a_newer_remote_restore_brings_a_trashed_entry_back() {
+        let key = test_key();
+        let conn = fresh_db();
+        let id = make_entry_with_content(&conn, &key, "body");
+        crate::commands::entries::soft_delete_entry_impl(&conn, &id).unwrap();
+        let entry = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+
+        ingest_remote_meta(&conn, &newer_remote_meta(&entry, None));
+
+        let after = db::get_entry_raw(&conn, &id).unwrap().unwrap();
+        assert_eq!((after.is_deleted, after.trashed_at), (false, None));
     }
 
     #[test]
@@ -22716,5 +23266,579 @@ mod tests {
             db::list_entry_versions(&conn_b, &entry_id).unwrap().len(),
             1
         );
+    }
+
+    // ─── Trash retention sweep after a successful pull ──────────────────────
+
+    /// Seeds one entry trashed past the retention window, one trashed now,
+    /// and a sweep watermark just behind `now`.
+    fn seed_due_and_recent_trash(conn: &Connection, key: &[u8; 32]) -> (String, String) {
+        let due = make_entry_with_content(conn, key, "due");
+        let recent = make_entry_with_content(conn, key, "recent");
+        let now = now_unix();
+        db::queries::trash_entry(
+            conn,
+            &due,
+            now - crate::commands::entries::TRASH_RETENTION_SECS - 1,
+        )
+        .unwrap();
+        db::queries::trash_entry(conn, &recent, now).unwrap();
+        // A prior sweep's watermark, so a sweep is live (not the first-ever
+        // seeding run, which would purge nothing either way).
+        db::set_setting(
+            conn,
+            crate::commands::entries::TRASH_SWEEP_LAST_RUN_KEY,
+            &(now - 60).to_string(),
+        )
+        .unwrap();
+        (due, recent)
+    }
+
+    fn in_trash(conn: &Connection, id: &str) -> bool {
+        db::get_entry(conn, id)
+            .unwrap()
+            .unwrap()
+            .trashed_at
+            .is_some()
+    }
+
+    #[tokio::test]
+    async fn sync_now_purges_due_trash_after_a_successful_pull() {
+        let dir = TempDir::new().unwrap();
+        let engine = make_engine(&dir, "dev-a");
+        let conn = fresh_db();
+        let key = test_key();
+        let (due, recent) = seed_due_and_recent_trash(&conn, &key);
+
+        let summary = engine
+            .sync_now(&conn, &key, &key_state_from_key(&key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        assert!(summary.pull_clean, "precondition: {:?}", summary.errors);
+        let row = db::get_entry(&conn, &due).unwrap().unwrap();
+        assert!(
+            row.is_deleted && row.trashed_at.is_none(),
+            "due entry purged"
+        );
+        assert!(in_trash(&conn, &recent), "not-yet-due entry kept");
+    }
+
+    /// `list_devices` always fails, so the pull leg errors out.
+    struct AlwaysFailListDevices;
+
+    #[async_trait::async_trait]
+    impl SyncProvider for AlwaysFailListDevices {
+        async fn list_devices(&self) -> Result<Vec<String>, SyncError> {
+            Err(SyncError::Io("offline".into()))
+        }
+        async fn list_files(
+            &self,
+            _device_id: &str,
+            _kind: FileKind,
+        ) -> Result<Vec<String>, SyncError> {
+            Err(SyncError::Io("offline".into()))
+        }
+        async fn read_file(&self, _path: &str) -> Result<Vec<u8>, SyncError> {
+            Err(SyncError::Io("offline".into()))
+        }
+        async fn write_file(&self, _path: &str, _data: &[u8]) -> Result<(), SyncError> {
+            Err(SyncError::Io("offline".into()))
+        }
+        async fn delete_file(&self, _path: &str) -> Result<(), SyncError> {
+            Err(SyncError::Io("offline".into()))
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_now_keeps_due_trash_when_the_pull_failed() {
+        let engine = SyncEngine::new(Arc::new(AlwaysFailListDevices), "dev-a".to_string());
+        let conn = fresh_db();
+        let key = test_key();
+        let (due, recent) = seed_due_and_recent_trash(&conn, &key);
+
+        let summary = engine
+            .sync_now(&conn, &key, &key_state_from_key(&key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        assert!(!summary.pull_clean, "precondition: the pull must fail");
+        assert!(in_trash(&conn, &due), "a failed pull must not purge");
+        assert!(in_trash(&conn, &recent));
+    }
+
+    // ─── Phase 10: two-device trash engine tests ────────────────────────────
+
+    async fn push_dev(engine: &SyncEngine, conn: &Connection, key: &[u8; 32]) {
+        engine
+            .push_local(conn, key, &key_state_from_key(key), SyncTrigger::Manual)
+            .await
+            .unwrap();
+    }
+
+    async fn pull_dev(engine: &SyncEngine, conn: &Connection, key: &[u8; 32]) -> PullStats {
+        let stats = engine
+            .pull_remote(conn, key, &key_state_from_key(key))
+            .await
+            .unwrap();
+        assert!(stats.errors.is_empty(), "pull errors: {:?}", stats.errors);
+        stats
+    }
+
+    /// Local `(is_deleted, trashed_at, updated_at)` of `id`.
+    fn trash_state(conn: &Connection, id: &str) -> (bool, Option<i64>, i64) {
+        let e = db::get_entry_raw(conn, id).unwrap().unwrap();
+        (e.is_deleted, e.trashed_at, e.updated_at)
+    }
+
+    /// Entry created on `dev-a`, pushed, and pulled live into `dev-b`.
+    async fn live_entry_on_two_devices(
+        dir: &TempDir,
+        key: &[u8; 32],
+    ) -> (Connection, SyncEngine, Connection, SyncEngine, String) {
+        let conn_a = fresh_db();
+        let engine_a = make_engine(dir, "dev-a");
+        let id = make_entry_with_content(&conn_a, key, "body");
+        push_dev(&engine_a, &conn_a, key).await;
+        let conn_b = fresh_db();
+        let engine_b = make_engine(dir, "dev-b");
+        pull_dev(&engine_b, &conn_b, key).await;
+        assert_eq!(
+            trash_state(&conn_b, &id).0,
+            false,
+            "precondition: live on B"
+        );
+        (conn_a, engine_a, conn_b, engine_b, id)
+    }
+
+    fn memory_is_deleted(conn: &Connection, memory_id: &str) -> bool {
+        conn.query_row(
+            "SELECT is_deleted FROM memory_items WHERE id = ?1",
+            [memory_id],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap()
+            != 0
+    }
+
+    fn add_media_row(conn: &Connection, entry_id: &str, files: &TempDir) -> String {
+        let path = files.path().join(format!("{entry_id}.jpg"));
+        std::fs::write(&path, b"fake image bytes").unwrap();
+        db::create_media(
+            conn,
+            crate::db::CreateMediaParams {
+                entry_id,
+                file_name: "photo.jpg",
+                file_type: "image/jpeg",
+                storage_path: &path.to_string_lossy(),
+                file_size: Some(16),
+                sort_order: 0,
+                insertion_mode: "inline",
+                width: None,
+                height: None,
+                exif_date: None,
+                exif_latitude: None,
+                exif_longitude: None,
+            },
+        )
+        .unwrap()
+        .id
+    }
+
+    #[tokio::test]
+    async fn two_device_trash_on_a_lands_in_b_trash_and_removes_b_memories() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        add_memory_item(&conn_b, "memory-b-0001", "fact", "journal_entry", 100);
+        db::memory::add_memory_source(&conn_b, "memory-b-0001", "journal_entry", &id).unwrap();
+
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+
+        let a = trash_state(&conn_a, &id);
+        let b = trash_state(&conn_b, &id);
+        assert!(a.1.is_some());
+        assert_eq!(b, a, "B holds A's trash: (1, trashed_at, updated_at)");
+        let listed = crate::commands::entries::list_trashed_entries_impl(
+            &conn_b,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
+        assert!(listed.iter().any(|e| e.id == id), "shown in B's Trash");
+        assert!(
+            memory_is_deleted(&conn_b, "memory-b-0001"),
+            "B's derived memories go with the trash"
+        );
+    }
+
+    /// v0.2.2 peers decode the manifest and payload without `trashed_at`
+    /// (neither struct denies unknown fields). A trashed entry must read as
+    /// live there, so a legacy diff pulls it instead of deleting it.
+    #[tokio::test]
+    async fn two_device_trash_reads_as_live_to_a_legacy_peer() {
+        #[derive(serde::Deserialize)]
+        struct LegacySummary {
+            entry_id: String,
+            updated_at: i64,
+            local_version: i64,
+            is_deleted: bool,
+        }
+        #[derive(serde::Deserialize)]
+        struct LegacyManifest {
+            entries: Vec<LegacySummary>,
+        }
+
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, _conn_b, _engine_b, id) =
+            live_entry_on_two_devices(&dir, &key).await;
+        let live_stamp = trash_state(&conn_a, &id).2;
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+
+        // Manifest, decoded with the legacy shape.
+        let legacy: LegacyManifest =
+            serde_json::from_slice(&std::fs::read(dir.path().join("dev-a/metadata.json")).unwrap())
+                .unwrap();
+        let row = legacy.entries.iter().find(|e| e.entry_id == id).unwrap();
+        assert!(!row.is_deleted, "legacy manifest row reads as live");
+
+        // A legacy diff (its local copy live and older) pulls, never deletes.
+        let to_summary = |e: &LegacySummary| super::super::metadata::SyncedEntrySummary {
+            entry_id: e.entry_id.clone(),
+            updated_at: e.updated_at,
+            local_version: e.local_version,
+            is_deleted: e.is_deleted,
+            trashed_at: None,
+        };
+        let manifest = |device: &str, entries| DeviceMetadata {
+            device_id: device.to_string(),
+            recovery_generation: 0,
+            entries,
+            journals: vec![],
+            chats_present: false,
+            memory_present: false,
+            generated_at: 0,
+            index_present: false,
+            outbox_versions: None,
+        };
+        let legacy_local = manifest(
+            "dev-old",
+            vec![super::super::metadata::SyncedEntrySummary {
+                entry_id: id.clone(),
+                updated_at: live_stamp,
+                local_version: 1,
+                is_deleted: false,
+                trashed_at: None,
+            }],
+        );
+        let remote = manifest("dev-a", legacy.entries.iter().map(to_summary).collect());
+        let diff = compute_diff(&legacy_local, &remote);
+        assert_eq!(diff.to_pull, vec![id.clone()]);
+        assert!(diff.to_delete_locally.is_empty());
+
+        // Payload metadata, decoded without `trashed_at`.
+        let bytes = std::fs::read(dir.path().join(format!("dev-a/entries/{id}.bin"))).unwrap();
+        let payload = super::super::entry_sync::deserialize_payload(&bytes).unwrap();
+        let plain =
+            decrypt_data_with_state(&payload.metadata_ciphertext, &engine_a.make_key_state(&key))
+                .unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&plain).unwrap();
+        assert_eq!(value["is_deleted"], serde_json::Value::Bool(false));
+        value.as_object_mut().unwrap().remove("trashed_at");
+        let legacy_meta: EntryMetadata = serde_json::from_value(value).unwrap();
+        assert!(!legacy_meta.is_deleted && legacy_meta.trashed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn two_device_restore_on_b_brings_the_entry_back_on_a() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+
+        crate::commands::entries::restore_entry_impl(
+            &conn_b,
+            &id,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
+        push_dev(&engine_b, &conn_b, &key).await;
+        pull_dev(&engine_a, &conn_a, &key).await;
+
+        let (a_deleted, a_trashed, a_stamp) = trash_state(&conn_a, &id);
+        assert_eq!((a_deleted, a_trashed), (false, None), "A is live again");
+        assert_eq!(a_stamp, trash_state(&conn_b, &id).2);
+    }
+
+    /// The purge stamp is the trashed row's `updated_at + 1` — no artificial
+    /// bump: that `+ 1` alone must cross the diff's strict `>`.
+    #[tokio::test]
+    async fn two_device_purge_tombstone_deletes_on_b_with_media_cascade() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let files = TempDir::new().unwrap();
+        let conn_a = fresh_db();
+        let engine_a = make_engine(&dir, "dev-a");
+        let id = make_entry_with_content(&conn_a, &key, "body");
+        let media_id = add_media_row(&conn_a, &id, &files);
+        db::mark_entry_pending(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        let conn_b = fresh_db();
+        let engine_b = make_engine(&dir, "dev-b");
+        pull_dev(&engine_b, &conn_b, &key).await;
+        assert!(db::get_media(&conn_b, &media_id).unwrap().is_some());
+
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+        assert!(
+            trash_state(&conn_b, &id).1.is_some(),
+            "precondition: B trashed"
+        );
+        assert!(
+            db::get_media(&conn_b, &media_id).unwrap().is_some(),
+            "a trash keeps the media for a restore"
+        );
+
+        let trashed_stamp = trash_state(&conn_a, &id).2;
+        crate::commands::entries::purge_entry_impl(
+            &conn_a,
+            &id,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
+        assert_eq!(trash_state(&conn_a, &id), (true, None, trashed_stamp + 1));
+        push_dev(&engine_a, &conn_a, &key).await;
+        let stats = pull_dev(&engine_b, &conn_b, &key).await;
+
+        assert_eq!(stats.deleted, 1);
+        assert_eq!(trash_state(&conn_b, &id).0, true);
+        assert_eq!(trash_state(&conn_b, &id).1, None, "purged, not in Trash");
+        assert!(
+            db::get_media(&conn_b, &media_id).unwrap().is_none(),
+            "the purge cascades B's media rows"
+        );
+    }
+
+    /// A restore on A after the trash, not yet seen by B, carries a newer
+    /// stamp than B's purge (`trashed + 1`), so it wins on both devices.
+    #[tokio::test]
+    async fn two_device_unseen_restore_on_a_beats_b_purge() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+        let trashed_stamp = trash_state(&conn_b, &id).2;
+
+        // A restores a minute later (explicit clock: the 1-second wall clock
+        // could tie the restore with B's `trashed + 1` purge stamp).
+        db::queries::restore_entry(&conn_a, &id, trashed_stamp + 60).unwrap();
+        db::mark_entry_pending(&conn_a, &id).unwrap();
+        crate::commands::entries::purge_entry_impl(
+            &conn_b,
+            &id,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
+        push_dev(&engine_b, &conn_b, &key).await;
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+
+        assert_eq!(trash_state(&conn_a, &id), (false, None, trashed_stamp + 60));
+        assert_eq!(trash_state(&conn_b, &id), (false, None, trashed_stamp + 60));
+    }
+
+    /// Restore with `now` equal to the trash stamp, concurrent with a purge
+    /// on B (`trashed + 1`): the restore stamps `trashed + 2`, so it wins on
+    /// both devices instead of tying with the purge (ties favour local, which
+    /// would leave A live and B purged forever).
+    #[tokio::test]
+    async fn two_device_same_second_restore_beats_concurrent_purge() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+        let trashed_stamp = trash_state(&conn_b, &id).2;
+
+        db::queries::restore_entry(&conn_a, &id, trashed_stamp).unwrap();
+        db::mark_entry_pending(&conn_a, &id).unwrap();
+        crate::commands::entries::purge_entry_impl(
+            &conn_b,
+            &id,
+            crate::db::LockedView::Revealed,
+            None,
+        )
+        .unwrap();
+        let restored = (false, None, trashed_stamp + 2);
+        for _round in 0..2 {
+            push_dev(&engine_b, &conn_b, &key).await;
+            push_dev(&engine_a, &conn_a, &key).await;
+            pull_dev(&engine_a, &conn_a, &key).await;
+            pull_dev(&engine_b, &conn_b, &key).await;
+            assert_eq!(trash_state(&conn_a, &id), restored);
+            assert_eq!(trash_state(&conn_b, &id), restored);
+        }
+    }
+
+    /// A v0.2.2 peer sees the trash as live (see the legacy test) and may
+    /// edit it. Its live wire form has no `trashed_at` key — byte-identical
+    /// to a v0.3.0 live payload — so a v0.3.0 `dev-c` stands in for it.
+    #[tokio::test]
+    async fn two_device_old_peer_edit_newer_than_trash_brings_entry_back_on_b() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        let conn_c = fresh_db();
+        let engine_c = make_engine(&dir, "dev-c");
+        pull_dev(&engine_c, &conn_c, &key).await;
+
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+        let trashed_stamp = trash_state(&conn_b, &id).2;
+        assert!(trash_state(&conn_b, &id).1.is_some(), "precondition");
+
+        conn_c
+            .execute(
+                "UPDATE entries SET title = 'edited on old peer', updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![trashed_stamp + 5, id],
+            )
+            .unwrap();
+        db::mark_entry_pending(&conn_c, &id).unwrap();
+        push_dev(&engine_c, &conn_c, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+
+        assert_eq!(trash_state(&conn_b, &id), (false, None, trashed_stamp + 5));
+        assert_eq!(
+            db::get_entry_raw(&conn_b, &id)
+                .unwrap()
+                .unwrap()
+                .title
+                .as_deref(),
+            Some("edited on old peer")
+        );
+    }
+
+    #[tokio::test]
+    async fn two_device_journal_delete_turns_peer_trashed_entries_into_purges() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let files = TempDir::new().unwrap();
+        let conn_a = fresh_db();
+        let engine_a = make_engine(&dir, "dev-a");
+        let journal = db::create_journal(&conn_a, "Doomed", None).unwrap();
+        let entry = db::create_entry(
+            &conn_a,
+            crate::db::CreateEntryParams {
+                journal_id: &journal.id,
+                title: Some("to trash"),
+                content_text: Some("body"),
+                preview_text: None,
+                entry_date: 1_700_000_000,
+            },
+        )
+        .unwrap();
+        let media_id = add_media_row(&conn_a, &entry.id, &files);
+        db::mark_entry_pending(&conn_a, &entry.id).unwrap();
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &entry.id).unwrap();
+        engine_a
+            .sync_now(
+                &conn_a,
+                &key,
+                &key_state_from_key(&key),
+                SyncTrigger::Manual,
+            )
+            .await
+            .unwrap();
+        let conn_b = fresh_db();
+        let engine_b = make_engine(&dir, "dev-b");
+        engine_b
+            .sync_now(
+                &conn_b,
+                &key,
+                &key_state_from_key(&key),
+                SyncTrigger::Manual,
+            )
+            .await
+            .unwrap();
+        assert!(trash_state(&conn_b, &entry.id).1.is_some(), "precondition");
+        assert!(db::get_media(&conn_b, &media_id).unwrap().is_some());
+
+        db::delete_journal(&conn_a, &journal.id).unwrap();
+        assert_eq!(trash_state(&conn_a, &entry.id).1, None);
+        conn_a
+            .execute(
+                "UPDATE journals SET updated_at = updated_at + 1000 WHERE id = ?1",
+                [&journal.id],
+            )
+            .unwrap();
+        engine_a
+            .sync_now(
+                &conn_a,
+                &key,
+                &key_state_from_key(&key),
+                SyncTrigger::Manual,
+            )
+            .await
+            .unwrap();
+        engine_b
+            .sync_now(
+                &conn_b,
+                &key,
+                &key_state_from_key(&key),
+                SyncTrigger::Manual,
+            )
+            .await
+            .unwrap();
+
+        let (deleted, trashed_at, _) = trash_state(&conn_b, &entry.id);
+        assert_eq!((deleted, trashed_at), (true, None), "purged, not in Trash");
+        assert!(db::get_media(&conn_b, &media_id).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn two_device_concurrent_purges_converge_without_flapping() {
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let (conn_a, engine_a, conn_b, engine_b, id) = live_entry_on_two_devices(&dir, &key).await;
+        crate::commands::entries::soft_delete_entry_impl(&conn_a, &id).unwrap();
+        push_dev(&engine_a, &conn_a, &key).await;
+        pull_dev(&engine_b, &conn_b, &key).await;
+        let trashed_stamp = trash_state(&conn_b, &id).2;
+
+        for conn in [&conn_a, &conn_b] {
+            crate::commands::entries::purge_entry_impl(
+                conn,
+                &id,
+                crate::db::LockedView::Revealed,
+                None,
+            )
+            .unwrap();
+        }
+        let purged = (true, None, trashed_stamp + 1);
+        for _round in 0..2 {
+            push_dev(&engine_a, &conn_a, &key).await;
+            push_dev(&engine_b, &conn_b, &key).await;
+            let sa = pull_dev(&engine_a, &conn_a, &key).await;
+            let sb = pull_dev(&engine_b, &conn_b, &key).await;
+            assert_eq!((sa.pulled, sa.deleted), (0, 0), "A: no flapping");
+            assert_eq!((sb.pulled, sb.deleted), (0, 0), "B: no flapping");
+            assert_eq!(trash_state(&conn_a, &id), purged);
+            assert_eq!(trash_state(&conn_b, &id), purged);
+        }
     }
 }

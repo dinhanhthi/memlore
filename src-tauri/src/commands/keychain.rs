@@ -668,6 +668,12 @@ pub fn unlock_with_biometric(
                 }) {
                     log::warn!("biometric: post-unlock retention purge failed: {e}");
                 }
+                if let Err(e) = state.with_conn(|c| {
+                    crate::commands::entries::purge_expired_trash_on_unlock(c, now_ms / 1000);
+                    Ok(())
+                }) {
+                    log::warn!("trash: unlock retention sweep skipped: {e}");
+                }
 
                 key_state.set_content_state(
                     content_keys,
