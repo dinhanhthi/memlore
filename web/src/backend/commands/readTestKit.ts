@@ -10,8 +10,10 @@ import {
   type VaultEntry,
 } from '../vault'
 import type { OutboxEntryV1 } from '../sync/outbox'
-import type { WebDb } from '../storage/idb'
+import type { DraftRecord, WebDb } from '../storage/idb'
 import type { Core } from '../../core/core'
+import type { KeyRing } from '../keys'
+import { NO_PENDING, pendingFromDrafts, type PendingV2 } from './pendingTaxonomy'
 import { configureReadEnv, type PullOutcome, type Taxonomy, type VaultApi } from './readSession'
 
 export interface FakeSpec {
@@ -48,8 +50,11 @@ export const EMPTY_TAXONOMY: Taxonomy = {
   knownJournalIds: [],
   tags: [],
   knownTagIds: [],
+  deletedTagNames: [],
+  lockedJournalNames: [],
   templates: [],
   deletedTemplateIds: [],
+  templateUpdatedAt: {},
 }
 
 /** In-memory `VaultApi`: `load` "downloads" a spec and records every call. */
@@ -59,6 +64,7 @@ export class FakeVault implements VaultApi {
   readonly #entries = new Map<string, VaultEntry>()
   readonly #stubs = new Map<string, string>()
   #outboxIntents = new Map<string, OutboxEntryV1>()
+  #trashed = new Set<string>()
 
   constructor(specs: FakeSpec[]) {
     for (const spec of specs) this.#specs.set(spec.id, spec)
@@ -78,6 +84,11 @@ export class FakeVault implements VaultApi {
 
   readonly getOutboxIntent = (entryId: string): OutboxEntryV1 | undefined => {
     return this.#outboxIntents.get(entryId)
+  }
+
+  /** Pending web trashes: served as deleted, as the real vault does. */
+  readonly setTrashedIds = (ids: Iterable<string>): void => {
+    this.#trashed = new Set(ids)
   }
 
   readonly load = async (ids: readonly string[]): Promise<LoadResult> => {
@@ -102,15 +113,16 @@ export class FakeVault implements VaultApi {
     return result
   }
 
-  readonly isLoaded = (id: string): boolean =>
-    this.#entries.has(id) || Boolean(this.#outboxIntents.get(id)?.created_on_web)
+  readonly isLoaded = (id: string): boolean => this.status(id) === 'visible'
 
   readonly status: VaultApi['status'] = (id) => {
+    if (this.#trashed.has(id)) return 'deleted'
     if (this.#outboxIntents.get(id)?.created_on_web) return 'visible'
     return this.#entries.has(id) ? 'visible' : ((this.#stubs.get(id) ?? 'not-loaded') as 'locked')
   }
 
   readonly getEntry = (id: string): VaultEntry => {
+    if (this.#trashed.has(id)) throw new EntryUnavailableError(id, 'deleted')
     const intent = this.#outboxIntents.get(id)
     if (intent && intent.created_on_web) {
       const metadata: EntryMetadata = {
@@ -210,12 +222,13 @@ export class FakeVault implements VaultApi {
 
   readonly listLoaded: VaultApi['listLoaded'] = (filter = {}) =>
     [...this.#entries.values()]
+      .filter((e) => !this.#trashed.has(e.metadata.entry_id))
       .filter((e) => filter.journalId === undefined || e.metadata.journal_id === filter.journalId)
       .sort((a, b) => b.metadata.entry_date - a.metadata.entry_date)
 
   readonly listIndex: VaultApi['listIndex'] = () =>
     [...this.#specs.values()]
-      .filter((s) => s.tombstone !== true && !this.#stubs.has(s.id))
+      .filter((s) => s.tombstone !== true && !this.#stubs.has(s.id) && !this.#trashed.has(s.id))
       .sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : 1))
       .map((s) => ({
         entryId: s.id,
@@ -292,6 +305,8 @@ export function installFakeSession(
     pageSize?: number
     now?: number
     pull?: () => Promise<PullOutcome>
+    /** Some desktop takes outbox v2 intents (Phase 22 handlers). Default false. */
+    outboxV2?: boolean
   } = {},
 ): Harness {
   const vault = new FakeVault(specs)
@@ -299,7 +314,7 @@ export function installFakeSession(
   let unlocked = true
 
   let seq = 0
-  const draftsMap = new Map<string, Uint8Array>()
+  const draftsMap = new Map<string, DraftRecord>()
   const blobsMap = new Map<string, Uint8Array>()
   const db = {
     device: {
@@ -307,22 +322,17 @@ export function installFakeSession(
       allocateChangeSeq: async () => ++seq,
     },
     drafts: {
-      put: async (rec: { entryId: string; sealed: Uint8Array }) => {
-        draftsMap.set(rec.entryId, rec.sealed)
+      put: async (rec: DraftRecord) => {
+        draftsMap.set(rec.entryId, { ...rec })
       },
       get: async (id: string) => {
-        const sealed = draftsMap.get(id)
-        return sealed ? { entryId: id, sealed, updatedAt: Date.now() } : undefined
+        const rec = draftsMap.get(id)
+        return rec ? { ...rec } : undefined
       },
       delete: async (id: string) => {
         draftsMap.delete(id)
       },
-      list: async () =>
-        Array.from(draftsMap.entries()).map(([entryId, sealed]) => ({
-          entryId,
-          sealed,
-          updatedAt: Date.now(),
-        })),
+      list: async () => Array.from(draftsMap.values(), (rec) => ({ ...rec })),
     },
     blobs: {
       put: async (b: { path: string; bytes: Uint8Array }) => {
@@ -342,14 +352,42 @@ export function installFakeSession(
     sealOutboxEntry: (_ring: unknown, json: string) => new TextEncoder().encode(json),
     sealOutboxMedia: (_ring: unknown, bytes: Uint8Array) => bytes,
     sealOutboxThumb: (_ring: unknown, bytes: Uint8Array) => bytes,
+    // v2 "sealing" is the JSON text behind a `2` byte; v1 bytes start with `{`.
+    sealOutboxIntentV2: (_ring: unknown, json: string) =>
+      new Uint8Array([2, ...new TextEncoder().encode(json)]),
+    openOutboxIntent: (_ring: unknown, bytes: Uint8Array) => {
+      const version = bytes[0] === 2 ? 2 : 1
+      const json = new TextDecoder().decode(version === 2 ? bytes.subarray(1) : bytes)
+      return { version, json, free: () => undefined }
+    },
   } as unknown as Core
+
+  let pending: PendingV2 = NO_PENDING
+
+  // A real FIFO mutex, as the session's, so concurrent writes serialize in tests.
+  let outboxTail: Promise<void> = Promise.resolve()
+  const acquireOutboxLock = async (): Promise<() => void> => {
+    const previous = outboxTail
+    let release!: () => void
+    outboxTail = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    return release
+  }
 
   configureReadEnv({
     isUnlocked: () => unlocked,
     session: async () => ({
       vault,
       ready: async () => options.taxonomy ?? EMPTY_TAXONOMY,
-      acquireOutboxLock: async () => () => undefined,
+      outboxV2Capable: () => options.outboxV2 ?? false,
+      pendingV2: () => pending,
+      refreshPendingV2: async () => {
+        pending = pendingFromDrafts(await db.drafts.list(), core, {} as KeyRing)
+        vault.setTrashedIds(pending.trashedEntryIds)
+      },
+      acquireOutboxLock,
       pull: options.pull ?? (async () => ({ stale: [], changed: false })),
       db,
       core,

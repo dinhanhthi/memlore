@@ -28,7 +28,7 @@
  *
  * Outbox v2 (Phase 20.3): a journal, tag, template or trash draft holds sealed v2 bytes and is
  * uploaded as-is under `[jtpd]-<id>.bin` (safeUpload re-opens it with `openOutboxIntent`). Entry
- * drafts are untouched: the same v1 bytes under `<entryId>.bin`. Three rules keep drafts queued
+ * drafts are untouched: the same v1 bytes under `<entryId>.bin`. Four rules keep drafts queued
  * (counted in `held` and `pending`, never `skipped`, nothing written for them):
  *  - v2 drafts while no slot-holding desktop advertises `outbox_versions ∋ 2` (`outboxV2Capable`);
  *  - hold-back: an entry draft whose `journal_id` or `tags_add` names a journal / tag this browser
@@ -36,6 +36,8 @@
  *    `tags.bin` do not show yet. So no desktop ever reads the entry before the create, whose
  *    absence it would refuse for good (`journal_not_found` / `tag_not_found`). A held draft is
  *    retried by the next push (every interval pull requests one while drafts are pending);
+ *  - hold-back of a journal draft whose `auto_tag_ids` name a tag this browser created that the
+ *    pulled `tags.bin` does not show yet: the desktop silently drops an unknown auto tag;
  *  - a trash draft `d-<E>` while an entry draft `<E>` is still unpushed after this run's entry
  *    uploads (held, failed or skipped). Trash drafts upload after every entry draft of a run. A
  *    desktop refuses a trash of an entry it does not have for good (`absent`), and that entry
@@ -44,7 +46,7 @@
  * Heavy modules are imported lazily by the default env, so importing this file has no side effects.
  */
 
-import type { Core } from '../../core/core'
+import type { Core, OutboxIntentV2 } from '../../core/core'
 import { getCachedWriteFlag } from '../config'
 import type { DriveReader, DriveWriterDeps } from '../drive/client'
 import { createDraftManager, type DraftManager } from '../drafts'
@@ -418,6 +420,27 @@ function isHeldBack(
 }
 
 /**
+ * Does this journal draft auto-apply a tag created on this browser and not reflected yet? The
+ * desktop drops an unknown auto tag id silently (`create_journal_with_id`), so it must wait.
+ */
+function isJournalHeldBack(
+  core: Core,
+  ring: KeyRing,
+  draft: DraftRecord,
+  createdTags: ReadonlySet<string>,
+  state: V2PushState,
+): boolean {
+  let intent: OutboxIntentV2
+  try {
+    intent = openV2Intent(core, ring, draft.sealed)
+  } catch {
+    return false // `packV2Draft` logs and skips it
+  }
+  if (intent.kind !== 'create_journal') return false
+  return intent.auto_tag_ids.some((tag) => createdTags.has(tag) && !state.tagIds.has(tag))
+}
+
+/**
  * Splits the unpushed drafts into those this run may push and the number held (see the header).
  * The v2 state is read only when a v2 draft exists, so a vault without any keeps today's path.
  */
@@ -440,7 +463,8 @@ async function selectDrafts(
     const hold =
       kind === 'entry'
         ? isHeldBack(s.deps.core, ring, draft, created, state)
-        : !state.outboxV2Capable
+        : !state.outboxV2Capable ||
+          (kind === 'journal' && isJournalHeldBack(s.deps.core, ring, draft, created.tags, state))
     if (!hold) ready.push(draft)
     else if (kind === 'entry') heldEntries.add(draft.entryId)
   }

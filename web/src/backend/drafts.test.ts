@@ -79,6 +79,18 @@ describe('DraftManager', () => {
     expect(unpushedDraftCount()).toBe(4)
   })
 
+  it('stores the kind of a v2 draft under its prefixed key, unpushed', async () => {
+    const sealed = new Uint8Array([7, 8])
+    await manager.saveDraft('t-11111111-1111-4111-8111-111111111111', sealed, 'tag')
+
+    const rec = await db.drafts.get('t-11111111-1111-4111-8111-111111111111')
+    expect(rec).toMatchObject({ kind: 'tag', sealed })
+    expect(await manager.listEntryDrafts()).toEqual([])
+    expect((await manager.listUnpushedDrafts()).map((d) => d.entryId)).toEqual([
+      't-11111111-1111-4111-8111-111111111111',
+    ])
+  })
+
   it('installs beforeunload listener that warns when dirty', async () => {
     const listeners: Record<string, ((e: BeforeUnloadEvent) => void)[]> = {}
     const mockWindow = {

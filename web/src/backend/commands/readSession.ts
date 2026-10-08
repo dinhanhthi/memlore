@@ -17,6 +17,11 @@
  *      outbox-writing entry commands share one per-session mutex (`acquireOutboxLock`), so a pass
  *      never drops a draft (and its media) that a write is rebuilding from `priorIntent`,
  *   4. `warmStart()` once per unlock: only the 5 newest entry payloads are loaded.
+ * The pending outbox v2 drafts (Phase 22: journal / tag creates, template edits, entry trashes) are
+ * re-read at hydration and after every retention pass (`refreshPending`): pending trashes are
+ * hidden in the vault, pending journals admitted, and `openForRead` / `openForWrite` overlay the
+ * pending creates and template edits on the taxonomy. `ready()` itself stays synced: push
+ * hold-back and retention read it (see `pendingTaxonomy.ts`).
  * After every `puller.refresh()`, the intents the pull read from OTHER web devices' outboxes are
  * opened, validated and fed to `vault.setForeignIntents` (read-only overlay, Phase 16.2); one that
  * fails is skipped and logged by error name only.
@@ -34,13 +39,20 @@ import { emitFromBackend } from '../../tauri/event'
 import { nowSecs } from '../clock'
 import { VaultLockedError, getKeyRing, isUnlocked, onLock, type KeyRing } from '../keys'
 import type { DriveReader } from '../drive/client'
-import { JOURNAL_SEEN_PREFIX, type WebDb } from '../storage/idb'
+import { JOURNAL_SEEN_PREFIX, draftKind, type DraftRecord, type WebDb } from '../storage/idb'
 import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1, WebNotice } from '../sync/outbox'
 import type { MonthIndexReader } from '../sync/monthIndex'
 import type { ForeignIntentFile, Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
 import type { DeviceBinLoader } from './deviceBins'
+import {
+  NO_PENDING,
+  overlayTaxonomy,
+  pendingFromDrafts,
+  pendingJournalIds,
+  type PendingV2,
+} from './pendingTaxonomy'
 
 /** The part of the vault the read commands use. */
 export type VaultApi = Pick<
@@ -58,6 +70,7 @@ export type VaultApi = Pick<
   | 'getOutboxIntents'
   | 'getOutboxIntent'
   | 'setForeignIntents'
+  | 'setTrashedIds'
   | 'getWriteView'
   | 'getSynced'
 >
@@ -78,10 +91,25 @@ export interface Taxonomy {
   tags: Tag[]
   /** Every tag id in the pulled `tags.bin` files, live or deleted (Phase 21 retention). */
   knownTagIds: string[]
+  /**
+   * Names of the tags whose synced winner is deleted (Phase 22): the desktop refuses a web tag
+   * create under one of them (`name_taken`), so the web refuses it first.
+   */
+  deletedTagNames: string[]
+  /**
+   * Names of the locked journals (not deleted, not invisible) (Phase 22): desktop
+   * `create_journal_with_id` refuses a web journal create under one of them (`name_taken`).
+   */
+  lockedJournalNames: string[]
   /** Live user templates (predefined templates do not sync), `sort_order` then name. */
   templates: Template[]
   /** Template ids whose synced winner is deleted (Phase 21 retention). */
   deletedTemplateIds: string[]
+  /**
+   * `updated_at` of each live synced template (Phase 22): the `base_updated_at` of a web template
+   * edit or delete. Own keys only.
+   */
+  templateUpdatedAt: Record<string, number>
 }
 
 /** What one `pull()` observed. */
@@ -142,6 +170,17 @@ export interface ReadSession {
    * Absent in test doubles (= false).
    */
   outboxV2Capable?: () => boolean
+  /**
+   * Phase 22: this browser's pending v2 creates, template edits and trashes (`pendingTaxonomy.ts`),
+   * as last read. Absent in test doubles (= none).
+   */
+  pendingV2?: () => PendingV2
+  /**
+   * Re-reads the pending v2 drafts, then hides the pending trashes and admits the pending journals
+   * in the vault. Run by the session after every retention pass; every v2 write runs it after
+   * saving its draft. Absent in test doubles.
+   */
+  refreshPendingV2?: () => Promise<void>
   /**
    * Waits for the outbox mutex (held by one retention pass or one outbox write at a time) and
    * resolves its release. Never await `ready()` or `pull()` while holding it: both can run
@@ -219,27 +258,40 @@ function getDefaultSession(): Promise<ReadSession> {
   return sessionPromise
 }
 
+/** The synced taxonomy with the session's pending v2 overlay (`pendingTaxonomy.ts`). */
+function overlaid(session: ReadSession, synced: Taxonomy): Taxonomy {
+  return overlayTaxonomy(synced, session.pendingV2?.() ?? NO_PENDING)
+}
+
 /**
  * Locked: rejects with `VaultLockedError`. Otherwise the vault and the taxonomy, with the index
- * refreshed and the journal exclusions applied.
+ * refreshed and the journal exclusions applied. The taxonomy includes this browser's pending
+ * journal / tag creates and template edits (Phase 22).
  */
 export async function openForRead(): Promise<{ vault: VaultApi; taxonomy: Taxonomy }> {
   const env = readEnv()
   if (!env.isUnlocked()) throw new VaultLockedError()
   const session = await env.session()
   const taxonomy = await session.ready()
-  return { vault: session.vault, taxonomy }
+  return { vault: session.vault, taxonomy: overlaid(session, taxonomy) }
 }
 
 /**
- * Write session: returns the vault, taxonomy, IndexedDB and wasm core.
+ * Write session: returns the vault, taxonomy (pending overlay included, as `openForRead`),
+ * IndexedDB and wasm core, the session's v2 capability and its pending-overlay refresh.
  * Rejects with VaultLockedError if locked or if write dependencies are unavailable.
  */
 export async function openForWrite(): Promise<{
   vault: VaultApi
   taxonomy: Taxonomy
+  /** The synced taxonomy alone (the bases of v2 template intents). */
+  synced: Taxonomy
+  /** `synced` with the pending overlay as of now: call it under the outbox lock. */
+  currentTaxonomy: () => Taxonomy
   db: WebDb
   core: Core
+  outboxV2Capable: boolean
+  refreshPendingV2: () => Promise<void>
 }> {
   const env = readEnv()
   if (!env.isUnlocked()) throw new VaultLockedError()
@@ -248,7 +300,18 @@ export async function openForWrite(): Promise<{
   if (!session.db || !session.core) {
     throw new Error('Write session dependencies (db, core) unavailable')
   }
-  return { vault: session.vault, taxonomy, db: session.db, core: session.core }
+  return {
+    vault: session.vault,
+    taxonomy: overlaid(session, taxonomy),
+    synced: taxonomy,
+    currentTaxonomy: () => overlaid(session, taxonomy),
+    db: session.db,
+    core: session.core,
+    outboxV2Capable: session.outboxV2Capable?.() ?? false,
+    refreshPendingV2: async () => {
+      await session.refreshPendingV2?.()
+    },
+  }
 }
 
 /** The session's outbox mutex (see `ReadSession.acquireOutboxLock`). Call after `openForWrite()`. */
@@ -327,6 +390,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   let foreignSeen: readonly ForeignIntentFile[] | null = null
   /** `<device>/<entry>@<web_updated_at_secs>` of the foreign intents shown, for `changed`. */
   let foreignKey = ''
+  /** This browser's pending v2 drafts, as last read (`refreshPending`). */
+  let pending: PendingV2 = NO_PENDING
   // Bumped by the lock hook. Every step that awaits captures it first and discards its result
   // (writes no cache, no exclusions, no warm-start state) when a lock landed in between.
   let epoch = 0
@@ -339,6 +404,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     primedIndex = null
     foreignSeen = null
     foreignKey = ''
+    pending = NO_PENDING
     notices = []
     deviceBins.clear()
     monthIndex.clear()
@@ -421,18 +487,48 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     if (cache !== null && key !== null && cache.key === key) return cache.value
     const value = await readTaxonomy(db, core, getKeyRing())
     assertSameEpoch(started)
-    vault.setExcludedJournalIds(value.excludedJournalIds, value.knownJournalIds)
+    applyJournals(value)
     cache = { key, value }
     return value
   }
 
+  // A journal this browser created is known (not locked or invisible): its entries are served.
+  const applyJournals = (value: Taxonomy): void => {
+    vault.setExcludedJournalIds(value.excludedJournalIds, [
+      ...value.knownJournalIds,
+      ...pendingJournalIds(value, pending),
+    ])
+  }
+
+  // Sets the pending overlay from these drafts. Re-applies the journal exclusions (O(entries in
+  // RAM)) only when the pending journal set changed.
+  const setPending = (drafts: readonly DraftRecord[]): void => {
+    const next = pendingFromDrafts(drafts, core, getKeyRing())
+    const journalsOf = (p: PendingV2): string =>
+      cache === null ? '' : pendingJournalIds(cache.value, p).join('\n')
+    const journalsChanged = journalsOf(next) !== journalsOf(pending)
+    pending = next
+    vault.setTrashedIds(next.trashedEntryIds)
+    if (journalsChanged && cache !== null) applyJournals(cache.value)
+  }
+
+  const refreshPending = async (): Promise<void> => {
+    const started = epoch
+    const drafts = await db.drafts.list()
+    assertSameEpoch(started)
+    setPending(drafts)
+  }
+
   // Lists every entry draft (pushed ones too: a pushed edit may not be imported yet; v2 drafts
-  // carry no entry intent), which also recomputes the page's dirty flag after a reload. Intents
-  // already in the overlay win: they were set by a write after these drafts were read.
+  // carry no entry intent: they feed the pending overlay), which also recomputes the page's dirty
+  // flag after a reload. Intents already in the overlay win: they were set by a write after these
+  // drafts were read.
   const hydrate = async (): Promise<void> => {
     const started = epoch
-    const drafts = await createDraftManager({ db }).listEntryDrafts()
+    const all = await createDraftManager({ db }).listDrafts()
     assertSameEpoch(started)
+    setPending(all)
+    const drafts = all.filter((d) => draftKind(d) === 'entry')
     if (drafts.length === 0) return
     const ring = getKeyRing()
     const opened = drafts.flatMap((d) => openDraft(core, ring, d.entryId, d.sealed))
@@ -441,6 +537,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     vault.setOutboxIntents([...opened.filter((i) => !set.has(i.entry_id)), ...current])
     await retain()
     assertSameEpoch(started)
+    await refreshPending()
   }
 
   // Re-opened only when a refresh produced a new set; the vault drops them on lock.
@@ -517,6 +614,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     assertSameEpoch(started)
     const retained = await retain()
     assertSameEpoch(started)
+    // A dropped v2 draft (reflected, acked or finally refused) leaves the overlay now.
+    await refreshPending()
     const taxonomyChanged = taxonomyBefore !== null && taxonomyBefore !== JSON.stringify(value)
     const changed =
       retained ||
@@ -549,6 +648,8 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     core,
     ready,
     outboxV2Capable: () => puller.v2Desktops.size > 0,
+    pendingV2: () => pending,
+    refreshPendingV2: refreshPending,
     acquireOutboxLock,
     pull,
     dispose: () => {
@@ -819,6 +920,8 @@ export async function readTaxonomy(db: WebDb, core: Core, ring: KeyRing): Promis
   // No prototype: a journal id such as `__proto__` is an ordinary key.
   const autoTagIds = Object.create(null) as Record<string, string[]>
   for (const j of winners) autoTagIds[j.id] = j.autoTagIds
+  const templateUpdatedAt = Object.create(null) as Record<string, number>
+  for (const [id, r] of templates) if (!r.value.deleted) templateUpdatedAt[id] = r.updatedAt
   return {
     journals: winners
       .filter((j) => !j.is_deleted && !j.is_locked && !j.is_invisible)
@@ -832,6 +935,10 @@ export async function readTaxonomy(db: WebDb, core: Core, ring: KeyRing): Promis
       .map((r) => r.value.tag)
       .sort((a, b) => a.name.localeCompare(b.name)),
     knownTagIds: [...tags.keys()],
+    deletedTagNames: [...tags.values()].filter((r) => r.value.deleted).map((r) => r.value.tag.name),
+    lockedJournalNames: winners
+      .filter((j) => j.is_locked && !j.is_deleted && !j.is_invisible)
+      .map((j) => j.name),
     templates: [...templates.values()]
       .filter((r) => !r.value.deleted)
       .map((r) => r.value.template)
@@ -839,6 +946,7 @@ export async function readTaxonomy(db: WebDb, core: Core, ring: KeyRing): Promis
     deletedTemplateIds: [...templates.entries()]
       .filter(([, r]) => r.value.deleted)
       .map(([id]) => id),
+    templateUpdatedAt,
   }
 }
 

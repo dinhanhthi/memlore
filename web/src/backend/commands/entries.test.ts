@@ -12,7 +12,10 @@ import {
   toEntry,
 } from './entries'
 import { configureReadEnv, type Taxonomy } from './readSession'
-import { installFakeSession, type FakeSpec } from './readTestKit'
+import { EMPTY_TAXONOMY, installFakeSession, type FakeSpec } from './readTestKit'
+import type { OutboxIntentV2 } from '../../core/core'
+import type { WebDb } from '../storage/idb'
+import { WebUnsupportedError } from '../unsupported'
 import { setWriteFlagForTest } from '../config'
 import { resetClock, updateClockOffset } from '../clock'
 import { lock, setKeyRing, type KeyRing } from '../keys'
@@ -403,8 +406,11 @@ describe('write commands', () => {
       { id: 't2', name: 'Ideas', color: null },
     ],
     knownTagIds: ['t1', 't2'],
+    deletedTagNames: [],
+    lockedJournalNames: [],
     templates: [],
     deletedTemplateIds: [],
+    templateUpdatedAt: {},
   }
 
   it('rejects every write command with read_only when write flag is disabled', async () => {
@@ -866,5 +872,125 @@ describe('write commands', () => {
     await call('update_entry_emotion', { id: id(1), emotion: 'good' })
     const intentAfterEmotion = vault.getOutboxIntent(id(1))
     expect(intentAfterEmotion?.content_text).toBe('My updated journal content')
+  })
+})
+
+describe('soft_delete_entry: move to the desktop Trash (outbox v2, Phase 22.2)', () => {
+  const E1 = '33333333-3333-4333-8333-333333333331'
+  const E2 = '33333333-3333-4333-8333-333333333332'
+  const JOURNALS: Taxonomy = {
+    ...EMPTY_TAXONOMY,
+    journals: [
+      {
+        id: 'j1',
+        name: 'Daily',
+        color: null,
+        sort_order: 1,
+        created_at: 1000,
+        updated_at: 1000,
+        is_deleted: false,
+        is_locked: false,
+        is_invisible: false,
+        vault_id: null,
+        is_initial_placeholder: false,
+      },
+    ],
+    knownJournalIds: ['j1'],
+  }
+
+  function writable(outboxV2 = true) {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    return installFakeSession(
+      [
+        { id: E1, updatedAt: 1500, title: 'Doomed' },
+        { id: E2, updatedAt: 1400, title: 'Kept' },
+      ],
+      { taxonomy: JOURNALS, outboxV2 },
+    )
+  }
+
+  const trashIntent = async (db: WebDb, entryId: string): Promise<OutboxIntentV2 | undefined> => {
+    const rec = await db.drafts.get(`d-${entryId}`)
+    if (rec === undefined) return undefined
+    expect(rec.kind).toBe('trash')
+    return JSON.parse(new TextDecoder().decode(rec.sealed.subarray(1))) as OutboxIntentV2
+  }
+
+  it('stores a trash_entry draft based on the synced updated_at and hides the entry at once', async () => {
+    const { db, emitted } = writable()
+    expect((await listAll(1)).items.map((e) => e.id)).toEqual([E1, E2])
+
+    await call('soft_delete_entry', { id: E1 })
+
+    expect(await trashIntent(db, E1)).toEqual({
+      kind: 'trash_entry',
+      web_device_id: 'test-device-id',
+      web_updated_at_secs: expect.any(Number),
+      entry_id: E1,
+      base_updated_at: 1500,
+    })
+    expect(emitted).toContain('memlore:entries-changed')
+    expect((await listAll(1)).items.map((e) => e.id)).toEqual([E2])
+    await expect(call('get_entry', { id: E1 })).rejects.toThrow(MSG_UNAVAILABLE)
+    // Further edits of a trashed entry are refused.
+    await expect(call('update_entry', { id: E1, title: 'x' })).rejects.toThrow(MSG_UNAVAILABLE)
+  })
+
+  // Edit-then-delete. The desktop applies `<E>.bin` before `d-<E>.bin` in one import cycle and
+  // accepts the trash when its base is the row's stamp OR the stamp the web's own applied edit
+  // fast-forwarded from (`fast_forward_from`, src-tauri/src/sync/outbox_import.rs; the v1 apply
+  // records `applied_from_updated_at` = the row's stamp before it, a web create records 0). That
+  // stamp is the synced `updated_at` the web saw, so the base is the SYNCED stamp in both cases,
+  // never an overlay value, and the edit draft is kept and still pushed first.
+  it('edit then delete: the base is still the synced updated_at and the edit draft is kept', async () => {
+    const { db, vault } = writable()
+    await call('update_entry', { id: E1, title: 'Edited on web' })
+    const edit = vault.getOutboxIntent(E1)
+    expect(edit?.fields.title?.base_updated_at).toBe(1500)
+
+    await call('soft_delete_entry', { id: E1 })
+
+    expect(await trashIntent(db, E1)).toMatchObject({ base_updated_at: 1500 })
+    expect(await db.drafts.get(E1)).toBeDefined()
+    expect(vault.getOutboxIntent(E1)).toEqual(edit)
+  })
+
+  it('a web-created entry not synced yet is trashed from base 0 (the desktop create chains it)', async () => {
+    const { db } = writable()
+    const created = await call<Entry>('create_entry', { journalId: 'j1', title: 'Fresh' })
+
+    await call('soft_delete_entry', { id: created.id })
+
+    expect(await trashIntent(db, created.id)).toMatchObject({ base_updated_at: 0 })
+    expect(await db.drafts.get(created.id)).toBeDefined()
+    expect((await listAll(1)).items.map((e) => e.id)).not.toContain(created.id)
+  })
+
+  it('the entry reappears once its trash draft is gone (a final refusal drops it)', async () => {
+    const { db } = writable()
+    await call('soft_delete_entry', { id: E1 })
+    await db.drafts.delete(`d-${E1}`)
+    const { readEnv } = await import('./readSession')
+    await (await readEnv().session()).refreshPendingV2?.()
+
+    expect((await listAll(1)).items.map((e) => e.id)).toEqual([E1, E2])
+  })
+
+  it('refuses an entry the web cannot serve, and stores nothing', async () => {
+    const { db } = writable()
+    await expect(call('soft_delete_entry', { id: 'not-there' })).rejects.toThrow()
+    await call('soft_delete_entry', { id: E1 })
+    await expect(call('soft_delete_entry', { id: E1 })).rejects.toThrow(MSG_UNAVAILABLE)
+    expect((await db.drafts.list()).map((d) => d.entryId)).toEqual([`d-${E1}`])
+  })
+
+  it('is unsupported while no desktop takes v2, and read_only when writes are off', async () => {
+    const { db } = writable(false)
+    await expect(call('soft_delete_entry', { id: E1 })).rejects.toBeInstanceOf(WebUnsupportedError)
+    setWriteFlagForTest(false)
+    await expect(call('soft_delete_entry', { id: E1 })).rejects.toThrow('read_only')
+    expect(await db.drafts.list()).toEqual([])
+    expect((await listAll(1)).items.map((e) => e.id)).toEqual([E1, E2])
   })
 })

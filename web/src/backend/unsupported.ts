@@ -327,17 +327,12 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   // Version history is read-only on the web: no snapshot, restore or retention change.
   'set_version_retention_days',
   'snapshot_entry_version',
-  // TODO(later): see docs/LATER.md - Journal and tag creation / management
-  'create_journal',
-  'create_tag',
+  // TODO(later): see docs/LATER.md - Journal and tag rename / recolor / delete on the web
+  // (create is implemented through outbox v2, Phase 22; these need a new v2 intent kind).
   'delete_journal',
   'delete_tag',
   'update_journal',
   'update_tag',
-  // TODO(later): see docs/LATER.md - Template editing
-  'create_template',
-  'delete_template',
-  'update_template',
   // TODO(later): see docs/LATER.md - Updater and desktop shell
   'install_update',
   'restart_app',
@@ -355,8 +350,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'save_audio_memo',
   'start_recording',
   'stop_recording',
-  // TODO(later): see docs/LATER.md - Entry delete
-  'soft_delete_entry',
   // Trash: web never manages the Trash (restore, delete forever, empty are desktop only).
   'delete_entry_forever',
   'empty_trash',

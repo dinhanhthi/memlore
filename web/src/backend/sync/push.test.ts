@@ -733,6 +733,62 @@ describe('pushAll: outbox v2 intents (Phase 20.3)', () => {
     expect(next).toEqual({ pushed: 2, skipped: 0, pending: 0 })
   })
 
+  it('holds a journal whose auto tags name a web-created tag until the tag is reflected', async () => {
+    await putV2Draft(V2_CASES[1], 1) // t-<TAG_1>
+    const journal = V2_CASES[0].intent
+    if (journal.kind !== 'create_journal') throw new Error('fixture')
+    await putV2Draft({ ...V2_CASES[0], intent: { ...journal, auto_tag_ids: [TAG_1] } }, 2)
+
+    // Run 1: the tag is pushed, the journal waits (the desktop would drop the unknown auto tag).
+    const first = await pushAll()
+    expect(first).toEqual({ pushed: 1, skipped: 0, pending: 1, held: 1 })
+    expect(uploadedNames()).toEqual([`t-${TAG_1}.bin`])
+
+    // Reflected: the journal is pushed.
+    v2 = { ...v2, tagIds: new Set([TAG_1]) }
+    const second = await pushAll()
+    expect(second).toEqual({ pushed: 1, skipped: 0, pending: 0 })
+    expect(outbox(`j-${JOURNAL_1}.bin`)).toBeDefined()
+  })
+
+  it('pushes a held journal once its web-created auto tag draft is dropped (refused for good)', async () => {
+    await putV2Draft(V2_CASES[1], 1) // t-<TAG_1>
+    const journal = V2_CASES[0].intent
+    if (journal.kind !== 'create_journal') throw new Error('fixture')
+    await putV2Draft({ ...V2_CASES[0], intent: { ...journal, auto_tag_ids: [TAG_1] } }, 2)
+    expect(await pushAll()).toEqual({ pushed: 1, skipped: 0, pending: 1, held: 1 })
+
+    // Retention drops the refused tag draft; the tag never reaches the pulled tags.bin.
+    await db.drafts.delete(`t-${TAG_1}`)
+    expect(await pushAll()).toEqual({ pushed: 1, skipped: 0, pending: 0 })
+    expect(outbox(`j-${JOURNAL_1}.bin`)).toBeDefined()
+  })
+
+  it('seals and verifies an upsert_template in the shape the web handlers emit (Phase 22)', async () => {
+    const upsert: OutboxIntentV2 = {
+      ...BASE,
+      kind: 'upsert_template',
+      template_id: TEMPLATE_1,
+      name: 'Gratitude',
+      description: null,
+      content_b64: 'AQID',
+      sort_order: 0,
+      base_updated_at: null,
+    }
+    const sealed = await putV2Draft({ key: `p-${TEMPLATE_1}`, kind: 'template', intent: upsert }, 1)
+
+    expect(await pushAll()).toEqual({ pushed: 1, skipped: 0, pending: 0 })
+    expect(outbox(`p-${TEMPLATE_1}.bin`)?.content).toEqual(sealed)
+  })
+
+  it('does not hold a journal whose auto tags came from a desktop', async () => {
+    const journal = V2_CASES[0].intent
+    if (journal.kind !== 'create_journal') throw new Error('fixture')
+    await putV2Draft({ ...V2_CASES[0], intent: { ...journal, auto_tag_ids: [TAG_1] } }, 1)
+
+    expect(await pushAll()).toEqual({ pushed: 1, skipped: 0, pending: 0 })
+  })
+
   it('holds a trash with its held entry draft, then uploads the entry before the trash', async () => {
     await putV2Draft(V2_CASES[0], 1) // j-<JOURNAL_1>
     await putV2Draft(V2_CASES[3], 2) // d-<ENTRY_B>, older than its entry draft

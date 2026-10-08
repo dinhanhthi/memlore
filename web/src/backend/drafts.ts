@@ -14,7 +14,7 @@
  *  - Dispatches uploads via `safeUpload`.
  */
 
-import { draftKind, sameBytes, type DraftRecord, type WebDb } from './storage/idb'
+import { draftKind, sameBytes, type DraftKind, type DraftRecord, type WebDb } from './storage/idb'
 import { safeUpload, type SafeUploadDeps, type SafeUploadIntent } from './sync/safeUpload'
 
 export interface DraftManagerDeps {
@@ -58,10 +58,16 @@ export class DraftManager {
     this.#db = deps.db
   }
 
-  async saveDraft(entryId: string, sealed: Uint8Array): Promise<void> {
+  /** `kind` absent: an entry draft. A v2 draft passes its kind and its prefixed key. */
+  async saveDraft(
+    entryId: string,
+    sealed: Uint8Array,
+    kind?: Exclude<DraftKind, 'entry'>,
+  ): Promise<void> {
     // A plain put: the record has no `pushedHash`, so it is unpushed.
     await this.#db.drafts.put({
       entryId,
+      ...(kind === undefined ? {} : { kind }),
       sealed,
       updatedAt: Date.now(),
     })

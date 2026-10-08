@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Core } from '../../core/core'
-import type { Tag } from '../../../../src/types/journal'
-import type { KeyRing } from '../keys'
+import type { Core, OutboxIntentV2 } from '../../core/core'
+import type { Journal, Tag } from '../../../../src/types/journal'
+import type { Template } from '../../../../src/types/template'
+import { setWriteFlagForTest } from '../config'
+import { lock, setKeyRing, type KeyRing } from '../keys'
 import type { MetaRecord, WebDb } from '../storage/idb'
+import { WebUnsupportedError } from '../unsupported'
 import { configureReadEnv, readTaxonomy, type Taxonomy } from './readSession'
-import { EMPTY_TAXONOMY, installFakeSession } from './readTestKit'
+import { EMPTY_TAXONOMY, installFakeSession, type Harness } from './readTestKit'
 import { taxonomyHandlers } from './taxonomy'
 
-afterEach(() => configureReadEnv({}))
+afterEach(() => {
+  configureReadEnv({})
+  setWriteFlagForTest(false)
+  lock('manual')
+})
 
 const call = <T>(name: string, args: Record<string, unknown> = {}): Promise<T> =>
   Promise.resolve(taxonomyHandlers[name](args)) as Promise<T>
@@ -133,6 +140,314 @@ describe('taxonomy handlers', () => {
   })
 })
 
+describe('taxonomy write handlers (outbox v2, Phase 22.1)', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+  const TPL = '22222222-2222-4222-8222-222222222222'
+  const SYNCED: Taxonomy = {
+    ...TAXONOMY,
+    knownJournalIds: ['j1', 'j2'],
+    knownTagIds: ['t1', 't2', 't3', 't-gone'],
+    deletedTagNames: ['retired'],
+    templates: [
+      {
+        id: TPL,
+        name: 'Daily',
+        description: 'desc',
+        content: [1, 2],
+        is_predefined: false,
+        sort_order: 4,
+        created_at: 1,
+      },
+    ],
+    templateUpdatedAt: { [TPL]: 1700 },
+  }
+
+  function writable(taxonomy: Taxonomy = SYNCED, outboxV2 = true): Harness {
+    setWriteFlagForTest(true)
+    setKeyRing({ lock: () => undefined } as unknown as KeyRing)
+    return installFakeSession([], { taxonomy, outboxV2 })
+  }
+
+  /** Every stored v2 draft: key, kind and the opened intent. */
+  async function v2Drafts(h: Harness): Promise<Array<[string, string, OutboxIntentV2]>> {
+    const out: Array<[string, string, OutboxIntentV2]> = []
+    for (const d of await h.db.drafts.list()) {
+      const json = new TextDecoder().decode(d.sealed.subarray(1))
+      out.push([d.entryId, String(d.kind), JSON.parse(json) as OutboxIntentV2])
+    }
+    return out
+  }
+
+  it('create_journal stores a create_journal draft and the journal shows at once', async () => {
+    const h = writable()
+    const journal = await call<Journal>('create_journal', {
+      payload: { name: '  Travel  ', color: '#7C3AED', autoTagIds: ['t2'] },
+    })
+
+    expect(journal).toMatchObject({ name: 'Travel', color: '#7C3AED', is_deleted: false })
+    expect(journal.id).toMatch(UUID)
+    const [[key, kind, intent]] = await v2Drafts(h)
+    expect(key).toBe(`j-${journal.id}`)
+    expect(kind).toBe('journal')
+    expect(intent).toEqual({
+      kind: 'create_journal',
+      web_device_id: 'test-device-id',
+      web_updated_at_secs: expect.any(Number),
+      journal_id: journal.id,
+      name: 'Travel',
+      color: '#7C3AED',
+      auto_tag_ids: ['t2'],
+    })
+    expect((await call<Journal[]>('list_journals')).map((j) => j.id)).toContain(journal.id)
+    expect(await call('get_journal', { id: journal.id })).toEqual(journal)
+    expect(await call('list_journal_auto_tags', { journalId: journal.id })).toEqual([
+      tag('t2', 'beta'),
+    ])
+  })
+
+  it('create_journal sends a missing color as null and refuses invalid input or a taken name', async () => {
+    const h = writable()
+    const plain = await call<Journal>('create_journal', { payload: { name: 'Plain' } })
+    expect(plain.color).toBeNull()
+    const [[, , intent]] = await v2Drafts(h)
+    expect(intent).toMatchObject({ color: null, auto_tag_ids: [] })
+
+    const bad: Array<Record<string, unknown>> = [
+      { name: '   ' },
+      { name: 'x'.repeat(201) },
+      { name: 'Ok', color: 'red' },
+      { name: 'Ok', autoTagIds: ['nope'] },
+      { name: 'Journal j1' }, // a synced journal
+      { name: ' Plain ' }, // a pending one
+    ]
+    for (const payload of bad) {
+      await expect(call('create_journal', { payload }), JSON.stringify(payload)).rejects.toThrow()
+    }
+    await expect(call('create_journal', { payload: { name: 'Journal j1' } })).rejects.toThrow(
+      'name_taken',
+    )
+    expect(await h.db.drafts.list()).toHaveLength(1)
+  })
+
+  it('create_journal accepts a pending tag as auto tag', async () => {
+    writable()
+    const t = await call<Tag>('create_tag', { name: 'fresh' })
+    const j = await call<Journal>('create_journal', {
+      payload: { name: 'New', autoTagIds: [t.id] },
+    })
+    expect(await call('list_journal_auto_tags', { journalId: j.id })).toEqual([t])
+  })
+
+  it('create_journal refuses the name of a locked journal (desktop create_journal_with_id)', async () => {
+    const h = writable({ ...SYNCED, lockedJournalNames: [' Secret '] })
+    await expect(call('create_journal', { payload: { name: 'Secret' } })).rejects.toThrow(
+      'name_taken',
+    )
+    expect(await h.db.drafts.list()).toHaveLength(0)
+  })
+
+  it('two concurrent create_journal of one name store one draft; the second is name_taken', async () => {
+    const h = writable()
+    const [first, second] = await Promise.allSettled([
+      call<Journal>('create_journal', { payload: { name: 'Twin' } }),
+      call<Journal>('create_journal', { payload: { name: 'Twin' } }),
+    ])
+    expect(first.status).toBe('fulfilled')
+    expect(second).toMatchObject({ status: 'rejected', reason: new Error('name_taken') })
+    expect(await h.db.drafts.list()).toHaveLength(1)
+  })
+
+  it('two concurrent create_tag of one name store one draft and answer the same tag', async () => {
+    const h = writable()
+    const [a, b] = await Promise.all([
+      call<Tag>('create_tag', { name: 'twin' }),
+      call<Tag>('create_tag', { name: 'twin' }),
+    ])
+    expect(b).toEqual(a)
+    expect((await v2Drafts(h)).map(([key]) => key)).toEqual([`t-${a.id}`])
+  })
+
+  it('create_tag stores a create_tag draft; an existing name returns that tag without a draft', async () => {
+    const h = writable()
+    const created = await call<Tag>('create_tag', { name: ' sea ', color: '#00aaff' })
+    expect(created).toEqual({ id: expect.stringMatching(UUID), name: 'sea', color: '#00aaff' })
+    expect(await v2Drafts(h)).toEqual([
+      [
+        `t-${created.id}`,
+        'tag',
+        {
+          kind: 'create_tag',
+          web_device_id: 'test-device-id',
+          web_updated_at_secs: expect.any(Number),
+          tag_id: created.id,
+          name: 'sea',
+          color: '#00aaff',
+        },
+      ],
+    ])
+    expect(await call('list_tags')).toContainEqual(created)
+
+    // Desktop `create_tag` is get-or-create: the same name answers the existing tag.
+    expect(await call('create_tag', { name: 'alpha' })).toEqual(tag('t1', 'alpha'))
+    expect(await call('create_tag', { name: 'sea' })).toEqual(created)
+    expect(await h.db.drafts.list()).toHaveLength(1)
+
+    // A deleted tag keeps its name on desktop: refused there, so refused here first.
+    await expect(call('create_tag', { name: 'retired' })).rejects.toThrow('name_taken')
+    await expect(call('create_tag', { name: '' })).rejects.toThrow()
+    await expect(call('create_tag', { name: 'x', color: '#abc' })).rejects.toThrow()
+    expect(await h.db.drafts.list()).toHaveLength(1)
+  })
+
+  it('create_template stores an upsert with a null base and sort order 0', async () => {
+    const h = writable()
+    const tpl = await call<Template>('create_template', {
+      name: 'Gratitude',
+      description: 'three things',
+      content: [1, 2, 3],
+    })
+    expect(tpl).toMatchObject({
+      name: 'Gratitude',
+      description: 'three things',
+      content: [1, 2, 3],
+      is_predefined: false,
+      sort_order: 0,
+    })
+    expect(await v2Drafts(h)).toEqual([
+      [
+        `p-${tpl.id}`,
+        'template',
+        {
+          kind: 'upsert_template',
+          web_device_id: 'test-device-id',
+          web_updated_at_secs: expect.any(Number),
+          template_id: tpl.id,
+          name: 'Gratitude',
+          description: 'three things',
+          content_b64: 'AQID',
+          sort_order: 0,
+          base_updated_at: null,
+        },
+      ],
+    ])
+    expect((await call<Template[]>('list_templates')).map((t) => t.id)).toContain(tpl.id)
+    expect(await call('get_template', { id: tpl.id })).toEqual(tpl)
+
+    await call('create_template', { name: 'Bare' })
+    const bare = (await v2Drafts(h)).find(([, , i]) => 'name' in i && i.name === 'Bare')
+    expect(bare?.[2]).toMatchObject({ description: null, content_b64: null })
+    await expect(call('create_template', { name: ' ' })).rejects.toThrow()
+    await expect(
+      call('create_template', { name: 'Big', description: 'é'.repeat(2049) }),
+    ).rejects.toThrow()
+  })
+
+  it('update_template of a synced template carries its updated_at and keeps its sort order', async () => {
+    const h = writable()
+    const updated = await call<Template>('update_template', {
+      id: TPL,
+      name: 'Daily v2',
+      description: null,
+      content: [9],
+    })
+    expect(updated).toMatchObject({ id: TPL, name: 'Daily v2', sort_order: 4, content: [9] })
+    expect((await v2Drafts(h))[0]).toEqual([
+      `p-${TPL}`,
+      'template',
+      {
+        kind: 'upsert_template',
+        web_device_id: 'test-device-id',
+        web_updated_at_secs: expect.any(Number),
+        template_id: TPL,
+        name: 'Daily v2',
+        description: null,
+        content_b64: 'CQ==',
+        sort_order: 4,
+        base_updated_at: 1700,
+      },
+    ])
+    expect(await call('list_templates')).toEqual([updated])
+
+    // A second edit keeps the first edit's base (the web's view of the desktop row).
+    await call('update_template', { id: TPL, name: 'Daily v3' })
+    expect((await v2Drafts(h))[0][2]).toMatchObject({ name: 'Daily v3', base_updated_at: 1700 })
+  })
+
+  it('update_template of a template created here stays a create (null base)', async () => {
+    const h = writable()
+    const tpl = await call<Template>('create_template', { name: 'Mine' })
+    await call('update_template', { id: tpl.id, name: 'Mine 2' })
+    const [[, , intent]] = await v2Drafts(h)
+    expect(intent).toMatchObject({ kind: 'upsert_template', name: 'Mine 2', base_updated_at: null })
+    await expect(call('update_template', { id: 'unknown', name: 'x' })).rejects.toThrow()
+  })
+
+  it('delete_template carries the synced updated_at; a template created here deletes from 0', async () => {
+    const h = writable()
+    await call('delete_template', { id: TPL })
+    expect((await v2Drafts(h))[0][2]).toEqual({
+      kind: 'delete_template',
+      web_device_id: 'test-device-id',
+      web_updated_at_secs: expect.any(Number),
+      template_id: TPL,
+      base_updated_at: 1700,
+    })
+    expect(await call('list_templates')).toEqual([])
+    expect(await call('get_template', { id: TPL })).toBeNull()
+    await expect(call('delete_template', { id: TPL })).rejects.toThrow()
+
+    const mine = await call<Template>('create_template', { name: 'Mine' })
+    await call('delete_template', { id: mine.id })
+    const del = (await v2Drafts(h)).find(([k]) => k === `p-${mine.id}`)
+    expect(del?.[2]).toMatchObject({ kind: 'delete_template', base_updated_at: 0 })
+  })
+
+  it('a pending create disappears from the lists once its draft is gone (reflected, acked or refused)', async () => {
+    const h = writable()
+    const j = await call<Journal>('create_journal', { payload: { name: 'Gone' } })
+    const session = await readEnvSession()
+    await h.db.drafts.delete(`j-${j.id}`)
+    await session.refreshPendingV2?.()
+    expect((await call<Journal[]>('list_journals')).map((x) => x.id)).not.toContain(j.id)
+  })
+
+  it('a pending create the synced files already show is not overlaid twice', async () => {
+    const h = writable()
+    const t = await call<Tag>('create_tag', { name: 'once' })
+    // The desktop created it: the synced tags.bin now lists it.
+    configureReadEnv({})
+    const synced: Taxonomy = { ...SYNCED, tags: [...SYNCED.tags, t], knownTagIds: [t.id] }
+    const h2 = installFakeSession([], { taxonomy: synced, outboxV2: true })
+    for (const d of await h.db.drafts.list()) await h2.db.drafts.put(d)
+    await (await readEnvSession()).refreshPendingV2?.()
+    expect((await call<Tag[]>('list_tags')).filter((x) => x.id === t.id)).toHaveLength(1)
+  })
+
+  it('refuses every write as unsupported while no desktop takes v2, and read_only when writes are off', async () => {
+    const writes: Array<[string, Record<string, unknown>]> = [
+      ['create_journal', { payload: { name: 'J' } }],
+      ['create_tag', { name: 'T' }],
+      ['create_template', { name: 'P' }],
+      ['update_template', { id: TPL, name: 'P' }],
+      ['delete_template', { id: TPL }],
+    ]
+    const h = writable(SYNCED, false)
+    for (const [name, args] of writes) {
+      await expect(call(name, args), name).rejects.toBeInstanceOf(WebUnsupportedError)
+    }
+    setWriteFlagForTest(false)
+    for (const [name, args] of writes) {
+      await expect(call(name, args), name).rejects.toThrow('read_only')
+    }
+    expect(await h.db.drafts.list()).toEqual([])
+  })
+})
+
+async function readEnvSession() {
+  const { readEnv } = await import('./readSession')
+  return readEnv().session()
+}
+
 describe('readTaxonomy (merge across devices)', () => {
   function build(
     files: Record<string, unknown>,
@@ -187,6 +502,32 @@ describe('readTaxonomy (merge across devices)', () => {
     expect(taxonomy.journals[0]).not.toHaveProperty('autoTagIds')
     expect(taxonomy.autoTagIds.j1).toEqual(['t1'])
     expect(taxonomy.excludedJournalIds.sort()).toEqual(['j2', 'j3'])
+  })
+
+  it('lists the names of locked journals that are neither deleted nor invisible', async () => {
+    const { db, core } = build({
+      'devA/journals/j1.bin': journalFile('devA', { name: 'Open' }),
+      'devA/journals/j2.bin': journalFile('devA', {
+        journal_id: 'j2',
+        name: 'Secret',
+        is_locked: true,
+      }),
+      'devA/journals/j3.bin': journalFile('devA', {
+        journal_id: 'j3',
+        name: 'Hidden',
+        is_locked: true,
+        is_invisible: true,
+      }),
+      'devA/journals/j4.bin': journalFile('devA', {
+        journal_id: 'j4',
+        name: 'Gone',
+        is_locked: true,
+        is_deleted: true,
+      }),
+    })
+    const taxonomy = await readTaxonomy(db, core, ring)
+    expect(taxonomy.lockedJournalNames).toEqual(['Secret'])
+    expect(taxonomy.journals.map((j) => j.name)).toEqual(['Open'])
   })
 
   it('merges tags and templates by id and drops tombstones', async () => {

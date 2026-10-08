@@ -142,10 +142,36 @@ describe('route', () => {
   })
 
   it('rejects action commands with WebUnsupportedError naming the command', async () => {
-    const error = await route('soft_delete_entry', {}).catch((e: unknown) => e)
+    const error = await route('delete_journal', {}).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(WebUnsupportedError)
-    expect(error).toMatchObject({ code: 'unsupported_on_web', command: 'soft_delete_entry' })
-    expect((error as Error).message).toContain('soft_delete_entry')
+    expect(error).toMatchObject({ code: 'unsupported_on_web', command: 'delete_journal' })
+    expect((error as Error).message).toContain('delete_journal')
+  })
+
+  it('serves the outbox v2 writes (Phase 22) from the handler table', async () => {
+    for (const cmd of [
+      'create_journal',
+      'create_tag',
+      'create_template',
+      'update_template',
+      'delete_template',
+      'soft_delete_entry',
+    ]) {
+      expect(classes(cmd), cmd).toEqual(['implemented'])
+      // Locked (or writes off): refused by the handler, never as an unsupported stub.
+      const error = await route(cmd, { id: 'x', name: 'n', payload: { name: 'n' } }).catch(
+        (e: unknown) => e,
+      )
+      expect(error, cmd).toBeInstanceOf(Error)
+      expect(error, cmd).not.toBeInstanceOf(WebUnsupportedError)
+    }
+  })
+
+  it('keeps journal and tag rename, recolor and delete unsupported on the web', async () => {
+    for (const cmd of ['update_journal', 'delete_journal', 'update_tag', 'delete_tag']) {
+      expect(classes(cmd), cmd).toEqual(['action-unsupported'])
+      await expect(route(cmd, {}), cmd).rejects.toBeInstanceOf(WebUnsupportedError)
+    }
   })
 
   it('does not mistake prototype keys for commands', async () => {

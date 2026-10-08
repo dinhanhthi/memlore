@@ -350,6 +350,76 @@ describe('exclusions', () => {
     expect(f.vault.__debugDump()).not.toContain(SECRET)
   })
 
+  it('hides an entry with a pending web trash from every view, keeps its synced state, and shows it again once cleared', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', title: 'alpha', updated_at: 300 })
+    f.put({ entry_id: 'b', title: 'beta', updated_at: 200 })
+    await f.vault.load(['a', 'b'])
+    f.vault.setOutboxIntents([
+      {
+        schema_version: 1,
+        entry_id: 'w',
+        web_device_id: 'web-1',
+        created_on_web: true,
+        web_updated_at_secs: 400,
+        base_state_vector: [],
+        yjs_full_state: [],
+        content_text: 'web body',
+        preview_text: null,
+        fields: {
+          title: {
+            value: 'web',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 1,
+            changed_at_secs: 400,
+          },
+          entry_date: null,
+          emotion: null,
+          is_favorite: null,
+          journal_id: null,
+          tags_add: {},
+          tags_remove: {},
+        },
+        media: [],
+      },
+    ])
+
+    f.vault.setTrashedIds(['a', 'w'])
+
+    expect(f.vault.status('a')).toBe('deleted')
+    expect(f.vault.status('w')).toBe('deleted')
+    expect(() => f.vault.getEntry('a')).toThrow(EntryUnavailableError)
+    expect(() => f.vault.getWriteView('a')).toThrow(EntryUnavailableError)
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).toEqual(['b'])
+    expect(f.vault.search('alpha')).toEqual([])
+    expect(f.vault.listIndex().map((e) => e.entryId)).toEqual(['b'])
+    // Retention compares against the synced copy, never the overlay.
+    expect(f.vault.getSynced('a')).toMatchObject({
+      status: 'visible',
+      metadata: { updated_at: 300 },
+    })
+
+    f.vault.setTrashedIds([])
+    expect(f.vault.getEntry('a').metadata.title).toBe('alpha')
+    expect(
+      f.vault
+        .listLoaded()
+        .map((e) => e.metadata.entry_id)
+        .sort(),
+    ).toEqual(['a', 'b', 'w'])
+  })
+
+  it('forgets the pending trash set on lock', async () => {
+    const f = setup()
+    f.vault.setTrashedIds(['a'])
+    f.lock()
+    f.unlockState.locked = false
+    f.put({ entry_id: 'a' })
+    await f.vault.load(['a'])
+    expect(f.vault.status('a')).toBe('visible')
+  })
+
   it('reduces entries of an excluded journal to stubs, now and on later loads', async () => {
     const f = setup()
     f.put({ entry_id: 'a', title: SECRET, journal_id: 'secret-j' })

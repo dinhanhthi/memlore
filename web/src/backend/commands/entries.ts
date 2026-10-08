@@ -1,5 +1,6 @@
 /**
- * Entry read commands (Phase 10.3). READ-ONLY; writes are Phase 16.
+ * Entry read commands (Phase 10.3); writes Phase 16 (outbox v1), `soft_delete_entry` Phase 22.2
+ * (outbox v2 trash).
  *
  * WIRE SHAPE: the desktop pager is `PagedResult<T> = { items, total }` with 1-based pages of
  * `PAGE_SIZE` (src/types/pagination.ts, `usePagedQuery`), not `{entries, hasMore}`. The same shape
@@ -34,8 +35,11 @@ import { EntryUnavailableError, type VaultEntry } from '../vault'
 import type { Handler } from '../router'
 import { nowSecs as correctedNowSecs } from '../clock'
 import { getCachedWriteFlag } from '../config'
+import { sealOutboxIntentV2 } from '../../core/core'
 import { createDraftManager } from '../drafts'
+import { isUuid } from '../drive/paths'
 import { getKeyRing } from '../keys'
+import { WebUnsupportedError } from '../unsupported'
 import {
   DEFAULT_MEDIA_MAX_PHOTO_UPLOAD_BYTES,
   DEFAULT_MEDIA_MAX_VIDEO_UPLOAD_BYTES,
@@ -367,7 +371,7 @@ const countEntriesInJournal: Handler = async ({ journalId }) => {
 // Write Commands (Phase 16)
 // ---------------------------------------------------------------------------------------------
 
-function assertWritesEnabled(): void {
+export function assertWritesEnabled(): void {
   if (!getCachedWriteFlag()) {
     throw new Error('read_only')
   }
@@ -379,7 +383,7 @@ function assertWritesEnabled(): void {
  * reading `priorIntent`, so no retention pass can drop the draft (and its media) this write builds
  * on. It is released when the command settles. Never await `ready()` or `pull()` after it.
  */
-function outboxWrite(
+export function outboxWrite(
   body: (args: Record<string, unknown>, lock: () => Promise<void>) => Promise<unknown>,
 ): Handler {
   return async (args) => {
@@ -1410,6 +1414,52 @@ const savePastedImage = outboxWrite(async (args, lock) => {
   }
 })
 
+/**
+ * `soft_delete_entry` (Phase 22.2): moves the entry to the desktop Trash through a `trash_entry`
+ * outbox v2 draft (`d-<entryId>`). The entry is hidden at once (the session's pending overlay,
+ * `vault.setTrashedIds`); a final refusal drops the draft and it reappears with a notice (Phase 21
+ * retention). An edit draft of the same entry is kept: push uploads it before the trash.
+ *
+ * `base_updated_at` = the SYNCED `updated_at` of the entry, never an overlay value, with or
+ * without a pending edit. The desktop (`decide_trash_entry` / `fast_forward_from`,
+ * src-tauri/src/sync/outbox_import.rs) applies the trash when the base equals the row's stamp, or
+ * when the only change since is this web device's own `<entryId>.bin`, which records the stamp it
+ * fast-forwarded from (the row's stamp before it = the synced stamp the web saw; 0 for a web
+ * create). An entry only this browser created, with no synced copy yet, is trashed from 0.
+ */
+const softDeleteEntry = outboxWrite(async (args, lock) => {
+  assertWritesEnabled()
+  const id = String(args.id ?? '')
+  if (!id) throw new Error('id is required')
+
+  const { vault, db, core, outboxV2Capable, refreshPendingV2 } = await openForWrite()
+  if (!outboxV2Capable) throw new WebUnsupportedError('soft_delete_entry')
+
+  await ensureLoaded(vault, id)
+  await lock()
+
+  // Locked, invisible, excluded, already trashed, or another browser's: not this browser's to trash.
+  writeViewOrUnavailable(vault, id)
+  // The outbox file name needs a uuid; a draft without one could never be pushed.
+  if (!isUuid(id)) throw new Error('This entry cannot be moved to the Trash from the web.')
+  const synced = vault.getSynced(id)
+  const base =
+    synced.status === 'visible' && synced.metadata !== null ? synced.metadata.updated_at : 0
+
+  const device = await db.device.get()
+  if (!device) throw new Error('Device record missing')
+  const sealed = sealOutboxIntentV2(core, getKeyRing(), {
+    kind: 'trash_entry',
+    web_device_id: device.deviceId,
+    web_updated_at_secs: correctedNowSecs(),
+    entry_id: id,
+    base_updated_at: base,
+  })
+  await createDraftManager({ db }).saveDraft(`d-${id}`, sealed, 'trash')
+  await refreshPendingV2()
+  readEnv().emit('memlore:entries-changed')
+})
+
 export const entryHandlers: Record<string, Handler> = {
   list_entries_paged: listEntriesPaged,
   list_all_entries_paged: listAllEntriesPaged,
@@ -1435,4 +1485,5 @@ export const entryHandlers: Record<string, Handler> = {
   pick_image: pickMedia('image'),
   pick_video: pickMedia('video'),
   save_pasted_image: savePastedImage,
+  soft_delete_entry: softDeleteEntry,
 }

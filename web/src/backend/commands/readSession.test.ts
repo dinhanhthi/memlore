@@ -9,7 +9,7 @@ import { isFormatGuardLatched, latchFormatGuard, resetFormatGuardLatch } from '.
 import { PullTransientError } from '../sync/pull'
 import { createEmptyOutboxFields, type OutboxEntryV1 } from '../sync/outbox'
 import { entryHandlers } from './entries'
-import { configureReadEnv, createReadSession, type ReadSession } from './readSession'
+import { configureReadEnv, createReadSession, openForRead, type ReadSession } from './readSession'
 import { sha256Hex } from '../drafts'
 import type { RetentionDesktops } from '../sync/retention'
 import { FakeVault } from './readTestKit'
@@ -126,6 +126,7 @@ async function rig(): Promise<Rig> {
   fakes.puller = puller
   fakes.vault = {
     setExcludedJournalIds: setExcluded,
+    setTrashedIds: () => undefined,
     load: async () => ({}),
     status: () => 'not-loaded',
   }
@@ -503,6 +504,95 @@ describe('drafts rehydrate the outbox overlay', () => {
     await r.session.pull()
 
     expect(await r.db.drafts.get(key)).toBeUndefined()
+  })
+
+  describe('pending v2 overlay (Phase 22)', () => {
+    const DESKTOPS = {
+      manifests: ['desk-a'],
+      slots: new Set(['desk-a']),
+      tombstones: new Set<string>(),
+    }
+
+    async function pushedDraft(key: string, kind: DraftRecord['kind'], body: object) {
+      const sealed = enc.encode(JSON.stringify(body))
+      return { entryId: key, kind, sealed, pushedHash: await sha256Hex(sealed) }
+    }
+
+    async function refuse(db: WebDb, key: string, sealed: Uint8Array, reason: string) {
+      const ack = {
+        path: `web-1234/outbox/${key}.bin`,
+        content_hash: await sha256Hex(sealed),
+        applied_updated_at: null,
+        created: false,
+        refused_reason: reason,
+        decided: [],
+      }
+      await db.files.put({
+        path: 'desk-a/outbox-acks.bin',
+        ciphertext: enc.encode(JSON.stringify({ desktop_device_id: 'desk-a', acks: [ack] })),
+        etag: null,
+        modifiedTime: null,
+        lastAccess: 0,
+        pinned: false,
+      })
+    }
+
+    it('lists a pending journal and admits its entries while ready() stays synced; a final refusal removes it', async () => {
+      const J = '55555555-5555-4555-8555-555555555555'
+      const draft = await pushedDraft(`j-${J}`, 'journal', {
+        kind: 'create_journal',
+        web_device_id: 'web-1234',
+        web_updated_at_secs: 9,
+        journal_id: J,
+        name: 'Trips',
+        color: null,
+        auto_tag_ids: [],
+      })
+      const r = await hydrationRig([draft], DESKTOPS, new Set(['desk-a']))
+      configureReadEnv({ isUnlocked: () => true, session: async () => r.session })
+
+      // Push hold-back and retention read ready(): it must not show the pending create.
+      const synced = await r.session.ready()
+      expect(synced.journals).toEqual([])
+      expect(synced.knownJournalIds).toEqual([])
+      expect((await openForRead()).taxonomy.journals.map((j) => j.id)).toEqual([J])
+      expect(r.vault.setExcludedJournalIds.mock.lastCall?.[1]).toEqual([J])
+
+      await refuse(r.db, draft.entryId, draft.sealed, 'name_taken')
+      const outcome = await r.session.pull()
+
+      expect(await r.db.drafts.get(draft.entryId)).toBeUndefined()
+      expect(outcome.changed).toBe(true)
+      expect(outcome.notices).toEqual([
+        { kind: 'refused', field: 'create_journal', title: 'Trips', reason: 'name_taken' },
+      ])
+      expect((await openForRead()).taxonomy.journals).toEqual([])
+      expect(r.vault.setExcludedJournalIds.mock.lastCall?.[1]).toEqual([])
+    })
+
+    it('hides an entry with a pending trash; a final refusal brings it back with a notice', async () => {
+      const draft = await pushedDraft('d-e1', 'trash', {
+        kind: 'trash_entry',
+        web_device_id: 'web-1234',
+        web_updated_at_secs: 9,
+        entry_id: 'e1',
+        base_updated_at: 1,
+      })
+      const r = await hydrationRig([draft], DESKTOPS, new Set(['desk-a']))
+      await r.session.ready()
+      await r.vault.load(['e1'])
+      expect(r.vault.status('e1')).toBe('deleted')
+
+      await refuse(r.db, draft.entryId, draft.sealed, 'changed_on_desktop')
+      const outcome = await r.session.pull()
+
+      expect(await r.db.drafts.get('d-e1')).toBeUndefined()
+      expect(r.vault.status('e1')).toBe('visible')
+      expect(outcome.changed).toBe(true)
+      expect(outcome.notices).toEqual([
+        { kind: 'refused', field: 'trash_entry', reason: 'changed_on_desktop' },
+      ])
+    })
   })
 
   it('exposes every sealed draft through the overlay once ready() resolves', async () => {

@@ -298,6 +298,8 @@ export class Vault {
   #outboxIntents = new Map<string, OutboxEntryV1>()
   /** Other web devices' intents (read-only), one winner per entry (`foreignWins`). */
   #foreignIntents = new Map<string, OutboxEntryV1>()
+  /** Entries this browser moved to the desktop Trash (pending `d-<id>` drafts, Phase 22.2). */
+  #trashed = new Set<string>()
   /** Bumped by `clear()`; a load that started under an older epoch discards its result. */
   #epoch = 0
 
@@ -313,6 +315,15 @@ export class Vault {
   /** Sets the active outbox intents to overlay on top of synced state. */
   setOutboxIntents(intents: OutboxEntryV1[]): void {
     this.#outboxIntents = new Map(intents.map((i) => [i.entry_id, i]))
+  }
+
+  /**
+   * Sets the entries with a pending web trash (`d-<id>` drafts). They are served as deleted in
+   * every view (`getSynced` excepted: retention compares against the synced copy) until the set is
+   * replaced, i.e. until the desktop reflects the trash or finally refuses it.
+   */
+  setTrashedIds(ids: Iterable<string>): void {
+    this.#trashed = new Set(ids)
   }
 
   /**
@@ -384,6 +395,7 @@ export class Vault {
     this.#knownJournals = null
     this.#outboxIntents = new Map()
     this.#foreignIntents = new Map()
+    this.#trashed = new Set()
   }
 
   /** Unregisters the lock hook and clears. */
@@ -401,6 +413,7 @@ export class Vault {
    * over an outbox intent, and the overlaid journal is subject to journal exclusion.
    */
   status(id: string): EntryStatus {
+    if (this.#trashed.has(id)) return 'deleted'
     const held = this.#entries.get(id)
     if (held !== undefined) {
       const journalId = this.#overlaidJournalId(held.metadata, this.#intentFor(id))
@@ -650,12 +663,14 @@ export class Vault {
 
     for (const [id, held] of this.#entries) {
       seenIds.add(id)
+      if (this.#trashed.has(id)) continue
       const view = this.#applyOverlay(held)
       if (!this.#journalExcluded(view.metadata.journal_id)) list.push(view)
     }
 
     for (const id of new Set([...this.#outboxIntents.keys(), ...this.#foreignIntents.keys()])) {
-      const intent = seenIds.has(id) || this.#stubs.has(id) ? undefined : this.#webCreated(id)
+      const hidden = seenIds.has(id) || this.#stubs.has(id) || this.#trashed.has(id)
+      const intent = hidden ? undefined : this.#webCreated(id)
       if (intent !== undefined) {
         const journalId = intent.fields.journal_id?.value ?? ''
         if (!this.#journalExcluded(journalId)) {
@@ -917,7 +932,7 @@ export class Vault {
     const index = this.#puller?.index
     if (index === null || index === undefined) return []
     return [...index.values()]
-      .filter((e) => isLive(e) && !this.#isStubbed(e))
+      .filter((e) => isLive(e) && !this.#isStubbed(e) && !this.#trashed.has(e.entryId))
       .sort((a, b) => b.updatedAt - a.updatedAt || (a.entryId < b.entryId ? -1 : 1))
   }
 
