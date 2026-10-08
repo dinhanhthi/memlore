@@ -118,10 +118,18 @@ describe('route', () => {
     await expect(route('get_sync_status')).resolves.toMatchObject({ enabled: false })
   })
 
-  it('answers recalculate_streak with the empty streak, like get_streak', async () => {
-    const empty = { current_streak: 0, longest_streak: 0, last_entry_date: null }
-    await expect(route('recalculate_streak')).resolves.toEqual(empty)
-    await expect(route('get_streak')).resolves.toEqual(empty)
+  it('serves the device-bin reads (chats, memory, persona, streak), which reject while locked', async () => {
+    for (const cmd of [
+      'daily_chat_list_sessions_paged',
+      'daily_chat_load_session',
+      'list_memory_items',
+      'get_persona',
+      'get_streak',
+      'recalculate_streak',
+    ]) {
+      expect(classes(cmd)).toEqual(['implemented'])
+      await expect(route(cmd, {})).rejects.toThrow('vault is locked')
+    }
   })
 
   it('serves the read commands from the handler table, which reject while locked', async () => {

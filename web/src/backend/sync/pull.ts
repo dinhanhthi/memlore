@@ -20,9 +20,11 @@
  *     row shape or `schema_version` latches the format guard and keeps the previously cached
  *     manifest for that device (degraded `manifest-format`); the pull still serves. Per-device
  *     reads run concurrently through the shared limiter; results are folded in device-list order.
- *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin` and
- *     `templates.bin` ciphertext (also concurrent per-device reads through the shared limiter,
- *     folded in device-list order). `settings.bin` is skipped (nothing in Phase 10 needs it).
+ *  3. Per desktop: caches `outbox-acks.bin` (Phase 16), `journals/*.bin`, `tags.bin`,
+ *     `templates.bin` and `streak.bin` ciphertext (also concurrent per-device reads through the
+ *     shared limiter, folded in device-list order). `settings.bin` is skipped (nothing in Phase 10
+ *     needs it); `chats.bin` and `memory.bin` are never pulled here, only on demand
+ *     (`readDeviceBin`, used by `commands/deviceBins.ts`).
  *  4. `computeDiff` (WASM) against the previously cached manifest gives the stale set; cached entry
  *     ciphertext of stale ids is dropped so a changed entry is never served from the cache, and an
  *     in-flight download of a stale path is detached: it never caches, and later callers start a
@@ -333,6 +335,7 @@ export class Puller {
   #index: Map<string, IndexEntry> | null = null
   #refreshing: Promise<PullResult> | null = null
   #oversizeSkipped = 0
+  #pulls = 0
   #degraded: DegradedDevice[] = []
   /** Retention view of the last refresh: manifest devices, slot ids, tombstoned entry ids. */
   #desktops: RetentionDesktops = { manifests: [], slots: null, tombstones: new Set() }
@@ -377,6 +380,11 @@ export class Puller {
    */
   get foreignIntents(): readonly ForeignIntentFile[] {
     return this.#foreignIntents
+  }
+
+  /** Completed `refresh()` runs: a new value means device files may have changed on Drive. */
+  get pulls(): number {
+    return this.#pulls
   }
 
   /** The download limiter (concurrency 4), shared with the media reads of Phase 11.1. */
@@ -505,6 +513,7 @@ export class Puller {
     this.#foreignIntents = foreignIntents
     const tombstones = tombstonesOf(manifests, this.#index)
     this.#desktops = { manifests: [...manifests.keys()], slots: this.#listedSlots, tombstones }
+    this.#pulls += 1
     return { generation, devices: [...manifests.keys()].sort(), stale, warnings }
   }
 
@@ -653,13 +662,18 @@ export class Puller {
   /**
    * Bytes of a logical device file, or null on a confirmed NotFound or a path the reader refuses
    * (`RangeError`: an unsafe name from untrusted Drive content is "missing", never a failed pull).
-   * A `DriveTooLargeError` (a planted or corrupt file above the default cap) yields `'oversize'`:
-   * it is neither missing nor transient, and retrying cannot help, so one file never aborts the
-   * whole pull; callers skip it and keep whatever they had cached. Other errors are transient.
+   * A `DriveTooLargeError` (a planted or corrupt file above `maxBytes`, default: the reader's cap)
+   * yields `'oversize'`: it is neither missing nor transient, and retrying cannot help, so one
+   * file never aborts the whole pull; callers skip it and keep whatever they had cached. Other
+   * errors are transient.
    */
-  async #readOptional(generation: number, path: string): Promise<Uint8Array | null | 'oversize'> {
+  async #readOptional(
+    generation: number,
+    path: string,
+    maxBytes?: number,
+  ): Promise<Uint8Array | null | 'oversize'> {
     try {
-      return await this.#reader.readDeviceFile(generation, path)
+      return await this.#reader.readDeviceFile(generation, path, maxBytes)
     } catch (error) {
       if (error instanceof DriveNotFoundError || error instanceof RangeError) return null
       if (error instanceof DriveTooLargeError) {
@@ -787,7 +801,7 @@ export class Puller {
   }
 
   /**
-   * `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin` of one desktop. Every
+   * `outbox-acks.bin`, `journals/*.bin`, `tags.bin`, `templates.bin`, `streak.bin` of one desktop. Every
    * individual network call is concurrency-limited (wrapping the whole task in `#limit` would
    * deadlock the queue); the returned warnings fold into the pull's warnings in device order.
    */
@@ -805,12 +819,14 @@ export class Puller {
     const acks = `${device}/${ACKS_FILE}`
     const tags = `${device}/tags.bin`
     const templates = `${device}/templates.bin`
-    // Acks, tags, templates and the journals listing all start at once; the listed journal
-    // files are downloaded concurrently below.
-    const [ackRead, tagRead, templateRead, journalListing] = await Promise.allSettled([
+    const streak = `${device}/streak.bin`
+    // Acks, tags, templates, streak and the journals listing all start at once; the listed
+    // journal files are downloaded concurrently below.
+    const [ackRead, tagRead, templateRead, streakRead, journalListing] = await Promise.allSettled([
       bytesOf(acks),
       bytesOf(tags),
       bytesOf(templates),
+      bytesOf(streak),
       this.#limit(() => {
         this.#assertUnlocked()
         return guarded(`${device}/journals`, () =>
@@ -823,6 +839,7 @@ export class Puller {
     if (ackRead.status === 'rejected') throw ackRead.reason
     if (tagRead.status === 'rejected') throw tagRead.reason
     if (templateRead.status === 'rejected') throw templateRead.reason
+    if (streakRead.status === 'rejected') throw streakRead.reason
     if (journalListing.status === 'rejected') throw journalListing.reason
     const names = journalListing.value.filter((n) => n.endsWith('.bin'))
     const journalReads = Promise.allSettled(
@@ -832,6 +849,7 @@ export class Puller {
     else await cache(acks, ackRead.value)
     await cache(tags, tagRead.value)
     await cache(templates, templateRead.value)
+    await cache(streak, streakRead.value)
     const journals = (await journalReads).map((result) => {
       if (result.status === 'rejected') throw result.reason
       return result.value
@@ -886,6 +904,22 @@ export class Puller {
       if (FOREIGN_INTENT.test(path) && !keep.has(path)) await this.#db.files.delete(path)
     }
     return kept
+  }
+
+  /**
+   * On-demand download of one device file (`chats.bin`, `memory.bin`) through the shared limiter,
+   * at most `maxBytes`: null when it is missing, `'oversize'` when it is larger. Nothing is cached:
+   * the caller keeps the decoded result in RAM. Needs a prior `refresh()` or `primeFromCache()`.
+   */
+  async readDeviceBin(path: string, maxBytes: number): Promise<Uint8Array | null | 'oversize'> {
+    const generation = this.#generation
+    if (generation === null) throw new Error('readDeviceBin needs a prior refresh()')
+    const bytes = await this.#limit(() => {
+      this.#assertUnlocked()
+      return this.#readOptional(generation, path, maxBytes)
+    })
+    this.#assertUnlocked()
+    return bytes
   }
 
   /**

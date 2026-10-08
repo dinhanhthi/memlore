@@ -100,9 +100,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   is_biometric_available: false,
   is_biometric_unlock_enabled: false,
   second_lock_status: false,
-  // Needs the whole history, which the web never loads at once (the read commands are in commands/).
-  get_streak: { current_streak: 0, longest_streak: 0, last_entry_date: null },
-  recalculate_streak: { current_streak: 0, longest_streak: 0, last_entry_date: null },
   // Media.
   list_media_for_entry: [],
   list_all_media_paged: EMPTY_PAGE,
@@ -161,16 +158,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   },
   get_embedding_sync_decisions: EMBEDDING_SYNC_DECISIONS,
   get_background_indexing_settings: { enabled: false, hostedConsentAt: null, allowed: false },
-  list_memory_items: [],
-  get_persona: {
-    answersJson: '',
-    traitsText: '',
-    styleText: '',
-    enabled: false,
-    userEdited: false,
-    generatedAt: null,
-    updatedAt: 0,
-  },
   list_ai_audit_log: [],
   get_ai_audit_retention_days: 90,
   // TODO(later): see docs/LATER.md - on-device LLM
@@ -180,7 +167,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   get_on_device_llm_server_status: { state: 'stopped' },
   on_device_llm_binary_status: { installed: false, size_bytes: 0 },
   // TODO(later): see docs/LATER.md - daily chats
-  daily_chat_list_sessions_paged: EMPTY_PAGE,
   chat_session_for_entry: null,
   chat_search_attachable_entries: [],
   chat_count_entries_in_range: { entryCount: 0, totalBytes: 0 },
@@ -271,7 +257,6 @@ export const ACTION_UNSUPPORTED: readonly string[] = [
   'convert_chat_to_entry',
   'daily_chat_delete_session',
   'daily_chat_generate_title',
-  'daily_chat_load_session',
   'daily_chat_mark_converted',
   'daily_chat_rename_session',
   'daily_chat_send_turn',

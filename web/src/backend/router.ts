@@ -1,5 +1,6 @@
 import { authHandlers } from './commands/auth'
 import { cacheHandlers, installCacheStatsEmitter } from './commands/cache'
+import { deviceBinHandlers } from './commands/deviceBins'
 import { entryHandlers } from './commands/entries'
 import { mediaHandlers } from './commands/media'
 import { searchHandlers } from './commands/search'
@@ -43,6 +44,7 @@ registerHandlers(cacheHandlers)
 registerHandlers(taxonomyHandlers)
 registerHandlers(searchHandlers)
 registerHandlers(syncHandlers)
+registerHandlers(deviceBinHandlers)
 installSyncAutostart()
 installEvictorAutostart()
 installDraftsAutostart()

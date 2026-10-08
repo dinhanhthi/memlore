@@ -39,6 +39,7 @@ import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1, WebNotice } from '../sync/outbox'
 import type { ForeignIntentFile, Limiter } from '../sync/pull'
 import type { Vault } from '../vault'
+import type { DeviceBinLoader } from './deviceBins'
 
 /** The part of the vault the read commands use. */
 export type VaultApi = Pick<
@@ -114,6 +115,8 @@ export interface ReadSession {
   vault: VaultApi
   /** Absent in sessions that cannot serve media. */
   media?: MediaBackend
+  /** On-demand `chats.bin` / `memory.bin` and cached `streak.bin` (Phase 5). Absent in test doubles. */
+  deviceBins?: DeviceBinLoader
   db?: WebDb
   core?: Core
   /** Refreshes the index if needed, applies the journal exclusions, warm-starts once. */
@@ -265,14 +268,17 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     { createDraftManager },
     { runRetention },
     { checkEntryMetadata, getFormatGuardReason, passesFormatGuard },
+    { createDeviceBinLoader },
   ] = await Promise.all([
     import('../sync/pull'),
     import('../vault'),
     import('../drafts'),
     import('../sync/retention'),
     import('../sync/formatGuard'),
+    import('./deviceBins'),
   ])
   const puller = createPuller({ reader, db, core })
+  const deviceBins = createDeviceBinLoader({ puller, db, core })
   const vault = createVault({
     core,
     puller,
@@ -305,6 +311,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     foreignSeen = null
     foreignKey = ''
     notices = []
+    deviceBins.clear()
   })
   const assertSameEpoch = (started: number): void => {
     if (started !== epoch) throw new VaultLockedError()
@@ -499,6 +506,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
   return {
     vault,
     media: { db, reader, core, limit: puller.limit },
+    deviceBins,
     db,
     core,
     ready,

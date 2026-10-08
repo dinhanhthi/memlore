@@ -419,7 +419,61 @@ describe('refresh', () => {
     expect(
       downloads(env.drive).some((p) => p.includes('settings.bin') || p.includes('/media/')),
     ).toBe(false)
+    // The fixture desktop publishes chats.bin (`chats_present: true`): it is loaded on demand only,
+    // from the flags the cached (normalized) manifest still carries.
+    const manifest = await env.db.files.get(`${env.desktop}/metadata.json`)
+    expect(JSON.parse(text(manifest?.ciphertext ?? new Uint8Array()))).toMatchObject({
+      chats_present: true,
+      memory_present: false,
+      generated_at: NEWEST,
+    })
+    expect(downloads(env.drive).some((p) => /\/(chats|memory)\.bin$/.test(p))).toBe(false)
     expect(env.drive.mutating()).toEqual([])
+  })
+
+  it('caches streak.bin by name on every pull; a missing one is skipped without a warning', async () => {
+    const env = await setup()
+    const first = await env.puller.refresh()
+    expect(await env.db.files.get(`${env.desktop}/streak.bin`)).toBeUndefined()
+    expect(first.warnings.some((w) => w.includes('streak'))).toBe(false)
+    const folder = env.drive.find(['Memlore', 'generations', 'g-0', env.desktop])
+    if (!folder) throw new Error('no desktop folder')
+    env.drive.addFile('streak.bin', folder.id, 'STREAK')
+    await env.puller.refresh()
+    const cached = await env.db.files.get(`${env.desktop}/streak.bin`)
+    expect(text(cached?.ciphertext ?? new Uint8Array())).toBe('STREAK')
+  })
+
+  it('readDeviceBin downloads a device bin on demand through the limiter', async () => {
+    const env = await setup()
+    await env.puller.refresh()
+    env.drive.requests.length = 0
+    const got = await env.puller.readDeviceBin(`${env.desktop}/chats.bin`, 16 * 1024 * 1024)
+    if (!(got instanceof Uint8Array)) throw new Error('expected bytes')
+    const payload = JSON.parse(text(core.openDeviceBin(getKeyRing(), got))) as {
+      sessions: unknown[]
+    }
+    expect(Array.isArray(payload.sessions)).toBe(true)
+    expect(downloads(env.drive)).toEqual([`generations/g-0/${env.desktop}/chats.bin`])
+    expect(await env.db.files.get(`${env.desktop}/chats.bin`)).toBeUndefined()
+    expect(await env.puller.readDeviceBin(`${env.desktop}/memory.bin`, 1024)).toBeNull()
+    // A body above the caller's cap is refused at the download layer.
+    expect(await env.puller.readDeviceBin(`${env.desktop}/chats.bin`, 4)).toBe('oversize')
+  })
+
+  it('readDeviceBin needs a prior refresh and refuses a locked session', async () => {
+    const unlocked = { current: true }
+    const env = await setup({}, { isUnlocked: () => unlocked.current })
+    await expect(env.puller.readDeviceBin(`${env.desktop}/chats.bin`, 1024)).rejects.toThrow(
+      /prior refresh/,
+    )
+    await env.puller.refresh()
+    unlocked.current = false
+    env.drive.requests.length = 0
+    await expect(env.puller.readDeviceBin(`${env.desktop}/chats.bin`, 1024)).rejects.toBeInstanceOf(
+      VaultLockedError,
+    )
+    expect(downloads(env.drive)).toEqual([])
   })
 
   it('exposes the manifest devices, listed slot ids and every tombstone row for retention', async () => {
