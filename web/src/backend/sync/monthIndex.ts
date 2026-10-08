@@ -32,7 +32,7 @@ import { getKeyRing, isUnlocked, VaultLockedError, type KeyRing } from '../keys'
 import type { Core } from '../../core/core'
 import { isSafeComponent } from '../drive/paths'
 import type { WebDb } from '../storage/idb'
-import { isLive } from './entryIndex'
+import { isLive, type IndexEntry } from './entryIndex'
 import { PullTransientError, type Puller } from './pull'
 
 /** Largest index file the web opens: the WASM `MAX_BIN_BYTES` (memlore-wasm lib.rs). */
@@ -94,6 +94,14 @@ export interface MonthIndexResult {
   degraded: string[]
 }
 
+/** A media item of a visible index row and where its bytes live. */
+export interface MonthIndexMediaOwner {
+  entryId: string
+  /** The device folder of the entry-index winner. */
+  authorDevice: string
+  media: MonthIndexMedia
+}
+
 export interface MonthIndexDeps {
   puller: Pick<Puller, 'indexSource' | 'index' | 'pulls' | 'readDeviceBin'>
   db: { files: Pick<WebDb['files'], 'get' | 'put' | 'delete' | 'paths'> }
@@ -112,6 +120,16 @@ export interface MonthIndexReader {
   revalidate(): Promise<void>
   /** Rows of these UTC months (`YYYY-MM`), fetched on demand. */
   getMonths(months: readonly string[]): Promise<MonthIndexResult>
+  /**
+   * The months the current catalog lists, newest first (revalidated like `getMonths`, no month is
+   * fetched). Empty without an index source or a readable catalog.
+   */
+  listMonths(): Promise<string[]>
+  /**
+   * The owner of a media id among the months already read into RAM (never downloads), re-checked
+   * against the fail-closed rule at call time. Null when unknown, unsafe, locked or not visible.
+   */
+  findMedia(mediaId: string): MonthIndexMediaOwner | null
   /** Drops the RAM state and detaches in-flight reads (call on lock). */
   clear(): void
 }
@@ -319,6 +337,35 @@ export function createMonthIndexReader(deps: MonthIndexDeps): MonthIndexReader {
     return filterRows(loaded)
   }
 
+  async function listMonths(): Promise<string[]> {
+    const started = epoch
+    assertUnlocked(started)
+    await ensureFresh()
+    assertUnlocked(started)
+    return catalog === null ? [] : [...catalog.hashes.keys()].sort().reverse()
+  }
+
+  /** The Phase 15 rule for one row: winner live, same `updated_at`, journal not excluded. */
+  function isVisible(row: MonthIndexRow): IndexEntry | null {
+    const winner = puller.index?.get(row.entry_id)
+    if (winner === undefined || !isLive(winner) || winner.updatedAt !== row.updated_at) return null
+    return deps.isJournalExcluded(row.journal_id) ? null : winner
+  }
+
+  function findMedia(mediaId: string): MonthIndexMediaOwner | null {
+    if (!unlocked() || !isSafeComponent(mediaId) || mediaId.startsWith('.')) return null
+    for (const { rows } of months.values()) {
+      for (const row of rows) {
+        const media = row.media.find((m) => m.id === mediaId)
+        if (media === undefined) continue
+        const winner = isVisible(row)
+        if (winner !== null)
+          return { entryId: row.entry_id, authorDevice: winner.authorDevice, media }
+      }
+    }
+    return null
+  }
+
   /**
    * The fail-closed filter. An entry listed in two months (its date moved and one month file is
    * older) yields its matching row; it is `unconfirmed` only when no row matches the winner.
@@ -357,6 +404,8 @@ export function createMonthIndexReader(deps: MonthIndexDeps): MonthIndexReader {
   return {
     revalidate,
     getMonths,
+    listMonths,
+    findMedia,
     clear: () => {
       epoch += 1
       catalog = null

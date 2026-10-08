@@ -20,6 +20,7 @@ import { isFormatGuardLatched, resetFormatGuardLatch } from '../sync/formatGuard
 import { onboardComplete } from '../sync/onboard'
 import { clearReonboardReason } from '../sync/pull'
 import { MSG_UNAVAILABLE, entryHandlers } from './entries'
+import { indexViewHandlers } from './indexViews'
 import { configureReadEnv, createReadSession } from './readSession'
 import { cancelSearchScan, searchHandlers, whenSearchScanSettled } from './search'
 import { taxonomyHandlers } from './taxonomy'
@@ -54,7 +55,7 @@ interface Env {
   onEntryGet: { current: ((n: number) => void) | null }
 }
 
-const handlers = { ...entryHandlers, ...taxonomyHandlers, ...searchHandlers }
+const handlers = { ...entryHandlers, ...indexViewHandlers, ...taxonomyHandlers, ...searchHandlers }
 const call = <T>(name: string, args: Record<string, unknown> = {}): Promise<T> =>
   Promise.resolve(handlers[name](args)) as Promise<T>
 

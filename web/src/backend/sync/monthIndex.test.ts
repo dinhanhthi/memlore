@@ -329,6 +329,83 @@ describe('getMonths', () => {
   })
 })
 
+describe('listMonths', () => {
+  it('lists the catalog months newest first, without fetching any month', async () => {
+    const h = harness()
+    h.setCatalog({ '2025-01': 'a', '2026-10': 'b', '2026-02': 'c' })
+    const reader = createMonthIndexReader(h.deps)
+    expect(await reader.listMonths()).toEqual(['2026-10', '2026-02', '2025-01'])
+    expect(h.reads).toEqual([`${SRC}/index/months.bin`])
+  })
+
+  it('is empty without an index source or a readable catalog', async () => {
+    const h = harness()
+    h.state.source = null
+    const reader = createMonthIndexReader(h.deps)
+    expect(await reader.listMonths()).toEqual([])
+    h.state.source = SRC
+    h.state.pulls += 1
+    expect(await reader.listMonths()).toEqual([])
+  })
+})
+
+describe('findMedia', () => {
+  const MEDIA = 'f0000000-0000-4000-8000-00000000000f'
+  const withMedia = (entryId: string, updatedAt: number, journalId = 'j1', id = MEDIA) => ({
+    ...row(entryId, updatedAt, journalId),
+    media: [{ id, file_name: 'a.jpg', file_type: 'image/jpeg', file_size: 9, width: 4, height: 3 }],
+  })
+
+  it('finds media of a month already read, with the winner as author device', async () => {
+    const h = harness()
+    h.setCatalog({ '2026-09': 'h9' })
+    h.setMonth('2026-09', [withMedia(E1, 100)])
+    h.state.index.set(E1, live(E1, 100, { authorDevice: OTHER }))
+    const reader = createMonthIndexReader(h.deps)
+    expect(reader.findMedia(MEDIA)).toBeNull() // nothing read yet: no download
+    await reader.getMonths(['2026-09'])
+    const found = reader.findMedia(MEDIA)
+    expect(found?.entryId).toBe(E1)
+    expect(found?.authorDevice).toBe(OTHER)
+    expect(found?.media.file_type).toBe('image/jpeg')
+  })
+
+  it('applies the fail-closed rule: stale, trashed or excluded rows are not found', async () => {
+    const h = harness()
+    h.setCatalog({ '2026-09': 'h9' })
+    h.setMonth('2026-09', [withMedia(E1, 100)])
+    h.state.index.set(E1, live(E1, 100))
+    const reader = createMonthIndexReader(h.deps)
+    await reader.getMonths(['2026-09'])
+    expect(reader.findMedia(MEDIA)).not.toBeNull()
+
+    h.state.index.set(E1, live(E1, 150))
+    expect(reader.findMedia(MEDIA)).toBeNull()
+    h.state.index.set(E1, live(E1, 100, { trashedAt: 120 }))
+    expect(reader.findMedia(MEDIA)).toBeNull()
+    h.state.index.set(E1, live(E1, 100))
+    h.state.excluded.add('j1')
+    expect(reader.findMedia(MEDIA)).toBeNull()
+    h.state.excluded.clear()
+    h.state.unlocked = false
+    expect(reader.findMedia(MEDIA)).toBeNull()
+  })
+
+  it('never returns an unsafe media id and forgets everything on clear', async () => {
+    const h = harness()
+    h.setCatalog({ '2026-09': 'h9' })
+    h.setMonth('2026-09', [withMedia(E1, 100, 'j1', '../x'), withMedia(E2, 100)])
+    h.state.index.set(E1, live(E1, 100))
+    h.state.index.set(E2, live(E2, 100))
+    const reader = createMonthIndexReader(h.deps)
+    await reader.getMonths(['2026-09'])
+    expect(reader.findMedia('../x')).toBeNull()
+    expect(reader.findMedia(MEDIA)?.entryId).toBe(E2)
+    reader.clear()
+    expect(reader.findMedia(MEDIA)).toBeNull()
+  })
+})
+
 describe('UTC month keys for local-time views', () => {
   it('lists every UTC month a [from, to) range touches', () => {
     const oct1 = Date.UTC(2026, 9, 1) / 1000

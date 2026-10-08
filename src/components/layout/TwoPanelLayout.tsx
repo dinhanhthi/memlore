@@ -23,7 +23,8 @@ import { OnThisDayView } from '../entries/OnThisDayView'
 import { MediaGalleryView } from '../media/MediaGalleryView'
 import { MediaGalleryFullView } from '../media/MediaGalleryFullView'
 import { BODY_OVERLAY_HOST_ID } from '../../lib/overlayHost'
-import { isViewAvailable } from '../../lib/viewAvailability'
+import { isViewAvailable, needsMonthIndex } from '../../lib/viewAvailability'
+import { isWeb } from '../../lib/platform'
 import { UnsupportedOnWeb } from '../common/UnsupportedOnWeb'
 import { LocationsMapView } from '../map/LocationsMapView'
 import { StatisticsView } from '../stats/StatisticsView'
@@ -236,7 +237,12 @@ export function TwoPanelLayout() {
                   // Unsupported views render a placeholder — checked first so
                   // they never reach the real panel (which fires Tauri invokes).
                   if (unsupported) {
-                    return <UnsupportedOnWeb key={activeTabId} title={t(activeView)} />
+                    // On web these views wait for a desktop month index (0.3.0+).
+                    const message =
+                      isWeb && needsMonthIndex(activeView) ? t('web_needs_index') : undefined
+                    return (
+                      <UnsupportedOnWeb key={activeTabId} title={t(activeView)} message={message} />
+                    )
                   }
                   // Media full-page replaces the 2-panel gallery; map stays static.
                   if (activeView === 'media') {

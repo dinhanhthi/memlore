@@ -331,14 +331,6 @@ describe('reads over the loaded set', () => {
     expect(await call('count_entries_in_journal', { journalId: 'j1' })).toBe(2)
   })
 
-  it('lists on-this-day across years and validates month and day', async () => {
-    await loadAll()
-    const hits = await call<Entry[]>('list_on_this_day', { month: 3, day: 5 })
-    expect(hits.map((e) => e.id)).toEqual(['c', 'a', 'b'])
-    await expect(call('list_on_this_day', { month: 13, day: 1 })).rejects.toThrow('month must be')
-    await expect(call('list_on_this_day', { month: 1, day: 0 })).rejects.toThrow('day must be')
-  })
-
   it('returns one pair per day and emotion for the year, latest first within a day', async () => {
     await loadAll()
     const pairs = await call<Array<[string, string]>>('get_emotion_by_date', { year: 2024 })
@@ -363,7 +355,6 @@ describe('locked vault', () => {
       ['get_entry_content', { id: id(1) }],
       ['list_entry_dates', { journalId: null }],
       ['list_entries_for_date_range', { journalId: null, fromTs: 0, toTs: 1 }],
-      ['list_on_this_day', { month: 1, day: 1 }],
       ['get_emotion_by_date', { year: 2024 }],
       ['count_entries_in_journal', { journalId: 'j1' }],
     ]

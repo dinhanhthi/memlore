@@ -19,8 +19,6 @@ export class WebUnsupportedError extends Error {
 
 type DefaultValue = unknown | ((args: Record<string, unknown>) => unknown)
 
-const EMPTY_PAGE = { items: [], total: 0 }
-
 function emptySlot(slot: EmbedSyncSlot): EmbedSyncDecisionSlotView {
   return {
     slot,
@@ -102,7 +100,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   second_lock_status: false,
   // Media.
   list_media_for_entry: [],
-  list_all_media_paged: EMPTY_PAGE,
   // Sync and devices.
   get_sync_catchup_status: { complete: true, pulled: 0, total: 0 },
   get_sync_scope_upgrade_required: false,

@@ -10,6 +10,7 @@ import {
 import { FakeDrive } from '../drive/fakeDrive'
 import { VaultLockedError, type KeyRing } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb, type WebDb } from '../storage/idb'
+import type { MonthIndexMediaOwner, MonthIndexReader } from '../sync/monthIndex'
 import { createLimiter } from '../sync/pull'
 import { EntryUnavailableError, type VaultEntry } from '../vault'
 import {
@@ -128,6 +129,10 @@ interface Rig {
   setLoaded: (entries: VaultEntry[]) => void
   /** Entries `listLoaded` reports although `getEntry` refuses them (a locked entry leak). */
   setLeaked: (entries: VaultEntry[]) => void
+  /** Installs a month index double (`findMedia` only). */
+  setIndex: (findMedia: MonthIndexReader['findMedia'] | null) => void
+  /** Ids `vault.status` reports as stubs (locked) although not in `listLoaded`. */
+  setStubbed: (ids: string[]) => void
   clock: { now: number }
 }
 
@@ -148,8 +153,16 @@ async function rig(
   let unlocked = true
   let loaded = entries
   let leaked: VaultEntry[] = []
+  let monthIndex: MonthIndexReader | undefined
+  let stubbed: string[] = []
   const vault = {
     listLoaded: () => [...loaded, ...leaked],
+    status: (id: string) =>
+      loaded.some((e) => e.metadata.entry_id === id)
+        ? 'visible'
+        : stubbed.includes(id)
+          ? 'locked'
+          : 'not-loaded',
     getEntry: (id: string) => {
       const found = loaded.find((e) => e.metadata.entry_id === id)
       if (found === undefined) throw new EntryUnavailableError(id, 'locked')
@@ -178,6 +191,7 @@ async function rig(
     session: async () => ({
       vault,
       media,
+      ...(monthIndex === undefined ? {} : { monthIndex }),
       ready: async () => EMPTY_TAXONOMY,
       acquireOutboxLock: async () => () => undefined,
       pull: async () => ({ stale: [], changed: false }),
@@ -202,6 +216,12 @@ async function rig(
     },
     setLeaked: (e) => {
       leaked = e
+    },
+    setIndex: (findMedia) => {
+      monthIndex = findMedia === null ? undefined : ({ findMedia } as unknown as MonthIndexReader)
+    },
+    setStubbed: (ids) => {
+      stubbed = ids
     },
   }
 }
@@ -707,6 +727,109 @@ describe('media of entries the web does not serve', () => {
     const pending = call('read_media_bytes', MID)
     await new Promise((resolve) => setTimeout(resolve, 10))
     r.setLoaded([])
+    release()
+    await expect(pending).rejects.toBeInstanceOf(MediaNotFoundError)
+  })
+})
+
+describe('owner from the month index (entry not loaded)', () => {
+  const IDX = 'idx-entry'
+  const indexed = (extra: Partial<MonthIndexMediaOwner['media']> = {}): MonthIndexMediaOwner => ({
+    entryId: IDX,
+    authorDevice: OTHER,
+    media: {
+      id: MID,
+      file_name: 'a.png',
+      file_type: 'image/png',
+      file_size: 10,
+      sort_order: 0,
+      created_at: 5,
+      insertion_mode: 'inline',
+      width: 8,
+      height: 6,
+      duration_seconds: null,
+      exif_date: null,
+      exif_latitude: null,
+      exif_longitude: null,
+      ...extra,
+    },
+  })
+
+  it('serves the thumbnail of an unloaded index row from the winner device', async () => {
+    const r = await rig([])
+    r.setIndex((id) => (id === MID ? indexed() : null))
+    r.reader.files.set(`${OTHER}/media/${MID}.thumb`, seal(THUMB_PLAIN))
+    const bytes = await call<number[]>('read_media_thumbnail_bytes', MID)
+    expect(Uint8Array.from(bytes)).toEqual(THUMB_PLAIN)
+    expect(r.reader.calls).toEqual([`3:${OTHER}/media/${MID}.thumb`])
+    const status = await call<Record<string, unknown>>('get_media_status', MID)
+    expect(status).toMatchObject({ fileType: 'image/png', fileSize: 10, width: 8, height: 6 })
+  })
+
+  it('falls back to the other known devices like a loaded owner', async () => {
+    const r = await rig([])
+    r.setIndex(() => indexed())
+    await r.db.files.put({
+      path: `${OWNER}/metadata.json`,
+      ciphertext: new Uint8Array(0),
+      etag: null,
+      modifiedTime: null,
+      lastAccess: 0,
+      pinned: false,
+    })
+    r.reader.files.set(`${OWNER}/media/${MID}`, seal(PLAIN))
+    const bytes = await call<number[]>('read_media_bytes', MID)
+    expect(Uint8Array.from(bytes)).toEqual(PLAIN)
+  })
+
+  it('a stale or excluded row (the reader finds nothing) is MediaNotFoundError', async () => {
+    const r = await rig([])
+    r.setIndex(() => null)
+    r.reader.files.set(`${OTHER}/media/${MID}.thumb`, seal(THUMB_PLAIN))
+    await expect(call('read_media_thumbnail_bytes', MID)).rejects.toBeInstanceOf(MediaNotFoundError)
+    await expect(call('get_media_status', MID)).rejects.toBeInstanceOf(MediaNotFoundError)
+    expect(r.reader.calls).toEqual([])
+  })
+
+  it('never uses the index for an entry the vault holds (loaded or refused)', async () => {
+    const r = await rig([entryWith({ entryId: IDX, id: 'another-media' })])
+    r.setIndex(() => indexed())
+    r.reader.files.set(`${OTHER}/media/${MID}.thumb`, seal(THUMB_PLAIN))
+    await expect(call('read_media_thumbnail_bytes', MID)).rejects.toBeInstanceOf(MediaNotFoundError)
+    r.setLoaded([])
+    r.setStubbed([IDX])
+    await expect(call('read_media_thumbnail_bytes', MID)).rejects.toBeInstanceOf(MediaNotFoundError)
+    expect(r.reader.calls).toEqual([])
+  })
+
+  it('re-checks the row after the download: hidden meanwhile is MediaNotFoundError', async () => {
+    const r = await rig([])
+    let visible = true
+    r.setIndex(() => (visible ? indexed() : null))
+    r.reader.files.set(`${OTHER}/media/${MID}.thumb`, seal(THUMB_PLAIN))
+    let release!: () => void
+    r.reader.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const pending = call('read_media_thumbnail_bytes', MID)
+    while (r.reader.calls.length === 0) await new Promise((done) => setTimeout(done, 0))
+    visible = false
+    release()
+    await expect(pending).rejects.toBeInstanceOf(MediaNotFoundError)
+  })
+
+  it('re-checks the vault after the download: an entry loaded meanwhile is authoritative', async () => {
+    const r = await rig([])
+    r.setIndex(() => indexed())
+    r.reader.files.set(`${OTHER}/media/${MID}.thumb`, seal(THUMB_PLAIN))
+    let release!: () => void
+    r.reader.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const pending = call('read_media_thumbnail_bytes', MID)
+    while (r.reader.calls.length === 0) await new Promise((done) => setTimeout(done, 0))
+    // The fresh copy no longer carries the media; the index row is now ignored.
+    r.setLoaded([entryWith({ entryId: IDX, id: 'another-media' })])
     release()
     await expect(pending).rejects.toBeInstanceOf(MediaNotFoundError)
   })

@@ -22,9 +22,9 @@
  * invisible journal). `lockedView`, `activeVaultId` and `lockFilter` (second-locked / invisible-only
  * views list exactly the excluded entries) are therefore ignored or answered empty.
  *
- * Calendar-style reads (`list_entry_dates`, `list_entries_for_date_range`, `list_on_this_day`,
- * `get_emotion_by_date`, `count_entries_in_journal`) are answered from the entries loaded so far:
- * they never trigger a download.
+ * Calendar-style reads (`list_entry_dates`, `list_entries_for_date_range`, `get_emotion_by_date`,
+ * `count_entries_in_journal`) are answered from the entries loaded so far: they never trigger a
+ * download. `list_on_this_day` is answered from the month index (`indexViews.ts`).
  */
 
 import * as Y from 'yjs'
@@ -59,7 +59,6 @@ export const MSG_UNAVAILABLE = 'This entry is not available on the web (locked, 
 
 /** Upper bound of load rounds for one list call (each round loads at most one page of ids). */
 export const MAX_LOAD_ROUNDS = 50
-const ON_THIS_DAY_LIMIT = 200
 
 /** Thrown by `loadVisible` for locked, invisible and deleted entries. */
 export class EntryNotAvailableError extends Error {
@@ -328,28 +327,6 @@ const listEntriesForDateRange: Handler = async ({ journalId, fromTs, toTs }) => 
   return loadedIn(vault, asString(journalId))
     .filter((e) => e.metadata.entry_date >= from && e.metadata.entry_date < to)
     .sort(byDateDesc)
-    .map(toEntry)
-}
-
-/** Desktop buckets by UTC month and day (`strftime(..., 'unixepoch')`) and rejects bad bounds. */
-const listOnThisDay: Handler = async ({ month, day }) => {
-  const m = asNumber(month)
-  const d = asNumber(day)
-  if (m === null || !Number.isInteger(m) || m < 1 || m > 12) {
-    throw new Error(`month must be 1..=12, got ${String(month)}`)
-  }
-  if (d === null || !Number.isInteger(d) || d < 1 || d > 31) {
-    throw new Error(`day must be 1..=31, got ${String(day)}`)
-  }
-  const { vault } = await openForRead()
-  return vault
-    .listLoaded()
-    .filter((e) => {
-      const date = new Date(e.metadata.entry_date * 1000)
-      return date.getUTCMonth() + 1 === m && date.getUTCDate() === d
-    })
-    .sort(byDateDesc)
-    .slice(0, ON_THIS_DAY_LIMIT)
     .map(toEntry)
 }
 
@@ -1442,7 +1419,6 @@ export const entryHandlers: Record<string, Handler> = {
   get_entry_content: getEntryContent,
   list_entry_dates: listEntryDates,
   list_entries_for_date_range: listEntriesForDateRange,
-  list_on_this_day: listOnThisDay,
   get_emotion_by_date: getEmotionByDate,
   count_entries_in_journal: countEntriesInJournal,
   create_entry: createEntry,

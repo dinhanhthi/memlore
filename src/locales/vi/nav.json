@@ -15,6 +15,7 @@
   "about": "Giới thiệu",
   "entries": "Mục nhật ký",
   "dashboard": "Tổng quan",
+  "web_needs_index": "Hãy cập nhật Memlore trên máy tính lên phiên bản 0.3.0 trở lên để bật chế độ xem này",
   "sidebar": {
     "collapse": "Thu gọn thanh bên",
     "expand": "Mở thanh bên",

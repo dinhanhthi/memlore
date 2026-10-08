@@ -17,11 +17,19 @@
  * When it is missing there (another device edited the entry last), every OTHER known device (one
  * with a cached manifest) is tried the same way. Media ids are unique UUIDs, so this is safe.
  *
- * OWNER LOOKUP: the index has no media ids, so the owner is found among the LOADED visible entries
- * (every UI caller already has its entry loaded). Locked, invisible, deleted and excluded-journal
- * entries are stubs without media, so their media is "not found"; the owner is re-checked through
- * `vault.getEntry` before and after every await, and a media id tombstoned in `deleted_media` (desktop
- * `created_at <= deleted_at` rule) is not served either.
+ * OWNER LOOKUP: the entry index has no media ids, so the owner is found among the LOADED visible
+ * entries first. Locked, invisible, deleted and excluded-journal entries are stubs without media, so
+ * their media is "not found"; the owner is re-checked through `vault.getEntry` before and after every
+ * await, and a media id tombstoned in `deleted_media` (desktop `created_at <= deleted_at` rule) is
+ * not served either.
+ * Phase 16.2 fallback, for an entry the vault does NOT hold (never loaded: the gallery and On this
+ * day list media of unloaded entries): the month index rows already read into RAM
+ * (`MonthIndexReader.findMedia`, no download). The row must pass the Phase 15 fail-closed rule
+ * (winner live, same `updated_at`, journal not excluded); the owner device is the entry-index
+ * winner's, then the other-devices fallback below applies. The row is re-checked the same way
+ * before and after every await. An entry the vault holds (visible or refused) never uses the index:
+ * its loaded copy is authoritative (tombstones, locks). Index rows carry no `deleted_media`; the
+ * desktop indexes live, uploaded media only.
  *
  * LIMITS: a full media larger than 200 MB (`SyncMediaItem.file_size`, checked BEFORE any request)
  * is `too_large_for_web`: one AES-GCM envelope must be decrypted whole in RAM. The metadata size is
@@ -40,6 +48,7 @@ import { VaultLockedError, getKeyRing, type KeyRing } from '../keys'
 import type { Handler } from '../router'
 import { notifyCacheWrite } from '../storage/evictor'
 import type { VaultEntry } from '../vault'
+import type { MonthIndexReader } from '../sync/monthIndex'
 import { readEnv, type MediaBackend, type VaultApi } from './readSession'
 
 /** Largest full media the web decrypts (the envelope is opened whole in RAM). */
@@ -177,6 +186,8 @@ interface Owner {
   isOutbox?: boolean
   /** For web media: the web device whose `outbox/` holds it (it may not own the entry). */
   outboxDevice?: string
+  /** Found in a month index row (the entry is not loaded): re-checked through the index. */
+  fromIndex?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -186,7 +197,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 /** Media ids end up in a Drive path: same rule as the puller's entry ids. */
-const isSafeMediaId = (id: string): boolean =>
+export const isSafeMediaId = (id: string): boolean =>
   isSafeComponent(id) && !id.startsWith('.') && id !== '__proto__'
 
 function tombstonedAt(entry: VaultEntry, mediaId: string): number | null {
@@ -220,17 +231,53 @@ function ownerIn(entry: VaultEntry, mediaId: string): Owner | null {
   return null
 }
 
-function findOwner(vault: VaultApi, mediaId: string): Owner | null {
+type IndexLookup = Pick<MonthIndexReader, 'findMedia'> | null
+
+/** A visible index row of an entry the vault does not hold; null otherwise. */
+function indexOwner(vault: VaultApi, index: IndexLookup, mediaId: string): Owner | null {
+  const found = index?.findMedia(mediaId) ?? null
+  if (found === null || found.media.id !== mediaId) return null
+  if (vault.status(found.entryId) !== 'not-loaded') return null
+  return {
+    entryId: found.entryId,
+    deviceId: found.authorDevice,
+    fileType: found.media.file_type,
+    fileSize: found.media.file_size,
+    width: found.media.width,
+    height: found.media.height,
+    fromIndex: true,
+  }
+}
+
+/** The loaded copy still carries the media, not tombstoned: media.ts would serve it. */
+export const hasLiveMedia = (entry: VaultEntry, mediaId: string): boolean =>
+  ownerIn(entry, mediaId) !== null
+
+function findOwner(vault: VaultApi, mediaId: string, index: IndexLookup = null): Owner | null {
   for (const entry of vault.listLoaded()) {
     const owner = ownerIn(entry, mediaId)
     if (owner !== null) return owner
   }
-  return null
+  return indexOwner(vault, index, mediaId)
 }
 
 /** The owning entry must still be visible: it may have been locked or unloaded while we awaited. */
-function assertServable(vault: VaultApi, owner: Owner, mediaId: string): void {
+function assertServable(
+  vault: VaultApi,
+  owner: Owner,
+  mediaId: string,
+  index: IndexLookup = null,
+): void {
   if (!readEnv().isUnlocked()) throw new VaultLockedError()
+  if (owner.fromIndex === true) {
+    // Still a visible row of the same entry, and the vault still does not hold that entry: a copy
+    // loaded meanwhile is authoritative (it may have dropped the media), a refused one hides it.
+    const found = index?.findMedia(mediaId) ?? null
+    if (found?.entryId !== owner.entryId || vault.status(owner.entryId) !== 'not-loaded') {
+      throw new MediaNotFoundError(mediaId)
+    }
+    return
+  }
   try {
     vault.getEntry(owner.entryId)
   } catch {
@@ -285,15 +332,9 @@ async function downloadCiphertext(
   devices.push(...(await otherDevices(backend, owner.deviceId)).filter((d) => !devices.includes(d)))
   let mismatch: Error | null = null // a stale copy on one device must not hide a good one elsewhere
   for (const device of devices) {
-    const candidatePath = owner.isOutbox
-      ? `${device}/outbox/m-${name}`
-      : `${device}/media/${name}`
+    const candidatePath = owner.isOutbox ? `${device}/outbox/m-${name}` : `${device}/media/${name}`
     try {
-      const bytes = await backend.reader.readDeviceFile(
-        generation,
-        candidatePath,
-        maxBytes,
-      )
+      const bytes = await backend.reader.readDeviceFile(generation, candidatePath, maxBytes)
       if (bytes.length > maxBytes) throw oversize()
       return bytes
     } catch (error) {
@@ -389,6 +430,7 @@ function fetchCiphertext(
 interface Opened {
   backend: MediaBackend
   vault: VaultApi
+  index: IndexLookup
 }
 
 async function open(): Promise<Opened> {
@@ -397,15 +439,15 @@ async function open(): Promise<Opened> {
   const session = await env.session()
   await session.ready()
   if (session.media === undefined) throw new Error('media backend is not available')
-  return { backend: session.media, vault: session.vault }
+  return { backend: session.media, vault: session.vault, index: session.monthIndex ?? null }
 }
 
 function mediaIdArg(args: Record<string, unknown>): string {
   return typeof args.mediaId === 'string' ? args.mediaId : ''
 }
 
-function ownerOrThrow(vault: VaultApi, mediaId: string): Owner {
-  const owner = isSafeMediaId(mediaId) ? findOwner(vault, mediaId) : null
+function ownerOrThrow(vault: VaultApi, mediaId: string, index: IndexLookup): Owner {
+  const owner = isSafeMediaId(mediaId) ? findOwner(vault, mediaId, index) : null
   if (owner === null) throw new MediaNotFoundError(mediaId)
   return owner
 }
@@ -445,10 +487,10 @@ async function readPlain(
   wantThumb: boolean,
   plainCap: number = mediaEnv().maxBytes,
 ): Promise<Uint8Array> {
-  const { backend, vault } = await open()
+  const { backend, vault, index } = await open()
   const env = mediaEnv()
   const cap = Math.min(plainCap, env.maxBytes)
-  const owner = isSafeMediaId(mediaId) ? findOwner(vault, mediaId) : null
+  const owner = isSafeMediaId(mediaId) ? findOwner(vault, mediaId, index) : null
   if (owner === null) {
     // Not in the synced metadata: only a pending web upload can still resolve.
     const pending = isSafeMediaId(mediaId)
@@ -457,7 +499,7 @@ async function readPlain(
     if (pending === undefined || pending === null) throw new MediaNotFoundError(mediaId)
     return opener(backend)(pending)
   }
-  assertServable(vault, owner, mediaId) // before any request
+  assertServable(vault, owner, mediaId, index) // before any request
   const verify = opener(backend)
   if (wantThumb) {
     try {
@@ -470,7 +512,7 @@ async function readPlain(
         MAX_THUMB_BYTES + ENVELOPE_OVERHEAD_BYTES,
       )
       if (thumb !== null) {
-        assertServable(vault, owner, mediaId)
+        assertServable(vault, owner, mediaId, index)
         return thumb.plain
       }
     } catch (error) {
@@ -492,7 +534,7 @@ async function readPlain(
       : () => new TooLargeForWebError(),
   )
   if (full === null) throw new MediaNotFoundError(mediaId)
-  assertServable(vault, owner, mediaId)
+  assertServable(vault, owner, mediaId, index)
   if (full.plain.length > cap) throw new TooLargeForWebError()
   return full.plain
 }
@@ -513,9 +555,9 @@ const resolve =
 /** Desktop `MediaStatus`: everything is reported available; no request is made. */
 const getMediaStatus: Handler = async (args) => {
   const mediaId = mediaIdArg(args)
-  const { vault } = await open()
-  const owner = ownerOrThrow(vault, mediaId)
-  assertServable(vault, owner, mediaId)
+  const { vault, index } = await open()
+  const owner = ownerOrThrow(vault, mediaId, index)
+  assertServable(vault, owner, mediaId, index)
   const hasThumb = owner.fileType.startsWith('image/') || owner.fileType.startsWith('video/')
   return {
     mediaId,

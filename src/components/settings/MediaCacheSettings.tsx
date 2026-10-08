@@ -117,7 +117,8 @@ export function MediaCacheSettings() {
       >
         <div className="max-w-180 space-y-5">
           {/* Gallery view mode — only consumed by the media view
-              (activeView === 'media'), which caps.gallery blocks on web. */}
+              (activeView === 'media'), which caps.gallery gates: on web it
+              opens once a synced desktop publishes the month index. */}
           {caps.gallery && (
             <SettingsGroup title={t('media_groups.gallery')}>
               <SettingsRow

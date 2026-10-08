@@ -15,6 +15,7 @@
   "about": "About",
   "entries": "Entries",
   "dashboard": "Home",
+  "web_needs_index": "Update Memlore desktop to 0.3.0 or later to enable this view",
   "sidebar": {
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",

@@ -40,6 +40,7 @@ import { useInvisibleLockStore } from '../../stores/invisibleLockStore'
 import { AiIcon } from '../../components/common/AiIcon'
 import { canLock, lockApp } from '../lock'
 import { capabilities } from '../platform'
+import { currentCapabilities } from '../../hooks/useCapabilities'
 import { triggerNewEntry } from '../newEntry'
 import {
   coerceDesignSystem,
@@ -175,8 +176,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.onthisday',
     icon: History,
     keywords: ['memories', 'past', 'anniversary'],
-    // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
-    available: () => capabilities.lookback,
+    available: () => currentCapabilities().lookback,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'onthisday', selectedEntryId: null }),
   },
@@ -186,8 +186,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.media',
     icon: Image,
     keywords: ['photos', 'gallery', 'images'],
-    // TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index
-    available: () => capabilities.gallery,
+    available: () => currentCapabilities().gallery,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'media', selectedEntryId: null }),
   },
@@ -197,7 +196,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.map',
     icon: MapPin,
     keywords: ['location', 'places', 'geo'],
-    available: () => capabilities.mapView,
+    available: () => currentCapabilities().mapView,
     run: () => useTabStore.getState().updateActiveTab({ activeView: 'map', selectedEntryId: null }),
   },
   {
@@ -1395,8 +1394,8 @@ export const PILL_SETTINGS: readonly PillSetting[] = [
     get: getMediaViewMode,
     set: (v) => void setMediaViewMode(v as MediaViewMode),
     // The media view itself is gated by caps.gallery (Sidebar + tabStore);
-    // on web the toggle would write a mode nothing renders.
-    available: () => capabilities.gallery,
+    // on web without a month index the toggle would write a mode nothing renders.
+    available: () => currentCapabilities().gallery,
   },
   // ── AI ──
   {

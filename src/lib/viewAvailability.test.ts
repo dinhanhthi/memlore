@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ActiveView } from '../stores/uiStore'
 import { capabilities, type Capabilities } from './platform'
-import { isViewAvailable } from './viewAvailability'
+import { isViewAvailable, needsMonthIndex } from './viewAvailability'
 
 const ALL_VIEWS: readonly ActiveView[] = [
   'dashboard',
@@ -62,6 +62,12 @@ describe('isViewAvailable', () => {
     }
   })
 
+  it('web: gallery and lookback open once a desktop publishes the month index', () => {
+    const caps: Capabilities = { ...WEB_CAPS, gallery: true, lookback: true }
+    expect(isViewAvailable('media', caps)).toBe(true)
+    expect(isViewAvailable('onthisday', caps)).toBe(true)
+  })
+
   it('web: chat is available while ai stays false', () => {
     expect(WEB_CAPS.ai).toBe(false)
     expect(isViewAvailable('chat', WEB_CAPS)).toBe(true)
@@ -98,5 +104,13 @@ describe('isViewAvailable', () => {
   it.each([['ai'], ['chat']] as const)('view chat stays unavailable with only caps.%s', (flag) => {
     const caps: Capabilities = { ...NO_CAPS, [flag]: true }
     expect(isViewAvailable('chat', caps)).toBe(false)
+  })
+})
+
+describe('needsMonthIndex', () => {
+  it('names the views a desktop month index unlocks on web', () => {
+    for (const view of ALL_VIEWS) {
+      expect(needsMonthIndex(view)).toBe(view === 'media' || view === 'onthisday')
+    }
   })
 })
