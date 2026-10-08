@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Palette,
   Plus,
+  FileDown,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { MiniDatePicker } from '../common/MiniDatePicker'
@@ -36,6 +37,7 @@ import {
   updateEntryLocation,
   listLocationAliases,
 } from '../../lib/tauri'
+import { downloadEntryMarkdown } from '../../lib/entryMarkdownDownload'
 import { LOCATION_SUBMENU_PANE_CLASS } from '../../lib/entryContextLocationSubmenu'
 import { applyLocationAliasToEntry } from '../../hooks/applyLocationAliasToEntry'
 import { emitEntriesChanged } from '../../hooks/useEntries'
@@ -444,6 +446,11 @@ export function EntryContextMenu({
     onVersionHistory?.()
   }
 
+  function handleExportMarkdown() {
+    onClose()
+    void downloadEntryMarkdown(entryId)
+  }
+
   async function handleMoveToJournal(targetJournalId: string) {
     try {
       await moveEntryToJournal(entryId, targetJournalId)
@@ -617,6 +624,14 @@ export function EntryContextMenu({
                 icon={<History className="size-3.5" />}
                 label={t('entry_context.version_history', { defaultValue: 'Version history' })}
                 onClick={handleVersionHistory}
+                onMouseEnter={closeSubmenu}
+              />
+            )}
+            {caps.entryMarkdownExport && !entryLocked && !entryInvisible && (
+              <MenuItem
+                icon={<FileDown className="size-3.5" />}
+                label={t('entry_context.export_markdown', { defaultValue: 'Export as Markdown' })}
+                onClick={handleExportMarkdown}
                 onMouseEnter={closeSubmenu}
               />
             )}

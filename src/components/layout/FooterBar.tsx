@@ -283,8 +283,7 @@ export function FooterBar() {
           </>
         )}
         {!distractionShellActive && <AIProviderInfoPopover />}
-        {/* TODO(later): see docs/LATER.md - Web: Media Library + Lookback need an index */}
-        {caps.stats && (
+        {caps.streak && (
           <Tooltip content={t('streak.tooltip')} placement="top">
             <div
               data-testid="footer-streak"
