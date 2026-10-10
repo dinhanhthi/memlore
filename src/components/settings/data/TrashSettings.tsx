@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, Lock, RotateCcw, Trash2 } from 'lucide-react'
 import { trashAgeDays, trashDaysLeft, useTrash } from '../../../hooks/useTrash'
-import { formatEntryDateWithYear } from '../../../lib/dates'
+import { getIntlLocale } from '../../../lib/dates'
 import type { LockedView } from '../../../lib/tauri'
 import type { Entry } from '../../../types/entry'
 import { Button } from '../../common/Button'
 import { ConfirmDialog } from '../../common/ConfirmDialog'
 import { EntryPreviewModal } from '../../chat/EntryPreviewModal'
-import { SettingsRow } from '../SettingsRow'
 import { SettingsGroup } from '../SettingsSurfaceCard'
 import { SettingsSection } from '../SettingsSection'
 
@@ -47,28 +46,29 @@ function TrashRow({
     ? t('data_section.trash.locked_entry')
     : entry.title?.trim() || t('data_section.trash.untitled')
   const trashedAt = entry.trashed_at ?? nowSecs
-  const hint = [
-    formatEntryDateWithYear(entry.entry_date, i18n.language),
+  const meta = [
+    new Date(entry.entry_date * 1000).toLocaleDateString(getIntlLocale(i18n.language), {
+      dateStyle: 'medium',
+    }),
     t('data_section.trash.deleted_ago', { count: trashAgeDays(trashedAt, nowSecs) }),
     t('data_section.trash.days_left', { count: trashDaysLeft(trashedAt, nowSecs) }),
   ].join(' · ')
 
   return (
-    <SettingsRow
-      className="px-4"
-      divider={false}
-      title={title}
-      hint={hint}
-      titleBadge={
-        entry.is_locked ? <Lock className="text-fg-muted size-3.5" aria-hidden /> : undefined
-      }
-    >
-      <div className="flex shrink-0 items-center gap-2">
+    <div className="space-y-2 px-4 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-fg truncate text-sm font-medium">{title}</span>
+          {entry.is_locked && <Lock className="text-fg-muted size-3.5 shrink-0" aria-hidden />}
+        </div>
+        <p className="text-fg-muted mt-0.5 text-xs">{meta}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         {/* The preview refuses locked entries, so don't offer it. */}
         {!entry.is_locked && (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="secondary"
+            size="xs"
             icon={<Eye className="size-3.5" aria-hidden />}
             onClick={onPreview}
           >
@@ -77,19 +77,19 @@ function TrashRow({
         )}
         <Button
           variant="secondary"
-          size="sm"
+          size="xs"
           icon={<RotateCcw className="size-3.5" aria-hidden />}
           onClick={onRestore}
         >
           {t('data_section.trash.restore')}
         </Button>
         {canPurge(entry, lockedView) && (
-          <Button variant="destructive" size="sm" onClick={onDeleteForever}>
+          <Button variant="destructive" size="xs" onClick={onDeleteForever}>
             {t('data_section.trash.delete_forever')}
           </Button>
         )}
       </div>
-    </SettingsRow>
+    </div>
   )
 }
 
@@ -127,16 +127,17 @@ export function TrashSettings() {
 
   return (
     <div>
-      <SettingsSection hint={t('data_section.trash.hint')}>
+      <SettingsSection
+        hint={`${t('data_section.trash.hint')} ${t('data_section.trash.older_versions_note')}`}
+      >
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-fg-muted text-xs leading-snug">
-              {t('data_section.trash.older_versions_note')}
-              {hasHeldBack && ` ${t('data_section.trash.empty_trash_locked_note')}`}
+              {hasHeldBack && t('data_section.trash.empty_trash_locked_note')}
             </p>
             <Button
               variant="destructive"
-              size="sm"
+              size="xs"
               className="shrink-0"
               icon={<Trash2 className="size-3.5" aria-hidden />}
               disabled={purgeable.length === 0}
@@ -155,7 +156,8 @@ export function TrashSettings() {
           {entries.length === 0 ? (
             !isLoading && <p className="text-fg-muted text-sm">{t('data_section.trash.empty')}</p>
           ) : (
-            <SettingsGroup>
+            // A long Trash scrolls inside its card instead of pushing the page.
+            <SettingsGroup cardClassName="max-h-120 overflow-y-auto">
               {entries.map((entry) => (
                 <TrashRow
                   key={entry.id}

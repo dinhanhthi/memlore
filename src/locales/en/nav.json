@@ -48,6 +48,8 @@
   "footer": {
     "read_only": "Read only",
     "read_only_tooltip": "Editing on the web is turned off for now. You can read and search your journal; write in the Memlore desktop app.",
+    "trash_tooltip_one": "Recently deleted: {{count}} entry",
+    "trash_tooltip_other": "Recently deleted: {{count}} entries",
     "words": "{{count}} words",
     "chars": "{{count}} chars",
     "saving": "Saving…",

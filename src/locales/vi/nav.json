@@ -48,6 +48,8 @@
   "footer": {
     "read_only": "Chỉ đọc",
     "read_only_tooltip": "Hiện chưa bật chỉnh sửa trên web. Bạn vẫn đọc và tìm kiếm được nhật ký; hãy viết trong ứng dụng Memlore cho máy tính.",
+    "trash_tooltip_one": "Đã xóa gần đây: {{count}} mục",
+    "trash_tooltip_other": "Đã xóa gần đây: {{count}} mục",
     "words": "{{count}} từ",
     "chars": "{{count}} ký tự",
     "saving": "Đang lưu…",

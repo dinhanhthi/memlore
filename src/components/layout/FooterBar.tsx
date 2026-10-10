@@ -35,6 +35,7 @@ import { SyncStatus } from '../common/SyncStatus'
 import { InlineOrb } from '../common/ThinkingOrb'
 import { Tooltip } from '../common/Tooltip'
 import { IconButton } from '../common/primitives'
+import { FooterTrashButton } from './FooterTrashButton'
 
 // Streak tone tiers: < 5 days = neutral (cold), 5–20 = warming up (amber),
 // > 20 = on fire (violet). Light mode needs higher opacity because the footer
@@ -295,6 +296,7 @@ export function FooterBar() {
             </span>
           </>
         )}
+        {!distractionShellActive && caps.trash && <FooterTrashButton />}
         {!distractionShellActive && <AIProviderInfoPopover />}
         {caps.streak && (
           <Tooltip content={t('streak.tooltip')} placement="top">
