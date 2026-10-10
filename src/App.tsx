@@ -12,6 +12,7 @@ import { TwoPanelLayout } from './components/layout/TwoPanelLayout'
 import { TitleBar } from './components/layout/TitleBar'
 import { FooterBar } from './components/layout/FooterBar'
 import { WindowDragRegion } from './components/layout/WindowDragRegion'
+import { BootLoading } from './components/common/BootLoading'
 import { QuitConfirmDialog } from './components/layout/QuitConfirmDialog'
 import { SearchOverlay } from './components/search/SearchOverlay'
 import { UpdateAvailableModal } from './components/common/UpdateAvailableModal'
@@ -328,7 +329,12 @@ function App() {
   // Returning `null` here makes the Tauri window both blank and non-draggable
   // if backend startup is slow or blocked before auth reconciliation finishes.
   if (!hasReconciled) {
-    return withQuitConfirm(<WindowDragRegion />)
+    return withQuitConfirm(
+      <>
+        <WindowDragRegion />
+        <BootLoading />
+      </>,
+    )
   }
 
   // Boot sidecar invalid/unreadable — vault on disk is intact. Must render

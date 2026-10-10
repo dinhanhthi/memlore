@@ -19,7 +19,16 @@ import {
   violations,
 } from '../drive/fakeDrive'
 import { OAuthConnectError, ReauthRequiredError, SIGN_IN_CANCELLED_MESSAGE } from '../drive/oauth'
-import { configureKeysEnv, dispose, getAutoLockMinutes, isUnlocked } from '../keys'
+import {
+  configureKeysEnv,
+  dispose,
+  getAutoLockMinutes,
+  getLockDeadline,
+  isUnlocked,
+  lock,
+  touch,
+  type KeysEnv,
+} from '../keys'
 import { route } from '../router'
 import {
   WEB_SETTING_PREFIX,
@@ -43,6 +52,7 @@ import {
   PENDING_SESSION_TTL_MS,
   MSG_INVALID_PASSWORD,
   MSG_NO_VAULT,
+  SESSION_KEY,
   configureAuthEnv,
   resetAuthState,
 } from './auth'
@@ -63,6 +73,20 @@ interface FakeRing {
   lock: ReturnType<typeof vi.fn<() => void>>
   loadContentList: ReturnType<typeof vi.fn<(text: string) => void>>
   loadMasterOnly: ReturnType<typeof vi.fn<() => void>>
+  wrapLocal: (secret: string) => string
+}
+
+/** The fingerprint the fake rings' master matches. */
+let masterFingerprint: string
+/** This tab's sessionStorage. */
+let store: Map<string, string>
+let storageBlocked: boolean
+/** `PerformanceNavigationTiming.type` of the current page load. */
+let navType: string | null
+const sessionStore = {
+  getItem: (k: string) => store.get(k) ?? null,
+  setItem: (k: string, v: string) => void store.set(k, v),
+  removeItem: (k: string) => void store.delete(k),
 }
 
 let db: WebDb
@@ -81,18 +105,25 @@ const fakeCore = {
     JSON.stringify({ keyring_version: 2, sync_control_version: 1, content_list_version: 2 }),
   parseKeyringMeta: (text: string) => text,
   KeyRing: {
-    unlockLocal: (_wrapped: string, password: string) => {
-      if (password !== GOOD) throw new Error('bad tag')
+    unlockLocal: (wrapped: string, password: string) => {
+      const ok = wrapped.startsWith('session:')
+        ? wrapped === `session:${password}`
+        : password === GOOD
+      if (!ok) throw new Error('bad tag')
       const ring: FakeRing = {
         lock: vi.fn(),
         loadContentList: vi.fn((text: string) => {
           if (text === rejectedContent) throw new Error('content key fingerprint mismatch')
         }),
         loadMasterOnly: vi.fn(),
+        wrapLocal: (secret: string) => `session:${secret}`,
       }
       rings.push(ring)
       return ring
     },
+  },
+  verifyMasterFingerprint: (_ring: FakeRing, expected: string) => {
+    if (expected !== masterFingerprint) throw new Error('master fingerprint mismatch')
   },
 } as unknown as Core
 
@@ -108,19 +139,17 @@ beforeEach(async () => {
   clock = 1_000_000
   rings = []
   rejectedContent = null
+  masterFingerprint = RECORD.masterFingerprint
+  store = new Map()
+  storageBlocked = false
+  navType = 'reload'
   tokenFails = false
   connect = async () => undefined
   logout = vi.fn(async () => undefined)
   drive = new FakeDrive()
   seedVault(drive)
   db = await openWebDb({ factory: new IDBFactory() })
-  configureKeysEnv({
-    setTimeout: () => 0,
-    clearTimeout: () => {},
-    emit: (event) => events.push(event),
-    document: null,
-    window: null,
-  })
+  configureKeysEnv(keysEnv())
   let uuid = 0
   configureAuthEnv({
     now: () => clock,
@@ -144,8 +173,21 @@ beforeEach(async () => {
       locks: fakeLocks(drive),
     }),
     origin: () => 'https://web.test',
+    storage: () => (storageBlocked ? null : sessionStore),
+    navigationType: () => navType,
   })
 })
+
+function keysEnv(): Partial<KeysEnv> {
+  return {
+    now: () => clock,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    emit: (event) => events.push(event),
+    document: null,
+    window: null,
+  }
+}
 
 afterEach(() => {
   dispose()
@@ -492,6 +534,222 @@ describe('unlock: password and backoff', () => {
     }
     tokenFails = false
     await unlock(GOOD)
+  })
+})
+
+describe('reload session', () => {
+  beforeEach(async () => {
+    await db.device.put(RECORD)
+    putContent()
+  })
+
+  /** A page reload: the key holder and the auth module start empty, sessionStorage and IDB stay. */
+  function reload(): void {
+    dispose()
+    resetAuthState()
+    configureKeysEnv(keysEnv())
+    events = []
+  }
+
+  it('a reload of this tab stays unlocked without the password', async () => {
+    await unlock()
+    expect(store.has(SESSION_KEY)).toBe(true)
+    expect(store.get(SESSION_KEY)).not.toContain(GOOD)
+    reload()
+    expect(isUnlocked()).toBe(false)
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect(isUnlocked()).toBe(true)
+    expect(rings).toHaveLength(2)
+    expect(rings[1].loadContentList).toHaveBeenCalledWith(CONTENT_TEXT)
+    expect(events).toEqual(['app:unlocked'])
+    // ...and again after a second reload.
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+  })
+
+  it('restores the content list from the cache, without waiting on the Drive', async () => {
+    await unlock()
+    const cachedText = JSON.stringify({ version: 2, latest_epoch: 0, entries: [], created_at: 7 })
+    await putCache(cachedText)
+    reload()
+    const before = drive.requests.length
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect(drive.requests.length).toBe(before)
+    expect(rings[1].loadContentList).toHaveBeenCalledTimes(1)
+    expect(rings[1].loadContentList).toHaveBeenCalledWith(cachedText)
+  })
+
+  it('reads the Drive when the cached list is missing or unusable', async () => {
+    await unlock()
+    await db.files.delete(CONTENT)
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect(rings[1].loadContentList).toHaveBeenCalledWith(CONTENT_TEXT)
+
+    const bad = JSON.stringify({ version: 2, latest_epoch: 9, entries: [], created_at: 2 })
+    rejectedContent = bad
+    await putCache(bad)
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect(rings[2].loadContentList).toHaveBeenLastCalledWith(CONTENT_TEXT)
+  })
+
+  it('parallel checks restore once', async () => {
+    await unlock()
+    reload()
+    const results = await Promise.all([
+      call('is_encryption_initialized'),
+      call('is_encryption_initialized'),
+    ])
+    expect(results).toEqual([true, true])
+    expect(rings).toHaveLength(2)
+  })
+
+  it('every lock clears it, so the reload shows the lock screen', async () => {
+    for (const reason of ['manual', 'idle', 'hidden', 'revoked', 'format'] as const) {
+      await unlock()
+      expect(store.has(SESSION_KEY)).toBe(true)
+      if (reason === 'manual') await call('lock_encryption')
+      else lock(reason)
+      expect(store.has(SESSION_KEY)).toBe(false)
+      reload()
+      await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    }
+  })
+
+  it('expires at the idle auto-lock deadline', async () => {
+    await unlock()
+    clock += 15 * 60_000
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    expect(isUnlocked()).toBe(false)
+    expect(store.has(SESSION_KEY)).toBe(false)
+  })
+
+  it('only a reload restores: any other navigation type drops the session', async () => {
+    for (const type of ['navigate', 'back_forward', 'prerender', null]) {
+      await unlock()
+      reload()
+      navType = type
+      await expect(call('is_encryption_initialized')).resolves.toBe(false)
+      expect(store.has(SESSION_KEY)).toBe(false)
+      navType = 'reload'
+    }
+  })
+
+  it('a reload is not activity: the restored vault keeps the stored deadline', async () => {
+    await unlock()
+    const deadline = clock + 15 * 60_000
+    clock += 14 * 60_000
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect((JSON.parse(store.get(SESSION_KEY) ?? '') as { expiresAt: number }).expiresAt).toBe(
+      deadline,
+    )
+    clock += 60_000
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+  })
+
+  it('the hide that a reload unload fires does not shorten the restored idle window', async () => {
+    const listeners = new Set<() => void>()
+    const doc = {
+      visibilityState: 'visible',
+      addEventListener: (_t: string, l: () => void) => void listeners.add(l),
+      removeEventListener: (_t: string, l: () => void) => void listeners.delete(l),
+    }
+    configureKeysEnv({ ...keysEnv(), document: doc })
+    await unlock()
+    const idleDeadline = clock + 15 * 60_000
+    clock += 60_000
+    doc.visibilityState = 'hidden' // the unload of the reload
+    for (const l of [...listeners]) l()
+    reload()
+    configureKeysEnv({ ...keysEnv(), document: { ...doc, visibilityState: 'visible' } })
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+    expect(getLockDeadline()).toBe(idleDeadline)
+  })
+
+  it('a lock while the restore is finishing leaves it locked and clears the session', async () => {
+    await unlock()
+    reload()
+    configureWebSettingsEnv({
+      openDb: async () => {
+        lock('manual')
+        return db
+      },
+    })
+    try {
+      await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    } finally {
+      configureWebSettingsEnv({})
+    }
+    expect(isUnlocked()).toBe(false)
+    expect(store.has(SESSION_KEY)).toBe(false)
+    expect(events).not.toContain('app:unlocked')
+  })
+
+  it('activity pushes the deadline forward', async () => {
+    await unlock()
+    clock += 10 * 60_000
+    touch()
+    clock += 10 * 60_000
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(true)
+  })
+
+  it('is dropped when the device record no longer matches it', async () => {
+    await unlock()
+    masterFingerprint = 'aa'.repeat(32)
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    expect(rings[1].lock).toHaveBeenCalled()
+    expect(store.has(SESSION_KEY)).toBe(false)
+
+    masterFingerprint = RECORD.masterFingerprint
+    await unlock()
+    await db.device.put({ ...RECORD, deviceId: 'bbbbbbbb-1111-4222-8333-bbbbbbbbbbbb' })
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    expect(store.has(SESSION_KEY)).toBe(false)
+  })
+
+  it('a tampered session is dropped and never throws', async () => {
+    await unlock()
+    reload()
+    store.set(SESSION_KEY, '{not json')
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    expect(store.has(SESSION_KEY)).toBe(false)
+
+    await unlock()
+    const session = JSON.parse(store.get(SESSION_KEY) ?? '') as { secretHex: string }
+    store.set(SESSION_KEY, JSON.stringify({ ...session, secretHex: '00' }))
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    expect(store.has(SESSION_KEY)).toBe(false)
+  })
+
+  it('a failed restore is not a wrong-password attempt', async () => {
+    await unlock()
+    const session = JSON.parse(store.get(SESSION_KEY) ?? '') as { secretHex: string }
+    store.set(SESSION_KEY, JSON.stringify({ ...session, secretHex: '00' }))
+    // Drop the ring only: the backoff counters stay, so a counted restore would show below.
+    dispose()
+    configureKeysEnv(keysEnv())
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
+    for (let i = 0; i < FREE_TRIES; i += 1) {
+      expect(await message(unlock('wrong'))).toBe(MSG_INVALID_PASSWORD)
+    }
+    expect(await message(unlock('wrong'))).toBe(MSG_INVALID_PASSWORD)
+    expect(await message(unlock('wrong'))).toMatch(/Too many attempts/)
+  })
+
+  it('works without sessionStorage: the reload is locked', async () => {
+    storageBlocked = true
+    await unlock()
+    expect(isUnlocked()).toBe(true)
+    reload()
+    await expect(call('is_encryption_initialized')).resolves.toBe(false)
   })
 })
 

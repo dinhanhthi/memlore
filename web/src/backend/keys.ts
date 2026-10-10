@@ -56,11 +56,14 @@ const resolveEnv = (): KeysEnv => ({ ...defaultEnv(), ...injected })
 let ring: KeyRing | null = null
 let idleMinutes = DEFAULT_IDLE_MINUTES
 const hooks = new Set<() => void>()
+const deadlineHooks = new Set<(deadline: number) => void>()
 
 let idleTimer: unknown = null
 let hiddenTimer: unknown = null
 let hiddenAt: number | null = null
 let lastActivity = 0
+let idleDeadline = 0
+let lockDeadline = 0
 let watching: { e: KeysEnv; remove: () => void } | null = null
 
 /** Test seam: override injected pieces. Pass `{}` to restore the defaults. */
@@ -92,6 +95,17 @@ export function onLock(cb: () => void): () => void {
   }
 }
 
+/**
+ * Called with the new lock deadline (`getLockDeadline`) each time it changes: the idle timer
+ * restarts, or the tab is hidden.
+ */
+export function onLockDeadline(cb: (deadline: number) => void): () => void {
+  deadlineHooks.add(cb)
+  return () => {
+    deadlineHooks.delete(cb)
+  }
+}
+
 export const isUnlocked = (): boolean => ring !== null
 
 export function getKeyRing(): KeyRing {
@@ -99,17 +113,48 @@ export function getKeyRing(): KeyRing {
   return ring
 }
 
-function resetIdle(): void {
+/** Restarts the idle timer from now, or for what is left until `until` when that is sooner. */
+function resetIdle(until?: number): void {
   if (!watching) return
   const { e } = watching
   if (idleTimer !== null) e.clearTimeout(idleTimer)
-  lastActivity = e.now()
-  idleTimer = e.setTimeout(() => lock('idle'), idleMinutes * 60 * 1000)
+  const now = e.now()
+  const ms = idleMinutes * 60 * 1000
+  idleDeadline = until === undefined ? now + ms : Math.min(until, now + ms)
+  lastActivity = idleDeadline - ms
+  idleTimer = e.setTimeout(() => lock('idle'), Math.max(0, idleDeadline - now))
+  emitDeadline()
+}
+
+function emitDeadline(): void {
+  lockDeadline =
+    hiddenAt === null ? idleDeadline : Math.min(idleDeadline, hiddenAt + HIDDEN_LIMIT_MS)
+  for (const cb of [...deadlineHooks]) {
+    try {
+      cb(lockDeadline)
+    } catch (err) {
+      console.error('[keys] idle deadline hook threw', err)
+    }
+  }
 }
 
 /** Reset the idle timer (user activity). */
 export function touch(): void {
   resetIdle()
+}
+
+/**
+ * The earliest time (Unix ms) the vault locks by itself: idle, or the hidden-tab limit. 0 when no
+ * ring is watched: an already-passed deadline, never "no limit".
+ */
+export const getLockDeadline = (): number => lockDeadline
+
+/** The idle part of `getLockDeadline` alone (the hidden-tab limit left out). */
+export const getIdleDeadline = (): number => idleDeadline
+
+/** Brings the idle deadline forward to `until` (never later): a restored reload is not activity. */
+export function limitIdleDeadline(until: number): void {
+  resetIdle(until)
 }
 
 function stopWatchers(): void {
@@ -121,6 +166,8 @@ function stopWatchers(): void {
   idleTimer = null
   hiddenTimer = null
   hiddenAt = null
+  idleDeadline = 0
+  lockDeadline = 0
   remove()
 }
 
@@ -135,6 +182,7 @@ function startWatchers(): void {
       if (hiddenAt !== null) return
       hiddenAt = e.now()
       hiddenTimer = e.setTimeout(() => lock('hidden'), HIDDEN_LIMIT_MS)
+      emitDeadline()
       return
     }
     if (hiddenTimer !== null) e.clearTimeout(hiddenTimer)
@@ -206,6 +254,7 @@ export function dispose(): void {
   if (ring) safeLockRing(ring)
   ring = null
   hooks.clear()
+  deadlineHooks.clear()
   idleMinutes = DEFAULT_IDLE_MINUTES
   injected = {}
 }

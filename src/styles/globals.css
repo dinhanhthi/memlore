@@ -3138,6 +3138,20 @@ body {
   }
 }
 
+/* Boot loading fades in (BootLoading mounts it only after a delay; reduced motion: no fade). */
+@keyframes boot-loading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.boot-loading {
+  animation: boot-loading-in 200ms var(--motion-ease-out-expo) both;
+}
+
 /* Clay press physics honour reduced motion (kit §11): OS preference and
    the JS-driven `.reduce-motion` mirror (see useReducedMotion). Transitions
    are already killed by the global rules; only the transform jump remains. */

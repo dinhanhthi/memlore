@@ -8,8 +8,11 @@ import {
   dispose,
   getAutoLockMinutes,
   getKeyRing,
+  getLockDeadline,
   isUnlocked,
+  limitIdleDeadline,
   lock,
+  onLockDeadline,
   onLock,
   setAutoLockMinutes,
   setKeyRing,
@@ -170,6 +173,48 @@ describe('keys', () => {
       expect(isUnlocked()).toBe(false)
       expect(ring.lock).toHaveBeenCalledTimes(1)
       expect(emit).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports each new idle deadline until unsubscribed', () => {
+      const deadlines: number[] = []
+      const off = onLockDeadline((d) => deadlines.push(d))
+      setKeyRing(fakeRing().asRing)
+      expect(deadlines).toEqual([clock + 15 * MIN])
+      advance(2 * MIN)
+      win.fire('keydown')
+      setAutoLockMinutes(5)
+      expect(deadlines.slice(1)).toEqual([clock + 15 * MIN, clock + 5 * MIN])
+      off()
+      touch()
+      expect(deadlines).toHaveLength(3)
+    })
+
+    it('limitIdleDeadline only brings the deadline forward, and the timer fires then', () => {
+      setKeyRing(fakeRing().asRing)
+      limitIdleDeadline(clock + 99 * MIN)
+      expect(getLockDeadline()).toBe(clock + 15 * MIN)
+      limitIdleDeadline(clock + 2 * MIN)
+      expect(getLockDeadline()).toBe(clock + 2 * MIN)
+      advance(2 * MIN)
+      expect(isUnlocked()).toBe(false)
+    })
+
+    it('the lock deadline stays the hidden one while hidden, even when the idle timer restarts', () => {
+      setKeyRing(fakeRing().asRing)
+      hide()
+      setAutoLockMinutes(30)
+      expect(getLockDeadline()).toBe(clock + 5 * MIN)
+    })
+
+    it('a hidden tab reports the earlier hidden deadline; showing it restores the idle one', () => {
+      const deadlines: number[] = []
+      onLockDeadline((d) => deadlines.push(d))
+      setKeyRing(fakeRing().asRing)
+      hide()
+      expect(deadlines.at(-1)).toBe(clock + 5 * MIN)
+      advance(1 * MIN)
+      show()
+      expect(deadlines.at(-1)).toBe(clock + 15 * MIN)
     })
 
     it('ignores activity bursts inside the throttle window', () => {

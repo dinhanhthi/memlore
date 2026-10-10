@@ -172,14 +172,24 @@ export function useAuth() {
 
   // When the window closes (user closes app, reloads, or the process
   // receives a tab-close), do a best-effort final zeroize of the in-memory key.
+  // On the web only a page kept in the back/forward cache is locked (its live
+  // key would come back on Back): a lock on every unload would clear the
+  // session that keeps a reloaded tab unlocked, and a closed tab's heap dies.
   useEffect(() => {
-    const handler = () => {
+    const lockQuietly = () => {
       tauri.lockEncryption().catch(() => {
         /* nothing useful we can do here — process is shutting down */
       })
     }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
+    if (isWeb) {
+      const onPageHide = (event: PageTransitionEvent) => {
+        if (event.persisted) lockQuietly()
+      }
+      window.addEventListener('pagehide', onPageHide)
+      return () => window.removeEventListener('pagehide', onPageHide)
+    }
+    window.addEventListener('beforeunload', lockQuietly)
+    return () => window.removeEventListener('beforeunload', lockQuietly)
   }, [])
 
   // Change password. The backend keeps the entry key but re-wraps it with the

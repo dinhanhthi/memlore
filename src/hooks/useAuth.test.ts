@@ -546,6 +546,34 @@ describe('useAuth (password-only model)', () => {
     expect(unlistenSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('beforeunload locks on desktop but not on the web (a refreshed tab stays unlocked)', async () => {
+    vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
+    vi.mocked(tauri.lockEncryption).mockResolvedValue(undefined)
+
+    for (const isWeb of [false, true]) {
+      platform.isWeb = isWeb
+      vi.mocked(tauri.lockEncryption).mockClear()
+      const { result, unmount } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.encryptionMode).toBe('password'))
+      window.dispatchEvent(new Event('beforeunload'))
+      expect(tauri.lockEncryption).toHaveBeenCalledTimes(isWeb ? 0 : 1)
+      unmount()
+    }
+  })
+
+  it('web: locks a page going into the back/forward cache, not a reload', async () => {
+    platform.isWeb = true
+    vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
+    vi.mocked(tauri.lockEncryption).mockResolvedValue(undefined)
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.encryptionMode).toBe('password'))
+    vi.mocked(tauri.lockEncryption).mockClear()
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }))
+    expect(tauri.lockEncryption).not.toHaveBeenCalled()
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    expect(tauri.lockEncryption).toHaveBeenCalledTimes(1)
+  })
+
   it('desktop: does not subscribe to app:locked', async () => {
     vi.mocked(tauri.getEncryptionMode).mockResolvedValue('password')
 

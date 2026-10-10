@@ -26,6 +26,16 @@ let drive: FakeDrive
 let db: WebDb
 let events: string[]
 let offline: boolean
+/** This tab's sessionStorage (survives a simulated reload). */
+let store: Map<string, string>
+
+const keysEnv = {
+  setTimeout: () => 0,
+  clearTimeout: () => {},
+  emit: (event: string) => void events.push(event),
+  document: null,
+  window: null,
+}
 
 const entryPath = (id: string): string =>
   `generations/g-${fixture.generation}/${fixture.device_id}/entries/${id}.bin`
@@ -53,8 +63,10 @@ async function onboardThenLock(): Promise<void> {
     unlockMethod: 'password',
   })
   expect(isUnlocked()).toBe(true)
+  expect(store.size).toBe(1)
   await route('lock_encryption')
   expect(isUnlocked()).toBe(false)
+  expect(store.size).toBe(0)
 }
 
 beforeAll(async () => {
@@ -69,14 +81,15 @@ beforeEach(async () => {
   drive = new FakeDrive()
   seedFromFixture(drive, fixture)
   db = await openWebDb({ factory: new IDBFactory() })
-  configureKeysEnv({
-    setTimeout: () => 0,
-    clearTimeout: () => {},
-    emit: (event) => events.push(event),
-    document: null,
-    window: null,
-  })
+  store = new Map()
+  configureKeysEnv(keysEnv)
   configureAuthEnv({
+    storage: () => ({
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => void store.set(k, v),
+      removeItem: (k) => void store.delete(k),
+    }),
+    navigationType: () => 'reload',
     sleep: async () => {},
     emit: (event) => events.push(event),
     openDb: async () => db,
@@ -139,6 +152,19 @@ describe('onboard, reload, unlock (real WASM, desktop fixture)', () => {
       /please retry/,
     )
     expect(isUnlocked()).toBe(false)
+  })
+
+  it('a reload after unlock restores the real ring from the session, without the password', async () => {
+    await onboardThenLock()
+    await route('initialize_encryption', { password: PASSWORD })
+    expect(store.size).toBe(1)
+    // Reload: RAM state is gone, sessionStorage and IndexedDB stay.
+    dispose()
+    resetAuthState()
+    configureKeysEnv(keysEnv)
+    offline = true
+    await expect(route('is_encryption_initialized')).resolves.toBe(true)
+    expectOpensFixtureEntries()
   })
 
   it('rejects a wrong password and leaves the vault locked', async () => {

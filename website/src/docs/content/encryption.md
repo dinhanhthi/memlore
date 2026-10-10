@@ -1,7 +1,7 @@
 ---
 title: Encryption
 description: How your password seals a random key that locks the journal database on this computer.
-updated: 2026-09-25
+updated: 2026-10-10
 sources: website/src/legal/privacy.md, website/tokens.css, src-tauri/src/utils/encryption.rs, src-tauri/src/utils/boot_file.rs, src-tauri/src/utils/recovery.rs, src-tauri/src/commands/crypto.rs, src-tauri/src/db/mod.rs, src-tauri/src/db/schema.rs, src-tauri/src/db/queries.rs, src-tauri/src/lib.rs, src-tauri/src/commands/media.rs, src-tauri/src/sync/media_sync.rs, src-tauri/src/sync/local_keyring_v2.rs, src-tauri/src/sync/keyring_v2/types.rs, src-tauri/src/sync/rotation/publish.rs, src-tauri/src/utils/second_lock.rs, src-tauri/src/utils/invisible_lock.rs
 ---
 
@@ -31,7 +31,7 @@ A random master key locks the journal on this computer; your password opens the 
 
 ## On the web
 
-In the [Web companion](/docs/web), encryption keys exist strictly inside WebAssembly linear memory and are wiped as soon as you lock the vault or close the tab. The browser's IndexedDB stores only AES-256-GCM encrypted ciphertexts; unencrypted text is never written to disk or browser storage.
+In the [Web companion](/docs/web), encryption keys live inside WebAssembly linear memory and are wiped as soon as you lock the vault or close the tab. So that a page refresh stays unlocked, the open tab also keeps a sealed copy of the master key, with the one-time key that opens it, in its session storage. The app uses it only to reload that tab, until you lock or the auto-lock time passes; the browser may keep it on disk after the tab closes, and anyone who copies it there could open the journal. The browser's IndexedDB stores only AES-256-GCM encrypted ciphertexts; unencrypted text is never written to disk or browser storage.
 
 ## If you lose access
 

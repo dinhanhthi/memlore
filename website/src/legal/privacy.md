@@ -1,7 +1,7 @@
 ---
 title: Memlore — Privacy Policy
 description: How Memlore treats your journal: it stays on your device, with no Memlore server, no telemetry, and optional cloud and AI that you control.
-updated: 8 October 2026
+updated: 10 October 2026
 ---
 
 # Privacy Policy
@@ -77,7 +77,7 @@ The app may request GitHub release metadata so it can tell you when an update is
 
 Memlore Web is an optional browser companion that lets you read your existing Memlore journal from a web browser and, once editing is turned on, make edits that your desktop app imports.
 
-- **What is stored locally in the browser:** Memlore Web stores only an encrypted cache in your browser's IndexedDB. The master encryption keys are kept strictly in WebAssembly memory and are wiped as soon as you lock the vault or close the tab. Your journal entries are stored on disk only as AES-256-GCM encrypted ciphertexts; unencrypted text is never stored in browser storage.
+- **What is stored locally in the browser:** Memlore Web stores only an encrypted cache in your browser's IndexedDB. The master encryption keys are kept in WebAssembly memory and are wiped as soon as you lock the vault or close the tab. So that refreshing the page does not ask for your password again, the open tab also keeps a sealed copy of the master key, together with the one-time key that opens it, in that tab's session storage. The app uses it only to reload that tab, until you lock or the auto-lock time passes; locking deletes it. The browser may keep a tab's session storage on disk after the tab closes (for tab restore), and the time limit is enforced by the app, not by the encryption, so anyone who copies the browser profile before you lock could open the journal. Lock the vault before you leave a shared computer. Your journal entries are stored on disk only as AES-256-GCM encrypted ciphertexts; unencrypted text is never stored in browser storage.
 - **The Cloudflare Worker:** An ephemeral Cloudflare Worker at `web.memlore.app/api/*` handles the OAuth 2.0 PKCE token exchange with Google so client secrets stay protected. The Worker never sees, parses, or logs your master recovery phrase, encryption keys, or journal content, and maintains no persistent database or access logs of tokens.
 - **Hosting infrastructure:** Memlore Web is hosted on Cloudflare Pages. Like any web server, Cloudflare processes standard HTTP request headers and IP addresses strictly for DDoS mitigation and content delivery.
 - **Google Drive scope:** Memlore Web connects exclusively to Google Drive's limited `drive.appdata` scope (hidden application data). It cannot view, read, or modify any of your personal Google Drive documents, photos, or spreadsheets.

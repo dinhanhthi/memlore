@@ -1,7 +1,7 @@
 ---
 title: Web companion
 description: How Memlore Web works, how to sign in with your recovery phrase, and what is supported.
-updated: 2026-10-08
+updated: 2026-10-10
 sources: website/src/legal/privacy.md
 ---
 
@@ -51,5 +51,6 @@ Your desktop vault is always the primary authority. To guarantee that a browser 
 ## Caching and privacy on shared computers
 
 - **Encrypted local storage:** Memlore Web caches downloaded entry files in your browser's IndexedDB strictly as **AES-256-GCM ciphertexts**. Unencrypted text is never stored on disk.
-- **In-memory keys:** Encryption keys live strictly in volatile WebAssembly memory. When you click **Lock** or close the browser tab, all decryption keys are erased from RAM immediately.
+- **In-memory keys:** Encryption keys live in volatile WebAssembly memory. When you click **Lock** or close the browser tab, the keys in memory are erased immediately.
+- **Refresh without retyping:** So that reloading the page does not ask for your password again, the open tab keeps a sealed copy of the master key in its session storage, with the one-time key that opens it. The app uses it only when you reload that same tab; a new tab asks for your password. It is deleted when you click **Lock** or the tab auto-locks, and the app stops using it at the auto-lock time (sooner while the tab is in the background); a reload does not count as activity (the key press of a keyboard reload does). Closing the tab does not delete it right away: the browser may keep the tab's session storage on disk for tab restore. These time limits are checks in the app, not in the encryption: anyone who copies this browser profile could open your journal with the stored copy, so click **Lock** before you leave a shared computer.
 - **Leaving a shared device:** **Clear cache** in Memlore Web settings removes cached photos and videos only. To remove everything Memlore Web stored in that browser (cached entries, unsent edits and the password-wrapped key), clear the site data for web.memlore.app in the browser's settings before leaving.
