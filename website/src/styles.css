@@ -2767,6 +2767,14 @@ tbody th {
 .legal-article figure {
   padding-inline: var(--cell-inline);
 }
+/* `✅` in docs markdown: a green Lucide check sized to the text. */
+.docs-check {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  color: var(--color-success);
+}
 .legal-article h1 {
   font-family: var(--font-title);
   font-size: clamp(2.25rem, 4.2vw, 3.25rem);

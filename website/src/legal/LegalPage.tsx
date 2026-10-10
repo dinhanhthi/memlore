@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useEffect } from 'react'
 import { preloadHeadSprites } from '../HeadFollowLogo'
 import { LedgerGap, LedgerRule, SectionIndex } from '../Ledger'
@@ -11,6 +12,11 @@ export function Inline({ text }: { text: string }) {
   return parseInline(text).map((part, index) => {
     if (part.type === 'text') return <span key={index}>{part.text}</span>
     if (part.type === 'strong') return <strong key={index}>{part.text}</strong>
+    if (part.type === 'check') {
+      return (
+        <Check key={index} className="docs-check" strokeWidth={2.5} role="img" aria-label="Yes" />
+      )
+    }
     const external = isExternalHref(part.href)
     return (
       <a

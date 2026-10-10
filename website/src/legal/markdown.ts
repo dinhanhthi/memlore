@@ -287,8 +287,28 @@ export type LegalInline =
   | { type: 'text'; text: string }
   | { type: 'strong'; text: string }
   | { type: 'a'; text: string; href: string }
+  | { type: 'check' }
+
+/** `✅` in the markdown renders as a green Lucide check (`.docs-check`), not the emoji. */
+const CHECK_EMOJI = '✅'
+
+function splitChecks(parts: LegalInline[]): LegalInline[] {
+  return parts.flatMap((part) => {
+    if (part.type !== 'text' || !part.text.includes(CHECK_EMOJI)) return [part]
+    return part.text
+      .split(CHECK_EMOJI)
+      .flatMap((piece, index): LegalInline[] => [
+        ...(index > 0 ? [{ type: 'check' as const }] : []),
+        ...(piece ? [{ type: 'text' as const, text: piece }] : []),
+      ])
+  })
+}
 
 export function parseInline(text: string): LegalInline[] {
+  return splitChecks(parseInlineMarks(text))
+}
+
+function parseInlineMarks(text: string): LegalInline[] {
   const parts: LegalInline[] = []
   let rest = text
   while (rest) {
@@ -323,11 +343,16 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+// Lucide `Check`, drawn the same as the React render (LegalPage `Inline`).
+const CHECK_SVG =
+  '<svg class="docs-check" role="img" aria-label="Yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+
 function renderInline(text: string): string {
   return parseInline(text)
     .map((part) => {
       if (part.type === 'text') return escapeHtml(part.text)
       if (part.type === 'strong') return `<strong>${escapeHtml(part.text)}</strong>`
+      if (part.type === 'check') return CHECK_SVG
       const external = isExternalHref(part.href) ? ' target="_blank" rel="noreferrer"' : ''
       return `<a href="${escapeHtml(part.href)}"${external}>${escapeHtml(part.text)}</a>`
     })
