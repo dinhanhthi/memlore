@@ -1,45 +1,45 @@
-export const webSyncDiagram = `<svg class="docs-diagram-wide docs-diagram-full" role="img" viewBox="15 15 690 486" xmlns="http://www.w3.org/2000/svg">
+export const webSyncDiagram = `<svg class="docs-diagram-wide docs-diagram-full" role="img" viewBox="15 15 946 486" xmlns="http://www.w3.org/2000/svg">
   <title>How a web edit reaches your desktop</title>
   <desc>You edit an entry on the web. The browser saves a sealed draft and uploads it to the web outbox, a folder in your Google Drive app data that holds one file per entry. When the desktop app syncs, it reads the outbox, merges the edit into your journal, and writes a receipt for each edit. On its next sync it uploads the merged entry. When the web refreshes, it shows the desktop copy and drops its draft. The outbox file stays on Drive and is overwritten by the next edit of that entry. Text from both sides is kept. For the title, mood, journal, date, favorite, and tags, the desktop wins if it changed them too.</desc>
-  <rect x="16" y="16" width="688" height="484" rx="16" fill="var(--color-panel)" stroke="var(--color-rule-strong)" stroke-width="2"/>
-  <rect x="28" y="30" width="204" height="374" rx="12" fill="var(--color-lane-browser)" stroke="var(--color-lane-browser-edge)" stroke-width="1.5"/>
-  <rect x="260" y="30" width="200" height="374" rx="12" fill="var(--color-lane-drive)" stroke="var(--color-lane-drive-edge)" stroke-width="1.5"/>
-  <rect x="488" y="30" width="204" height="374" rx="12" fill="var(--color-lane-desktop)" stroke="var(--color-lane-desktop-edge)" stroke-width="1.5"/>
+  <rect x="16" y="16" width="944" height="484" rx="16" fill="var(--color-panel)" stroke="var(--color-rule-strong)" stroke-width="2"/>
+  <rect x="28" y="30" width="280" height="374" rx="12" fill="var(--color-lane-browser)" stroke="var(--color-lane-browser-edge)" stroke-width="1.5"/>
+  <rect x="348" y="30" width="280" height="374" rx="12" fill="var(--color-lane-drive)" stroke="var(--color-lane-drive-edge)" stroke-width="1.5"/>
+  <rect x="668" y="30" width="280" height="374" rx="12" fill="var(--color-lane-desktop)" stroke="var(--color-lane-desktop-edge)" stroke-width="1.5"/>
   <text x="40" y="56" text-anchor="start" fill="var(--color-kind-ordinary)" font-family="var(--font-body), sans-serif" font-size="15">This browser</text>
-  <text x="272" y="56" text-anchor="start" fill="var(--color-kind-vault)" font-family="var(--font-body), sans-serif" font-size="15">Your Google Drive</text>
-  <text x="500" y="56" text-anchor="start" fill="var(--color-kind-second-lock)" font-family="var(--font-body), sans-serif" font-size="15">Desktop app</text>
-  <rect x="40" y="72" width="180" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
+  <text x="360" y="56" text-anchor="start" fill="var(--color-kind-vault)" font-family="var(--font-body), sans-serif" font-size="15">Your Google Drive</text>
+  <text x="680" y="56" text-anchor="start" fill="var(--color-kind-second-lock)" font-family="var(--font-body), sans-serif" font-size="15">Desktop app</text>
+  <rect x="40" y="72" width="256" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
   <text x="56" y="100" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">1 · You edit</text>
   <text x="56" y="124" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Sealed draft saved</text>
-  <rect x="272" y="72" width="176" height="150" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
-  <text x="288" y="100" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">Web outbox</text>
-  <text x="288" y="124" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">One file per entry</text>
-  <text x="288" y="146" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Kept, overwritten</text>
-  <text x="288" y="168" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">by the next edit</text>
-  <rect x="500" y="152" width="180" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
-  <text x="516" y="180" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">2 · Desktop syncs</text>
-  <text x="516" y="204" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Merges the edit</text>
-  <rect x="500" y="242" width="180" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
-  <text x="516" y="270" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">3 · Next sync</text>
-  <text x="516" y="294" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Uploads the result</text>
-  <rect x="272" y="242" width="176" height="150" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
-  <text x="288" y="270" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">Desktop files</text>
-  <text x="288" y="294" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Merged entry</text>
-  <text x="288" y="316" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Receipt for each</text>
-  <text x="288" y="338" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">edit (step 2)</text>
-  <rect x="40" y="322" width="180" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
+  <rect x="360" y="72" width="256" height="150" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
+  <text x="376" y="100" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">Web outbox</text>
+  <text x="376" y="124" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">One file per entry</text>
+  <text x="376" y="146" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Kept, overwritten</text>
+  <text x="376" y="168" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">by the next edit</text>
+  <rect x="680" y="152" width="256" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
+  <text x="696" y="180" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">2 · Desktop syncs</text>
+  <text x="696" y="204" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Merges the edit</text>
+  <rect x="680" y="242" width="256" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
+  <text x="696" y="270" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">3 · Next sync</text>
+  <text x="696" y="294" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Uploads the result</text>
+  <rect x="360" y="242" width="256" height="150" rx="12" fill="var(--color-raised)" stroke="var(--color-rule-strong)" stroke-width="2"/>
+  <text x="376" y="270" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">Desktop files</text>
+  <text x="376" y="294" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Merged entry</text>
+  <text x="376" y="316" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Receipt for each</text>
+  <text x="376" y="338" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">edit (step 2)</text>
+  <rect x="40" y="322" width="256" height="70" rx="12" fill="var(--color-raised)" stroke="var(--color-accent)" stroke-width="2"/>
   <text x="56" y="350" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="16">4 · Web refreshes</text>
   <text x="56" y="374" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Shows desktop copy</text>
-  <path d="M224 107H268" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M260 100L268 107L260 114" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M452 187H496" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M488 180L496 187L488 194" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M590 226V238" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M583 230L590 238L597 230" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M496 277H452" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M460 270L452 277L460 284" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M268 357H224" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M232 350L224 357L232 364" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M300 107H356" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M348 100L356 107L348 114" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M620 187H676" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M668 180L676 187L668 194" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M808 226V238" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M801 230L808 238L815 230" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M676 277H620" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M628 270L620 277L628 284" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M356 357H300" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M308 350L300 357L308 364" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="40" y="440" text-anchor="start" fill="var(--color-ink)" font-family="var(--font-body), sans-serif" font-size="15">Text from both sides is kept.</text>
   <text x="40" y="466" text-anchor="start" fill="var(--color-muted)" font-family="var(--font-body), sans-serif" font-size="15">Title, mood, journal, date, favorite, tags: the desktop wins if it changed them too.</text>
 </svg>

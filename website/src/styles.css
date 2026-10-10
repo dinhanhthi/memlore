@@ -2855,7 +2855,10 @@ tbody th {
   max-width: 35rem;
   margin-inline: auto;
 }
-/* A dense drawing that reads better at the full column width. */
+/* A dense drawing that reads better at the full column width. Its viewBox
+   is ~946 wide so a full column (~740px) draws it near the same ~0.78 scale
+   as the capped ones; narrower than 44rem it would shrink its labels below
+   ~12px, so it swaps to the narrow drawing earlier (see the query below). */
 .legal-article figure svg.docs-diagram-wide.docs-diagram-full {
   max-width: none;
 }
@@ -2870,6 +2873,14 @@ tbody th {
     display: none;
   }
   .legal-article figure svg.docs-diagram-narrow {
+    display: block;
+  }
+}
+@container (max-width: 44rem) {
+  .legal-article figure svg.docs-diagram-wide.docs-diagram-full {
+    display: none;
+  }
+  .legal-article figure:has(.docs-diagram-full) svg.docs-diagram-narrow {
     display: block;
   }
 }
