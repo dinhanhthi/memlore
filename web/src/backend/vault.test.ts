@@ -504,7 +504,7 @@ describe('lock', () => {
     expect(f.vault.status('l')).toBe('not-loaded')
     expect(() => f.vault.getEntry('a')).toThrow(EntryUnavailableError)
     expect(f.vault.listLoaded()).toEqual([])
-    expect(JSON.parse(f.vault.__debugDump())).toEqual({ entries: [], stubs: [] })
+    expect(JSON.parse(f.vault.__debugDump())).toEqual({ entries: [], stubs: [], trashed: [] })
     await expect(f.vault.load(['a'])).rejects.toBeInstanceOf(VaultLockedError)
   })
 
@@ -1118,5 +1118,279 @@ describe('foreign intents (other web devices of this vault, read-only)', () => {
 
     expect(f.vault.status('w2')).toBe('not-loaded')
     expect(f.vault.listLoaded()).toEqual([])
+  })
+})
+
+describe('trash', () => {
+  const SECRET = 'TRASH-SECRET-qrs'
+
+  it('fetches a trashed index winner only through loadTrashed and serves it from trashView', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'Binned', updated_at: 500, trashed_at: 450 })
+    f.put({ entry_id: 'live', title: 'Kept', updated_at: 400 })
+    f.put({ entry_id: 'gone', updated_at: 300, is_deleted: true })
+    await f.vault.load(['t'])
+    expect(f.fetched).toEqual([])
+
+    expect(f.vault.listTrashedIndex().map((e) => e.entryId)).toEqual(['t'])
+    // Live and tombstoned winners are not trashed: never fetched here.
+    await f.vault.loadTrashed(['t', 'live', 'gone', 'unknown'])
+    expect(f.fetched).toEqual(['t'])
+    expect(f.vault.trashView('live')).toBeNull()
+    const view = f.vault.trashView('t')
+    expect(view).toMatchObject({ trashedAt: 450, pending: false })
+    expect(view?.held.metadata.title).toBe('Binned')
+    expect(view?.held.contentText).toBe('body')
+    expect(new TextDecoder().decode(view?.held.content)).toBe('yjs')
+  })
+
+  it('never shows a trashed copy in a live view', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'Binned', tag_ids: ['tt'], updated_at: 500, trashed_at: 450 })
+    f.put({ entry_id: 'live', title: 'Kept', updated_at: 400 })
+    await f.vault.load(['live'])
+    await f.vault.loadTrashed(['t'])
+
+    expect(f.vault.trashView('t')).not.toBeNull()
+    expect(f.vault.status('t')).toBe('not-loaded')
+    expect(f.vault.isLoaded('t')).toBe(false)
+    expect(() => f.vault.getEntry('t')).toThrow(EntryUnavailableError)
+    expect(f.vault.size).toBe(1)
+    expect(f.vault.listLoaded().map((e) => e.metadata.entry_id)).toEqual(['live'])
+    expect(f.vault.search('binned')).toEqual([])
+    expect(f.vault.count()).toBe(1)
+    expect(f.vault.tagCounts().get('tt')).toBeUndefined()
+    expect(f.vault.journalCounts().get('j1')).toBe(1)
+    expect(f.vault.listIndex().map((e) => e.entryId)).toEqual(['live'])
+  })
+
+  it('keeps no plaintext of a locked, invisible, journal-excluded or tombstone payload', async () => {
+    const f = setup()
+    const secret = { title: SECRET, content_text: SECRET, preview_text: SECRET }
+    f.put({ entry_id: 'locked', ...secret, is_locked: true, trashed_at: 10 }, SECRET)
+    f.put({ entry_id: 'invis', ...secret, is_invisible: true, trashed_at: 10 }, SECRET)
+    f.put({ entry_id: 'jx', ...secret, journal_id: 'jx', trashed_at: 10 }, SECRET)
+    // The index still says trashed, the payload is already a tombstone (purged).
+    f.put({ entry_id: 'tomb', ...secret, is_deleted: true }, SECRET)
+    f.index.set('tomb', {
+      entryId: 'tomb',
+      authorDevice: 'dev-a',
+      updatedAt: 100,
+      isDeleted: false,
+      trashedAt: 10,
+    })
+    f.vault.setExcludedJournalIds(['jx'])
+    const ids = ['locked', 'invis', 'jx', 'tomb']
+    await f.vault.loadTrashed(ids)
+
+    expect(f.fetched.sort()).toEqual([...ids].sort())
+    for (const id of ids) expect(f.vault.trashView(id)).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('falls back to the index trashedAt when the payload has none', async () => {
+    const f = setup()
+    f.put({ entry_id: 'b', title: 'No stamp' })
+    f.index.set('b', {
+      entryId: 'b',
+      authorDevice: 'dev-a',
+      updatedAt: 100,
+      isDeleted: false,
+      trashedAt: 77,
+    })
+    await f.vault.loadTrashed(['b'])
+    expect(f.vault.trashView('b')).toMatchObject({ trashedAt: 77, pending: false })
+  })
+
+  it('does not refetch a copy held at the winner updatedAt, and refetches a newer winner', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'v1', updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    await f.vault.loadTrashed(['t'])
+    expect(f.fetched).toEqual(['t'])
+    f.put({ entry_id: 't', title: 'v2', updated_at: 600, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    expect(f.fetched).toEqual(['t', 't'])
+    expect(f.vault.trashView('t')?.held.metadata.title).toBe('v2')
+  })
+
+  it('drops a held copy once its payload turns locked', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: SECRET, updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    f.put({ entry_id: 't', title: 'x', updated_at: 600, trashed_at: 450, is_locked: true })
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.trashView('t')).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('stops serving a desktop copy once the index winner is purged or restored', async () => {
+    const f = setup()
+    f.put({ entry_id: 'p', title: 'purged', updated_at: 500, trashed_at: 450 })
+    f.put({ entry_id: 'r', title: 'restored', updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['p', 'r'])
+    f.index.set('p', { entryId: 'p', authorDevice: 'dev-a', updatedAt: 600, isDeleted: true })
+    f.index.set('r', { entryId: 'r', authorDevice: 'dev-a', updatedAt: 600, isDeleted: false })
+    expect(f.vault.trashView('p')).toBeNull()
+    expect(f.vault.trashView('r')).toBeNull()
+  })
+
+  it('hides a held copy whose journal is excluded later', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', journal_id: 'j2', updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.trashView('t')).not.toBeNull()
+    f.vault.setExcludedJournalIds(['j2'])
+    expect(f.vault.trashView('t')).toBeNull()
+  })
+
+  it.each([
+    ['clear()', (f: Fake) => f.vault.clear()],
+    ['the lock hook', (f: Fake) => f.lock()],
+  ])('%s drops the trashed copies', async (_name, drop) => {
+    const f = setup()
+    f.put({ entry_id: 't', title: SECRET, updated_at: 500, trashed_at: 450 }, SECRET)
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.__debugDump()).toContain(SECRET)
+    drop(f)
+    expect(f.vault.trashView('t')).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('discards a loadTrashed result that raced a clear()', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: SECRET, updated_at: 500, trashed_at: 450 })
+    const pending = f.vault.loadTrashed(['t'])
+    f.vault.clear()
+    await pending
+    expect(f.vault.trashView('t')).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('serves a pending web trash from the synced copy with the overlay applied', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', title: 'Base', updated_at: 100 })
+    await f.vault.load(['a'])
+    f.vault.setOutboxIntents([
+      webIntent('a', {
+        created_on_web: false,
+        fields: {
+          title: {
+            value: 'Edited',
+            base: 'Base',
+            base_updated_at: 100,
+            change_seq: 1,
+            changed_at_secs: 150,
+          },
+        },
+      }),
+    ])
+    expect(f.vault.trashView('a')).toBeNull() // not trashed: a live entry has no trash view
+    f.vault.setTrashedIds(['a'])
+    const view = f.vault.trashView('a')
+    expect(view).toMatchObject({ trashedAt: null, pending: true })
+    expect(view?.held.metadata.title).toBe('Edited')
+    expect(f.fetched).toEqual(['a'])
+  })
+
+  it('serves a pending web trash of a web-created entry from its intent', () => {
+    const f = setup()
+    f.vault.setOutboxIntents([webIntent('w')])
+    f.vault.setTrashedIds(['w'])
+    const view = f.vault.trashView('w')
+    expect(view).toMatchObject({ trashedAt: null, pending: true })
+    expect(view?.held.metadata.title).toBe('Draft')
+    expect(view?.held.contentText).toBe('Draft body')
+  })
+
+  it('returns null for a pending trash in an excluded journal, or with nothing to show', async () => {
+    const f = setup()
+    f.put({ entry_id: 'a', journal_id: 'j2' })
+    await f.vault.load(['a'])
+    f.vault.setOutboxIntents([
+      webIntent('w', {
+        fields: {
+          journal_id: {
+            value: 'j2',
+            base: '',
+            base_updated_at: 0,
+            change_seq: 1,
+            changed_at_secs: 200,
+          },
+        },
+      }),
+    ])
+    f.vault.setTrashedIds(['a', 'w', 'nothing'])
+    f.vault.setExcludedJournalIds(['j2'])
+    expect(f.vault.trashView('a')).toBeNull()
+    expect(f.vault.trashView('w')).toBeNull()
+    expect(f.vault.trashView('nothing')).toBeNull()
+  })
+
+  it('refetches a cached trashed payload older than the winner once', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'fresh', updated_at: 500, trashed_at: 450 })
+    f.cache({ entry_id: 't', title: SECRET, updated_at: 400, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    expect(f.dropped).toEqual(['t'])
+    expect(f.vault.trashView('t')?.held.metadata.title).toBe('fresh')
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('keeps no copy when the refetched payload is still older than the winner', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'OLD-HELD-xyz', updated_at: 300, trashed_at: 250 })
+    await f.vault.loadTrashed(['t'])
+    f.put({ entry_id: 't', title: SECRET, updated_at: 400, trashed_at: 250 })
+    f.index.set('t', {
+      entryId: 't',
+      authorDevice: 'dev-a',
+      updatedAt: 500,
+      isDeleted: false,
+      trashedAt: 250,
+    })
+    await f.vault.loadTrashed(['t'])
+    expect(f.dropped).toEqual(['t'])
+    expect(f.vault.trashView('t')).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+    expect(f.vault.__debugDump()).not.toContain('OLD-HELD-xyz')
+  })
+
+  it('stops serving a held copy once the trashed winner moved on', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: 'v1', updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    f.index.set('t', {
+      entryId: 't',
+      authorDevice: 'dev-a',
+      updatedAt: 600,
+      isDeleted: false,
+      trashedAt: 450,
+    })
+    expect(f.vault.trashView('t')).toBeNull()
+  })
+
+  it('drops a held copy when the newer payload fails to open', async () => {
+    const f = setup((_id, json) => {
+      if (json.includes('CORRUPT')) throw new Error('bad metadata')
+    })
+    f.put({ entry_id: 't', title: SECRET, updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.__debugDump()).toContain(SECRET)
+    f.put({ entry_id: 't', title: 'CORRUPT', updated_at: 600, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.trashView('t')).toBeNull()
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+  })
+
+  it('drops held copies of a journal that becomes excluded', async () => {
+    const f = setup()
+    f.put({ entry_id: 't', title: SECRET, journal_id: 'j2', updated_at: 500, trashed_at: 450 })
+    await f.vault.loadTrashed(['t'])
+    f.vault.setExcludedJournalIds(['j2'])
+    expect(f.vault.__debugDump()).not.toContain(SECRET)
+    f.vault.setExcludedJournalIds([])
+    await f.vault.loadTrashed(['t'])
+    expect(f.vault.trashView('t')?.held.metadata.title).toBe(SECRET)
   })
 })

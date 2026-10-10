@@ -7,8 +7,10 @@ import {
   type EntryMetadata,
   type LoadResult,
   type SyncedView,
+  type TrashView,
   type VaultEntry,
 } from '../vault'
+import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1 } from '../sync/outbox'
 import type { DraftRecord, WebDb } from '../storage/idb'
 import type { Core } from '../../core/core'
@@ -34,6 +36,8 @@ export interface FakeSpec {
   invisible?: boolean
   /** The index row is a tombstone. */
   tombstone?: boolean
+  /** The index winner is in the desktop Trash since this time (unix seconds). */
+  trashedAt?: number
   /** `vault.load` reports a failure for it. */
   fails?: boolean
   yjs?: number[]
@@ -65,6 +69,11 @@ export class FakeVault implements VaultApi {
   readonly #stubs = new Map<string, string>()
   #outboxIntents = new Map<string, OutboxEntryV1>()
   #trashed = new Set<string>()
+  /** Desktop-Trash copies opened by `loadTrashed`. */
+  readonly #trashedCopies = new Map<string, VaultEntry>()
+  readonly loadTrashedCalls: string[][] = []
+  /** Journals whose entries the Trash view excludes (the real vault's `setExcludedJournalIds`). */
+  readonly excludedJournals = new Set<string>()
 
   constructor(specs: FakeSpec[]) {
     for (const spec of specs) this.#specs.set(spec.id, spec)
@@ -97,7 +106,7 @@ export class FakeVault implements VaultApi {
     for (const id of new Set(ids)) {
       const spec = this.#specs.get(id)
       if (spec === undefined) result.missing.push(id)
-      else if (spec.tombstone === true) {
+      else if (spec.tombstone === true || spec.trashedAt !== undefined) {
         this.#stubs.set(id, 'deleted')
         result.excluded.push(id)
       } else if (spec.fails === true) result.failed.push({ id, message: 'boom' })
@@ -123,6 +132,11 @@ export class FakeVault implements VaultApi {
 
   readonly getEntry = (id: string): VaultEntry => {
     if (this.#trashed.has(id)) throw new EntryUnavailableError(id, 'deleted')
+    return this.#overlaid(id)
+  }
+
+  /** The entry with its outbox intent overlaid, trashed or not. */
+  #overlaid(id: string): VaultEntry {
     const intent = this.#outboxIntents.get(id)
     if (intent && intent.created_on_web) {
       const metadata: EntryMetadata = {
@@ -228,7 +242,13 @@ export class FakeVault implements VaultApi {
 
   readonly listIndex: VaultApi['listIndex'] = () =>
     [...this.#specs.values()]
-      .filter((s) => s.tombstone !== true && !this.#stubs.has(s.id) && !this.#trashed.has(s.id))
+      .filter(
+        (s) =>
+          s.tombstone !== true &&
+          s.trashedAt === undefined &&
+          !this.#stubs.has(s.id) &&
+          !this.#trashed.has(s.id),
+      )
       .sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : 1))
       .map((s) => ({
         entryId: s.id,
@@ -242,6 +262,48 @@ export class FakeVault implements VaultApi {
     return this.listLoaded().filter((e) =>
       matchesQuery([foldText(e.metadata.title ?? ''), foldText(e.contentText)], parsed, options),
     )
+  }
+
+  readonly listTrashedIndex = (): IndexEntry[] =>
+    [...this.#specs.values()].flatMap((s) =>
+      s.trashedAt !== undefined && s.tombstone !== true
+        ? [
+            {
+              entryId: s.id,
+              authorDevice: 'dev',
+              updatedAt: s.updatedAt,
+              isDeleted: false,
+              trashedAt: s.trashedAt,
+            },
+          ]
+        : [],
+    )
+
+  /** "Downloads" the trashed specs; locked, invisible and journal-excluded ones are not kept. */
+  readonly loadTrashed = async (ids: readonly string[]): Promise<void> => {
+    this.loadTrashedCalls.push([...ids])
+    for (const id of ids) {
+      const spec = this.#specs.get(id)
+      if (spec?.trashedAt === undefined || spec.tombstone === true) continue
+      if (spec.locked === true || spec.invisible === true) continue
+      const entry = toVaultEntry(spec)
+      if (this.excludedJournals.has(entry.metadata.journal_id)) continue
+      this.#trashedCopies.set(id, entry)
+    }
+  }
+
+  /** RAM only: a desktop-Trash copy, else a pending web trash (synced copy or web create). */
+  readonly trashView = (id: string): TrashView | null => {
+    const copy = this.#trashedCopies.get(id)
+    const trashedAt = this.#specs.get(id)?.trashedAt
+    if (copy !== undefined && trashedAt !== undefined) {
+      return { held: copy, trashedAt, pending: false }
+    }
+    if (!this.#trashed.has(id) || this.#stubs.has(id)) return null
+    if (!this.#entries.has(id) && this.#outboxIntents.get(id)?.created_on_web !== true) return null
+    const held = this.#overlaid(id)
+    if (this.excludedJournals.has(held.metadata.journal_id)) return null
+    return { held, trashedAt: null, pending: true }
   }
 
   readonly tagCounts = (): Map<string, number> => {

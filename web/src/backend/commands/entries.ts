@@ -20,8 +20,10 @@
  * unknown. A page past the end is an honest empty page, as on desktop.
  *
  * VISIBILITY: only entries the vault serves (never locked, invisible, deleted or in a locked or
- * invisible journal). `lockedView`, `activeVaultId` and `lockFilter` (second-locked / invisible-only
- * views list exactly the excluded entries) are therefore ignored or answered empty.
+ * invisible journal). Exception: `get_entry` / `get_entry_content` also serve a Trash row the vault
+ * already holds (`vault.trashView`, never fetched there) with `is_deleted: true`, for the preview.
+ * `lockedView`, `activeVaultId` and `lockFilter` (second-locked / invisible-only views list exactly
+ * the excluded entries) are therefore ignored or answered empty.
  *
  * Calendar-style reads (`list_entry_dates`, `list_entries_for_date_range`, `get_emotion_by_date`,
  * `count_entries_in_journal`) are answered from the entries loaded so far: they never trigger a
@@ -29,9 +31,9 @@
  */
 
 import * as Y from 'yjs'
-import type { Entry, EmotionKey } from '../../../../src/types/entry'
+import type { Entry } from '../../../../src/types/entry'
 import type { EntrySort, EntryTimeRange, PagedResult } from '../../../../src/types/pagination'
-import { EntryUnavailableError, type VaultEntry } from '../vault'
+import { EntryUnavailableError, type TrashView, type VaultEntry } from '../vault'
 import type { Handler } from '../router'
 import { nowSecs as correctedNowSecs } from '../clock'
 import { getCachedWriteFlag } from '../config'
@@ -58,6 +60,8 @@ import {
 } from '../sync/outbox'
 import { acquireOutboxLock, openForRead, openForWrite, readEnv, type VaultApi } from './readSession'
 import { WEB_MEDIA_PATH_PREFIX } from './media'
+import { toTrashedEntry } from './trash'
+import { EMOTIONS, emotionOrNull, numOrNull, strOrNull } from './entryFields'
 
 export const MSG_UNAVAILABLE = 'This entry is not available on the web (locked, hidden or deleted).'
 
@@ -75,12 +79,6 @@ export class EntryNotAvailableError extends Error {
 // ---------------------------------------------------------------------------------------------
 // Mapping
 // ---------------------------------------------------------------------------------------------
-
-const EMOTIONS: readonly string[] = ['bad', 'neutral', 'good']
-
-const numOrNull = (v: unknown): number | null =>
-  typeof v === 'number' && Number.isFinite(v) ? v : null
-const strOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : null)
 
 /**
  * Desktop `Entry` from a visible vault entry. Fields the wire does not carry: `from_chat` is a
@@ -103,7 +101,7 @@ export function toEntry(entry: VaultEntry): Entry {
     location_address: strOrNull(m.location_address),
     weather_summary: strOrNull(m.weather_summary),
     weather_icon: strOrNull(m.weather_icon),
-    emotion: m.emotion !== null && EMOTIONS.includes(m.emotion) ? (m.emotion as EmotionKey) : null,
+    emotion: emotionOrNull(m.emotion),
     is_favorite: m.is_favorite,
     is_deleted: false,
     is_locked: false,
@@ -297,17 +295,55 @@ export async function loadVisible(vault: VaultApi, id: string): Promise<VaultEnt
   }
 }
 
+/**
+ * `loadVisible`, or else a Trash row the vault already holds in RAM (`vault.trashView`: a desktop
+ * Trash copy opened by `list_trashed_entries`, or a pending web delete), as the desktop
+ * `get_entry` also returns trashed rows. Never fetches a trashed payload: a Trash row not held
+ * keeps its `EntryNotAvailableError`. Also tried when `loadVisible` finds nothing, because a
+ * pending delete of an entry created on this web has no index winner (`load` reports it missing).
+ */
+async function loadVisibleOrTrashed(
+  vault: VaultApi,
+  id: string,
+): Promise<{ live: VaultEntry } | { trashed: TrashView } | null> {
+  let live: VaultEntry | null
+  try {
+    live = await loadVisible(vault, id)
+  } catch (error) {
+    const trashed = error instanceof EntryNotAvailableError ? vault.trashView(id) : null
+    if (trashed === null) throw error
+    return { trashed }
+  }
+  if (live !== null) return { live }
+  const trashed = vault.trashView(id)
+  return trashed === null ? null : { trashed }
+}
+
+/**
+ * A Trash row's `trashed_at` is the index winner's; a pending web delete's is its `d-<id>` draft
+ * request time (`DraftRecord.updatedAt`, ms), as `list_trashed_entries` shows it. `null` when the
+ * draft is gone.
+ */
 const getEntry: Handler = async ({ id }) => {
   const { vault } = await openForRead()
-  const entry = await loadVisible(vault, String(id))
-  return entry === null ? null : toEntry(entry)
+  const found = await loadVisibleOrTrashed(vault, String(id))
+  if (found === null) return null
+  if ('live' in found) return toEntry(found.live)
+  if (!found.trashed.pending) return toTrashedEntry(found.trashed)
+  const { db } = await readEnv().session()
+  const draft = await db?.drafts.get(`d-${String(id)}`)
+  return toTrashedEntry(
+    found.trashed,
+    draft === undefined ? {} : { trashedAt: Math.floor(draft.updatedAt / 1000) },
+  )
 }
 
 const getEntryContent: Handler = async ({ id }) => {
   const { vault } = await openForRead()
-  const entry = await loadVisible(vault, String(id))
-  if (entry === null || entry.content.length === 0) return null
-  return Array.from(entry.content)
+  const found = await loadVisibleOrTrashed(vault, String(id))
+  if (found === null) return null
+  const content = 'live' in found ? found.live.content : found.trashed.held.content
+  return content.length === 0 ? null : Array.from(content)
 }
 
 // ---------------------------------------------------------------------------------------------

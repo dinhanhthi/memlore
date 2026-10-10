@@ -49,6 +49,10 @@ export interface Entry {
    * has `is_deleted` and a null `trashed_at`). Optional so older fixtures and
    * payloads without the field still type-check. */
   trashed_at?: number | null
+  /** Web only: the entry was deleted on the web and the desktop has not
+   * applied that delete yet, so it is not in the desktop Trash. The desktop
+   * never sets it. */
+  trash_pending_desktop?: boolean
 }
 
 export interface SearchResult {

@@ -8,6 +8,7 @@ import { mediaHandlers } from './commands/media'
 import { searchHandlers } from './commands/search'
 import { installSyncAutostart, syncHandlers } from './commands/sync'
 import { taxonomyHandlers } from './commands/taxonomy'
+import { trashHandlers } from './commands/trash'
 import { versionHandlers } from './commands/versions'
 import {
   deleteWebSetting,
@@ -66,6 +67,7 @@ registerHandlers(deviceBinHandlers)
 registerHandlers(indexViewHandlers)
 registerHandlers(indexStatsHandlers)
 registerHandlers(versionHandlers)
+registerHandlers(trashHandlers)
 installSyncAutostart()
 installEvictorAutostart()
 installDraftsAutostart()

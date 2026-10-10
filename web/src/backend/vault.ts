@@ -33,6 +33,11 @@
  * read-only: `getOutboxIntent(s)` (drafts, retention, push) never return them, `getWriteView`
  * ignores them, and a foreign `created_on_web` entry no synced manifest knows yet refuses writes
  * (`ForeignEntryReadOnlyError`).
+ *
+ * TRASH (read-only Trash view): `loadTrashed` decrypts desktop-Trash entries into a SEPARATE map,
+ * never `#entries`/`#stubs`, so they never reach a live list, search, count or the month index.
+ * `trashView` serves those copies and the pending web trashes (`setTrashedIds`). Locked, invisible
+ * and journal-excluded entries are excluded there too, and the copies are dropped by `clear()`.
  */
 
 import * as Y from 'yjs'
@@ -190,6 +195,26 @@ interface Held extends VaultEntry {
   folded: string[]
 }
 
+/** A decrypted desktop-Trash entry (`loadTrashed`), kept apart from the live maps. */
+interface TrashedCopy {
+  held: Held
+  /** Unix seconds the desktop moved it to the Trash. */
+  trashedAt: number
+  /** The index winner's `updatedAt` this copy was fetched for. */
+  winnerUpdatedAt: number
+}
+
+/** `Vault.trashView`: a desktop-Trash copy, or a pending web trash (`trashedAt` null). */
+export interface TrashView {
+  held: VaultEntry
+  trashedAt: number | null
+  /** True while the trash is a web draft the desktop has not applied yet. */
+  pending: boolean
+}
+
+/** An index winner in the desktop Trash: trashed, not yet purged to a tombstone. */
+const isTrashedWinner = (e: IndexEntry): boolean => typeof e.trashedAt === 'number' && !e.isDeleted
+
 const EMPTY = new Uint8Array(0)
 const decoder = new TextDecoder()
 
@@ -304,6 +329,8 @@ export class Vault {
   #foreignIntents = new Map<string, OutboxEntryV1>()
   /** Entries this browser moved to the desktop Trash (pending `d-<id>` drafts, Phase 22.2). */
   #trashed = new Set<string>()
+  /** Desktop-Trash copies opened by `loadTrashed`; never read by the live views. */
+  #trashedCopies = new Map<string, TrashedCopy>()
   /** Bumped by `clear()`; a load that started under an older epoch discards its result. */
   #epoch = 0
 
@@ -400,6 +427,7 @@ export class Vault {
     this.#outboxIntents = new Map()
     this.#foreignIntents = new Map()
     this.#trashed = new Set()
+    this.#trashedCopies = new Map()
   }
 
   /** Unregisters the lock hook and clears. */
@@ -703,7 +731,8 @@ export class Vault {
    * channel). Loaded entries of them are reduced to stubs immediately. When `known` is given, an
    * entry whose (non-empty) journal id is not in it is excluded too: its journal record is missing
    * or deleted, so its lock state is unknown (fail closed). Journal stubs of a journal that is no
-   * longer excluded are dropped, so those entries are listed and loaded again.
+   * longer excluded are dropped, so those entries are listed and loaded again. Desktop-Trash copies
+   * (`loadTrashed`) of an excluded journal are dropped.
    */
   setExcludedJournalIds(ids: Iterable<string>, known?: Iterable<string>): void {
     this.#excludedJournals = new Set(ids)
@@ -718,6 +747,9 @@ export class Vault {
       if (stub.reason === 'journal' && !this.#journalExcluded(stub.metadata.journal_id)) {
         this.#stubs.delete(id)
       }
+    }
+    for (const [id, copy] of [...this.#trashedCopies]) {
+      if (this.#journalExcluded(copy.held.metadata.journal_id)) this.#trashedCopies.delete(id)
     }
   }
 
@@ -880,6 +912,149 @@ export class Vault {
     return incoming.updated_at
   }
 
+  // -------------------------------------------------------------------------------------------
+  // Trash (read-only, kept apart from the live maps)
+  // -------------------------------------------------------------------------------------------
+
+  /** Index winners in the desktop Trash (`trashedAt` set, not a tombstone), loaded or not. */
+  listTrashedIndex(): IndexEntry[] {
+    const index = this.#puller?.index
+    if (index === null || index === undefined) return []
+    return [...index.values()].filter(isTrashedWinner)
+  }
+
+  /**
+   * Opens the desktop-Trash payloads of these ids into `#trashedCopies`, never `#entries`/`#stubs`.
+   * Ids whose winner is not trashed are ignored; a copy already held for the winner's `updatedAt`
+   * or newer is not fetched again. Deleted, locked, invisible and journal-excluded payloads are not
+   * kept (an older copy of them is dropped), nor are copies of ids that left the Trash or whose
+   * journal is now excluded. As in `load()`, a payload older than the winner (a stale cache) is
+   * dropped from the cache and downloaded again, once; if it is still older, no copy is kept (fail
+   * closed). A payload that fails to open drops the held copy too.
+   */
+  async loadTrashed(ids: readonly string[]): Promise<void> {
+    const puller = this.#puller
+    if (puller === undefined) throw new Error('vault has no puller')
+    this.#keys.getKeyRing() // VaultLockedError early, before any download
+    const epoch = this.#epoch
+    const index = puller.index
+    if (index === null) throw new Error('vault.loadTrashed needs a prior pull refresh()')
+
+    for (const [id, copy] of [...this.#trashedCopies]) {
+      const winner = index.get(id)
+      if (
+        winner === undefined ||
+        !isTrashedWinner(winner) ||
+        this.#journalExcluded(copy.held.metadata.journal_id)
+      ) {
+        this.#trashedCopies.delete(id)
+      }
+    }
+    const toFetch: string[] = []
+    for (const id of new Set(ids)) {
+      const winner = index.get(id)
+      if (winner === undefined || !isTrashedWinner(winner)) continue
+      const copy = this.#trashedCopies.get(id)
+      if (copy === undefined || copy.winnerUpdatedAt < winner.updatedAt) toFetch.push(id)
+    }
+    if (toFetch.length === 0) return
+
+    const payloads = await puller.fetchEntries(toFetch)
+    if (epoch !== this.#epoch) return
+    const behind = this.#keepTrashed(toFetch, payloads, index)
+    if (behind.length === 0) return
+
+    // Older than the winner: drop the cached copy and download it again, once.
+    await puller.dropCached(behind)
+    const again = await puller.fetchEntries(behind)
+    if (epoch !== this.#epoch) return
+    this.#keepTrashed(behind, again, index)
+  }
+
+  /**
+   * Opens and keeps the trashed payloads of `ids`. Returns the ids whose payload is older than the
+   * index winner; no copy is kept for those (a stale payload is never recorded against the
+   * winner's `updatedAt`), nor for one that fails to open.
+   */
+  #keepTrashed(
+    ids: readonly string[],
+    payloads: Map<string, Uint8Array>,
+    index: ReadonlyMap<string, IndexEntry>,
+  ): string[] {
+    const ring = this.#keys.getKeyRing()
+    const behind: string[] = []
+    for (const id of ids) {
+      const bytes = payloads.get(id)
+      const winner = index.get(id)
+      if (bytes === undefined || winner === undefined) continue
+      try {
+        const opened = this.#core.openEntry(ring, bytes)
+        const metadata = parseMetadata(opened.metadataJson, id)
+        this.#guardMetadata(id, opened.metadataJson)
+        const trashedAt = metadata.trashed_at ?? winner.trashedAt
+        if (trashedAt === undefined || this.#trashExcluded(metadata)) {
+          this.#trashedCopies.delete(id)
+          continue
+        }
+        if (metadata.updated_at < winner.updatedAt) {
+          this.#trashedCopies.delete(id)
+          behind.push(id)
+          continue
+        }
+        const contentText = metadata.content_text ?? ''
+        const held: Held = {
+          metadata,
+          content: opened.yjs.length === 0 ? EMPTY : opened.yjs,
+          contentText,
+          previewText: metadata.preview_text ?? '',
+          loadedAt: this.#now(),
+          folded: [foldText(metadata.title ?? ''), foldText(contentText)],
+        }
+        this.#trashedCopies.set(id, { held, trashedAt, winnerUpdatedAt: winner.updatedAt })
+      } catch {
+        // corrupt or unopenable: not listed, and no older copy is kept
+        this.#trashedCopies.delete(id)
+      }
+    }
+    return behind
+  }
+
+  /** Deleted, locked, invisible or in an excluded journal: never kept as a trashed copy. */
+  #trashExcluded(metadata: EntryMetadata): boolean {
+    return (
+      metadata.is_deleted ||
+      metadata.is_locked ||
+      metadata.is_invisible ||
+      this.#journalExcluded(metadata.journal_id)
+    )
+  }
+
+  /**
+   * The Trash view of an entry, RAM only (never fetches): its desktop-Trash copy while the index
+   * winner is still trashed, else a pending web trash (`setTrashedIds`) from the synced copy with
+   * the overlay applied or from a `created_on_web` intent. Null when excluded, or when the copy
+   * was fetched for an older winner (the entry changed since, e.g. it was locked while trashed).
+   */
+  trashView(id: string): TrashView | null {
+    const copy = this.#trashedCopies.get(id)
+    const winner = this.#puller?.index?.get(id)
+    if (copy !== undefined && winner !== undefined && isTrashedWinner(winner)) {
+      // The winner moved on (e.g. locked or moved while still trashed): this copy is stale.
+      if (copy.winnerUpdatedAt < winner.updatedAt) return null
+      if (this.#journalExcluded(copy.held.metadata.journal_id)) return null
+      return { held: copy.held, trashedAt: copy.trashedAt, pending: false }
+    }
+    if (!this.#trashed.has(id) || this.#stubs.has(id)) return null
+    const synced = this.#entries.get(id)
+    const created = synced === undefined ? this.#webCreated(id) : undefined
+    let held: Held
+    if (synced !== undefined) held = this.#applyOverlay(synced)
+    else if (created !== undefined) held = this.#syntheticHeldFromIntent(created)
+    else return null
+    if (this.#journalExcluded(held.metadata.journal_id)) return null
+    return { held, trashedAt: null, pending: true }
+  }
+
   #exclusionReason(metadata: EntryMetadata): ExcludedReason | null {
     if (metadata.is_deleted || typeof metadata.trashed_at === 'number') return 'deleted'
     if (metadata.is_locked) return 'locked'
@@ -953,8 +1128,8 @@ export class Vault {
   }
 
   /**
-   * TESTS ONLY. JSON of everything the vault holds (visible entries, stubs, bytes as text) so a
-   * test can assert that a plaintext marker is, or is not, retained in RAM.
+   * TESTS ONLY. JSON of everything the vault holds (visible entries, stubs, trashed copies, bytes
+   * as text) so a test can assert that a plaintext marker is, or is not, retained in RAM.
    */
   __debugDump(): string {
     return JSON.stringify({
@@ -963,6 +1138,10 @@ export class Vault {
         content: decoder.decode(h.content),
       })),
       stubs: [...this.#stubs.values()],
+      trashed: [...this.#trashedCopies.values()].map((c) => ({
+        ...c,
+        held: { ...c.held, content: decoder.decode(c.held.content) },
+      })),
     })
   }
 }

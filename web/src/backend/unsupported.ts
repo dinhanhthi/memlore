@@ -116,8 +116,6 @@ export const QUERY_DEFAULTS: Record<string, DefaultValue> = {
   basemap_status: { status: 'not_downloaded', path: null, size_bytes: null },
   // TODO(later): see docs/LATER.md - reminders and notifications
   list_reminders: [],
-  // Trash: web never manages the Trash (desktop only), so it lists nothing.
-  list_trashed_entries: [],
   // Version retention is a desktop setting; the web reads history read-only (commands/versions.ts).
   get_version_retention_days: 7,
   // TODO(later): see docs/LATER.md - font downloads

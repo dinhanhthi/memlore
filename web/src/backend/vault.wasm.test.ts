@@ -211,7 +211,7 @@ describe('vault with the desktop fixture', () => {
     lock('manual')
     expect(vault.size).toBe(0)
     expect(() => vault.getEntry(allIds()[0])).toThrow(EntryUnavailableError)
-    expect(JSON.parse(vault.__debugDump())).toEqual({ entries: [], stubs: [] })
+    expect(JSON.parse(vault.__debugDump())).toEqual({ entries: [], stubs: [], trashed: [] })
     await expect(vault.load(allIds())).rejects.toThrow('vault is locked')
   })
 })

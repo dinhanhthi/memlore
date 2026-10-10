@@ -73,6 +73,9 @@ export type VaultApi = Pick<
   | 'setTrashedIds'
   | 'getWriteView'
   | 'getSynced'
+  | 'listTrashedIndex'
+  | 'loadTrashed'
+  | 'trashView'
 >
 
 export interface Taxonomy {

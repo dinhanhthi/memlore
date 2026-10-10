@@ -15,6 +15,7 @@ import { configureReadEnv, type Taxonomy } from './readSession'
 import { EMPTY_TAXONOMY, installFakeSession, type FakeSpec } from './readTestKit'
 import type { OutboxIntentV2 } from '../../core/core'
 import type { WebDb } from '../storage/idb'
+import type { OutboxEntryV1 } from '../sync/outbox'
 import { WebUnsupportedError } from '../unsupported'
 import { setWriteFlagForTest } from '../config'
 import { resetClock, updateClockOffset } from '../clock'
@@ -281,6 +282,96 @@ describe('single entry', () => {
     ])
     for (const name of ['get_entry', 'get_entry_content']) {
       for (const entryId of ['l', 'i', 'd']) {
+        await expect(call(name, { id: entryId })).rejects.toThrow(MSG_UNAVAILABLE)
+      }
+    }
+  })
+
+  it('serves a desktop-Trash copy the vault already holds, as a deleted entry with its body', async () => {
+    const { vault } = installFakeSession([
+      { id: 't', updatedAt: 4, trashedAt: 700, title: 'Binned', yjs: [4, 5, 6] },
+    ])
+    await vault.loadTrashed(['t'])
+
+    const entry = await call<Entry>('get_entry', { id: 't' })
+    expect(entry).toMatchObject({ id: 't', title: 'Binned', is_deleted: true, trashed_at: 700 })
+    expect(entry.trash_pending_desktop).toBeUndefined()
+    expect(await call('get_entry_content', { id: 't' })).toEqual([4, 5, 6])
+    expect(vault.loadTrashedCalls).toEqual([['t']])
+  })
+
+  it('serves a pending web delete from its overlay, dated by its trash draft', async () => {
+    const { vault, db } = installFakeSession([
+      { id: 'p', updatedAt: 4, title: 'Synced', yjs: [1, 2] },
+    ])
+    await vault.load(['p'])
+    vault.setOutboxIntents([
+      {
+        entry_id: 'p',
+        created_on_web: false,
+        fields: { title: { value: 'Edited on web' } },
+        yjs_full_state: [],
+      } as unknown as OutboxEntryV1,
+    ])
+    await db.drafts.put({
+      entryId: 'd-p',
+      kind: 'trash',
+      sealed: new Uint8Array([2]),
+      updatedAt: 1_700_000_000_999,
+    })
+    vault.setTrashedIds(['p'])
+
+    expect(await call<Entry>('get_entry', { id: 'p' })).toMatchObject({
+      id: 'p',
+      title: 'Edited on web',
+      is_deleted: true,
+      trash_pending_desktop: true,
+      trashed_at: 1_700_000_000,
+    })
+    expect(await call('get_entry_content', { id: 'p' })).toEqual([1, 2])
+    expect(vault.loadTrashedCalls).toEqual([])
+  })
+
+  it('serves a pending delete of a web-created entry from its create intent', async () => {
+    const { vault } = installFakeSession([])
+    vault.setOutboxIntents([
+      {
+        entry_id: 'w',
+        created_on_web: true,
+        web_device_id: 'web',
+        web_updated_at_secs: 100,
+        fields: { title: { value: 'Made on web' } },
+        yjs_full_state: [7],
+      } as unknown as OutboxEntryV1,
+    ])
+    vault.setTrashedIds(['w'])
+
+    expect(await call<Entry>('get_entry', { id: 'w' })).toMatchObject({
+      id: 'w',
+      title: 'Made on web',
+      is_deleted: true,
+      trash_pending_desktop: true,
+      trashed_at: null,
+    })
+    expect(await call('get_entry_content', { id: 'w' })).toEqual([7])
+  })
+
+  it('still rejects a trashed entry the vault does not hold, without fetching it', async () => {
+    const { vault } = installFakeSession([{ id: 't', updatedAt: 4, trashedAt: 700 }])
+    for (const name of ['get_entry', 'get_entry_content']) {
+      await expect(call(name, { id: 't' })).rejects.toThrow(MSG_UNAVAILABLE)
+    }
+    expect(vault.loadTrashedCalls).toEqual([])
+  })
+
+  it('still rejects locked and invisible trashed entries', async () => {
+    const { vault } = installFakeSession([
+      { id: 'l', updatedAt: 3, trashedAt: 700, locked: true },
+      { id: 'i', updatedAt: 2, trashedAt: 700, invisible: true },
+    ])
+    await vault.loadTrashed(['l', 'i'])
+    for (const name of ['get_entry', 'get_entry_content']) {
+      for (const entryId of ['l', 'i']) {
         await expect(call(name, { id: entryId })).rejects.toThrow(MSG_UNAVAILABLE)
       }
     }
@@ -932,7 +1023,11 @@ describe('soft_delete_entry: move to the desktop Trash (outbox v2, Phase 22.2)',
     })
     expect(emitted).toContain('memlore:entries-changed')
     expect((await listAll(1)).items.map((e) => e.id)).toEqual([E2])
-    await expect(call('get_entry', { id: E1 })).rejects.toThrow(MSG_UNAVAILABLE)
+    // Still previewable from the Trash, as a pending deleted entry.
+    expect(await call<Entry>('get_entry', { id: E1 })).toMatchObject({
+      is_deleted: true,
+      trash_pending_desktop: true,
+    })
     // Further edits of a trashed entry are refused.
     await expect(call('update_entry', { id: E1, title: 'x' })).rejects.toThrow(MSG_UNAVAILABLE)
   })
