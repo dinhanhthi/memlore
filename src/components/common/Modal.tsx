@@ -1,6 +1,15 @@
-import React, { useEffect, useRef, useCallback, useId, createContext, useContext } from 'react'
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useId,
+  createContext,
+  useContext,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../lib/cn'
+import { playExitGhost } from '../../lib/exitGhost'
 import { useOverlayHostBox, type OverlayHostBox } from '../../lib/overlayHost'
 
 // ─── Focusable element selector ───────────────────────────────────────────────
@@ -160,6 +169,12 @@ function ModalRoot({
   hostBox = null,
 }: ModalProps & { hostBox?: OverlayHostBox | null }) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
+  // Callers close a modal by unmounting it: fade a copy out in its place.
+  useLayoutEffect(() => {
+    const scrim = scrimRef.current
+    return () => playExitGhost(scrim)
+  }, [])
   // Auto-generate a header id for aria-labelledby when labelledBy is not provided
   const autoId = useId().replace(/:/g, '')
   const headerId = `modal-hdr-${autoId}`
@@ -261,9 +276,10 @@ function ModalRoot({
   return (
     <ModalContext.Provider value={{ headerId }}>
       <div
+        ref={scrimRef}
         data-modal-scrim="true"
         onClick={handleScrimClick}
-        className={`xj-scrim fixed z-1000 flex justify-center bg-black/60 backdrop-blur-[6px] ${
+        className={`xj-scrim overlay-enter fixed z-1000 flex justify-center bg-black/60 backdrop-blur-[6px] ${
           hostBox ? 'overflow-hidden rounded-2xl' : ''
         } ${align === 'top' ? 'items-start pt-[10vh]' : 'items-center'}`}
         style={hostBox ?? { inset: 0 }}
@@ -273,6 +289,7 @@ function ModalRoot({
           role="dialog"
           aria-modal="true"
           aria-labelledby={ariaLabelledBy}
+          data-overlay-panel
           className={`border-border-default bg-elevated relative flex max-h-[90%] w-full flex-col overflow-hidden rounded-2xl border shadow-(--elev-4) ${className}`}
           style={{ maxWidth }}
         >

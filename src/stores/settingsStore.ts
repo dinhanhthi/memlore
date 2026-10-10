@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { suppressExitGhosts } from '../lib/exitGhost'
 
 /**
  * Encryption mode. `null` means "not yet probed" (before first backend fetch).
@@ -25,7 +26,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   isLocked: false,
   encryptionMode: null,
   isBiometricEnabled: false,
-  setLocked: (locked) => set({ isLocked: locked }),
+  setLocked: (locked) => {
+    // Locking unmounts every open overlay; never replay one over the lock screen.
+    if (locked) suppressExitGhosts()
+    set({ isLocked: locked })
+  },
   setEncryptionMode: (mode) => set({ encryptionMode: mode }),
   setBiometricEnabled: (enabled) => set({ isBiometricEnabled: enabled }),
 }))

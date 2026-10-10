@@ -2893,6 +2893,51 @@ body {
 }
 
 /* ---------------------------------------------------------
+   Overlay in/out (Modal, Search)
+   ---------------------------------------------------------
+   `.overlay-enter` on the scrim fades it in and lifts the panel
+   (`[data-overlay-panel]`) into place on mount. `.overlay-exit` runs on the
+   copy `playExitGhost` (src/lib/exitGhost.ts) leaves behind on unmount; it
+   must finish inside EXIT_GHOST_FALLBACK_MS. The panel animates `transform`,
+   which composes with Tailwind's separate `translate` property used for
+   centring. Auto-disabled by the reduced-motion rules below.
+*/
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes overlay-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes overlay-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes overlay-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+.overlay-enter {
+  animation: overlay-fade-in var(--motion-duration-fast) var(--motion-ease-out-expo);
+}
+.overlay-enter [data-overlay-panel] {
+  animation: overlay-panel-in var(--motion-duration-base) var(--motion-ease-out-expo);
+}
+.overlay-exit {
+  animation: overlay-fade-out var(--motion-duration-fast) ease-in forwards;
+}
+.overlay-exit [data-overlay-panel] {
+  animation: overlay-panel-out var(--motion-duration-fast) ease-in forwards;
+}
+
+/* ---------------------------------------------------------
    Media auto-download indicator
 
    Used by the "downloading" placeholder in MediaAttachment: a cloud icon

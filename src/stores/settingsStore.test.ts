@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as exitGhost from '../lib/exitGhost'
 import { useSettingsStore } from './settingsStore'
 
 describe('settingsStore', () => {
@@ -63,5 +64,16 @@ describe('settingsStore', () => {
     useSettingsStore.getState().setEncryptionMode('password')
     useSettingsStore.getState().setEncryptionMode(null)
     expect(useSettingsStore.getState().encryptionMode).toBe(null)
+  })
+
+  // Locking unmounts every open overlay; their exit copies would replay the
+  // closed content over the lock screen.
+  it('locking suppresses overlay exit animations, unlocking does not', () => {
+    const spy = vi.spyOn(exitGhost, 'suppressExitGhosts')
+    useSettingsStore.getState().setLocked(false)
+    expect(spy).not.toHaveBeenCalled()
+    useSettingsStore.getState().setLocked(true)
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 })

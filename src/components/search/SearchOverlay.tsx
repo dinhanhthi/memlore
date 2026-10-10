@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../../stores/uiStore'
@@ -35,6 +35,7 @@ import { highlightQuery } from '../../lib/search'
 import { SearchFilterRow } from './SearchFilterRow'
 import { defaultSearchUiFilters, hasAnyFilter, type SearchUiFilters } from './searchUiFilters'
 import { useOverlayHostBox } from '../../lib/overlayHost'
+import { playExitGhost, suppressExitGhosts } from '../../lib/exitGhost'
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input,textarea,select,[tabindex]:not([tabindex="-1"])'
@@ -44,10 +45,21 @@ export function SearchOverlay() {
   const { keepResults, setKeepResults } = useSearchOverlayKeepResults()
   const activeVaultId = useInvisibleLockStore((s) => s.activeVaultId)
   const lockedView = useSecondLockStore((s) => s.lockedView())
+  const retentionKey = searchOverlayRetentionKey(activeVaultId, lockedView)
+  // A new key drops results from the previous vault or lock view; its exit
+  // copy would show them again.
+  const firstKey = useRef(true)
+  useLayoutEffect(() => {
+    if (firstKey.current) {
+      firstKey.current = false
+      return
+    }
+    suppressExitGhosts()
+  }, [retentionKey])
   if (!shouldRetainSearchOverlayContent(searchOverlayOpen, keepResults)) return null
   return (
     <SearchOverlayContent
-      key={searchOverlayRetentionKey(activeVaultId, lockedView)}
+      key={retentionKey}
       visible={searchOverlayOpen}
       keepResults={keepResults}
       onKeepResultsChange={setKeepResults}
@@ -94,6 +106,13 @@ function SearchOverlayContent({
     activeMode === 'keyword' ? keywordSearch.results.length : meaningSearch.results.length
 
   const cardRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
+  // Closing unmounts the overlay: fade a copy out in its place.
+  useLayoutEffect(() => {
+    if (!visible) return
+    const scrim = scrimRef.current
+    return () => playExitGhost(scrim)
+  }, [visible])
   const inputRef = useRef<HTMLInputElement>(null)
   const hostBox = useOverlayHostBox()
 
@@ -152,16 +171,18 @@ function SearchOverlayContent({
 
   return createPortal(
     <div
+      ref={scrimRef}
       role="dialog"
       aria-modal="true"
       aria-label={t('search.overlay_aria')}
-      className={`xj-scrim xj-scrim-keep-blur fixed z-50 bg-black/35 backdrop-blur-md ${hostBox ? 'overflow-hidden rounded-2xl' : ''}`}
+      className={`xj-scrim xj-scrim-keep-blur overlay-enter fixed z-50 bg-black/35 backdrop-blur-md ${hostBox ? 'overflow-hidden rounded-2xl' : ''}`}
       style={hostBox ?? { inset: 0 }}
       onClick={handleScrimClick}
     >
       {/* Card — 640px wide, 90px from top, horizontally centered */}
       <div
         ref={cardRef}
+        data-overlay-panel
         className={cn(
           'absolute top-22.5 left-1/2 w-160 -translate-x-1/2',
           'bg-elevated rounded-2xl shadow-xl',
