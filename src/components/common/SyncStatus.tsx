@@ -257,7 +257,23 @@ export function SyncStatus({
     displayPhase !== 'syncing' &&
     !hasError &&
     !showNotices
-  const pillTooltip = busyNote ?? (showHeldNote ? heldNote : summaryTooltip)
+  // The resting pending label says what is waiting; this says why and what
+  // happens next.
+  const pendingNote =
+    unheldCount > 0 &&
+    !recoveryBlocksSync &&
+    displayPhase !== 'syncing' &&
+    !hasError &&
+    !showNotices
+      ? t('sync.pending_note', { count: unheldCount })
+      : null
+  const pillTooltip =
+    busyNote ??
+    (showHeldNote
+      ? heldNote
+      : pendingNote
+        ? `${pendingNote} ${t('sync.pending_click')}`
+        : summaryTooltip)
 
   // Don't show the error (red) tone while a sync is actively in flight — a
   // lingering `lastError` from a prior attempt must not paint a healthy
@@ -425,6 +441,7 @@ export function SyncStatus({
             </ShimmerText>
           )}
           {showHeldNote && <span className="text-fg-muted mt-0.5 text-sm">{heldNote}</span>}
+          {pendingNote && <span className="text-fg-muted mt-0.5 text-sm">{pendingNote}</span>}
           {busyNote && <span className="text-fg-muted mt-0.5 text-sm">{busyNote}</span>}
           {hasError && !isSyncing && !recoveryBlocksSync && (
             <span className="text-fg-muted mt-0.5 text-sm">
