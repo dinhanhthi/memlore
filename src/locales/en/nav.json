@@ -160,7 +160,8 @@
       "pulling-locations": "Pulling locations",
       "pulling-chats": "Pulling chats",
       "pulling-streak": "Pulling streak",
-      "pulling-ai-audit": "Pulling AI audit"
+      "pulling-ai-audit": "Pulling AI audit",
+      "importing-web-edits": "Checking web edits"
     },
     "web_notice": {
       "title": "From your desktop",

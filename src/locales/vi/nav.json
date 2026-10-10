@@ -160,7 +160,8 @@
       "pulling-locations": "Kéo địa điểm",
       "pulling-chats": "Kéo trò chuyện",
       "pulling-streak": "Kéo chuỗi",
-      "pulling-ai-audit": "Kéo nhật ký AI"
+      "pulling-ai-audit": "Kéo nhật ký AI",
+      "importing-web-edits": "Kiểm tra thay đổi từ web"
     },
     "web_notice": {
       "title": "Từ bản desktop",

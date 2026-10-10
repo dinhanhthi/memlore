@@ -1361,66 +1361,15 @@ fn run_sync_now_holding(
             } else {
                 Some(summary.errors.join("; "))
             };
-            let err_clone = err.clone();
-            emit_status(app, phase, state, err_clone);
 
-            // Outbox importer runs after terminal status has been emitted.
-            let is_folder = {
-                let conn = state.lock().map_err(|e| e.to_string())?;
-                matches!(
-                    configured_cloud_provider(&conn)?,
-                    Some(CloudProvider::Folder(_))
-                )
-            };
-            if !is_folder && !summary.scope_mismatch {
-                let cloud_opt = {
-                    let conn = state.lock().map_err(|e| e.to_string())?;
-                    configured_cloud_provider(&conn)?
-                };
-                if let (Ok(key_list), Some(cloud)) = (key_state.content_key_list(), cloud_opt) {
-                    let slots = block_on(crate::sync::keyring_v2::io::list_device_slots(&cloud))
-                        .unwrap_or_default();
-                    let has_candidate_web_devices = slots.into_iter().any(|s| {
-                        s.device_id != device_id
-                            && !summary.fetched_manifests.contains(&s.device_id)
-                            && !summary.unchanged_peers.contains(&s.device_id)
-                    });
-                    if has_candidate_web_devices {
-                        let sink = crate::sync::outbox_import::TauriOutboxSink { app, state };
-                        use tauri::Manager;
-                        let media_dir = app
-                            .path()
-                            .app_data_dir()
-                            .unwrap_or_else(|_| std::path::PathBuf::from("."))
-                            .join("media");
-
-                        let (known_ids, pull_clean) = if summary.pull_clean {
-                            match block_on(engine.fetch_manifests(true)) {
-                                Ok((manifests, errors)) if errors.is_empty() => (
-                                    crate::sync::outbox_import::collect_known_ids_from_manifests(
-                                        &manifests,
-                                    ),
-                                    true,
-                                ),
-                                _ => (std::collections::HashMap::new(), false),
-                            }
-                        } else {
-                            (std::collections::HashMap::new(), false)
-                        };
-
-                        if let Err(e) =
-                            block_on(crate::sync::outbox_import::run_outbox_import_cycle(
-                                &cloud, &cloud, &device_id, &key_list, known_ids, pull_clean,
-                                &summary, &media_dir, state, &sink,
-                            ))
-                        {
-                            log::warn!("run_sync_now: outbox import cycle failed: {e}");
-                        }
-                    }
-                    // Re-emit final sync status to clear any progress state
-                    emit_status(app, phase, state, err);
-                }
+            // Outbox importer runs before the terminal status, so "Synced" means web edits were
+            // applied too. It never fails the sync: errors are logged, then the status is emitted.
+            if let Err(e) =
+                import_web_outbox_after_sync(app, state, key_state, &engine, &device_id, &summary)
+            {
+                log::warn!("run_sync_now: outbox import skipped: {e}");
             }
+            emit_status(app, phase, state, err);
 
             Ok(summary)
         }
@@ -1446,6 +1395,80 @@ fn run_sync_now_holding(
             Err(e)
         }
     }
+}
+
+/// Runs the outbox importer (web companion edits) at the end of a successful sync, before the
+/// terminal status. Emits `importing-web-edits` progress while it runs and logs its duration.
+fn import_web_outbox_after_sync(
+    app: &AppHandle,
+    state: &AppState,
+    key_state: &EncryptionKeyState,
+    engine: &SyncEngine,
+    device_id: &str,
+    summary: &SyncSummary,
+) -> Result<(), String> {
+    let cloud_opt = {
+        let conn = state.lock().map_err(|e| e.to_string())?;
+        configured_cloud_provider(&conn)?
+    };
+    if matches!(cloud_opt, Some(CloudProvider::Folder(_))) || summary.scope_mismatch {
+        return Ok(());
+    }
+    let (Ok(key_list), Some(cloud)) = (key_state.content_key_list(), cloud_opt) else {
+        return Ok(());
+    };
+    let slots =
+        block_on(crate::sync::keyring_v2::io::list_device_slots(&cloud)).unwrap_or_default();
+    let has_candidate_web_devices = slots.into_iter().any(|s| {
+        s.device_id != device_id
+            && !summary.fetched_manifests.contains(&s.device_id)
+            && !summary.unchanged_peers.contains(&s.device_id)
+    });
+    if !has_candidate_web_devices {
+        return Ok(());
+    }
+
+    use crate::sync::outbox_import::OutboxEventSink;
+    use tauri::Manager;
+    let sink = crate::sync::outbox_import::TauriOutboxSink { app, state };
+    // Shown while the manifests are re-read, before any outbox file is checked.
+    sink.emit_progress(0, 0);
+    let started = std::time::Instant::now();
+    let media_dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("media");
+
+    let (known_ids, pull_clean) = if summary.pull_clean {
+        match block_on(engine.fetch_manifests(true)) {
+            Ok((manifests, errors)) if errors.is_empty() => (
+                crate::sync::outbox_import::collect_known_ids_from_manifests(&manifests),
+                true,
+            ),
+            _ => (std::collections::HashMap::new(), false),
+        }
+    } else {
+        (std::collections::HashMap::new(), false)
+    };
+
+    match block_on(crate::sync::outbox_import::run_outbox_import_cycle(
+        &cloud, &cloud, device_id, &key_list, known_ids, pull_clean, summary, &media_dir, state,
+        &sink,
+    )) {
+        Ok(imported) => log::info!(
+            "run_sync_now: outbox import took {} ms (listed {}, applied {}, refused {}, \
+             transient {}, unchanged {})",
+            started.elapsed().as_millis(),
+            imported.intents_listed,
+            imported.intents_applied,
+            imported.intents_refused,
+            imported.intents_transient,
+            imported.intents_skipped_unchanged,
+        ),
+        Err(e) => log::warn!("run_sync_now: outbox import cycle failed: {e}"),
+    }
+    Ok(())
 }
 
 // ─── Sync reset ─────────────────────────────────────────────────────────────
@@ -3829,6 +3852,7 @@ mod tests {
             (SyncProgressPhase::PullingChats, "pulling-chats"),
             (SyncProgressPhase::PullingStreak, "pulling-streak"),
             (SyncProgressPhase::PullingAiAudit, "pulling-ai-audit"),
+            (SyncProgressPhase::ImportingWebEdits, "importing-web-edits"),
         ];
         for (variant, expected) in cases {
             let got = serde_json::to_string(&variant).unwrap();

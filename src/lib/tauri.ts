@@ -1756,6 +1756,7 @@ export type SyncProgressPhase =
   | 'pulling-chats'
   | 'pulling-streak'
   | 'pulling-ai-audit'
+  | 'importing-web-edits'
 
 /** Payload emitted on every meaningful loop boundary during a push/pull cycle. */
 export interface SyncProgressEvent {

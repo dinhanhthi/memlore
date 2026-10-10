@@ -1636,7 +1636,7 @@ impl<'a> OutboxEventSink for TauriOutboxSink<'a> {
     fn emit_progress(&self, current: u32, total: u32) {
         use tauri::Emitter;
         let event = SyncProgressEvent {
-            phase: SyncProgressPhase::PullingEntries,
+            phase: SyncProgressPhase::ImportingWebEdits,
             current,
             total,
         };
@@ -2301,7 +2301,9 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
     // MAX_DECODED_BYTES (checked before each read, so one intent may overshoot it by at
     // most MAX_OUTBOX_PAYLOAD_BYTES), so memory stays bounded.
     let mut decoded: Vec<DecodedIntent> = Vec::new();
-    for intent_path in intent_paths {
+    let checked_total = intent_paths.len() as u32;
+    let mut checked_count: u32 = 0;
+    for (checked, intent_path) in intent_paths.into_iter().enumerate() {
         if start_time.elapsed() >= MAX_READ_WALL_CLOCK
             || changed_intents_count >= MAX_CHANGED_INTENTS
             || decoded_bytes >= MAX_DECODED_BYTES
@@ -2309,6 +2311,8 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
             log::info!("outbox_import: budget reached, deferring remaining intents to next cycle");
             break;
         }
+        checked_count = checked as u32 + 1;
+        sink.emit_progress(checked_count, checked_total);
 
         let recorded =
             access.with_conn(|conn| outbox_import_get(conn, &intent_path).map_err(sync_io))?;
@@ -2358,7 +2362,6 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
             .and_then(|intent| decode_named_intent(&intent_path, intent).map_err(Err));
 
         changed_intents_count += 1;
-        sink.emit_progress(changed_intents_count as u32, 20);
 
         let body = match opened {
             Ok(body) => body,
@@ -2506,7 +2509,9 @@ pub async fn run_outbox_import_cycle<C: ConnAccess, S: OutboxEventSink>(
                                     total_media_bytes += enc_len;
                                     summary_out.media_downloaded += 1;
                                     summary_out.media_bytes_downloaded += enc_len;
-                                    sink.emit_progress(changed_intents_count as u32, 20);
+                                    // Same count again: keeps the UI watchdog alive during
+                                    // long media downloads.
+                                    sink.emit_progress(checked_count, checked_total);
                                     Some(dec)
                                 }
                                 Err(_) => None,
@@ -4060,7 +4065,8 @@ mod tests {
         // Progress emitted
         let progress = sink.progress_events.lock().unwrap();
         assert!(!progress.is_empty());
-        assert_eq!(progress[0], (1, 20));
+        assert_eq!(progress[0], (1, 1)); // files checked / files listed
+        assert!(progress.iter().all(|&(_, total)| total == 1));
 
         // Bridge event emitted
         let bridge = sink.bridge_events.lock().unwrap();

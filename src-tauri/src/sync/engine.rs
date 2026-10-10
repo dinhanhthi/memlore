@@ -278,6 +278,8 @@ pub enum SyncProgressPhase {
     PullingChats,
     PullingStreak,
     PullingAiAudit,
+    /// Outbox importer: checking and applying web companion edits, after push/pull.
+    ImportingWebEdits,
 }
 
 /// Per-event payload emitted during a push/pull cycle.

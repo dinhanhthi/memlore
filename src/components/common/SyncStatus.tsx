@@ -228,7 +228,9 @@ export function SyncStatus({
     ? t('sync.recovery_in_progress')
     : displayPhase === 'syncing'
       ? isSyncing && progress
-        ? `${t(`sync.progress.${progress.phase}`)} ${progress.current}/${progress.total}`
+        ? progress.total > 0
+          ? `${t(`sync.progress.${progress.phase}`)} ${progress.current}/${progress.total}`
+          : t(`sync.progress.${progress.phase}`)
         : t('sync.syncing')
       : hasError
         ? t('sync.error')
