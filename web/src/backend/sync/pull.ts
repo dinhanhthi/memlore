@@ -206,6 +206,9 @@ export interface DegradedDevice {
   reason: DegradedReason
 }
 
+/** A stage of `refresh()`, reported for the sync status line. */
+export type PullStep = 'access' | 'changes' | 'lists'
+
 export interface PullResult {
   generation: number
   /** Devices that have a manifest (desktops), sorted. */
@@ -435,9 +438,9 @@ export class Puller {
     return this.#loadedCore
   }
 
-  /** Concurrent callers share one run. */
-  refresh(): Promise<PullResult> {
-    this.#refreshing ??= this.#refresh().finally(() => {
+  /** Concurrent callers share one run; only the caller that starts it receives `onStep`. */
+  refresh(onStep?: (step: PullStep) => void): Promise<PullResult> {
+    this.#refreshing ??= this.#refresh(onStep).finally(() => {
       this.#refreshing = null
     })
     return this.#refreshing
@@ -485,7 +488,8 @@ export class Puller {
     }
   }
 
-  async #refresh(): Promise<PullResult> {
+  async #refresh(onStep?: (step: PullStep) => void): Promise<PullResult> {
+    onStep?.('access')
     // Folder ids are reused between reads, never across refreshes: the authority check below
     // must see a deleted or recreated `devices` folder, not a cached id.
     this.#reader.clearFolderCache()
@@ -495,6 +499,7 @@ export class Puller {
     const generation = await this.#checkAuthority(core, versions)
     this.#assertUnlocked()
     this.#generation = generation
+    onStep?.('changes')
 
     const reader = this.#reader
     const devices = (await guarded('the device list', () => reader.listDevices(generation))).filter(
@@ -526,6 +531,7 @@ export class Puller {
     this.#assertUnlocked()
     const stale = await this.#diffAndCacheManifests(core, manifests)
     await this.#pruneGhostManifests(devices)
+    onStep?.('lists')
     // Small files of every desktop run concurrently through the shared limiter; the first
     // rejection in device order aborts the pull and the warnings fold in device order.
     const smallFiles = await Promise.allSettled(

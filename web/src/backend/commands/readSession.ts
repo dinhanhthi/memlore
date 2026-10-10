@@ -43,7 +43,7 @@ import { JOURNAL_SEEN_PREFIX, draftKind, type DraftRecord, type WebDb } from '..
 import type { IndexEntry } from '../sync/entryIndex'
 import type { OutboxEntryV1, WebNotice } from '../sync/outbox'
 import type { MonthIndexReader } from '../sync/monthIndex'
-import type { ForeignIntentFile, Limiter } from '../sync/pull'
+import type { ForeignIntentFile, Limiter, PullStep } from '../sync/pull'
 import type { Vault } from '../vault'
 import type { DeviceBinLoader } from './deviceBins'
 import {
@@ -111,6 +111,9 @@ export interface Taxonomy {
    */
   templateUpdatedAt: Record<string, number>
 }
+
+/** A stage of `pull()` for the sync status line: the puller's, then reloading changed entries. */
+export type SessionPullStep = PullStep | 'entries'
 
 /** What one `pull()` observed. */
 export interface PullOutcome {
@@ -191,7 +194,7 @@ export interface ReadSession {
    * Phase 10.4: re-reads the cloud (always hits the network), re-applies the journal exclusions
    * and reloads the entries that are already in RAM and changed on the server.
    */
-  pull: () => Promise<PullOutcome>
+  pull: (onStep?: (step: SessionPullStep) => void) => Promise<PullOutcome>
   /** Unregisters the session's lock hooks (its own and the vault's). Absent in test doubles. */
   dispose?: () => void
 }
@@ -594,7 +597,7 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     return value
   }
 
-  const pull = async (): Promise<PullOutcome> => {
+  const pull = async (onStep?: (step: SessionPullStep) => void): Promise<PullOutcome> => {
     const started = epoch
     // Prime first so a reload compares the refresh against the cached index, not nothing.
     await prime()
@@ -602,8 +605,9 @@ export async function createReadSession(deps: ReadSessionDeps): Promise<ReadSess
     const before = puller.index
     const taxonomyBefore = cache === null ? null : JSON.stringify(cache.value)
     const foreignBefore = foreignKey
-    const result = await puller.refresh()
+    const result = await puller.refresh(onStep)
     assertSameEpoch(started)
+    onStep?.('entries')
     const value = await ready()
     assertSameEpoch(started)
     // Lazy policy: only what is already in RAM is reloaded, stubs included (an entry that was

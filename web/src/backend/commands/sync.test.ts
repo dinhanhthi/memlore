@@ -6,7 +6,7 @@ import { dispose, lock, setKeyRing, type KeyRing } from '../keys'
 import { WRAPPED_MASTER_HEX_LEN, openWebDb } from '../storage/idb'
 import type { WebNotice } from '../sync/outbox'
 import type { PushResult } from '../sync/push'
-import type { PullOutcome } from './readSession'
+import type { PullOutcome, SessionPullStep } from './readSession'
 import {
   BACKOFF_BASE_MS,
   BACKOFF_MAX_MS,
@@ -65,6 +65,13 @@ function harness() {
   const h = {
     pulls: 0,
     outcome: NOOP,
+    /** The stages every pull reports, in order. */
+    pullSteps: [] as SessionPullStep[],
+    /** `sync:progress` phases, in order. */
+    progress: () =>
+      events
+        .filter((e) => e.event === 'sync:progress')
+        .map((e) => (e.payload as { phase: string }).phase),
     pushes: 0,
     /** The cached write flag. Off by default, so the pull-only tests never push. */
     flag: false,
@@ -163,9 +170,10 @@ function harness() {
       h.pending = result.pending
       return result
     },
-    pull: async () => {
+    pull: async (onStep) => {
       h.pulls += 1
       h.log.push('pull')
+      for (const step of h.pullSteps) onStep?.(step)
       const next = script.shift()
       return next === undefined ? h.outcome : next()
     },
@@ -1147,6 +1155,32 @@ describe('push status', () => {
       errors: [],
     })
     expect(h.log).toEqual(['pull', 'push'])
+    expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0, error: null })
+  })
+
+  it('reports each pull stage as a web-* progress step without counts', async () => {
+    const h = harness()
+    h.pullSteps = ['access', 'changes', 'lists', 'entries']
+    await syncHandlers.sync_now({})
+    expect(h.progress()).toEqual([
+      'web-checking-access',
+      'web-checking-changes',
+      'web-downloading-lists',
+      'web-updating-entries',
+    ])
+    const ticks = h.events.filter((e) => e.event === 'sync:progress').map((e) => e.payload)
+    expect(ticks.every((p) => (p as { total: number }).total === 0)).toBe(true)
+  })
+
+  it('sync_now with drafts stays syncing through the upload, then ends synced', async () => {
+    const h = harness()
+    h.flag = true
+    h.pending = 1
+    h.pushResult = PUSHED_ALL
+    await syncHandlers.sync_now({})
+    // pull, then the upload: its pending-count update is still `syncing`, then the end.
+    expect(h.states()).toEqual(['syncing', 'synced', 'syncing', 'syncing', 'synced'])
+    expect(h.progress()).toEqual(['web-uploading-edits'])
     expect(h.last()).toMatchObject({ state: 'synced', entriesPending: 0, error: null })
   })
 

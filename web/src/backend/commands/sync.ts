@@ -17,9 +17,11 @@
  *          status; an absent field counts as none); reset to both false on lock. `main.tsx`
  *          feeds it to `capabilitiesStore`, which starts at false, so the first all-false pull
  *          emits nothing.
- *   Event  "sync:progress" is deliberately NOT emitted: the UI treats every `pulling-*` tick as
- *          "rows are landing" and refetches all lists, which a no-op pull must not trigger. The
- *          lists refresh through the two events above (and syncStore does it on `synced` anyway).
+ *   Event  "sync:progress" carries only the web's own `web-*` phases (one per pull stage, and the
+ *          upload of `sync_now`), with `total: 0` (no counts), so the status line says what runs.
+ *          Never a desktop `pulling-*` phase: the UI treats those ticks as "rows are landing" and
+ *          refetches all lists, which a no-op pull must not trigger. The lists refresh through the
+ *          two events above (and syncStore does it on `synced` anyway).
  *   Cmd    sync_now -> SyncSummary `{pushed, pulled, merged, errors}`: a pull, then (cached write
  *          flag on) a push. A pull or push failure is reported in `errors` (the store reads
  *          `summary.errors`), it does not reject. Locked: rejects.
@@ -77,9 +79,19 @@ import { VaultLockedError, isUnlocked, onLock } from '../keys'
 import type { Handler } from '../router'
 import type { WebNotice } from '../sync/outbox'
 import type { PushResult } from '../sync/push'
-import { readEnv, type PullOutcome } from './readSession'
+import { readEnv, type PullOutcome, type SessionPullStep } from './readSession'
 
 export const STATUS_EVENT = 'sync:status-changed'
+export const PROGRESS_EVENT = 'sync:progress'
+
+/** The status-line phase of each pull stage (labels in `nav.json` `sync.progress`). */
+const PULL_STEP_PHASE: Record<SessionPullStep, string> = {
+  access: 'web-checking-access',
+  changes: 'web-checking-changes',
+  lists: 'web-downloading-lists',
+  entries: 'web-updating-entries',
+}
+const PUSH_PHASE = 'web-uploading-edits'
 export const CAPABILITIES_EVENT = 'memlore:web-capabilities'
 const CHANGED_EVENT = 'memlore:entries-changed'
 
@@ -149,8 +161,8 @@ export interface SyncEnv {
   /** `memlore:entries-changed`, through the read session's emitter (shim + window event). */
   emitChanged: () => void
   isUnlocked: () => boolean
-  /** One pull of the read session. */
-  pull: () => Promise<PullOutcome>
+  /** One pull of the read session; `onStep` reports its stages. */
+  pull: (onStep?: (step: SessionPullStep) => void) => Promise<PullOutcome>
   /** `pushAll()`, imported lazily (push.ts loads the WASM core). Never rejects. */
   push: () => Promise<PushResult>
   /** The last fetched write flag. Off: no push at all. */
@@ -173,7 +185,7 @@ function defaultEnv(): SyncEnv {
     emit: emitFromBackend,
     emitChanged: () => readEnv().emit(CHANGED_EVENT),
     isUnlocked,
-    pull: async () => (await readEnv().session()).pull(),
+    pull: async (onStep) => (await readEnv().session()).pull(onStep),
     push: async () => (await import('../sync/push')).pushAll(),
     cachedWriteFlag: getCachedWriteFlag,
     onWriteFlagOn,
@@ -336,6 +348,11 @@ function setPhase(next: SyncPhase, error: string | null): void {
   env().emit(STATUS_EVENT, payload)
 }
 
+/** A status-line step without counts; shown only while the status is `syncing`. */
+function emitProgress(phase: string): void {
+  env().emit(PROGRESS_EVENT, { phase, current: 0, total: 0 })
+}
+
 // ---------------------------------------------------------------------------------------------
 // Pull
 // ---------------------------------------------------------------------------------------------
@@ -376,7 +393,9 @@ async function doPull(): Promise<PullReport> {
   lastAttemptAt = e.now()
   setPhase('syncing', null)
   try {
-    const outcome = await e.pull()
+    const outcome = await e.pull((step) => {
+      if (startedEpoch === epoch) emitProgress(PULL_STEP_PHASE[step])
+    })
     if (startedEpoch !== epoch) return { outcome: null, message: null }
     const firstPull = !pulledThisEpoch
     pulledThisEpoch = true
@@ -692,7 +711,17 @@ async function syncNow(): Promise<SyncSummary> {
   // Pull first (see the header): it detects a revoke before anything is written.
   let pushed = 0
   if (report.outcome !== null && e.isUnlocked() && e.cachedWriteFlag()) {
+    // With drafts to upload, stay `syncing` (with its step) until the push is done.
+    const showPush = e.pendingCount() > 0
+    const startedEpoch = epoch
+    if (showPush) {
+      setPhase('syncing', null)
+      emitProgress(PUSH_PHASE)
+    }
     const result = await runPush()
+    if (showPush && phase === 'syncing' && startedEpoch === epoch && e.isUnlocked()) {
+      setPhase('synced', pullNote())
+    }
     pushed = result.pushed
     if (result.error !== undefined) errors.push(errorText(result.error))
   }
