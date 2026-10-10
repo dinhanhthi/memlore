@@ -46,6 +46,7 @@ export class FakeDrive {
   interceptors: Array<(req: Recorded) => Response | undefined> = []
   pageSize = 1000
   omitEtag = false
+  omitVersion = false
   #nextId = 1
   #clock = 0
 
@@ -142,7 +143,8 @@ export class FakeDrive {
     if (req.method === 'PATCH') {
       // A media upload to /upload/.../files/<id> replaces content only (a `.json` file is sent with
       // Content-Type application/json, which is legitimate). Anything that could change the name,
-      // parents or trash state, or that skips If-Match, is unsafe. The body is file content, so
+      // parents or trash state, or that skips both If-Match and the version precondition (two
+      // metadata reads of the same file right before it), is unsafe. The body is file content, so
       // only the move/trash keywords are checked there (`name` is a normal key in a JSON slot).
       const params = req.url.searchParams
       const ok =
@@ -150,7 +152,7 @@ export class FakeDrive {
         params.get('uploadType') === 'media' &&
         !['addParents', 'removeParents', 'trashed', 'name', 'parents'].some((k) => params.has(k)) &&
         !/addParents|removeParents/.test(req.body ? text(req.body) : '') &&
-        req.headers.has('if-match')
+        (req.headers.has('if-match') || this.#versionChecked(req))
       if (!ok)
         violations.push(`unsafe PATCH (could change name/parents or skips If-Match): ${label}`)
     }
@@ -158,6 +160,21 @@ export class FakeDrive {
       if (req.url.searchParams.get('spaces') !== 'appDataFolder')
         violations.push(`no appDataFolder: ${label}`)
     }
+  }
+
+  /** The two requests before this PATCH read the same file's `version` (check-then-write). */
+  #versionChecked(req: Recorded): boolean {
+    const id = req.url.pathname.split('/').pop()
+    const before = this.requests.slice(-3, -1)
+    return (
+      before.length === 2 &&
+      before.every(
+        (r) =>
+          r.method === 'GET' &&
+          r.url.pathname === `/drive/v3/files/${id}` &&
+          (r.url.searchParams.get('fields') ?? '').split(',').includes('version'),
+      )
+    )
   }
 
   #answer(req: Recorded): Response {
@@ -171,7 +188,8 @@ export class FakeDrive {
         return new Response(file.content as BodyInit, { status: 200 })
       }
       const headers: Record<string, string> = this.omitEtag ? {} : { ETag: this.etag(file) }
-      return json({ id: file.id, name: file.name }, 200, headers)
+      const version = this.omitVersion ? {} : { version: String(file.version) }
+      return json({ id: file.id, name: file.name, ...version }, 200, headers)
     }
     if (req.method === 'POST' && pathname === '/drive/v3/files') {
       const meta = JSON.parse(text(req.body ?? new Uint8Array())) as {
@@ -188,7 +206,9 @@ export class FakeDrive {
     if (req.method === 'PATCH' && patch) {
       const file = this.files.find((f) => f.id === patch[1])
       if (!file) return json({ error: 'nf' }, 404)
-      if (req.headers.get('if-match') !== this.etag(file)) return json({ error: 'pre' }, 412)
+      // Like Drive: a missing If-Match is an unconditional update; a stale one is a 412.
+      const ifMatch = req.headers.get('if-match')
+      if (ifMatch !== null && ifMatch !== this.etag(file)) return json({ error: 'pre' }, 412)
       file.content = req.body ?? new Uint8Array()
       file.version += 1
       return json({ id: file.id })

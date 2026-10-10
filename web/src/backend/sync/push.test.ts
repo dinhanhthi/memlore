@@ -402,10 +402,24 @@ describe('pushAll', () => {
     expect(await isPushed(ENTRY_B)).toBe(false)
   })
 
-  it('stops with the error when an update has no ETag, keeping the draft unpushed', async () => {
+  it('updates an existing outbox file when Drive shows no ETag (version precondition)', async () => {
     const outboxId = drive.chain('Memlore', 'generations', 'g-0', WEB_ID, 'outbox')
     drive.addFile(`${ENTRY_A}.bin`, outboxId, 'old')
     drive.omitEtag = true
+    await putDraft(intent(ENTRY_A), 1)
+
+    const result = await pushAll()
+
+    expect(result.error).toBeUndefined()
+    expect(result).toMatchObject({ pushed: 1, pending: 0 })
+    expect(await isPushed(ENTRY_A)).toBe(true)
+  })
+
+  it('stops with the error when an update has no ETag or version, keeping the draft unpushed', async () => {
+    const outboxId = drive.chain('Memlore', 'generations', 'g-0', WEB_ID, 'outbox')
+    drive.addFile(`${ENTRY_A}.bin`, outboxId, 'old')
+    drive.omitEtag = true
+    drive.omitVersion = true
     await putDraft(intent(ENTRY_A), 1)
     await putDraft(intent(ENTRY_B), 2)
 

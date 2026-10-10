@@ -6,7 +6,8 @@
  *  - `DriveReader`: read-only (list, get, path resolution, desktop-compatible device reads).
  *  - `DriveWriter`: the ONLY mutating surface. Every write is checked against the allowlist in
  *    `paths.ts` BEFORE any network call, runs under one cross-tab lock, updates in place with
- *    `If-Match`, creates a file only when none exists, and may create only `<ownId>` and
+ *    `If-Match` (or a `version` precondition when the browser sees no ETag), creates a file only
+ *    when none exists, and may create only `<ownId>` and
  *    `<ownId>/outbox` under an existing `generations/g-<localGen>`.
  *
  * There is deliberately no delete, trash, move or rename anywhere in this module: no method for
@@ -17,7 +18,7 @@
  * (an ESLint rule is added in 15.4). Everything else imports `DriveReader` only.
  *
  * Mirrors `src-tauri/src/sync/gdrive_provider.rs`: `spaces=appDataFolder`, root folder
- * `Memlore`, multipart upload, ETag / If-Match, 4 attempts with 400 ms base backoff capped at
+ * `Memlore`, multipart upload, ETag / If-Match with a `version` fallback, 4 attempts with 400 ms base backoff capped at
  * 5 s, `Retry-After` honoured (capped at 10 s like desktop). Differences from desktop are
  * called out where they matter (list paging; duplicate-folder choice; write retries).
  */
@@ -83,7 +84,10 @@ export class DriveNotFoundError extends Error {
   }
 }
 
-/** 412 on an If-Match update: the file changed under us. Never overwritten blindly. */
+/**
+ * 412 on an If-Match update, or a `version` precondition mismatch: the file changed under us.
+ * Never overwritten blindly.
+ */
 export class DriveConflictError extends Error {
   constructor() {
     super('Drive file changed since it was read (If-Match failed)')
@@ -101,7 +105,7 @@ export class DriveHttpError extends Error {
   }
 }
 
-/** The API answered with an unexpected shape (missing id/etag, bad JSON). Fail closed. */
+/** The API answered with an unexpected shape (missing id/revision, bad JSON). Fail closed. */
 export class DriveProtocolError extends Error {
   constructor(message: string) {
     super(`Unexpected Drive response: ${message}`)
@@ -352,8 +356,10 @@ function canonicalOrder(files: DriveFile[]): DriveFile[] {
 export interface FileMeta {
   id: string
   name: string
-  /** `ETag` response header, or null when Drive omitted it (the writer then refuses to update). */
+  /** `ETag` response header, or null when Drive omitted it or CORS hid it from the browser. */
   etag: string | null
+  /** Drive's monotonic file `version` (body field, so CORS cannot hide it), or null. */
+  version: string | null
 }
 
 export interface ResolvedFile {
@@ -587,12 +593,15 @@ export class DriveReader {
     return file === null ? null : { id: file.id, parentId }
   }
 
-  /** Metadata GET (never `fields=etag`, which 400s on Drive v3); the ETag is a response header. */
+  /**
+   * Metadata GET (never `fields=etag`, which 400s on Drive v3); the ETag is a response header,
+   * `version` a body field.
+   */
   async getMeta(fileId: string): Promise<FileMeta> {
     assertDriveId(fileId, 'file')
     const response = await send(
       this.#t,
-      `${this.#t.apiBase}/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name`,
+      `${this.#t.apiBase}/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,version`,
       { method: 'GET' },
       true,
     )
@@ -602,10 +611,12 @@ export class DriveReader {
       throw new DriveProtocolError('metadata has no name')
     }
     const etag = response.headers.get('etag')
+    const version = typeof body.version === 'string' && body.version !== '' ? body.version : null
     return {
       id: assertDriveId(body.id, 'metadata'),
       name: body.name,
       etag: etag !== null && etag !== '' ? etag : null,
+      version,
     }
   }
 
@@ -948,7 +959,8 @@ export class DriveWriter {
   }
 
   /**
-   * Write `bytes` at an allowlisted path: update in place with If-Match when the file exists,
+   * Write `bytes` at an allowlisted path: update in place when the file exists (If-Match, or a
+   * `version` recheck when no ETag is visible),
    * create it (multipart) only when none exists. The path is checked first, before any network
    * call. The identity is immutable once set (setIdentity refuses changes), so one check before
    * taking the lock suffices.
@@ -986,14 +998,31 @@ export class DriveWriter {
     return this.#createAndAdopt(target.name, parentId, bytes, target.contentType)
   }
 
+  /**
+   * PATCH with `If-Match` when the ETag is visible. Real Drive usually omits it for appDataFolder
+   * files (or CORS hides it), so otherwise re-read `version` right before the PATCH and refuse on
+   * a mismatch, like desktop's `ensure_synthetic_revision_precondition`. That check is not atomic
+   * and only covers the short gap between the two reads, so it is not real conflict protection:
+   * the safety comes from only this device writing these paths, under the writer lock. With
+   * neither an ETag nor a version the update is refused.
+   */
   async #update(fileId: string, bytes: Uint8Array, contentType: string): Promise<void> {
     const meta = await this.#reader.getMeta(fileId)
-    if (meta.etag === null) throw new DriveProtocolError('no ETag for the file to update')
+    const headers: Record<string, string> = { 'Content-Type': contentType }
+    if (meta.etag !== null) {
+      headers['If-Match'] = meta.etag
+    } else {
+      if (meta.version === null) {
+        throw new DriveProtocolError('no ETag or version for the file to update')
+      }
+      const recheck = await this.#reader.getMeta(fileId)
+      if (recheck.version !== meta.version) throw new DriveConflictError()
+    }
     const body = new Uint8Array(bytes)
     const response = await send(
       this.#t,
       `${this.#t.uploadBase}/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media`,
-      { method: 'PATCH', headers: { 'Content-Type': contentType, 'If-Match': meta.etag }, body },
+      { method: 'PATCH', headers, body },
       false,
     )
     ensureOk(response, fileId)

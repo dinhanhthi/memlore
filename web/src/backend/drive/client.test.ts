@@ -442,10 +442,42 @@ describe('put: update in place, create only when absent', () => {
     expect(h.drive.mutating().map((r) => r.method)).toEqual(['POST'])
   })
 
-  it('fails closed without an ETag: no PATCH is sent', async () => {
+  it('updates under a version precondition when Drive shows no ETag (no If-Match sent)', async () => {
+    const h = await readyOutbox()
+    const id = h.drive.addFile(`${UUID_A}.bin`, h.parent, 'old')
+    h.drive.omitEtag = true
+    const result = await h.writer.put(`${outbox()}/${UUID_A}.bin`, bytes('new'))
+    expect(result).toEqual({ fileId: id, created: false, adoptedOther: false })
+    const writes = h.drive.mutating()
+    expect(writes).toHaveLength(1)
+    expect(writes[0].headers.has('if-match')).toBe(false)
+    expect(text(h.drive.files.find((f) => f.id === id)?.content as Uint8Array)).toBe('new')
+  })
+
+  it('refuses the update when the version changes before the PATCH', async () => {
+    const h = await readyOutbox()
+    const id = h.drive.addFile(`${UUID_A}.bin`, h.parent, 'old')
+    h.drive.omitEtag = true
+    let metaReads = 0
+    h.drive.interceptors.push((req) => {
+      if (req.method === 'GET' && req.url.pathname.endsWith(`/files/${id}`)) {
+        metaReads += 1
+        if (metaReads === 2) (h.drive.files.find((f) => f.id === id) as FakeFile).version += 1
+      }
+      return undefined
+    })
+    await expect(h.writer.put(`${outbox()}/${UUID_A}.bin`, bytes('new'))).rejects.toBeInstanceOf(
+      DriveConflictError,
+    )
+    expect(h.drive.mutating()).toHaveLength(0)
+    expect(text(h.drive.files.find((f) => f.id === id)?.content as Uint8Array)).toBe('old')
+  })
+
+  it('fails closed without an ETag or a version: no PATCH is sent', async () => {
     const h = await readyOutbox()
     h.drive.addFile(`${UUID_A}.bin`, h.parent, 'old')
     h.drive.omitEtag = true
+    h.drive.omitVersion = true
     await expect(h.writer.put(`${outbox()}/${UUID_A}.bin`, bytes('new'))).rejects.toBeInstanceOf(
       DriveProtocolError,
     )
