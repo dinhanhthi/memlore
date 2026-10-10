@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import * as Y from 'yjs'
+import { extractPlainText } from '../../../src/lib/yjs'
 import type { KeyRing } from './keys'
 import { VaultLockedError } from './keys'
 import type { IndexEntry } from './sync/entryIndex'
@@ -16,7 +18,7 @@ const enc = new TextEncoder()
 interface Fake {
   vault: ReturnType<typeof createVault>
   /** Registers a payload; the "ciphertext" is just the entry id. */
-  put: (meta: Partial<EntryMetadata> & { entry_id: string }, yjs?: string) => void
+  put: (meta: Partial<EntryMetadata> & { entry_id: string }, yjs?: string | Uint8Array) => void
   index: Map<string, IndexEntry>
   fetched: string[]
   /** Registers a copy served from the "cache" before the Drive copy, until `dropCached`. */
@@ -104,7 +106,10 @@ function setup(guardMetadata?: (id: string, metadataJson: string) => void): Fake
   })
   const put: Fake['put'] = (meta, yjs = 'yjs') => {
     const full = fullOf(meta)
-    payloads.set(full.entry_id, { metadataJson: JSON.stringify(full), yjs: enc.encode(yjs) })
+    payloads.set(full.entry_id, {
+      metadataJson: JSON.stringify(full),
+      yjs: typeof yjs === 'string' ? enc.encode(yjs) : yjs,
+    })
     index.set(full.entry_id, {
       entryId: full.entry_id,
       authorDevice: full.device_id,
@@ -564,6 +569,46 @@ describe('cross-device LWW (mocked core merge)', () => {
 })
 
 describe('outbox overlay', () => {
+  it('reads the text of a draft over a newer desktop copy from the merged doc', async () => {
+    const paragraph = (doc: Y.Doc, text: string) => {
+      const p = new Y.XmlElement('paragraph')
+      p.insert(0, [new Y.XmlText(text)])
+      doc.getXmlFragment('default').push([p])
+    }
+    const base = new Y.Doc()
+    paragraph(base, 'Base')
+    const draft = new Y.Doc()
+    Y.applyUpdate(draft, Y.encodeStateAsUpdate(base))
+    paragraph(draft, 'From web')
+    const desktop = new Y.Doc()
+    Y.applyUpdate(desktop, Y.encodeStateAsUpdate(base))
+    paragraph(desktop, 'From desktop')
+
+    const f = setup()
+    f.put(
+      { entry_id: 'a', updated_at: 200, content_text: 'Base\nFrom desktop' },
+      Y.encodeStateAsUpdate(desktop),
+    )
+    await f.vault.load(['a'])
+    f.vault.setOutboxIntents([
+      webIntent('a', {
+        created_on_web: false,
+        yjs_full_state: Array.from(Y.encodeStateAsUpdate(draft)),
+        content_text: 'Base\nFrom web',
+        preview_text: 'Base\nFrom web',
+      }),
+    ])
+
+    const held = f.vault.getEntry('a')
+    const merged = new Y.Doc()
+    Y.applyUpdate(merged, held.content)
+    expect(held.contentText).toBe(extractPlainText(merged))
+    expect(held.contentText).toContain('From web')
+    expect(held.contentText).toContain('From desktop')
+    expect(held.previewText).toBe(held.contentText.slice(0, 150))
+    expect(held.metadata.preview_text).toBe(held.previewText)
+  })
+
   it('overlays pending outbox fields on top of synced entry when base matches', async () => {
     const f = setup()
     f.put({ entry_id: 'a', updated_at: 100, title: 'Base Title' })

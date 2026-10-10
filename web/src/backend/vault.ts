@@ -36,6 +36,7 @@
  */
 
 import * as Y from 'yjs'
+import { extractPlainText } from '../../../src/lib/yjs'
 import type { Core } from '../core/core'
 import { getKeyRing, onLock, type KeyRing } from './keys'
 import { isLive, type IndexEntry } from './sync/entryIndex'
@@ -43,6 +44,9 @@ import type { OutboxEntryV1 } from './sync/outbox'
 import { foldText, matchesQuery, parseQuery, type MatchOptions } from './textFold'
 
 type VaultCore = Pick<Core, 'openEntry' | 'mergeMetadataLww'>
+
+/** Same cut as the editor's autosave (`EditorPanel`). */
+const PREVIEW_LENGTH = 150
 
 export interface VaultKeys {
   getKeyRing: () => KeyRing
@@ -482,6 +486,7 @@ export class Vault {
     const { fields } = intent
 
     let content = base.content
+    let mergedText: string | null = null
     if (intent.yjs_full_state && intent.yjs_full_state.length > 0) {
       try {
         const doc = new Y.Doc()
@@ -490,18 +495,29 @@ export class Vault {
         }
         Y.applyUpdate(doc, new Uint8Array(intent.yjs_full_state))
         content = Y.encodeStateAsUpdate(doc)
+        // The draft's own text misses whatever the desktop copy added since
+        // the draft was written; read the text from the merged doc instead.
+        if (base.content.length > 0) mergedText = extractPlainText(doc)
       } catch {
         // Corrupt intent yjs state: keep base content
       }
     }
 
-    const contentText = intent.content_text ?? base.contentText
-    const previewText = intent.preview_text ?? base.previewText
-    if (intent.content_text !== null && intent.content_text !== undefined) {
-      m.content_text = intent.content_text
-    }
-    if (intent.preview_text !== null && intent.preview_text !== undefined) {
-      m.preview_text = intent.preview_text
+    const contentText = mergedText ?? intent.content_text ?? base.contentText
+    const previewText =
+      mergedText !== null
+        ? mergedText.slice(0, PREVIEW_LENGTH)
+        : (intent.preview_text ?? base.previewText)
+    if (mergedText !== null) {
+      m.content_text = contentText
+      m.preview_text = previewText
+    } else {
+      if (intent.content_text !== null && intent.content_text !== undefined) {
+        m.content_text = intent.content_text
+      }
+      if (intent.preview_text !== null && intent.preview_text !== undefined) {
+        m.preview_text = intent.preview_text
+      }
     }
 
     if (fields.title) {

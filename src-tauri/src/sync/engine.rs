@@ -5620,10 +5620,12 @@ impl SyncEngine {
                 crate::utils::encryption::decrypt_data(sync_k, inner)
             })
             .map_err(SyncError::Serialization)?;
+        let mut yjs_merged = false;
         let final_yjs_plain: Vec<u8> = if let Some(ref e) = existing {
             let local_blob_raw = db::get_entry_content(conn, &e.id).map_err(sync_io)?;
             match local_blob_raw {
                 Some(local_plain) if !local_plain.is_empty() && !remote_yjs_plain.is_empty() => {
+                    yjs_merged = true;
                     merge_yjs_full_state_updates(&local_plain, &remote_yjs_plain)?
                 }
                 _ => remote_yjs_plain.clone(),
@@ -5691,6 +5693,19 @@ impl SyncEngine {
         } else {
             remote_meta.clone()
         };
+
+        // The body is the CRDT union of both sides, but LWW hands the text
+        // fields to one side only, so the card excerpt and search text would
+        // miss the other side's edits. Read them from the merged doc instead.
+        if yjs_merged {
+            if let Some((content_text, preview_text)) = final_yjs_doc
+                .as_deref()
+                .and_then(crate::yjs_doc::extract_entry_text)
+            {
+                merged_meta.content_text = Some(content_text);
+                merged_meta.preview_text = Some(preview_text);
+            }
+        }
 
         let (is_locked, is_invisible, vault_id) = normalize_entry_lock_and_vault(
             merged_meta.is_locked,
@@ -11831,6 +11846,97 @@ mod tests {
             .unwrap();
         let a_entry = db::get_entry(&conn_a, &id).unwrap().unwrap();
         assert_eq!(a_entry.content_text.as_deref(), Some("A wrote — B edited"));
+    }
+
+    /// Both desktops add a paragraph to the same entry; the pull merges the
+    /// two docs, so the text and excerpt must come from the merged doc, not
+    /// from the LWW winner's copy that lacks the loser's paragraph.
+    #[tokio::test]
+    async fn pull_merge_derives_text_from_the_merged_doc() {
+        use yrs::types::xml::XmlIn;
+        use yrs::updates::decoder::Decode;
+        use yrs::{
+            ReadTxn, StateVector, Transact, Update, XmlElementPrelim, XmlFragment, XmlTextPrelim,
+        };
+
+        fn add_paragraph(base: &[u8], text: &str) -> Vec<u8> {
+            let doc = yrs::Doc::new();
+            let _ = doc
+                .transact_mut()
+                .apply_update(Update::decode_v1(base).unwrap());
+            let fragment = doc.get_or_insert_xml_fragment("default");
+            fragment.push_back(
+                &mut doc.transact_mut(),
+                XmlElementPrelim::new("paragraph", [XmlIn::from(XmlTextPrelim::new(text))]),
+            );
+            let bytes = doc
+                .transact()
+                .encode_state_as_update_v1(&StateVector::default());
+            bytes
+        }
+        fn set_content(conn: &Connection, id: &str, blob: &[u8], text: &str, updated_at: i64) {
+            conn.execute(
+                "UPDATE entries SET yjs_doc = ?1, content_text = ?2, preview_text = ?2, \
+                 updated_at = ?3 WHERE id = ?4",
+                rusqlite::params![blob, text, updated_at, id],
+            )
+            .unwrap();
+            db::mark_entry_pending(conn, id).unwrap();
+        }
+
+        let key = test_key();
+        let dir = TempDir::new().unwrap();
+        let ks = key_state_from_key(&key);
+
+        let conn_a = fresh_db();
+        let engine_a = make_engine(&dir, "dev-a");
+        let id = make_entry_with_content(&conn_a, &key, "Base");
+        let (base, _, _) = crate::yjs_doc::build_entry_yjs(&["Base"], &[]);
+        set_content(&conn_a, &id, &base, "Base", now_unix());
+        engine_a
+            .sync_now(&conn_a, &key, &ks, SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        let conn_b = fresh_db();
+        let engine_b = make_engine(&dir, "dev-b");
+        engine_b
+            .sync_now(&conn_b, &key, &ks, SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        // A edits first (older), B edits later (newer, so B wins LWW).
+        set_content(
+            &conn_a,
+            &id,
+            &add_paragraph(&base, "From A"),
+            "Base\nFrom A",
+            now_unix() + 5,
+        );
+        set_content(
+            &conn_b,
+            &id,
+            &add_paragraph(&base, "From B"),
+            "Base\nFrom B",
+            now_unix() + 10,
+        );
+        engine_b
+            .sync_now(&conn_b, &key, &ks, SyncTrigger::Manual)
+            .await
+            .unwrap();
+        engine_a
+            .sync_now(&conn_a, &key, &ks, SyncTrigger::Manual)
+            .await
+            .unwrap();
+
+        let a_entry = db::get_entry(&conn_a, &id).unwrap().unwrap();
+        let blob = db::get_entry_content(&conn_a, &id).unwrap().unwrap();
+        let (want_text, want_preview) = crate::yjs_doc::extract_entry_text(&blob).unwrap();
+        let text = a_entry.content_text.unwrap();
+        assert_eq!(text, want_text);
+        assert_eq!(a_entry.preview_text.unwrap(), want_preview);
+        assert!(text.contains("From A") && text.contains("From B"), "{text}");
+        assert_eq!(text.matches("Base").count(), 1);
     }
 
     #[tokio::test]

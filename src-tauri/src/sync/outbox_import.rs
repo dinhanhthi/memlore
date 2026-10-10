@@ -1180,27 +1180,19 @@ pub fn apply_intent_full(
         let full_state = local_doc
             .transact()
             .encode_state_as_update_v1(&StateVector::default());
-        let intent_text = intent.entry.content_text.as_deref().unwrap_or("");
-        let local_text = entry.content_text.as_deref().unwrap_or("");
-        let is_clean_edit = if intent.entry.base_state_vector.is_empty() {
-            sv_before.is_empty()
-        } else {
-            StateVector::decode_v1(&intent.entry.base_state_vector)
-                .map(|base_sv| sv_before == base_sv)
-                .unwrap_or(false)
-        };
-        let content_text = if !is_clean_edit
-            && !local_text.is_empty()
-            && !intent_text.is_empty()
-            && local_text != intent_text
-        {
-            format!("{}\n{}", local_text, intent_text)
-        } else if !intent_text.is_empty() {
-            intent_text.to_string()
-        } else {
-            local_text.to_string()
-        };
-        let preview_text: String = content_text.chars().take(PREVIEW_MAX_CHARS).collect();
+        // The text is read from the merged doc, so it holds both sides'
+        // edits exactly once, as the editor would save it.
+        let (content_text, preview_text) = crate::yjs_doc::extract_entry_text(&full_state)
+            .unwrap_or_else(|| {
+                let text = intent
+                    .entry
+                    .content_text
+                    .clone()
+                    .or_else(|| entry.content_text.clone())
+                    .unwrap_or_default();
+                let preview = text.chars().take(PREVIEW_MAX_CHARS).collect();
+                (text, preview)
+            });
         let _ = save_entry_content_impl(conn, &entry.id, &full_state, &content_text, &preview_text);
         touched_entry_ids.push(entry.id.clone());
     }
@@ -4135,6 +4127,25 @@ mod tests {
 
     #[test]
     fn test_created_on_web_text_race_crdt_union() {
+        use yrs::types::xml::XmlIn;
+        use yrs::{XmlElementPrelim, XmlFragment, XmlTextPrelim};
+
+        fn add_paragraph(base: &[u8], text: &str) -> Vec<u8> {
+            let doc = Doc::new();
+            let _ = doc
+                .transact_mut()
+                .apply_update(Update::decode_v1(base).unwrap());
+            let fragment = doc.get_or_insert_xml_fragment("default");
+            fragment.push_back(
+                &mut doc.transact_mut(),
+                XmlElementPrelim::new("paragraph", [XmlIn::from(XmlTextPrelim::new(text))]),
+            );
+            let bytes = doc
+                .transact()
+                .encode_state_as_update_v1(&StateVector::default());
+            bytes
+        }
+
         let conn = setup_test_db();
         let jid = default_journal_id(&conn);
         let dir = tempfile::tempdir().unwrap();
@@ -4142,7 +4153,7 @@ mod tests {
         let eid = "web-race-crdt-entry";
 
         // 1. Web creates E
-        let yjs1 = make_test_yjs("Web Hello");
+        let (yjs1, _, _) = crate::yjs_doc::build_entry_yjs(&["Web Hello"], &[]);
         let mut intent1 = make_base_intent(eid, "web-dev-1");
         intent1.entry.created_on_web = true;
         intent1.entry.fields.journal_id = Some(FieldChange {
@@ -4157,49 +4168,39 @@ mod tests {
         apply_intent(&conn, &ctx, &intent1);
 
         // 2. Desktop edits text locally before web pulls it
-        let local_doc = Doc::new();
-        let _ = local_doc
-            .transact_mut()
-            .apply_update(Update::decode_v1(&yjs1).unwrap());
-        let txt = local_doc.get_or_insert_text("default");
-        txt.push(&mut local_doc.transact_mut(), " + Desktop Local Edit");
-        let local_yjs = local_doc
-            .transact()
-            .encode_state_as_update_v1(&StateVector::default());
+        let local_yjs = add_paragraph(&yjs1, "Desktop Local Edit");
         save_entry_content_impl(
             &conn,
             eid,
             &local_yjs,
-            "Web Hello + Desktop Local Edit",
-            "Web Hello + Desktop Local Edit",
+            "Web Hello\nDesktop Local Edit",
+            "Web Hello\nDesktop Local Edit",
         )
         .unwrap();
 
         // 3. Web edits text again with created_on_web = true
-        let web_doc = Doc::new();
-        let _ = web_doc
-            .transact_mut()
-            .apply_update(Update::decode_v1(&yjs1).unwrap());
-        let web_txt = web_doc.get_or_insert_text("default");
-        web_txt.push(&mut web_doc.transact_mut(), " + Web Second Edit");
         let mut intent2 = make_base_intent(eid, "web-dev-1");
         intent2.revision = Some("rev-2".to_string());
         intent2.entry.created_on_web = true;
         intent2.entry.base_state_vector = vec![];
-        let bytes2 = web_doc
-            .transact()
-            .encode_state_as_update_v1(&StateVector::default());
-        intent2.entry.yjs_full_state = bytes2;
-        intent2.entry.content_text = Some("Web Hello + Web Second Edit".to_string());
+        intent2.entry.yjs_full_state = add_paragraph(&yjs1, "Web Second Edit");
+        intent2.entry.content_text = Some("Web Hello\nWeb Second Edit".to_string());
 
         let (outcome2, touched2) = apply_intent(&conn, &ctx, &intent2);
         assert_eq!(outcome2, Outcome::Applied);
         assert_eq!(touched2, vec![eid.to_string()]);
 
+        // The text is the merged doc's, not either side's copy: both edits
+        // once, the shared base once, and the excerpt matches it.
         let final_entry = db::queries::get_entry(&conn, eid).unwrap().unwrap();
+        let blob = db::queries::get_entry_content(&conn, eid).unwrap().unwrap();
+        let (want_text, want_preview) = crate::yjs_doc::extract_entry_text(&blob).unwrap();
         let text = final_entry.content_text.unwrap();
-        assert!(text.contains("Desktop Local Edit"));
-        assert!(text.contains("Web Second Edit"));
+        assert_eq!(text, want_text);
+        assert_eq!(final_entry.preview_text.unwrap(), want_preview);
+        assert_eq!(text.matches("Web Hello").count(), 1);
+        assert_eq!(text.matches("Desktop Local Edit").count(), 1);
+        assert_eq!(text.matches("Web Second Edit").count(), 1);
     }
 
     #[test]
