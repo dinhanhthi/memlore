@@ -17,7 +17,7 @@ const NEW_CAPABILITY_FLAGS = [
 ]
 
 /** Read-only flags that hold on both platforms. */
-const BOTH_PLATFORM_FLAGS = ['chatRead', 'memoryRead', 'streak', 'entryMarkdownExport']
+const BOTH_PLATFORM_FLAGS = ['chatRead', 'memoryRead', 'streak', 'entryMarkdownExport', 'trashView']
 
 async function load() {
   vi.resetModules()
@@ -49,6 +49,9 @@ describe('platform', () => {
     for (const [flag, value] of Object.entries(p.capabilities)) {
       expect(value, flag).toBe(BOTH_PLATFORM_FLAGS.includes(flag))
     }
+    // The Trash list is readable on web; its actions stay desktop-only.
+    expect(p.capabilities.trashView).toBe(true)
+    expect(p.capabilities.trash).toBe(false)
   })
 
   it('desktop: isMacOS follows the user agent', async () => {

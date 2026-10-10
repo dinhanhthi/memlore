@@ -503,7 +503,11 @@
       "empty_trash_body_one": "{{count}} entry and its media will be permanently deleted. This can't be undone.",
       "empty_trash_body_other": "{{count}} entries and their media will be permanently deleted. This can't be undone.",
       "empty_trash_locked_note": "Locked entries are skipped here. Unlock them to delete them now; otherwise they are deleted after 30 days like the rest.",
-      "error": "Something went wrong: {{message}}"
+      "error": "Something went wrong: {{message}}",
+      "desktop_only_title": "Only in the desktop app",
+      "desktop_only_body": "Restoring and permanently deleting entries happen in the Memlore desktop app. Entries deleted on the web stay here until your desktop applies the delete.",
+      "waiting_for_desktop": "Waiting for your desktop",
+      "in_desktop_trash": "In your desktop Trash"
     }
   },
   "about_section": {

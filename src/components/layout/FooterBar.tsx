@@ -296,7 +296,7 @@ export function FooterBar() {
             </span>
           </>
         )}
-        {!distractionShellActive && caps.trash && <FooterTrashButton />}
+        {!distractionShellActive && caps.trashView && <FooterTrashButton />}
         {!distractionShellActive && <AIProviderInfoPopover />}
         {caps.streak && (
           <Tooltip content={t('streak.tooltip')} placement="top">

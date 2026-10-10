@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, Lock, RotateCcw, Trash2 } from 'lucide-react'
-import { trashAgeDays, trashDaysLeft, useTrash } from '../../../hooks/useTrash'
+import { useCapabilities } from '../../../hooks/useCapabilities'
+import { trashAgeDays, trashRowStatus, useTrash } from '../../../hooks/useTrash'
 import { getIntlLocale } from '../../../lib/dates'
 import type { LockedView } from '../../../lib/tauri'
 import type { Entry } from '../../../types/entry'
 import { Button } from '../../common/Button'
 import { ConfirmDialog } from '../../common/ConfirmDialog'
+import { DesktopOnlyDialog } from '../../common/DesktopOnlyDialog'
 import { EntryPreviewModal } from '../../chat/EntryPreviewModal'
 import { SettingsGroup } from '../SettingsSurfaceCard'
 import { SettingsSection } from '../SettingsSection'
@@ -18,6 +20,13 @@ function canPurge(entry: Entry, lockedView: LockedView): boolean {
   return !entry.is_locked || lockedView === 'revealed'
 }
 
+/** A web delete the desktop has not applied yet, for an entry this vault never
+ * loaded: there is no body to preview. The empty `journal_id` is the marker
+ * `untitledPendingEntry` (web/src/backend/commands/trash.ts) sets. */
+function hasNothingToShow(entry: Entry): boolean {
+  return entry.trash_pending_desktop === true && entry.journal_id === ''
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -26,6 +35,8 @@ interface TrashRowProps {
   entry: Entry
   nowSecs: number
   lockedView: LockedView
+  /** False on web: the row sits in the desktop Trash, not here. */
+  canAct: boolean
   onPreview: () => void
   onRestore: () => void
   onDeleteForever: () => void
@@ -35,6 +46,7 @@ function TrashRow({
   entry,
   nowSecs,
   lockedView,
+  canAct,
   onPreview,
   onRestore,
   onDeleteForever,
@@ -45,14 +57,22 @@ function TrashRow({
   const title = redacted
     ? t('data_section.trash.locked_entry')
     : entry.title?.trim() || t('data_section.trash.untitled')
-  const trashedAt = entry.trashed_at ?? nowSecs
-  const meta = [
-    new Date(entry.entry_date * 1000).toLocaleDateString(getIntlLocale(i18n.language), {
-      dateStyle: 'medium',
-    }),
-    t('data_section.trash.deleted_ago', { count: trashAgeDays(trashedAt, nowSecs) }),
-    t('data_section.trash.days_left', { count: trashDaysLeft(trashedAt, nowSecs) }),
-  ].join(' · ')
+  const status = trashRowStatus(entry, nowSecs)
+  const date = new Date(entry.entry_date * 1000).toLocaleDateString(getIntlLocale(i18n.language), {
+    dateStyle: 'medium',
+  })
+  const meta =
+    status.kind === 'pending'
+      ? [date, t('data_section.trash.waiting_for_desktop')]
+      : [
+          date,
+          canAct
+            ? t('data_section.trash.deleted_ago', {
+                count: trashAgeDays(entry.trashed_at ?? nowSecs, nowSecs),
+              })
+            : t('data_section.trash.in_desktop_trash'),
+          t('data_section.trash.days_left', { count: status.daysLeft }),
+        ]
 
   return (
     <div className="space-y-2 px-4 py-3">
@@ -61,11 +81,11 @@ function TrashRow({
           <span className="text-fg truncate text-sm font-medium">{title}</span>
           {entry.is_locked && <Lock className="text-fg-muted size-3.5 shrink-0" aria-hidden />}
         </div>
-        <p className="text-fg-muted mt-0.5 text-xs">{meta}</p>
+        <p className="text-fg-muted mt-0.5 text-xs">{meta.join(' · ')}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {/* The preview refuses locked entries, so don't offer it. */}
-        {!entry.is_locked && (
+        {!entry.is_locked && !hasNothingToShow(entry) && (
           <Button
             variant="secondary"
             size="xs"
@@ -101,6 +121,8 @@ function TrashRow({
 export function TrashSettings() {
   const { t } = useTranslation('settings')
   const { entries, isLoading, error, lockedView, restore, deleteForever, empty } = useTrash()
+  // On web the list is read-only: the actions open a desktop-only notice.
+  const caps = useCapabilities()
   // Captured once per mount: the Settings tab is short-lived and a day count
   // that ticks over mid-visit is not worth a timer.
   const [nowSecs] = useState(() => Math.floor(Date.now() / 1000))
@@ -108,9 +130,11 @@ export function TrashSettings() {
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null)
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [desktopOnly, setDesktopOnly] = useState(false)
 
-  const purgeable = entries.filter((e) => canPurge(e, lockedView))
-  const hasHeldBack = purgeable.length < entries.length
+  // A pending web delete is not in any Trash yet, so there is nothing to purge.
+  const purgeable = entries.filter((e) => !e.trash_pending_desktop && canPurge(e, lockedView))
+  const hasHeldBack = entries.some((e) => !canPurge(e, lockedView))
 
   // `ConfirmDialog` only logs a rejected action, so failures are caught here
   // and shown on the page.
@@ -141,7 +165,7 @@ export function TrashSettings() {
               className="shrink-0"
               icon={<Trash2 className="size-3.5" aria-hidden />}
               disabled={purgeable.length === 0}
-              onClick={() => setConfirmEmpty(true)}
+              onClick={() => (caps.trash ? setConfirmEmpty(true) : setDesktopOnly(true))}
             >
               {t('data_section.trash.empty_trash')}
             </Button>
@@ -164,9 +188,14 @@ export function TrashSettings() {
                   entry={entry}
                   nowSecs={nowSecs}
                   lockedView={lockedView}
+                  canAct={caps.trash}
                   onPreview={() => setPreviewId(entry.id)}
-                  onRestore={() => void run(() => restore(entry.id))}
-                  onDeleteForever={() => setPendingDelete(entry)}
+                  onRestore={() =>
+                    caps.trash ? void run(() => restore(entry.id)) : setDesktopOnly(true)
+                  }
+                  onDeleteForever={() =>
+                    caps.trash ? setPendingDelete(entry) : setDesktopOnly(true)
+                  }
                 />
               ))}
             </SettingsGroup>
@@ -182,6 +211,13 @@ export function TrashSettings() {
           onClose={() => setPreviewId(null)}
         />
       )}
+
+      <DesktopOnlyDialog
+        open={desktopOnly}
+        onClose={() => setDesktopOnly(false)}
+        title={t('data_section.trash.desktop_only_title')}
+        body={t('data_section.trash.desktop_only_body')}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

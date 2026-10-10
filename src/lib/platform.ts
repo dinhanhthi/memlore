@@ -62,6 +62,9 @@ export interface Capabilities {
   deleteEntries: boolean
   /** Entry Trash: restore, delete forever, empty. */
   trash: boolean
+  /** The Trash list (Settings → Data → Recently deleted) and the footer shortcut;
+   * its actions stay behind `trash`. */
+  trashView: boolean
   /** Voice memo recording. */
   audioRecording: boolean
   /** Attaching files to entries. */
@@ -119,4 +122,5 @@ export const capabilities: Capabilities = {
   memoryRead: true,
   streak: true,
   entryMarkdownExport: true,
+  trashView: true,
 }

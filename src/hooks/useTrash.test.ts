@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 import { invoke } from '@tauri-apps/api/core'
 import { useInvisibleLockStore } from '../stores/invisibleLockStore'
 import { useSecondLockStore } from '../stores/secondLockStore'
-import { trashAgeDays, trashDaysLeft, useTrash } from './useTrash'
+import { trashAgeDays, trashDaysLeft, trashRowStatus, useTrash } from './useTrash'
 
 const mockInvoke = vi.mocked(invoke)
 const DAY = 86_400
@@ -86,6 +86,25 @@ describe('trash retention helpers', () => {
     expect(trashDaysLeft(now - 45 * DAY, now)).toBe(0)
     // A peer clock ahead of ours must not show a negative age.
     expect(trashAgeDays(now + DAY, now)).toBe(0)
+  })
+})
+
+describe('trashRowStatus', () => {
+  const now = 1_700_000_000
+
+  it('is pending for a web delete the desktop has not applied yet', () => {
+    const entry = { ...trashed('a'), trash_pending_desktop: true }
+    expect(trashRowStatus(entry, now)).toEqual({ kind: 'pending' })
+  })
+
+  it('counts days left for a row in the desktop Trash', () => {
+    const entry = { ...trashed('a'), trashed_at: now - 2 * DAY }
+    expect(trashRowStatus(entry, now)).toEqual({ kind: 'trash', daysLeft: 28 })
+  })
+
+  it('treats a row with no trashed_at as just trashed', () => {
+    const entry = { ...trashed('a'), trashed_at: null }
+    expect(trashRowStatus(entry, now)).toEqual({ kind: 'trash', daysLeft: 30 })
   })
 })
 

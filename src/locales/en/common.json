@@ -6,7 +6,8 @@
   },
   "web_unsupported": {
     "title": "Not supported in the web version",
-    "body": "Open the Memlore desktop app to use this feature."
+    "body": "Open the Memlore desktop app to use this feature.",
+    "ok": "OK"
   },
   "sync_catchup": {
     "incomplete": "Figures are still filling in while older entries sync.",

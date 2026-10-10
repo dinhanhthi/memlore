@@ -6,7 +6,7 @@ import { Button } from '../common/Button'
 import { Tooltip } from '../common/Tooltip'
 
 /** Footer shortcut to Settings → Data → Recently deleted, shown only while
- * the Trash holds something. Mount it only where Trash is supported. */
+ * the Trash holds something. Mount it behind `caps.trashView`. */
 export function FooterTrashButton() {
   const { t } = useTranslation('nav')
   const { entries } = useTrash()

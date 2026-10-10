@@ -500,7 +500,11 @@
       "empty_trash_title": "Dọn sạch thùng rác?",
       "empty_trash_body_other": "{{count}} mục cùng tệp đa phương tiện của chúng sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
       "empty_trash_locked_note": "Các mục đã khóa được bỏ qua ở đây. Mở khóa để xóa chúng ngay; nếu không, chúng cũng bị xóa vĩnh viễn sau 30 ngày như các mục khác.",
-      "error": "Đã xảy ra lỗi: {{message}}"
+      "error": "Đã xảy ra lỗi: {{message}}",
+      "desktop_only_title": "Chỉ có trên ứng dụng máy tính",
+      "desktop_only_body": "Khôi phục và xóa vĩnh viễn chỉ làm được trong ứng dụng Memlore trên máy tính. Các mục xóa trên web nằm ở đây cho tới khi máy tính áp dụng việc xóa.",
+      "waiting_for_desktop": "Đang chờ máy tính xử lý",
+      "in_desktop_trash": "Trong thùng rác của máy tính"
     }
   },
   "about_section": {

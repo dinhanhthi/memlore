@@ -63,6 +63,8 @@ describe('useCapabilities', () => {
     act(() => store.setWrites(true))
     expect(result.current.taxonomyEdits).toBe(false)
     expect(result.current.trash).toBe(false)
+    // The Trash list itself is readable on web.
+    expect(result.current.trashView).toBe(true)
   })
 
   it('web: dashboard, gallery, lookback, stats, mapView and versionsRead follow the month index', async () => {

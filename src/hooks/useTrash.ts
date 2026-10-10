@@ -31,6 +31,16 @@ export function trashDaysLeft(trashedAt: number, nowSecs: number): number {
   return Math.max(0, TRASH_RETENTION_DAYS - trashAgeDays(trashedAt, nowSecs))
 }
 
+export type TrashRowStatus = { kind: 'pending' } | { kind: 'trash'; daysLeft: number }
+
+/** What a Trash row shows: a web delete the desktop has not applied yet, or
+ * a row in the desktop Trash with its days left. A row with no `trashed_at`
+ * counts as trashed now. */
+export function trashRowStatus(entry: Entry, nowSecs: number): TrashRowStatus {
+  if (entry.trash_pending_desktop) return { kind: 'pending' }
+  return { kind: 'trash', daysLeft: trashDaysLeft(entry.trashed_at ?? nowSecs, nowSecs) }
+}
+
 export interface UseTrashResult {
   entries: Entry[]
   isLoading: boolean
