@@ -6,6 +6,7 @@ const tauriMocks = vi.hoisted(() => ({
   getEntryContent: vi.fn(),
   getTagsForEntry: vi.fn(),
   listMediaForEntry: vi.fn(),
+  listJournals: vi.fn(() => Promise.resolve([])),
   exportStatsFile: vi.fn(),
 }))
 

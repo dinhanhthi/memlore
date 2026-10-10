@@ -1,5 +1,6 @@
 import { PenLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useCapabilities } from '../../../hooks/useCapabilities'
 import { useOnThisDay } from '../../../hooks/useOnThisDay'
 import { getIntlLocale } from '../../../lib/dates'
 import { triggerNewEntry } from '../../../lib/newEntry'
@@ -14,6 +15,7 @@ import { DashboardCard } from '../DashboardCard'
 export function TodayCard() {
   const { t, i18n } = useTranslation('dashboard')
   const { t: tEditor } = useTranslation('editor')
+  const caps = useCapabilities()
   const now = new Date()
   const { groups, isLoading, error } = useOnThisDay([
     { month: now.getMonth() + 1, day: now.getDate() },
@@ -38,7 +40,9 @@ export function TodayCard() {
     <DashboardCard
       title={title}
       action={
-        <Tooltip content={t('actions.write')}>
+        <Tooltip
+          content={caps.writes ? t('actions.write') : t('footer.read_only_tooltip', { ns: 'nav' })}
+        >
           <Button
             variant="secondary"
             size="sm"
@@ -46,6 +50,7 @@ export function TodayCard() {
             icon={<PenLine className="size-4" />}
             aria-label={t('actions.write')}
             onClick={triggerNewEntry}
+            disabled={!caps.writes}
           />
         </Tooltip>
       }

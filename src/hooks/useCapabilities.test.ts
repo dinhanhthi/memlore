@@ -65,7 +65,7 @@ describe('useCapabilities', () => {
     expect(result.current.trash).toBe(false)
   })
 
-  it('web: gallery, lookback, stats, mapView and versionsRead follow the month index', async () => {
+  it('web: dashboard, gallery, lookback, stats, mapView and versionsRead follow the month index', async () => {
     vi.stubEnv('VITE_MEMLORE_PLATFORM', 'web')
     vi.resetModules()
     const { useCapabilities } = await import('./useCapabilities')
@@ -73,15 +73,21 @@ describe('useCapabilities', () => {
     const store = useCapabilitiesStore.getState()
     store.setWebCapabilities({ outboxV2: true, monthIndex: false })
     const { result } = renderHook(() => useCapabilities())
-    const indexed = ['gallery', 'lookback', 'stats', 'mapView', 'versionsRead'] as const
+    const indexed = [
+      'dashboard',
+      'gallery',
+      'lookback',
+      'stats',
+      'mapView',
+      'versionsRead',
+    ] as const
     for (const flag of indexed) expect(result.current[flag], flag).toBe(false)
     act(() => store.setWebCapabilities({ outboxV2: false, monthIndex: true }))
     for (const flag of indexed) expect(result.current[flag], flag).toBe(true)
-    // Version restore and the dashboard are not part of the index.
+    // Version restore is not part of the index.
     expect(result.current.versions).toBe(false)
     // Location and weather writes stay desktop-only: only the map view follows the index.
     expect(result.current.maps).toBe(false)
-    expect(result.current.dashboard).toBe(false)
   })
 
   it('currentCapabilities reads the store outside React, like the hook', async () => {

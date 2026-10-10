@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Shuffle } from 'lucide-react'
+import { useCapabilities } from '../../../hooks/useCapabilities'
 import { localDateKey } from '../../../lib/dashboardDates'
 import { dailyPromptIndex, nextPromptIndex, promptSeedHtml } from '../../../lib/dashboardPrompts'
 import { useTabStore } from '../../../stores/tabStore'
@@ -16,6 +17,7 @@ function asPromptList(value: unknown): string[] {
 
 export function PromptCard() {
   const { t } = useTranslation('dashboard')
+  const caps = useCapabilities()
   const prompts = asPromptList(t('prompts', { returnObjects: true }))
   const [index, setIndex] = useState(() =>
     dailyPromptIndex(localDateKey(new Date()), prompts.length),
@@ -27,7 +29,8 @@ export function PromptCard() {
   }
 
   const handleWriteNow = () => {
-    if (!prompt) return
+    // Web with writes off: nothing can be created (triggerNewEntry has the same gate).
+    if (!prompt || !caps.writes) return
     // Bypasses triggerNewEntry()/newEntryMode on purpose: this seeds the entry
     // with the prompt text, and template mode would otherwise silently
     // discard that seed in favor of the picked template.
@@ -43,9 +46,16 @@ export function PromptCard() {
     <DashboardCard
       title={t('cards.prompt')}
       action={
-        <Button variant="primary" size="xs" onClick={handleWriteNow} disabled={!prompt}>
-          {t('prompt.write_now')}
-        </Button>
+        <Tooltip content={t('footer.read_only_tooltip', { ns: 'nav' })} disabled={caps.writes}>
+          <Button
+            variant="primary"
+            size="xs"
+            onClick={handleWriteNow}
+            disabled={!prompt || !caps.writes}
+          >
+            {t('prompt.write_now')}
+          </Button>
+        </Tooltip>
       }
     >
       <div className="flex items-start gap-2">

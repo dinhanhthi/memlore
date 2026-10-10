@@ -155,7 +155,7 @@ function SearchOverlayContent({
       role="dialog"
       aria-modal="true"
       aria-label={t('search.overlay_aria')}
-      className={`xj-scrim fixed z-50 bg-black/35 backdrop-blur-sm ${hostBox ? 'overflow-hidden rounded-2xl' : ''}`}
+      className={`xj-scrim xj-scrim-keep-blur fixed z-50 bg-black/35 backdrop-blur-md ${hostBox ? 'overflow-hidden rounded-2xl' : ''}`}
       style={hostBox ?? { inset: 0 }}
       onClick={handleScrimClick}
     >

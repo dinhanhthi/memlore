@@ -72,4 +72,30 @@ describe('triggerNewEntry', () => {
 
     window.removeEventListener('memlore:new-entry', handler)
   })
+
+  it('does nothing on web while writes are off (⌘N, palette, dashboard Write)', async () => {
+    vi.stubEnv('VITE_MEMLORE_PLATFORM', 'web')
+    vi.resetModules()
+    try {
+      const { triggerNewEntry: trigger } = await import('./newEntry')
+      const { useCapabilitiesStore } = await import('../stores/capabilitiesStore')
+      const { useUiStore: ui } = await import('../stores/uiStore')
+      const { useSettingsStore: settings } = await import('../stores/settingsStore')
+      settings.setState({ isLocked: false })
+      ui.setState({ newEntryMode: 'template', templatePickerOpen: false })
+      useCapabilitiesStore.getState().setWrites(false)
+      const handler = vi.fn()
+      window.addEventListener('memlore:new-entry', handler)
+
+      trigger()
+      await waitForFrame()
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(ui.getState().templatePickerOpen).toBe(false)
+      window.removeEventListener('memlore:new-entry', handler)
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
 })

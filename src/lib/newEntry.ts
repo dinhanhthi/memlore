@@ -1,3 +1,4 @@
+import { currentCapabilities } from '../hooks/useCapabilities'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'
 import { useUiStore } from '../stores/uiStore'
@@ -14,6 +15,8 @@ export function triggerNewEntry() {
   // equivalent gate of its own, so a locked vault must not open the template
   // picker or switch the active view underneath the lock screen.
   if (useSettingsStore.getState().isLocked) return
+  // Web with writes off (⌘N, palette, dashboard Write): there is nothing to create into.
+  if (!currentCapabilities().writes) return
   if (useUiStore.getState().newEntryMode === 'template') {
     useUiStore.getState().setTemplatePickerOpen(true)
     return

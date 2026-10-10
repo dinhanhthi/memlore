@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Check,
   EyeOff,
   Flame,
@@ -224,6 +225,18 @@ export function FooterBar() {
             >
               <EyeOff className="text-accent size-4" />
             </IconButton>
+          </Tooltip>
+        )}
+        {!caps.writes && (
+          <Tooltip content={t('footer.read_only_tooltip')} placement="top">
+            <span
+              tabIndex={0}
+              data-testid="footer-read-only"
+              className="border-warning-border bg-warning-bg text-warning-fg inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-medium whitespace-nowrap"
+            >
+              <BookOpen className="size-3" aria-hidden />
+              {t('footer.read_only')}
+            </span>
           </Tooltip>
         )}
         <SyncStatus compact isConnecting={isConnecting} />

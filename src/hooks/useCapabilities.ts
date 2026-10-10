@@ -18,6 +18,8 @@ function deriveCapabilities(writes: boolean, outboxV2: boolean, monthIndex: bool
     gallery: monthIndex,
     lookback: monthIndex,
     stats: monthIndex,
+    // Home's cards read the same index views as Stats / Gallery / On this day.
+    dashboard: monthIndex,
     mapView: monthIndex,
     versionsRead: monthIndex,
   }

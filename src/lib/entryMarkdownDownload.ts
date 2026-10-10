@@ -9,6 +9,7 @@ import {
   getEntry,
   getEntryContent,
   getTagsForEntry,
+  listJournals,
   listMediaForEntry,
 } from './tauri'
 import { snapshotToPmJson } from './yjs'
@@ -16,7 +17,24 @@ import { snapshotToPmJson } from './yjs'
 export type EntryMarkdownResult = 'saved' | 'cancelled' | 'error'
 
 export interface EntryMarkdownInput {
-  entry: Pick<Entry, 'title' | 'entry_date' | 'emotion'>
+  entry: Pick<Entry, 'title' | 'entry_date' | 'emotion'> &
+    Partial<
+      Pick<
+        Entry,
+        | 'created_at'
+        | 'updated_at'
+        | 'is_favorite'
+        | 'location_label'
+        | 'location_address'
+        | 'latitude'
+        | 'longitude'
+        | 'weather_summary'
+        | 'content_language'
+        | 'from_chat'
+      >
+    >
+  /** The entry's journal name, when known. */
+  journal?: string | null
   tags: string[]
   content: JSONContent
   /** `data-media-id` → original file name. Missing ids fall back to the src's last segment. */
@@ -75,14 +93,40 @@ function withMediaNames(node: JSONContent, mediaNames: Map<string, string>): JSO
   return next
 }
 
-function frontMatter(entry: EntryMarkdownInput['entry'], tags: string[]): string {
-  // Keys and formats match the Markdown importer (`split_frontmatter` in
-  // src-tauri/src/commands/import.rs) so an exported entry re-imports.
+function isoSeconds(secs: number): string {
+  return `${new Date(secs * 1000).toISOString().slice(0, 19)}Z`
+}
+
+function frontMatter(
+  entry: EntryMarkdownInput['entry'],
+  tags: string[],
+  journal: string | null | undefined,
+): string {
+  // `title`, `date` and `tags` match the Markdown importer (`split_frontmatter` in
+  // src-tauri/src/commands/import.rs) so an exported entry re-imports; it ignores the rest.
   const lines = ['---']
   if (entry.title?.trim()) lines.push(`title: ${JSON.stringify(entry.title.trim())}`)
-  lines.push(`date: ${new Date(entry.entry_date * 1000).toISOString().slice(0, 19)}Z`)
+  lines.push(`date: ${isoSeconds(entry.entry_date)}`)
   if (tags.length > 0) lines.push(`tags: [${tags.map((tag) => JSON.stringify(tag)).join(', ')}]`)
   if (entry.emotion) lines.push(`emotion: ${entry.emotion}`)
+  if (journal?.trim()) lines.push(`journal: ${JSON.stringify(journal.trim())}`)
+  if (entry.is_favorite) lines.push('favorite: true')
+  if (entry.location_label?.trim()) {
+    lines.push(`location: ${JSON.stringify(entry.location_label.trim())}`)
+  }
+  if (entry.location_address?.trim()) {
+    lines.push(`address: ${JSON.stringify(entry.location_address.trim())}`)
+  }
+  if (Number.isFinite(entry.latitude) && Number.isFinite(entry.longitude)) {
+    lines.push(`coordinates: [${entry.latitude}, ${entry.longitude}]`)
+  }
+  if (entry.weather_summary?.trim()) {
+    lines.push(`weather: ${JSON.stringify(entry.weather_summary.trim())}`)
+  }
+  if (entry.content_language) lines.push(`language: ${JSON.stringify(entry.content_language)}`)
+  if (entry.from_chat) lines.push('source: ai_chat')
+  if (typeof entry.created_at === 'number') lines.push(`created: ${isoSeconds(entry.created_at)}`)
+  if (typeof entry.updated_at === 'number') lines.push(`updated: ${isoSeconds(entry.updated_at)}`)
   lines.push('---')
   return lines.join('\n')
 }
@@ -90,12 +134,13 @@ function frontMatter(entry: EntryMarkdownInput['entry'], tags: string[]): string
 /** Render one entry as a standalone Markdown file: front matter, then the body. */
 export function buildEntryMarkdown({
   entry,
+  journal,
   tags,
   content,
   mediaNames,
 }: EntryMarkdownInput): string {
   const body = exportMarkdown(withMediaNames(content, mediaNames)).trimEnd()
-  return `${frontMatter(entry, tags)}\n\n${body}\n`
+  return `${frontMatter(entry, tags, journal)}\n\n${body}\n`
 }
 
 function downloadBlob(markdown: string, fileName: string): void {
@@ -123,16 +168,19 @@ export async function downloadEntryMarkdown(entryId: string): Promise<EntryMarkd
   try {
     const entry = await getEntry(entryId)
     if (!entry) throw new Error(`Entry ${entryId} not found`)
-    const [bytes, tags, media] = await Promise.all([
+    const [bytes, tags, media, journals] = await Promise.all([
       getEntryContent(entryId),
       getTagsForEntry(entryId),
       listMediaForEntry(entryId).catch(() => []),
+      // Metadata only: a failed lookup drops the `journal` key, not the export.
+      listJournals(entry.vault_id ?? null).catch(() => []),
     ])
     const content: JSONContent = bytes
       ? snapshotToPmJson(new Uint8Array(bytes))
       : { type: 'doc', content: [] }
     const markdown = buildEntryMarkdown({
       entry,
+      journal: journals.find((j) => j.id === entry.journal_id)?.name ?? null,
       tags: tags.map((tag) => tag.name),
       content,
       mediaNames: new Map(media.map((row) => [row.id, row.file_name])),

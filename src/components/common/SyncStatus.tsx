@@ -475,7 +475,9 @@ export function SyncStatus({
               ? 'sync.view_recovery'
               : isForceRePair
                 ? 'sync.repair'
-                : 'sync.sync_now',
+                : hasError
+                  ? 'sync.try_again'
+                  : 'sync.sync_now',
           )}
         </Button>
         {actions}

@@ -1917,8 +1917,10 @@ describe('WCAG AA 4.5:1 — eight shipping surfaces', () => {
 
   // Frosted glass is Signature's vocabulary; Clay's is matte warm paper.
   // Clean already strips the blur — Clay never did.
-  it('strips the backdrop blur from Clay scrims', () => {
-    expect(cssCode).toMatch(/:root\.ds-clay \.xj-scrim\s*\{[^}]*backdrop-filter:\s*none/)
+  it('strips the backdrop blur from Clay scrims (search keeps its own)', () => {
+    expect(cssCode).toMatch(
+      /:root\.ds-clay \.xj-scrim:not\(\.xj-scrim-keep-blur\)\s*\{[^}]*backdrop-filter:\s*none/,
+    )
   })
 
   it('Clean pins --radius-2xl to the shadcn Card radius (0.75rem)', () => {

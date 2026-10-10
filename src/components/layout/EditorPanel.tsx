@@ -823,6 +823,31 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
     savedTitleRef.current = savedTitle
   }, [handleTitleSave, title, savedTitle])
 
+  // Cmd/Ctrl+S saves the entry now instead of opening the browser's "Save page" dialog (web):
+  // flush the pending debounced content and title saves. Autosave keeps running either way.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+      if (event.key.toLowerCase() !== 's') return
+      event.preventDefault()
+      // Same guards as the flush on leave: a save rejected as trashed is not retried.
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current)
+        autoSaveTimer.current = null
+        if (docRef.current && entryIdRef.current && !contentRejectedRef.current) {
+          triggerAutoSaveRef.current?.(docRef.current, entryIdRef.current)
+        }
+      }
+      if (titleSaveTimer.current) {
+        clearTimeout(titleSaveTimer.current)
+        titleSaveTimer.current = null
+        if (!titleRejectedRef.current) void handleTitleSaveRef.current?.(titleRef.current)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   const titleInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Auto-grow the title textarea so wrapped lines stay visible without

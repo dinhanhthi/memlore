@@ -46,6 +46,8 @@
     "best_other": "Kỷ lục: <b>{{count}}</b> ngày"
   },
   "footer": {
+    "read_only": "Chỉ đọc",
+    "read_only_tooltip": "Hiện chưa bật chỉnh sửa trên web. Bạn vẫn đọc và tìm kiếm được nhật ký; hãy viết trong ứng dụng Memlore cho máy tính.",
     "words": "{{count}} từ",
     "chars": "{{count}} ký tự",
     "saving": "Đang lưu…",
@@ -124,6 +126,7 @@
     "held_order_one": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ một thay đổi trước đó được đồng bộ về bản desktop.",
     "held_order_other": "Đã lưu trong trình duyệt này. {{count}} thay đổi đang chờ một thay đổi trước đó được đồng bộ về bản desktop.",
     "sync_now": "Đồng bộ ngay",
+    "try_again": "Thử lại",
     "repair": "Sửa khoá",
     "force_re_pair_inconclusive": "Không xác minh được keyring trên cloud. Sửa khoá để tiếp tục đồng bộ.",
     "force_re_pair_rotated": "Vault đã được xoay trên thiết bị khác. Ghép lại để tiếp tục đồng bộ.",

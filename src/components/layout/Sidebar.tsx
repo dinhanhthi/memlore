@@ -126,6 +126,8 @@ export function Sidebar() {
       aria-label={newEntryLabel}
       icon={<PenLine className="size-4 shrink-0" strokeWidth={2} />}
       onClick={triggerNewEntry}
+      // Web with writes off: nothing can be created, so the CTA is visibly off.
+      disabled={!caps.writes}
       // px-2.5 centers the 16px icon in the collapsed ~36px CTA (w-12 − px-1.5×2).
       // gap-0 overrides primary's gap-2 so label spacing can live on the span.
       className="h-9 w-full min-w-0 justify-start gap-0 overflow-hidden px-2.5"
@@ -162,9 +164,9 @@ export function Sidebar() {
             pen icon — never shifts when the sidebar width animates. */}
         <div className="shrink-0 px-1.5 pt-3">
           <Tooltip
-            content={newEntryLabel}
+            content={caps.writes ? newEntryLabel : t('footer.read_only_tooltip')}
             placement={sidebarRight ? 'left' : 'right'}
-            disabled={!sidebarCollapsed}
+            disabled={caps.writes && !sidebarCollapsed}
             className="w-full"
           >
             {newEntryButton}

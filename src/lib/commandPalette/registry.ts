@@ -139,7 +139,7 @@ const PAGE_COMMANDS: Command[] = [
     labelKey: 'page.dashboard',
     icon: LayoutDashboard,
     keywords: ['home', 'overview', 'cards'],
-    available: () => capabilities.dashboard,
+    available: () => currentCapabilities().dashboard,
     run: () =>
       useTabStore.getState().updateActiveTab({ activeView: 'dashboard', selectedEntryId: null }),
   },

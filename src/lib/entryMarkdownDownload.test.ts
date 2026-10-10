@@ -7,6 +7,7 @@ const tauriMocks = vi.hoisted(() => ({
   getEntryContent: vi.fn(),
   getTagsForEntry: vi.fn(),
   listMediaForEntry: vi.fn(),
+  listJournals: vi.fn(() => Promise.resolve([])),
   exportStatsFile: vi.fn(),
 }))
 const snapshotMock = vi.hoisted(() => vi.fn())
@@ -55,6 +56,51 @@ describe('buildEntryMarkdown', () => {
     })
     expect(md).toBe(
       '---\ntitle: "My Day"\ndate: 2024-01-15T12:00:00Z\ntags: ["work", "coffee"]\nemotion: good\n---\n\nHello body\n',
+    )
+  })
+
+  it('adds journal, place, weather, favorite, language, source and timestamps when set', () => {
+    const md = buildEntryMarkdown({
+      entry: {
+        title: 'Trip',
+        entry_date: MIDDAY,
+        emotion: null,
+        created_at: MIDDAY,
+        updated_at: MIDDAY + 60,
+        is_favorite: true,
+        location_label: 'Hội An',
+        location_address: 'Quảng Nam, Việt Nam',
+        latitude: 15.88,
+        longitude: 108.33,
+        weather_summary: 'Sunny, 31°C',
+        content_language: 'vi',
+        from_chat: true,
+      },
+      journal: 'Travel',
+      tags: [],
+      content: doc(p('Body')),
+      mediaNames: new Map(),
+    })
+    expect(md).toBe(
+      [
+        '---',
+        'title: "Trip"',
+        'date: 2024-01-15T12:00:00Z',
+        'journal: "Travel"',
+        'favorite: true',
+        'location: "Hội An"',
+        'address: "Quảng Nam, Việt Nam"',
+        'coordinates: [15.88, 108.33]',
+        'weather: "Sunny, 31°C"',
+        'language: "vi"',
+        'source: ai_chat',
+        'created: 2024-01-15T12:00:00Z',
+        'updated: 2024-01-15T12:01:00Z',
+        '---',
+        '',
+        'Body',
+        '',
+      ].join('\n'),
     )
   })
 

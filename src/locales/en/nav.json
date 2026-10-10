@@ -46,6 +46,8 @@
     "best_other": "Best: <b>{{count}}</b> days"
   },
   "footer": {
+    "read_only": "Read only",
+    "read_only_tooltip": "Editing on the web is turned off for now. You can read and search your journal; write in the Memlore desktop app.",
     "words": "{{count}} words",
     "chars": "{{count}} chars",
     "saving": "Saving…",
@@ -124,6 +126,7 @@
     "held_order_one": "Saved in this browser. {{count}} change is waiting for an earlier change to reach your desktop first.",
     "held_order_other": "Saved in this browser. {{count}} changes are waiting for an earlier change to reach your desktop first.",
     "sync_now": "Sync now",
+    "try_again": "Try again",
     "repair": "Repair",
     "force_re_pair_inconclusive": "The cloud keyring could not be verified. Repair to continue syncing.",
     "force_re_pair_rotated": "Vault was rotated on another device. Re-pair to continue syncing.",
