@@ -458,10 +458,13 @@ export function SettingsPanel() {
 
   const activeMeta = activeCat
   // AI is unavailable on web, but its Memories and Persona tabs render read-only
-  // there. Kept out of `isSettingsCategoryAvailable` so the palette's AI deep
-  // links (providers, models, features) stay hidden on web.
+  // there; Data likewise keeps its Recently deleted tab. Kept out of
+  // `isSettingsCategoryAvailable` so the palette's AI and Data deep links stay
+  // hidden on web.
   const activeAvailable =
-    isSettingsCategoryAvailable(activeMeta.id, caps) || (activeMeta.id === 'ai' && caps.memoryRead)
+    isSettingsCategoryAvailable(activeMeta.id, caps) ||
+    (activeMeta.id === 'ai' && caps.memoryRead) ||
+    (activeMeta.id === 'data' && caps.trashView)
 
   return (
     <div

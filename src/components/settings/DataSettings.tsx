@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Info } from 'lucide-react'
 
 import { RestoredScroll } from '../common/RestoredScroll'
+import { UnsupportedOnWeb } from '../common/UnsupportedOnWeb'
+import { useCapabilities } from '../../hooks/useCapabilities'
 import { cn } from '../../lib/cn'
 import { asCloudProviderKind, providerLabel } from '../../lib/providerLabel'
 import { useSyncStore } from '../../stores/syncStore'
@@ -62,6 +64,7 @@ export function DataSettings() {
     providerLabel(asCloudProviderKind(rawProvider), t) ||
     t('data_section.local_data_notice_provider_fallback')
 
+  const caps = useCapabilities()
   const activeTab = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
     return tab?.dataTab ?? 'import'
@@ -111,6 +114,9 @@ export function DataSettings() {
       <div className="min-h-0 flex-1">
         {DATA_TABS.map((tab) => {
           const isActive = activeTab === tab.id
+          // Web reaches Data only for Recently deleted; the other tabs stay
+          // visible and say they need the desktop app.
+          const desktopOnly = !caps.importExport && tab.id !== 'trash'
           return (
             <RestoredScroll
               key={tab.id}
@@ -129,19 +135,29 @@ export function DataSettings() {
                 isActive && slideDir === 'left' && 'tab-slide-in-left',
               )}
             >
-              {tab.id === 'import' && (
+              {desktopOnly && (
+                <UnsupportedOnWeb
+                  title={
+                    tab.labelKey
+                      ? t(tab.labelKey, { defaultValue: tab.defaultLabel })
+                      : tab.defaultLabel
+                  }
+                />
+              )}
+
+              {tab.id === 'import' && !desktopOnly && (
                 <div className="max-w-180">
                   <ImportModal />
                 </div>
               )}
 
-              {tab.id === 'export' && (
+              {tab.id === 'export' && !desktopOnly && (
                 <div className="max-w-180">
                   <ExportModal />
                 </div>
               )}
 
-              {tab.id === 'downloads' && (
+              {tab.id === 'downloads' && !desktopOnly && (
                 <div className="max-w-180">
                   <DownloadsSettings />
                 </div>
@@ -153,7 +169,7 @@ export function DataSettings() {
                 </div>
               )}
 
-              {tab.id === 'demo' && SeedDemoCard != null && (
+              {tab.id === 'demo' && SeedDemoCard != null && !desktopOnly && (
                 <div className="max-w-180">
                   <Suspense fallback={null}>
                     <SeedDemoCard />
@@ -166,10 +182,13 @@ export function DataSettings() {
       </div>
 
       {/* ── Page footer: local-data notice (fixed to bottom of Data page) ─── */}
-      <div className="border-border-default surface-soft:border-border-default text-fg-muted hover:text-fg flex shrink-0 items-start gap-2 border-t px-2 py-2 text-xs transition-colors">
-        <Info className="mt-0.5 size-3.5 shrink-0" />
-        <span className="leading-snug">{t('data_section.local_data_notice', { provider })}</span>
-      </div>
+      {/* Desktop only: the web keeps no journal of its own to lose on uninstall. */}
+      {caps.importExport && (
+        <div className="border-border-default surface-soft:border-border-default text-fg-muted hover:text-fg flex shrink-0 items-start gap-2 border-t px-2 py-2 text-xs transition-colors">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <span className="leading-snug">{t('data_section.local_data_notice', { provider })}</span>
+        </div>
+      )}
     </div>
   )
 }
