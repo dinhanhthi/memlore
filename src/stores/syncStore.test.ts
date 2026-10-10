@@ -572,10 +572,11 @@ describe('syncStore', () => {
     expect(summary).toEqual(prior)
   })
 
-  it('syncNow sync_in_progress rejection without a confirmed cycle restores the previous state', async () => {
-    // Guard held by a non-sync flow (OAuth connect, cloud wipe, …) that never
-    // emits lifecycle events: no 'syncing' event arrives, so the UI must NOT
-    // pin at "syncing" — it returns to its previous state, still error-free.
+  it('syncNow sync_in_progress rejection without a confirmed cycle shows the busy message', async () => {
+    // The backend queued, then gave up: the guard is held by a flow that never
+    // emits lifecycle events (OAuth connect, cloud wipe, post-terminal outbox
+    // import, …). The UI must NOT pin at "syncing" — it returns to its previous
+    // state and tells the user the click did not run.
     vi.mocked(tauri.syncNow).mockRejectedValueOnce(new Error('sync_in_progress'))
     await useSyncStore.getState().init()
 
@@ -583,10 +584,34 @@ describe('syncStore', () => {
 
     const s = useSyncStore.getState()
     expect(s.lastError).toBeNull()
+    expect(s.lastErrorKey).toBe('nav:sync.busy')
+    expect(s.lastErrorAction).toBeNull()
     expect(s.phase).toBe('idle')
     expect(s.isSyncing).toBe(false)
     expect(s.inflightSync).toBe(false)
     expect(s.watchdogTimer).toBeNull()
+  })
+
+  it('syncNow sync_in_progress rejection after a failed cycle still shows the busy message', async () => {
+    vi.mocked(tauri.syncNow).mockRejectedValueOnce(new Error('sync_in_progress'))
+    await useSyncStore.getState().init()
+    // The previous cycle failed before the click: phase stays 'error' (event
+    // driven) while the click clears the old error text.
+    fireStatus({
+      state: 'error',
+      enabled: true,
+      provider: 'gdrive',
+      lastSync: null,
+      entriesPending: 2,
+      error: 'boom',
+    })
+
+    await useSyncStore.getState().syncNow()
+
+    const s = useSyncStore.getState()
+    expect(s.phase).toBe('error')
+    expect(s.lastError).toBeNull()
+    expect(s.lastErrorKey).toBe('nav:sync.busy')
   })
 
   it('syncNow sync_in_progress rejection keeps an error completion that beat it', async () => {
@@ -616,6 +641,7 @@ describe('syncStore', () => {
     expect(s.phase).toBe('error')
     expect(s.isSyncing).toBe(false)
     expect(s.lastError).toBe('boom')
+    expect(s.lastErrorKey).toBeNull()
   })
 
   it('syncNow sync_in_progress rejection does not re-enter syncing when the cycle already completed', async () => {
@@ -644,6 +670,7 @@ describe('syncStore', () => {
     expect(s.phase).toBe('synced')
     expect(s.isSyncing).toBe(false)
     expect(s.lastError).toBeNull()
+    expect(s.lastErrorKey).toBe('nav:sync.busy')
   })
 
   // ── Progress tracking ────────────────────────────────────────────────────

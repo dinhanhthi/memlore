@@ -157,6 +157,13 @@ const emptySummary: SyncSummary = { pushed: 0, pulled: 0, merged: 0, errors: [] 
 const SYNC_IN_PROGRESS_ERR = 'sync_in_progress'
 
 /**
+ * `lastErrorKey` set when a manual sync was still blocked after the backend
+ * queue wait. Informational, not a failure — `SyncStatus` renders it in a
+ * neutral tone instead of the error chrome.
+ */
+export const SYNC_BUSY_KEY = 'nav:sync.busy'
+
+/**
  * Recognise an error class that has an actionable user-facing follow-up.
  * The substrings are anchored to backend error strings — change them in
  * sync if the backend strings change.
@@ -669,21 +676,27 @@ export const useSyncStore = create<SyncStoreState>()((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg === SYNC_IN_PROGRESS_ERR) {
-        // Another guard-holder already owns the backend single-flight guard —
-        // a "skip, no harm done" marker, not an error. Mirror the frontend
-        // inflightSync guard above and resolve with the last summary instead
-        // of surfacing an error.
+        // The backend queues a manual sync behind the single-flight guard (up
+        // to 60s) and only rejects with this marker when the guard is STILL
+        // busy after waiting. Resolve with the last summary (like the
+        // inflightSync guard above) rather than throwing.
         //
         // Keep the syncing presentation ONLY when a backend 'syncing' event
         // confirmed a real sync cycle is running (phase is event-driven) —
         // that cycle's terminal event clears `isSyncing` and the watchdog.
-        // Guard-holders that never emit lifecycle events (gdrive OAuth
-        // connect, cloud wipe, authoritative restore, re-pair recheck) must
-        // not pin the UI at "syncing", so anything else falls through to the
-        // normal finally teardown and the UI returns to its previous state.
+        // Otherwise (a guard-holder that never emits lifecycle events: gdrive
+        // OAuth connect, cloud wipe, authoritative restore, re-pair recheck,
+        // or a cycle's post-terminal outbox import) the UI must not pin at
+        // "syncing": fall through to the finally teardown and tell the user
+        // the click did not run — unless an error arrived during the wait (the
+        // click cleared the old one, so anything set now is fresh: the
+        // guard-holder's error event or the watchdog), which must stay visible.
         set({ inflightSync: false })
         if (get().isSyncing && get().phase === 'syncing') {
           handedOffToInflightCycle = true
+        } else if (get().lastError === null && get().lastErrorKey === null) {
+          console.info('syncStore: syncNow skipped, another sync task is still running')
+          set({ lastErrorKey: SYNC_BUSY_KEY, lastErrorAction: null })
         }
         return get().lastSummary ?? emptySummary
       }

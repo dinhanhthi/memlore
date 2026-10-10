@@ -134,6 +134,7 @@
     "view_error_details": "View sync error details in Settings",
     "timeout": "Sync timed out",
     "network_error": "Couldn't reach the cloud",
+    "busy": "Another sync task is still running. Try again in a moment.",
     "retry_in": "Retrying in {{count}} min",
     "retry_soon": "Retrying soon",
     "last_summary": "Pushed {{pushed}} · Pulled {{pulled}} · Merged {{merged}}",

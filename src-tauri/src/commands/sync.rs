@@ -699,11 +699,18 @@ pub(crate) const USER_SYNC_NOW_TRIGGER: SyncTrigger = SyncTrigger::Manual;
 /// messages, keeping the UI responsive. This mirrors exactly what the background
 /// scheduler already does in `src-tauri/src/sync/scheduler.rs`.
 ///
-/// The in-flight guard lives inside `run_sync_now` itself, so this command
-/// returns `Err("sync_in_progress")` if the scheduler (or window-close final
-/// push) is already running a cycle.
+/// **Queues instead of bailing.** Unlike the scheduler and window-close paths
+/// (which call [`run_sync_now`] and skip on a busy guard), a user click waits
+/// up to [`MANUAL_SYNC_QUEUE_TIMEOUT`] for the single-flight guard and then
+/// runs its own cycle. The guard can be held while the UI looks idle (the
+/// pre-flight before the 'syncing' event, or the outbox import after the
+/// terminal event), so bailing immediately made "Sync now" a silent no-op.
+/// Returns `Err("sync_in_progress")` only if the guard is still busy when the
+/// wait times out.
 #[tauri::command]
 pub async fn sync_now(app: AppHandle) -> Result<SyncSummary, String> {
+    log::info!("sync_now: manual sync requested");
+    let guard = acquire_manual_sync_guard(MANUAL_SYNC_QUEUE_TIMEOUT).await?;
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<AppState>();
@@ -719,10 +726,26 @@ pub async fn sync_now(app: AppHandle) -> Result<SyncSummary, String> {
         {
             scheduler.reset_backoff();
         }
-        run_sync_now(&app, &state, &key_state, USER_SYNC_NOW_TRIGGER)
+        run_sync_now_holding(guard, &app, &state, &key_state, USER_SYNC_NOW_TRIGGER)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// How long a manual "Sync now" queues behind a busy single-flight guard.
+///
+/// Must stay well under the frontend `WATCHDOG_MS` (130s in
+/// `src/stores/syncStore.ts`): the frontend watchdog is armed at click and
+/// only re-armed once the backend emits 'syncing', so a longer wait here
+/// would let the watchdog fire a false "Sync timed out" while still queued.
+const MANUAL_SYNC_QUEUE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Queue for the single-flight guard on behalf of a manual sync, mapping a
+/// timeout to the stable [`SYNC_IN_PROGRESS_ERR`] marker.
+async fn acquire_manual_sync_guard(timeout: Duration) -> Result<SyncInProgressGuard, String> {
+    SyncInProgressGuard::acquire_waiting(timeout)
+        .await
+        .ok_or_else(|| SYNC_IN_PROGRESS_ERR.to_string())
 }
 
 /// Shared implementation behind every sync entry point: the user-invoked
@@ -735,12 +758,14 @@ pub async fn sync_now(app: AppHandle) -> Result<SyncSummary, String> {
 /// identical events.
 ///
 /// **Single-flight guard.** A `SyncInProgressGuard` is acquired at the very
-/// top of this function — if another caller (user, scheduler, close-handler)
+/// top of `run_sync_now` — if another caller (user, scheduler, close-handler)
 /// is already running a cycle, we return `Err(SYNC_IN_PROGRESS_ERR)` without
-/// touching the DB or emitting any status event. This is the load-bearing
-/// invariant that lets `sync_reset_local_state` safely flip rows back to
-/// `pending` without racing an in-flight engine that would re-stamp them
-/// to `synced` mid-reset.
+/// touching the DB or emitting any status event. The manual `sync_now`
+/// command instead queues for the guard and hands it to
+/// `run_sync_now_holding`, which holds it for the whole cycle. This is the
+/// load-bearing invariant that lets `sync_reset_local_state` safely flip rows
+/// back to `pending` without racing an in-flight engine that would re-stamp
+/// them to `synced` mid-reset.
 /// Re-upload ONLY `devices/<id>.json` for the current device with a fresh
 /// `last_seen_at`, so peer devices see this device as recently active.
 ///
@@ -955,16 +980,27 @@ pub(crate) fn run_sync_now(
     trigger: SyncTrigger,
 ) -> Result<SyncSummary, String> {
     // Acquire the single-flight slot. If another sync is already running,
-    // bail with the stable marker before touching anything else. The guard
-    // is held for the entire body — Drop releases it on every return path,
-    // including panics and early `?`-propagation.
-    let _guard =
+    // bail with the stable marker before touching anything else.
+    let guard =
         SyncInProgressGuard::try_acquire().ok_or_else(|| SYNC_IN_PROGRESS_ERR.to_string())?;
+    run_sync_now_holding(guard, app, state, key_state, trigger)
+}
 
+/// Body of [`run_sync_now`], run by a caller that already holds the
+/// single-flight guard. The guard is held for the entire body — Drop releases
+/// it on every return path, including panics and early `?`-propagation.
+fn run_sync_now_holding(
+    _guard: SyncInProgressGuard,
+    app: &AppHandle,
+    state: &AppState,
+    key_state: &EncryptionKeyState,
+    trigger: SyncTrigger,
+) -> Result<SyncSummary, String> {
     // Guard: refuse to push if a rotation job is active or force-re-pair is
-    // required. The SyncInProgressGuard above handles the in-flight case; this
-    // catches the persistent case where the guard was dropped (e.g. retry-abort
-    // in reencrypt_items) but the rotation_jobs row is still active.
+    // required. The SyncInProgressGuard passed in by the caller handles the
+    // in-flight case; this catches the persistent case where the guard was
+    // dropped (e.g. retry-abort in reencrypt_items) but the rotation_jobs row
+    // is still active.
     ensure_safe_to_push(state)?;
     ensure_remote_recovery_push_allowed(state, None)?;
 
@@ -3602,6 +3638,26 @@ mod tests {
         assert!(
             start.elapsed().is_zero(),
             "zero timeout must return without sleeping"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn manual_sync_guard_returns_sync_in_progress_after_timeout() {
+        let _lock = crate::commands::sync::SYNC_GUARD_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
+        let _holder = SyncInProgressGuard::try_acquire().expect("guard must be free");
+        let start = tokio::time::Instant::now();
+        let result = acquire_manual_sync_guard(std::time::Duration::from_millis(300)).await;
+        assert_eq!(
+            result.err().as_deref(),
+            Some(SYNC_IN_PROGRESS_ERR),
+            "a guard busy for the whole wait must map to the stable marker"
+        );
+        assert!(
+            start.elapsed() >= std::time::Duration::from_millis(300),
+            "must wait out the timeout before giving up"
         );
     }
 

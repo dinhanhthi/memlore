@@ -134,6 +134,7 @@
     "view_error_details": "Xem chi tiết lỗi đồng bộ trong Cài đặt",
     "timeout": "Đồng bộ hết thời gian",
     "network_error": "Không kết nối được với cloud",
+    "busy": "Một tác vụ đồng bộ khác vẫn đang chạy. Thử lại sau giây lát.",
     "retry_in": "Thử lại sau {{count}} phút",
     "retry_soon": "Sắp thử lại",
     "last_summary": "Đã đẩy {{pushed}} · Đã kéo {{pulled}} · Đã gộp {{merged}}",

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { useSync } from '../../hooks/useSync'
-import { useSyncStore } from '../../stores/syncStore'
+import { SYNC_BUSY_KEY, useSyncStore } from '../../stores/syncStore'
 import { useCapabilitiesStore } from '../../stores/capabilitiesStore'
 import { useUpdateActiveTab } from '../../hooks/useActiveTab'
 import { useForceRePairStore } from '../../hooks/useForceRePair'
@@ -198,7 +198,13 @@ export function SyncStatus({
     heldCount > 0
       ? t(outboxV2 ? 'sync.held_order' : 'sync.held_update', { count: heldCount })
       : null
-  const hasError = displayPhase === 'error' || !!resolvedError
+  // "Still busy after queueing" is informational: it must not paint the row red,
+  // even over an 'error' phase left from before the click (the click cleared
+  // that error's text; any error arriving later replaces the busy key).
+  const isBusyNote = lastErrorKey === SYNC_BUSY_KEY
+  const hasError = !isBusyNote && (displayPhase === 'error' || !!resolvedError)
+  const busyNote =
+    isBusyNote && !hasError && !isSyncing && !recoveryBlocksSync ? resolvedError : null
   // Notices outrank the resting pending/synced label, never an error,
   // a running sync or recovery.
   const showNotices =
@@ -249,7 +255,7 @@ export function SyncStatus({
     displayPhase !== 'syncing' &&
     !hasError &&
     !showNotices
-  const pillTooltip = showHeldNote ? heldNote : summaryTooltip
+  const pillTooltip = busyNote ?? (showHeldNote ? heldNote : summaryTooltip)
 
   // Don't show the error (red) tone while a sync is actively in flight — a
   // lingering `lastError` from a prior attempt must not paint a healthy
@@ -417,6 +423,7 @@ export function SyncStatus({
             </ShimmerText>
           )}
           {showHeldNote && <span className="text-fg-muted mt-0.5 text-sm">{heldNote}</span>}
+          {busyNote && <span className="text-fg-muted mt-0.5 text-sm">{busyNote}</span>}
           {hasError && !isSyncing && !recoveryBlocksSync && (
             <span className="text-fg-muted mt-0.5 text-sm">
               {forceRePairMessage ?? resolvedError}
