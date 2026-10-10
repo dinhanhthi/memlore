@@ -13,6 +13,7 @@ export type DiagramName =
   | 'customization'
   | 'maps'
   | 'editor'
+  | 'web-sync'
 
 export type WidgetName =
   | 'privacy-toggle'

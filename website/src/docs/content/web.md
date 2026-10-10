@@ -9,8 +9,6 @@ sources: website/src/legal/privacy.md
 
 Memlore Web ([web.memlore.app](https://web.memlore.app)) is an optional in-browser companion to the Memlore desktop app. It allows you to open and search your existing journal, and to edit it once editing on the web is turned on, from any modern web browser without sending your journal content, passwords, or encryption keys to any application server.
 
----
-
 ## How to sign in
 
 Memlore Web opens an **existing vault** that has already been created on your desktop and synced to Google Drive.
@@ -27,15 +25,23 @@ Memlore Web opens an **existing vault** that has already been created on your de
 
 :::
 
----
-
 ## What works and what is desktop-only
 
 You can read and search your journal on the web today. Writing and editing are rolling out, and most other features stay on the desktop app. See [Web vs desktop](/docs/web-vs-desktop) for the full feature-by-feature table.
 
 For security invariants and technical design, see the [Privacy Policy](/privacy) and [Sync documentation](/docs/sync).
 
----
+## How a web edit reaches your desktop
+
+:::diagram web-sync
+
+:::cards
+
+- **Your text is never lost** — Text written on the web and on the desktop is merged, so both sides stay in the entry.
+- **The desktop decides the rest** — For the title, mood, journal, date, favorite, and tags, your edit applies only if the desktop has not changed that field since the web last saw the entry. Otherwise the web tells you which edit was replaced.
+- **The draft stays until it is safe** — The browser keeps your draft until the desktop's copy shows the edit. The outbox file on Drive is never deleted; your next edit of that entry overwrites it.
+
+:::
 
 ## Safety and the outbox model
 
@@ -45,8 +51,6 @@ Your desktop vault is always the primary authority. To guarantee that a browser 
 - **Desktop imports and verifies all edits.** When your desktop app syncs, it reads the outbox, merges text changes using CRDTs (so concurrent typing is preserved), and saves the result to your local encrypted database.
 - **Deletes go to the desktop Trash.** Deleting on the web moves the entry to the Trash on your desktop, where you can restore it for 30 days. The browser only hides the entry until your desktop applies the move; nothing is erased. Anyone with your unlocked web session can queue a delete, so lock or sign out on a shared computer.
 - **Instant revocation.** You can cut off web access at any time from your desktop app: open Settings → Security → Security actions → Connected devices and remove the web companion. At its next sync the web tab drops its cached entries and locks; its unsent edits stay sealed in the browser until you re-connect or clear the site data.
-
----
 
 ## Caching and privacy on shared computers
 

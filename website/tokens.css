@@ -38,6 +38,21 @@
   --color-kind-second-lock: oklch(0.8 0.12 300);
   --color-kind-vault: oklch(0.82 0.12 165);
   --color-kind-other-vault: oklch(0.8 0.12 350);
+  /* Pale lanes of the web-sync diagram: browser, Google Drive, desktop. */
+  --color-lane-browser: color-mix(in oklab, var(--color-kind-ordinary) 18%, var(--color-panel));
+  --color-lane-browser-edge: color-mix(
+    in oklab,
+    var(--color-kind-ordinary) 45%,
+    var(--color-panel)
+  );
+  --color-lane-drive: color-mix(in oklab, var(--color-kind-vault) 18%, var(--color-panel));
+  --color-lane-drive-edge: color-mix(in oklab, var(--color-kind-vault) 45%, var(--color-panel));
+  --color-lane-desktop: color-mix(in oklab, var(--color-kind-second-lock) 18%, var(--color-panel));
+  --color-lane-desktop-edge: color-mix(
+    in oklab,
+    var(--color-kind-second-lock) 45%,
+    var(--color-panel)
+  );
   --color-compare-surface: var(--color-paper);
   --color-compare-head: var(--color-panel);
   --color-compare-stripe: color-mix(in oklch, var(--color-ink) 5%, var(--color-paper));

@@ -2847,6 +2847,10 @@ tbody th {
   max-width: 35rem;
   margin-inline: auto;
 }
+/* A dense drawing that reads better at the full column width. */
+.legal-article figure svg.docs-diagram-wide.docs-diagram-full {
+  max-width: none;
+}
 /* Below the cap the wide drawing would shrink past ~12px type; swap it. */
 .legal-article figure svg.docs-diagram-narrow {
   display: none;

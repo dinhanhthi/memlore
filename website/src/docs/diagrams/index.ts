@@ -12,6 +12,7 @@ import { personaDiagram } from './persona'
 import { privacyDiagram } from './privacy'
 import { searchDiagram } from './search'
 import { syncDiagram } from './sync'
+import { webSyncDiagram } from './webSync'
 
 export const DIAGRAMS: Record<DiagramName, string> = {
   overview: overviewDiagram,
@@ -27,4 +28,5 @@ export const DIAGRAMS: Record<DiagramName, string> = {
   customization: customizationDiagram,
   maps: mapsDiagram,
   editor: editorDiagram,
+  'web-sync': webSyncDiagram,
 }
