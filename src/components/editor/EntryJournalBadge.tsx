@@ -13,6 +13,7 @@ import {
   useListNavigation,
   useRole,
 } from '@floating-ui/react'
+import { Button } from '../common/Button'
 import { Tooltip } from '../common/Tooltip'
 import { moveEntryToJournal } from '../../lib/tauri'
 import { emitEntriesChanged } from '../../hooks/useEntries'
@@ -100,9 +101,11 @@ export function EntryJournalBadge({ journal, entryId }: { journal: Journal; entr
         placement="top"
         disabled={open}
       >
-        <button
+        <Button
           ref={refs.setReference}
-          type="button"
+          variant="ghost"
+          size="sm"
+          active={open}
           aria-label={t('pills.journal_switch_aria', {
             name: journal.name,
             defaultValue: 'Change journal ({{name}})',
@@ -110,11 +113,12 @@ export function EntryJournalBadge({ journal, entryId }: { journal: Journal; entr
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? menuId : undefined}
-          className="hover:bg-surface-subtle inline-flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors outline-none"
+          className="shrink-0 rounded-lg"
+          style={{ padding: '0 8px' }}
           {...getReferenceProps()}
         >
           {dot}
-        </button>
+        </Button>
       </Tooltip>
       {open && (
         <FloatingPortal>

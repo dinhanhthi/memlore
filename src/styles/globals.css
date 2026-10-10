@@ -50,6 +50,11 @@
      utility and a :root var usable from inline styles. */
   --font-title: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
 
+  /* Lone emoji glyphs (mood, weather). With the UI font first, the line box
+     takes Geist's metrics and the glyph sits high; naming the emoji font
+     first centres it in its box. Generates the `font-emoji` utility. */
+  --font-emoji: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+
   /* Interface font-size ladder (2xs → base) is multiplied by the runtime
      `--ui-font-scale` (Appearance → Interface size; 1 / 1.05 / 1.1) and
      `--ds-type-scale` (per design system; Clay 1.06). Headings (`text-lg`+)
@@ -1490,8 +1495,9 @@
 
 /* shadcn DialogOverlay: flat scrim, no blur. Modal.tsx already paints
    `bg-black/60`; only the blur is stripped here. `.xj-scrim` also marks the
-   search and slide-over scrims. */
-:root.ds-clean .xj-scrim {
+   search and slide-over scrims. Search keeps its blur (`.xj-scrim-keep-blur`) so the
+   results read apart from the page behind. */
+:root.ds-clean .xj-scrim:not(.xj-scrim-keep-blur) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -1904,7 +1910,7 @@
 
 /* Frosted glass is Signature's vocabulary; Clay's is matte warm paper. Same
    one-liner Clean uses. */
-:root.ds-clay .xj-scrim {
+:root.ds-clay .xj-scrim:not(.xj-scrim-keep-blur) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }

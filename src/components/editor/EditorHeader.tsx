@@ -15,6 +15,8 @@ import { useEditorDistractionEnabled } from '../../hooks/useEditorDistractionEna
 import { useCapabilities } from '../../hooks/useCapabilities'
 import { useEditorEmbedded } from './EditorEmbedContext'
 import { cn } from '../../lib/cn'
+import { formatTime } from '../../lib/dates'
+import { useUiStore } from '../../stores/uiStore'
 import { editorContentColumnClass } from '../../lib/editorLayout'
 import { EntryMetadataSuggestionModal } from './EntryMetadataSuggestionModal'
 import type { EntryMetadataSuggestionPayload } from './EntryMetadataSuggestionModal'
@@ -41,6 +43,7 @@ export function EditorHeader({
   onEntryRefetch,
 }: EditorHeaderProps) {
   const { t, i18n } = useTranslation('editor')
+  const timeFormat = useUiStore((s) => s.timeFormat)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [extractDates, setExtractDates] = useState<number[] | null>(null)
   const [extractError, setExtractError] = useState<string | null>(null)
@@ -112,6 +115,7 @@ export function EditorHeader({
   const day = date.getDate()
   const monthYear = date.toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' })
   const weekday = date.toLocaleDateString(i18n.language, { weekday: 'long' })
+  const timeLabel = formatTime(entry.entry_date, i18n.language, timeFormat === '12h')
 
   async function handleDateChange(timestamp: number) {
     setShowDatePicker(false)
@@ -156,12 +160,15 @@ export function EditorHeader({
         aria-label={t('pills.date_edit_aria', { defaultValue: 'Edit entry date' })}
         aria-haspopup="dialog"
         aria-expanded={showDatePicker}
-        className="hover:bg-surface-subtle inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left whitespace-nowrap transition-colors outline-none"
+        className="hover:bg-surface-subtle inline-flex max-w-full min-w-0 items-center rounded-md px-1.5 py-0.5 text-left whitespace-nowrap transition-colors outline-none"
       >
-        <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
+        <span className="flex max-w-full min-w-0 flex-col gap-0.5">
           <span className="text-fg truncate text-sm leading-none font-medium">{monthYear}</span>
-          <span className="text-fg-muted shrink-0 text-sm leading-none">·</span>
-          <span className="text-fg-muted truncate text-sm leading-none">{weekday}</span>
+          <span className="text-fg-muted flex min-w-0 items-center gap-1.5 text-sm leading-none">
+            <span className="truncate">{weekday}</span>
+            <span className="shrink-0">·</span>
+            <span className="shrink-0 tabular-nums">{timeLabel}</span>
+          </span>
         </span>
       </button>
     </Tooltip>
@@ -179,7 +186,9 @@ export function EditorHeader({
           onClick={onRefetchWeather}
           className="hover:bg-surface-subtle inline-flex size-7 shrink-0 items-center justify-center rounded-md text-base leading-none transition-colors outline-none"
         >
-          <span aria-hidden>{entry.weather_icon}</span>
+          <span className="font-emoji" aria-hidden>
+            {entry.weather_icon}
+          </span>
         </button>
       </Tooltip>
     ) : (
@@ -195,7 +204,9 @@ export function EditorHeader({
           aria-label={entry.weather_summary ?? undefined}
           className="inline-flex size-7 shrink-0 items-center justify-center text-base leading-none"
         >
-          <span aria-hidden>{entry.weather_icon}</span>
+          <span className="font-emoji" aria-hidden>
+            {entry.weather_icon}
+          </span>
         </span>
       </Tooltip>
     )
@@ -206,18 +217,22 @@ export function EditorHeader({
       content={entry.emotion ? t(EMOTION_BY_KEY[entry.emotion].i18nKey) : t('pills.mood_add')}
       placement="bottom"
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-label={t('pills.mood_aria')}
         onClick={onEmotionPickerOpen}
-        className="text-fg-secondary hover:bg-surface-subtle inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors outline-none"
-      >
-        {entry.emotion ? (
-          <span className="text-lg leading-none">{EMOTION_BY_KEY[entry.emotion].emoji}</span>
-        ) : (
-          <Smile className="size-4" aria-hidden />
-        )}
-      </button>
+        className="rounded-lg"
+        icon={
+          entry.emotion ? (
+            <span className="font-emoji text-base leading-none" aria-hidden>
+              {EMOTION_BY_KEY[entry.emotion].emoji}
+            </span>
+          ) : (
+            <Smile className="size-4" aria-hidden />
+          )
+        }
+      />
     </Tooltip>
   )
 
@@ -260,7 +275,7 @@ export function EditorHeader({
       )}
     >
       <div className={editorContentColumnClass(distractionMode, 'flex items-center gap-1.5 px-6')}>
-        <span className="font-title text-fg flex shrink-0 items-center text-2xl leading-none font-bold select-none">
+        <span className="font-title text-fg flex shrink-0 items-center text-[2.2rem] leading-none font-bold select-none">
           {day}
         </span>
         <div className="flex min-w-0 items-center gap-2">
