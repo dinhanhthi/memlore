@@ -1,9 +1,10 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { VaultLockedError } from '../keys'
+import { VaultLockedError, dispose, getAutoLockMinutes } from '../keys'
 import { WEB_SETTING_PREFIX, openWebDb, type WebDb } from '../storage/idb'
 import {
   WEB_SETTING_KEYS,
+  applyStoredAutoLock,
   configureWebSettingsEnv,
   deleteWebSetting,
   getWebSetting,
@@ -51,13 +52,15 @@ beforeEach(async () => {
 
 afterEach(() => {
   configureWebSettingsEnv({})
+  dispose()
 })
 
 describe('isWebSetting', () => {
-  it('names exactly the three persisted map settings', () => {
+  it('names exactly the persisted map and auto-lock settings', () => {
     expect([...WEB_SETTING_KEYS].sort()).toEqual([
       'map_tile_source',
       'maptiler_api_key',
+      'web_auto_lock_minutes',
       'web_map_tiles_consent',
     ])
     expect(isWebSetting('map_tile_source')).toBe(true)
@@ -165,6 +168,55 @@ describe('consent and tile source', () => {
     await db.meta.put({ key: `${WEB_SETTING_PREFIX}web_map_tiles_consent`, value: true })
     expect(await getWebSetting('map_tile_source')).toBeNull()
     expect(await getWebSetting('web_map_tiles_consent')).toBeNull()
+  })
+})
+
+describe('web_auto_lock_minutes', () => {
+  const AUTO = 'web_auto_lock_minutes'
+
+  it('persists across a simulated reload and applies on write', async () => {
+    await setWebSetting(AUTO, '5')
+    expect(getAutoLockMinutes()).toBe(5)
+    db = await openWebDb({ factory })
+    wire()
+    expect(await getWebSetting(AUTO)).toBe('5')
+  })
+
+  it('reads as unset until written', async () => {
+    expect(await getWebSetting(AUTO)).toBeNull()
+  })
+
+  it('refuses values outside 1/5/15/30 (no "never" on the web)', async () => {
+    for (const bad of ['0', '2', '60', 'x', '-5']) {
+      await expect(setWebSetting(AUTO, bad)).rejects.toThrow(TypeError)
+    }
+    expect(await getWebSetting(AUTO)).toBeNull()
+    expect(getAutoLockMinutes()).toBe(15)
+  })
+
+  it('an empty value or a delete drops back to the 15 min default', async () => {
+    await setWebSetting(AUTO, '30')
+    await setWebSetting(AUTO, '')
+    expect(await getWebSetting(AUTO)).toBeNull()
+    expect(getAutoLockMinutes()).toBe(15)
+    await setWebSetting(AUTO, '1')
+    await deleteWebSetting(AUTO)
+    expect(await getWebSetting(AUTO)).toBeNull()
+    expect(getAutoLockMinutes()).toBe(15)
+  })
+
+  it('reads an unexpected stored value as unset', async () => {
+    await db.meta.put({ key: `${WEB_SETTING_PREFIX}${AUTO}`, value: '0' })
+    expect(await getWebSetting(AUTO)).toBeNull()
+  })
+
+  it('applyStoredAutoLock applies the stored value, or the default when none', async () => {
+    await db.meta.put({ key: `${WEB_SETTING_PREFIX}${AUTO}`, value: '30' })
+    await applyStoredAutoLock()
+    expect(getAutoLockMinutes()).toBe(30)
+    await db.meta.delete(`${WEB_SETTING_PREFIX}${AUTO}`)
+    await applyStoredAutoLock()
+    expect(getAutoLockMinutes()).toBe(15)
   })
 })
 

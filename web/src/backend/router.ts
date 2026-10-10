@@ -24,8 +24,9 @@ import webVersion from '../../version.json'
 export type Handler = (args: Record<string, unknown>) => unknown | Promise<unknown>
 
 // TODO(later): see docs/LATER.md - settings persistence (Phase 9+)
-// Session-scoped on purpose: no localStorage, settings will sync through the vault later. The map
-// settings in `webSettings.ts` (consent, tile source, sealed MapTiler key) persist in IndexedDB.
+// Session-scoped on purpose: no localStorage, settings will sync through the vault later. The
+// settings in `webSettings.ts` (map consent, tile source, sealed MapTiler key, auto-lock minutes)
+// persist in IndexedDB.
 const settings = new Map<string, string>()
 
 /** Implemented commands, keyed by command name. Phases 9-16 fill it via `registerHandlers`. */

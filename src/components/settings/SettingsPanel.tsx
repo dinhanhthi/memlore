@@ -18,7 +18,13 @@ import { useCapabilities } from '../../hooks/useCapabilities'
 import { useLayoutFlags } from '../../hooks/useLayoutPreset'
 import { useStartAtLogin } from '../../hooks/useStartAtLogin'
 import { useVersionRetention } from '../../hooks/useVersionRetention'
+import {
+  WEB_AUTO_LOCK_OPTIONS,
+  useWebAutoLock,
+  type WebAutoLockMinutes,
+} from '../../hooks/useWebAutoLock'
 import { cn } from '../../lib/cn'
+import { isWeb } from '../../lib/platform'
 import { scrollIntoViewNearest } from '../../lib/scrollIntoViewNearest'
 import { isSettingsCategoryAvailable } from '../../lib/settingsAvailability'
 import { DEFAULT_SETTINGS_CATEGORY, useTabStore } from '../../stores/tabStore'
@@ -105,6 +111,30 @@ const CATEGORIES: CategoryMeta[] = [
   },
   { id: 'data', icon: <Code2 className="size-(--ui-icon-size)" strokeWidth={1.75} /> },
 ]
+
+/** Web only: idle auto-lock minutes for this browser. */
+function WebAutoLockRow({ className }: { className: string }) {
+  const { t } = useTranslation('settings')
+  const { minutes, setMinutes } = useWebAutoLock()
+  return (
+    <SettingsRow
+      className={className}
+      divider={false}
+      title={t('general.web_auto_lock.title')}
+      hint={t('general.web_auto_lock.hint')}
+    >
+      <SegmentedControl<WebAutoLockMinutes>
+        ariaLabel={t('general.web_auto_lock.title')}
+        value={minutes}
+        onChange={(next) => void setMinutes(next)}
+        options={WEB_AUTO_LOCK_OPTIONS.map((opt) => ({
+          value: opt,
+          label: t('general.web_auto_lock.minutes', { count: Number(opt) }),
+        }))}
+      />
+    </SettingsRow>
+  )
+}
 
 function GeneralDetail() {
   const { t } = useTranslation('settings')
@@ -200,6 +230,8 @@ function GeneralDetail() {
                 }))}
               />
             </SettingsRow>
+
+            {isWeb && <WebAutoLockRow className={rowClass} />}
 
             {caps.updater && (
               <>

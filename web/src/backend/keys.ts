@@ -69,8 +69,8 @@ export function configureKeysEnv(partial: Partial<KeysEnv>): void {
 }
 
 /**
- * Auto-lock minutes from the synced settings. null/NaN/<=0/non-number fall back to the
- * default. Desktop's auto-lock settings (`*_auto_lock_minutes`, options 1/5/15/30 and
+ * Auto-lock minutes from the `web_auto_lock_minutes` web setting (`commands/webSettings.ts`).
+ * null/NaN/<=0/non-number fall back to the default. Desktop's auto-lock settings (`*_auto_lock_minutes`, options 1/5/15/30 and
  * 0 = "never") belong to the second/invisible locks, but if "never" (0) ever arrives
  * here it is NOT honoured: a browser tab is less trusted, so it becomes the 15 min
  * default. Other values are clamped to [1, 24*60].

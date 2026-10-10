@@ -14,6 +14,10 @@
  *    wrapper over core `seal_media`; the plan's `sealMedia` export is test-only) and read back with
  *    `openMedia`. A ciphertext that no longer opens (key rotation, re-onboard) or a malformed
  *    record reads as absent, and the user enters the key again. `''` deletes it.
+ *  - `web_auto_lock_minutes`: idle auto-lock minutes for this browser, `'1'`/`'5'`/`'15'`/`'30'`
+ *    (no "never": a tab is less trusted). `''` deletes it, back to the 15 min default. A write or
+ *    delete applies at once (`keys.setAutoLockMinutes`); `applyStoredAutoLock` re-applies it after
+ *    each unlock. The 5 min hidden-tab lock is not affected.
  *
  * `map_tile_source` reads as unset unless consent `'1'` is also stored, so a stray source (an old
  * write, a partial revoke) never enables MapTiler tiles on its own. A stored ciphertext longer than
@@ -25,19 +29,22 @@
 
 import type { Core } from '../../core/core'
 import { loadCore } from '../../core/core'
-import { getKeyRing, type KeyRing } from '../keys'
+import { getKeyRing, setAutoLockMinutes, type KeyRing } from '../keys'
 import { WEB_SETTING_PREFIX, openWebDb, type WebDb } from '../storage/idb'
 
 export const WEB_SETTING_KEYS = [
   'web_map_tiles_consent',
   'map_tile_source',
   'maptiler_api_key',
+  'web_auto_lock_minutes',
 ] as const
 export type WebSettingKey = (typeof WEB_SETTING_KEYS)[number]
 
 const CONSENT = 'web_map_tiles_consent'
 const SOURCE = 'map_tile_source'
 const API_KEY = 'maptiler_api_key'
+const AUTO_LOCK = 'web_auto_lock_minutes'
+const AUTO_LOCK_VALUES = ['1', '5', '15', '30']
 /** Longest MapTiler key accepted (real keys are a few dozen characters). */
 const MAX_KEY_LENGTH = 1024
 /** Longest stored ciphertext hex opened: the key's hex plus generous envelope overhead. */
@@ -110,6 +117,8 @@ export async function getWebSetting(key: WebSettingKey): Promise<string | null> 
   const value = (await (await getDb()).meta.get(metaKey(key)))?.value
   env().getKeyRing()
   if (key === API_KEY) return openKey(value)
+  if (key === AUTO_LOCK)
+    return typeof value === 'string' && AUTO_LOCK_VALUES.includes(value) ? value : null
   if (key === CONSENT) return value === '1' ? '1' : null
   if (value !== 'maptiler') return null
   // Tiles reveal the viewed area and the IP to MapTiler: no source without stored consent.
@@ -123,6 +132,13 @@ export async function deleteWebSetting(key: WebSettingKey): Promise<void> {
   const db = await getDb()
   if (key === CONSENT) await db.meta.delete(metaKey(SOURCE))
   await db.meta.delete(metaKey(key))
+  if (key === AUTO_LOCK) setAutoLockMinutes(null)
+}
+
+/** Apply the stored auto-lock minutes (or the default) after an unlock. */
+export async function applyStoredAutoLock(): Promise<void> {
+  const stored = await getWebSetting(AUTO_LOCK)
+  setAutoLockMinutes(stored === null ? null : Number(stored))
 }
 
 export async function setWebSetting(key: WebSettingKey, value: string): Promise<void> {
@@ -137,6 +153,14 @@ export async function setWebSetting(key: WebSettingKey, value: string): Promise<
     if (value === '') return deleteWebSetting(SOURCE)
     if (value !== 'maptiler') throw new TypeError(`${SOURCE} on the web must be "maptiler"`)
     await (await getDb()).meta.put({ key: metaKey(SOURCE), value })
+    return
+  }
+  if (key === AUTO_LOCK) {
+    if (value === '') return deleteWebSetting(AUTO_LOCK)
+    if (!AUTO_LOCK_VALUES.includes(value))
+      throw new TypeError(`${AUTO_LOCK} must be 1, 5, 15 or 30`)
+    await (await getDb()).meta.put({ key: metaKey(AUTO_LOCK), value })
+    setAutoLockMinutes(Number(value))
     return
   }
   if (value === '') return deleteWebSetting(API_KEY)

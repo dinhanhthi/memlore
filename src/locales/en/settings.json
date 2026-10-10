@@ -67,6 +67,11 @@
       "blank": "Blank entry",
       "template": "From template"
     },
+    "web_auto_lock": {
+      "title": "Auto-lock",
+      "hint": "Lock this browser tab after this long without activity. A hidden tab still locks after 5 minutes.",
+      "minutes": "{{count}} min"
+    },
     "auto_check_updates": {
       "title": "Automatically check for updates",
       "hint": "When Memlore starts, it contacts GitHub to see whether a newer version exists. Turn this off and Memlore will not contact GitHub by itself — you can still check any time from the Memlore menu."

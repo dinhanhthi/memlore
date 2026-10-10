@@ -242,6 +242,7 @@ import { isUnlocked, lock, setKeyRing, type KeyRing } from '../keys'
 import { openWebDb, type DeviceRecord, type WebDb } from '../storage/idb'
 import type { OnboardDeps } from '../sync/onboard'
 import type { Handler } from '../router'
+import { applyStoredAutoLock } from './webSettings'
 
 // ---------------------------------------------------------------------------------------------
 // Constants and messages
@@ -520,7 +521,17 @@ const unlockOnce: Handler = async ({ password }) => {
   failures = 0
   blockedUntil = 0
   setKeyRing(ring)
+  await applyAutoLock()
   e.emit('app:unlocked')
+}
+
+/** The stored web auto-lock minutes; a failed read keeps the vault unlocked on the default. */
+async function applyAutoLock(): Promise<void> {
+  try {
+    await applyStoredAutoLock()
+  } catch (err) {
+    console.error('[auth] auto-lock setting not applied', err)
+  }
 }
 
 const lockEncryption: Handler = async () => {
@@ -723,6 +734,7 @@ const onboardComplete: Handler = async ({ mnemonic, newLocalPassword, sessionId 
   } finally {
     pending.delete(id)
   }
+  await applyAutoLock()
   e.emit('app:unlocked')
 }
 

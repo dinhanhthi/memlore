@@ -19,9 +19,16 @@ import {
   violations,
 } from '../drive/fakeDrive'
 import { OAuthConnectError, ReauthRequiredError, SIGN_IN_CANCELLED_MESSAGE } from '../drive/oauth'
-import { configureKeysEnv, dispose, isUnlocked } from '../keys'
+import { configureKeysEnv, dispose, getAutoLockMinutes, isUnlocked } from '../keys'
 import { route } from '../router'
-import { WRAPPED_MASTER_HEX_LEN, openWebDb, type DeviceRecord, type WebDb } from '../storage/idb'
+import {
+  WEB_SETTING_PREFIX,
+  WRAPPED_MASTER_HEX_LEN,
+  openWebDb,
+  type DeviceRecord,
+  type WebDb,
+} from '../storage/idb'
+import { configureWebSettingsEnv } from './webSettings'
 import {
   DeviceRecordConflictError,
   FormatUnsupportedError,
@@ -219,6 +226,19 @@ describe('unlock: content keys', () => {
     const cached = await db.files.get(CONTENT)
     expect(new TextDecoder().decode(cached?.ciphertext)).toBe(CONTENT_TEXT)
     expect(events).toEqual(['app:unlocked'])
+  })
+
+  it('applies the stored web auto-lock minutes before emitting app:unlocked', async () => {
+    putContent()
+    configureWebSettingsEnv({ openDb: async () => db })
+    try {
+      await db.meta.put({ key: `${WEB_SETTING_PREFIX}web_auto_lock_minutes`, value: '5' })
+      await unlock()
+      expect(getAutoLockMinutes()).toBe(5)
+      expect(events).toEqual(['app:unlocked'])
+    } finally {
+      configureWebSettingsEnv({})
+    }
   })
 
   it('never caches a Drive content list the ring refuses: the good cached copy survives', async () => {
