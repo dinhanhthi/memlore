@@ -247,6 +247,9 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   // Debounced title save timer — declared here so the entry-load cleanup can
   // flush or clear it.
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const titleSavingRef = useRef(false)
+  /** Our last title save, so an older refetched copy is not adopted over it. */
+  const titleSavedRef = useRef<{ id: string; at: number } | null>(null)
 
   // ── Version history: session-based snapshot (Phase 3) ──────────────────────
   // All four refs are reset whenever the open entryId changes (see the
@@ -785,8 +788,10 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
   const handleTitleSave = useCallback(
     async (newTitle: string) => {
       if (!entry) return
+      titleSavingRef.current = true
       try {
         const updated = await updateEntry(entry.id, newTitle, undefined, undefined)
+        titleSavedRef.current = { id: updated.id, at: updated.updated_at }
         useEntryStore.getState().updateEntry(updated)
         // A save flushed on leave resolves after the panel moved on; don't
         // write the old entry's state into the next one.
@@ -813,6 +818,8 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
           return
         }
         setSaveError(err instanceof Error ? err.message : 'Save failed')
+      } finally {
+        titleSavingRef.current = false
       }
     },
     [entry],
@@ -822,6 +829,25 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
     titleRef.current = title
     savedTitleRef.current = savedTitle
   }, [handleTitleSave, title, savedTitle])
+
+  // A rename from elsewhere (a sync pull, the entry card, the AI title
+  // suggestion) moves `entry.title` but not the title field, which is only
+  // read at load. Adopt it unless the user has an unsaved title of their own.
+  // A refetch that started before our own save can resolve after it; its
+  // older copy must not put the previous title back.
+  const entryTitle = entry?.title ?? ''
+  const loadedEntryId = entry?.id
+  const entryUpdatedAt = entry?.updated_at ?? 0
+  useEffect(() => {
+    if (!loadedEntryId || loadedEntryId !== entryIdRef.current) return
+    if (titleSaveTimer.current || titleSavingRef.current || titleRejectedRef.current) return
+    const saved = titleSavedRef.current
+    if (saved?.id === loadedEntryId && entryUpdatedAt <= saved.at) return
+    if (titleRef.current !== savedTitleRef.current) return
+    if (entryTitle === savedTitleRef.current) return
+    setTitle(entryTitle)
+    setSavedTitle(entryTitle)
+  }, [loadedEntryId, entryTitle, entryUpdatedAt])
 
   // Cmd/Ctrl+S saves the entry now instead of opening the browser's "Save page" dialog (web):
   // flush the pending debounced content and title saves. Autosave keeps running either way.
@@ -870,6 +896,7 @@ export function EditorPanel({ entryId }: EditorPanelProps) {
       setSaveStatus('unsaved')
       if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current)
       titleSaveTimer.current = setTimeout(() => {
+        titleSaveTimer.current = null
         handleTitleSave(newTitle)
       }, AUTO_SAVE_DEBOUNCE_MS)
     },
